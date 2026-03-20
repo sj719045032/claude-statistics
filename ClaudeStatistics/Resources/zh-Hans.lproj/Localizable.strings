@@ -25,6 +25,8 @@
 
 /* Session Detail */
 "detail.back" = "返回";
+"detail.copyPath" = "复制路径";
+"detail.copyId" = "复制会话 ID";
 "detail.new" = "新建";
 "detail.resume" = "恢复";
 "detail.parsing" = "解析中…";
@@ -69,9 +71,11 @@
 "stats.tokens" = "Token";
 "stats.messages" = "消息";
 "stats.costByPeriod %@" = "%@费用趋势";
+"stats.costByPeriod" = "费用趋势";
 "stats.modelBreakdown" = "模型明细";
 "stats.models %lld" = "%lld 个模型";
 "stats.periodDetails %@" = "%@明细";
+"stats.periodDetails" = "明细";
 "stats.periods %lld" = "%lld 个周期";
 "stats.tools" = "工具";
 "stats.back" = "统计";
@@ -95,6 +99,7 @@
 "settings.enableAutoRefresh" = "自动刷新订阅用量";
 "settings.interval" = "间隔";
 "settings.autoRefreshHint" = "用量接口容易限流，建议适当调大刷新间隔";
+"settings.fontSize" = "字体大小";
 "settings.terminal" = "终端";
 "settings.resumeIn" = "恢复终端";
 "settings.notFound %@" = "%@（未找到）";

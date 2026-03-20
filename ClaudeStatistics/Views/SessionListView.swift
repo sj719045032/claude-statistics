@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct SessionListView: View {
     @ObservedObject var viewModel: SessionViewModel
@@ -13,7 +14,7 @@ struct SessionListView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
                     .font(.system(size: 11))
-                TextField(String(localized: "session.search"), text: $viewModel.searchText)
+                TextField("session.search", text: $viewModel.searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12))
                 if !viewModel.searchText.isEmpty {
@@ -41,12 +42,12 @@ struct SessionListView: View {
 
                     Spacer()
 
-                    Button(String(localized: "session.selectAll")) { viewModel.selectAll() }
+                    Button("session.selectAll") { viewModel.selectAll() }
                         .font(.system(size: 10))
                         .buttonStyle(.plain)
                         .foregroundStyle(Color.blue)
 
-                    Button(String(localized: "session.delete")) {
+                    Button("session.delete") {
                         deleteTarget = viewModel.selectedIds
                         showDeleteConfirm = true
                     }
@@ -55,7 +56,7 @@ struct SessionListView: View {
                     .foregroundStyle(.red)
                     .disabled(viewModel.selectedIds.isEmpty)
 
-                    Button(String(localized: "session.cancel")) { viewModel.exitSelecting() }
+                    Button("session.cancel") { viewModel.exitSelecting() }
                         .font(.system(size: 10))
                         .buttonStyle(.plain)
                         .foregroundStyle(.secondary)
@@ -71,14 +72,14 @@ struct SessionListView: View {
                             .font(.system(size: 10))
                     }
                     .buttonStyle(.plain)
-                    .help(String(localized: "session.select.help"))
+                    .help("session.select.help")
 
                     Button(action: { store.forceRescan() }) {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 10))
                     }
                     .buttonStyle(.plain)
-                    .help(String(localized: "session.refresh.help"))
+                    .help("session.refresh.help")
                 }
             }
             .padding(.horizontal, 12)
@@ -125,13 +126,13 @@ struct SessionListView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     HStack(spacing: 12) {
-                        Button(String(localized: "session.cancel")) {
+                        Button("session.cancel") {
                             showDeleteConfirm = false
                             deleteTarget = []
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
-                        Button(String(localized: "session.delete")) {
+                        Button("session.delete") {
                             viewModel.deleteSessions(deleteTarget)
                             showDeleteConfirm = false
                             deleteTarget = []
@@ -188,6 +189,10 @@ struct SessionRow: View {
                             .background(Color.gray.opacity(0.1))
                             .cornerRadius(3)
                     }
+
+                    if isHovered && !isSelecting {
+                        CopyButton(text: session.displayName, help: "detail.copyPath")
+                    }
                 }
 
                 if let topic = quickStats?.topic {
@@ -212,6 +217,10 @@ struct SessionRow: View {
                         Text(formatCost(stats.estimatedCost))
                             .font(.system(size: 9, weight: .medium, design: .monospaced))
                             .foregroundStyle(costColor(stats.estimatedCost))
+
+                        if stats.contextTokens > 0 {
+                            contextBadge(stats)
+                        }
                     } else if let qs = quickStats, qs.messageCount > 0 {
                         Label("\(qs.messageCount)", systemImage: "message")
                             .font(.system(size: 9))
@@ -236,7 +245,7 @@ struct SessionRow: View {
                         .foregroundStyle(.green)
                 }
                 .buttonStyle(.plain)
-                .help(String(localized: "session.new.help"))
+                .help("session.new.help")
 
                 Button(action: onResume) {
                     Image(systemName: "terminal")
@@ -244,7 +253,7 @@ struct SessionRow: View {
                         .foregroundStyle(Color.blue)
                 }
                 .buttonStyle(.plain)
-                .help(String(localized: "session.resume.help"))
+                .help("session.resume.help")
 
                 Button(action: onDelete) {
                     Image(systemName: "trash")
@@ -252,7 +261,7 @@ struct SessionRow: View {
                         .foregroundStyle(.red)
                 }
                 .buttonStyle(.plain)
-                .help(String(localized: "session.delete.help"))
+                .help("session.delete.help")
             }
 
             if !isSelecting {
@@ -274,6 +283,18 @@ struct SessionRow: View {
         .onHover { isHovered = $0 }
     }
 
+    private func contextBadge(_ stats: SessionStats) -> some View {
+        let pct = stats.contextUsagePercent
+        let color: Color = pct >= 80 ? .red : pct >= 50 ? .orange : .green
+        return Text(String(format: "%.0f%%", pct))
+            .font(.system(size: 9, weight: .medium, design: .monospaced))
+            .foregroundStyle(color)
+            .padding(.horizontal, 3)
+            .padding(.vertical, 1)
+            .background(color.opacity(0.1))
+            .cornerRadius(3)
+    }
+
     private func shortModel(_ id: String) -> String {
         id.replacingOccurrences(of: "claude-", with: "")
             .replacingOccurrences(of: "-2025", with: "")
@@ -290,5 +311,23 @@ struct SessionRow: View {
         if cost > 1.0 { return .red }
         if cost > 0.1 { return .orange }
         return .green
+    }
+}
+
+struct CopyButton: View {
+    let text: String
+    let help: LocalizedStringKey
+
+    var body: some View {
+        Button(action: {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+        }) {
+            Image(systemName: "doc.on.doc")
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+        }
+        .buttonStyle(.plain)
+        .help(help)
     }
 }

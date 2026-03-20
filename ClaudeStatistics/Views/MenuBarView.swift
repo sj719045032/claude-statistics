@@ -8,12 +8,12 @@ enum AppTab: String, CaseIterable, Identifiable, Codable {
 
     var id: String { rawValue }
 
-    var localizedName: String {
+    var localizedName: LocalizedStringKey {
         switch self {
-        case .sessions: return String(localized: "tab.sessions")
-        case .stats: return String(localized: "tab.stats")
-        case .usage: return String(localized: "tab.usage")
-        case .settings: return String(localized: "tab.settings")
+        case .sessions: return "tab.sessions"
+        case .stats: return "tab.stats"
+        case .usage: return "tab.usage"
+        case .settings: return "tab.settings"
         }
     }
 
@@ -52,6 +52,7 @@ struct MenuBarView: View {
     @ObservedObject var updaterService: UpdaterService
     @State private var selectedTab: AppTab = AppTab.loadOrder().first ?? .sessions
     @State private var tabOrder: [AppTab] = AppTab.loadOrder()
+    @AppStorage("fontScale") private var fontScale = 1.0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -70,28 +71,31 @@ struct MenuBarView: View {
                 .padding(.top, 4)
 
             // Content
-            Group {
-                switch selectedTab {
-                case .sessions:
-                    sessionContent
-                case .stats:
-                    StatisticsView(viewModel: statisticsViewModel, store: store)
-                case .usage:
-                    ScrollView {
-                        UsageView(viewModel: usageViewModel)
-                            .padding(12)
+            GeometryReader { geo in
+                Group {
+                    switch selectedTab {
+                    case .sessions:
+                        sessionContent
+                    case .stats:
+                        StatisticsView(viewModel: statisticsViewModel, store: store)
+                    case .usage:
+                        ScrollView {
+                            UsageView(viewModel: usageViewModel)
+                                .padding(12)
+                        }
+                    case .settings:
+                        SettingsView(usageViewModel: usageViewModel, tabOrder: $tabOrder, updaterService: updaterService)
                     }
-                case .settings:
-                    SettingsView(usageViewModel: usageViewModel, tabOrder: $tabOrder, updaterService: updaterService)
                 }
+                .frame(width: geo.size.width / fontScale, height: geo.size.height / fontScale, alignment: .topLeading)
+                .scaleEffect(fontScale, anchor: .topLeading)
             }
-            .frame(maxHeight: .infinity)
 
             Divider()
 
             // Footer
             HStack {
-                Button(String(localized: "app.quit")) {
+                Button("app.quit") {
                     NSApplication.shared.terminate(nil)
                 }
                 .buttonStyle(.plain)
@@ -100,7 +104,7 @@ struct MenuBarView: View {
 
                 Spacer()
 
-                Text(String(localized: "app.name"))
+                Text("app.name")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
@@ -143,7 +147,7 @@ struct MenuBarView: View {
 }
 
 struct TabButton: View {
-    let title: String
+    let title: LocalizedStringKey
     let icon: String
     let isSelected: Bool
     let action: () -> Void

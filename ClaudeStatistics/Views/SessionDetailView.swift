@@ -63,9 +63,19 @@ struct SessionDetailView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     // Title
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(session.displayName)
-                            .font(.system(size: 14, weight: .semibold))
-                            .lineLimit(1)
+                        HStack(spacing: 4) {
+                            Text(session.displayName)
+                                .font(.system(size: 14, weight: .semibold))
+                                .lineLimit(1)
+                            CopyButton(text: session.displayName, help: "detail.copyPath")
+                        }
+                        HStack(spacing: 4) {
+                            Text(session.id)
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(1)
+                            CopyButton(text: session.id, help: "detail.copyId")
+                        }
                         if let topic, !topic.isEmpty {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(topic)
@@ -77,9 +87,15 @@ struct SessionDetailView: View {
                                 // Show expand/collapse only when text is long enough
                                 if topic.count > 80 {
                                     Button(action: { isTopicExpanded.toggle() }) {
-                                        Text(isTopicExpanded ? String(localized: "detail.collapse") : String(localized: "detail.more"))
-                                            .font(.system(size: 10))
-                                            .foregroundStyle(.blue)
+                                        if isTopicExpanded {
+                                            Text("detail.collapse")
+                                                .font(.system(size: 10))
+                                                .foregroundStyle(.blue)
+                                        } else {
+                                            Text("detail.more")
+                                                .font(.system(size: 10))
+                                                .foregroundStyle(.blue)
+                                        }
                                     }
                                     .buttonStyle(.plain)
                                 }
@@ -103,6 +119,7 @@ struct SessionDetailView: View {
                     }
                 }
                 .padding(12)
+                .textSelection(.enabled)
             }
         }
         .overlay(alignment: .bottom) {
@@ -115,12 +132,12 @@ struct SessionDetailView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     HStack(spacing: 12) {
-                        Button(String(localized: "session.cancel")) {
+                        Button("session.cancel") {
                             showDeleteConfirm = false
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
-                        Button(String(localized: "session.delete")) {
+                        Button("session.delete") {
                             showDeleteConfirm = false
                             onDelete?()
                         }
@@ -144,13 +161,13 @@ struct SessionDetailView: View {
         // Overview row
         SectionCard {
             HStack(spacing: 16) {
-                InfoCell(title: String(localized: "detail.model"), value: displayModel(stats.model), icon: "cpu")
+                InfoCell(title: "detail.model", value: displayModel(stats.model), icon: "cpu")
                 Divider().frame(height: 28)
                 if let duration = stats.duration {
-                    InfoCell(title: String(localized: "detail.duration"), value: TimeFormatter.duration(duration), icon: "clock")
+                    InfoCell(title: "detail.duration", value: TimeFormatter.duration(duration), icon: "clock")
                     Divider().frame(height: 28)
                 }
-                InfoCell(title: String(localized: "detail.size"), value: TimeFormatter.fileSize(session.fileSize), icon: "doc")
+                InfoCell(title: "detail.size", value: TimeFormatter.fileSize(session.fileSize), icon: "doc")
             }
         }
 
@@ -159,7 +176,7 @@ struct SessionDetailView: View {
             SectionCard {
                 VStack(spacing: 6) {
                     HStack {
-                        Label(String(localized: "detail.contextWindow"), systemImage: "rectangle.stack")
+                        Label("detail.contextWindow", systemImage: "rectangle.stack")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.secondary)
                         Spacer()
@@ -180,16 +197,16 @@ struct SessionDetailView: View {
             SectionCard {
                 VStack(spacing: 8) {
                     HStack(spacing: 16) {
-                        InfoCell(title: String(localized: "detail.started"), value: TimeFormatter.absoluteDate(start), icon: "calendar")
+                        InfoCell(title: "detail.started", value: TimeFormatter.absoluteDate(start), icon: "calendar")
                         if let end = stats.endTime {
                             Divider().frame(height: 28)
-                            InfoCell(title: String(localized: "detail.lastActive"), value: TimeFormatter.absoluteDate(end), icon: "clock.arrow.circlepath")
+                            InfoCell(title: "detail.lastActive", value: TimeFormatter.absoluteDate(end), icon: "clock.arrow.circlepath")
                         }
                     }
                     if let prompt = stats.lastPrompt, !prompt.isEmpty {
                         Divider()
                         VStack(alignment: .leading, spacing: 4) {
-                            Label(String(localized: "detail.lastPrompt"), systemImage: "text.bubble")
+                            Label("detail.lastPrompt", systemImage: "text.bubble")
                                 .font(.system(size: 10))
                                 .foregroundStyle(.tertiary)
                             Text(prompt)
@@ -199,9 +216,15 @@ struct SessionDetailView: View {
                                 .textSelection(.enabled)
                             if prompt.count > 80 {
                                 Button(action: { isPromptExpanded.toggle() }) {
-                                    Text(isPromptExpanded ? String(localized: "detail.collapse") : String(localized: "detail.more"))
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.blue)
+                                    if isPromptExpanded {
+                                        Text("detail.collapse")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(.blue)
+                                    } else {
+                                        Text("detail.more")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(.blue)
+                                    }
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -219,7 +242,7 @@ struct SessionDetailView: View {
         SectionCard {
             VStack(spacing: 6) {
                 HStack {
-                    Label(String(localized: "detail.tokens"), systemImage: "number")
+                    Label("detail.tokens", systemImage: "number")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -236,19 +259,19 @@ struct SessionDetailView: View {
 
                 // Legend
                 HStack(spacing: 12) {
-                    TokenLegend(color: .blue, label: String(localized: "token.input"), value: TimeFormatter.tokenCount(stats.totalInputTokens))
-                    TokenLegend(color: .green, label: String(localized: "token.output"), value: TimeFormatter.tokenCount(stats.totalOutputTokens))
+                    TokenLegend(color: .blue, label: "token.input", value: TimeFormatter.tokenCount(stats.totalInputTokens))
+                    TokenLegend(color: .green, label: "token.output", value: TimeFormatter.tokenCount(stats.totalOutputTokens))
                     if stats.cacheCreation5mTokens > 0 {
-                        TokenLegend(color: .yellow, label: String(localized: "token.cache5m"), value: TimeFormatter.tokenCount(stats.cacheCreation5mTokens))
+                        TokenLegend(color: .yellow, label: "token.cache5m", value: TimeFormatter.tokenCount(stats.cacheCreation5mTokens))
                     }
                     if stats.cacheCreation1hTokens > 0 {
-                        TokenLegend(color: .orange, label: String(localized: "token.cache1h"), value: TimeFormatter.tokenCount(stats.cacheCreation1hTokens))
+                        TokenLegend(color: .orange, label: "token.cache1h", value: TimeFormatter.tokenCount(stats.cacheCreation1hTokens))
                     }
                     if stats.cacheCreation5mTokens == 0 && stats.cacheCreation1hTokens == 0 && stats.cacheCreationTotalTokens > 0 {
-                        TokenLegend(color: .orange, label: String(localized: "token.cacheWrite"), value: TimeFormatter.tokenCount(stats.cacheCreationTotalTokens))
+                        TokenLegend(color: .orange, label: "token.cacheWrite", value: TimeFormatter.tokenCount(stats.cacheCreationTotalTokens))
                     }
                     if stats.cacheReadTokens > 0 {
-                        TokenLegend(color: .purple, label: String(localized: "token.cacheRead"), value: TimeFormatter.tokenCount(stats.cacheReadTokens))
+                        TokenLegend(color: .purple, label: "token.cacheRead", value: TimeFormatter.tokenCount(stats.cacheReadTokens))
                     }
                 }
                 .font(.system(size: 10))
@@ -258,11 +281,11 @@ struct SessionDetailView: View {
         // Messages card
         SectionCard {
             HStack(spacing: 16) {
-                InfoCell(title: String(localized: "detail.messages"), value: "\(stats.messageCount)", icon: "message")
+                InfoCell(title: "detail.messages", value: "\(stats.messageCount)", icon: "message")
                 Divider().frame(height: 28)
-                InfoCell(title: String(localized: "detail.user"), value: "\(stats.userMessageCount)", icon: "person")
+                InfoCell(title: "detail.user", value: "\(stats.userMessageCount)", icon: "person")
                 Divider().frame(height: 28)
-                InfoCell(title: String(localized: "detail.assistant"), value: "\(stats.assistantMessageCount)", icon: "brain")
+                InfoCell(title: "detail.assistant", value: "\(stats.assistantMessageCount)", icon: "brain")
             }
         }
 
@@ -272,7 +295,7 @@ struct SessionDetailView: View {
             SectionCard {
                 VStack(spacing: 6) {
                     HStack {
-                        Label(String(localized: "detail.tools"), systemImage: "wrench.and.screwdriver")
+                        Label("detail.tools", systemImage: "wrench.and.screwdriver")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.secondary)
                         Spacer()
@@ -331,7 +354,7 @@ struct SessionDetailView: View {
         return .green
     }
 
-    private func costGridRow(_ label: String, tokens: Int, rate: Double) -> some View {
+    private func costGridRow(_ label: LocalizedStringKey, tokens: Int, rate: Double) -> some View {
         GridRow {
             Text(label)
                 .font(.system(size: 11))
@@ -391,7 +414,7 @@ struct SectionCard<Content: View>: View {
 }
 
 struct InfoCell: View {
-    let title: String
+    let title: LocalizedStringKey
     let value: String
     let icon: String
 
@@ -495,7 +518,7 @@ struct CostModelsCard: View {
             VStack(spacing: 8) {
                 // Header: total cost
                 HStack {
-                    Label(String(localized: "detail.estimatedCost"), systemImage: "dollarsign.circle")
+                    Label("detail.estimatedCost", systemImage: "dollarsign.circle")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -575,19 +598,19 @@ struct CostModelsCard: View {
                             if isExpanded {
                                 let p = ModelPricing.pricing(for: item.model)
                                 Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 3) {
-                                    costDetailRow(String(localized: "token.input"), tokens: item.inputTokens, rate: p.input)
-                                    costDetailRow(String(localized: "token.output"), tokens: item.outputTokens, rate: p.output)
+                                    costDetailRow("token.input", tokens: item.inputTokens, rate: p.input)
+                                    costDetailRow("token.output", tokens: item.outputTokens, rate: p.output)
                                     if item.cacheCreation5mTokens > 0 {
-                                        costDetailRow(String(localized: "token.cache5m"), tokens: item.cacheCreation5mTokens, rate: p.cacheWrite5m)
+                                        costDetailRow("token.cache5m", tokens: item.cacheCreation5mTokens, rate: p.cacheWrite5m)
                                     }
                                     if item.cacheCreation1hTokens > 0 {
-                                        costDetailRow(String(localized: "token.cache1h"), tokens: item.cacheCreation1hTokens, rate: p.cacheWrite1h)
+                                        costDetailRow("token.cache1h", tokens: item.cacheCreation1hTokens, rate: p.cacheWrite1h)
                                     }
                                     if item.cacheCreation5mTokens == 0 && item.cacheCreation1hTokens == 0 && item.cacheCreationTotalTokens > 0 {
-                                        costDetailRow(String(localized: "token.cacheWriteFull"), tokens: item.cacheCreationTotalTokens, rate: p.cacheWrite1h)
+                                        costDetailRow("token.cacheWriteFull", tokens: item.cacheCreationTotalTokens, rate: p.cacheWrite1h)
                                     }
                                     if item.cacheReadTokens > 0 {
-                                        costDetailRow(String(localized: "token.cacheReadFull"), tokens: item.cacheReadTokens, rate: p.cacheRead)
+                                        costDetailRow("token.cacheReadFull", tokens: item.cacheReadTokens, rate: p.cacheRead)
                                     }
                                 }
                                 .padding(.top, 4)
@@ -606,7 +629,7 @@ struct CostModelsCard: View {
     }
 
     @ViewBuilder
-    private func costDetailRow(_ label: String, tokens: Int, rate: Double) -> some View {
+    private func costDetailRow(_ label: LocalizedStringKey, tokens: Int, rate: Double) -> some View {
         GridRow {
             Text(label)
                 .font(.system(size: 11))
@@ -628,7 +651,7 @@ struct CostModelsCard: View {
 
 struct TokenLegend: View {
     let color: Color
-    let label: String
+    let label: LocalizedStringKey
     let value: String
 
     var body: some View {
@@ -636,7 +659,7 @@ struct TokenLegend: View {
             Circle()
                 .fill(color.opacity(0.7))
                 .frame(width: 6, height: 6)
-            Text("\(label): \(value)")
+            (Text(label) + Text(": \(value)"))
                 .foregroundStyle(.secondary)
         }
     }

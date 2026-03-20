@@ -25,6 +25,8 @@
 
 /* Session Detail */
 "detail.back" = "Back";
+"detail.copyPath" = "Copy path";
+"detail.copyId" = "Copy session ID";
 "detail.new" = "New";
 "detail.resume" = "Resume";
 "detail.parsing" = "Parsing...";
@@ -69,9 +71,11 @@
 "stats.tokens" = "Tokens";
 "stats.messages" = "Messages";
 "stats.costByPeriod %@" = "Cost by %@ Period";
+"stats.costByPeriod" = "Cost Trend";
 "stats.modelBreakdown" = "Model Breakdown";
 "stats.models %lld" = "%lld models";
 "stats.periodDetails %@" = "%@ Details";
+"stats.periodDetails" = "Details";
 "stats.periods %lld" = "%lld periods";
 "stats.tools" = "Tools";
 "stats.back" = "Stats";
@@ -95,6 +99,7 @@
 "settings.enableAutoRefresh" = "Auto refresh subscription usage";
 "settings.interval" = "Interval";
 "settings.autoRefreshHint" = "The usage API is rate-limited. A longer interval is recommended to avoid errors.";
+"settings.fontSize" = "Font Size";
 "settings.terminal" = "Terminal";
 "settings.resumeIn" = "Resume in";
 "settings.notFound %@" = "%@ (not found)";

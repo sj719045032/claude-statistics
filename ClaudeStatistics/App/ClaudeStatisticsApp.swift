@@ -27,6 +27,14 @@ struct ClaudeStatisticsApp: App {
     @StateObject private var appState = AppState()
     @AppStorage("appLanguage") private var appLanguage = "auto"
 
+    private var currentLocale: Locale {
+        switch appLanguage {
+        case "en": Locale(identifier: "en")
+        case "zh-Hans": Locale(identifier: "zh-Hans")
+        default: Locale.current
+        }
+    }
+
     init() {
         LanguageManager.setup()
     }
@@ -40,7 +48,7 @@ struct ClaudeStatisticsApp: App {
                 store: appState.store,
                 updaterService: appState.updaterService
             )
-            .environment(\.locale, LanguageManager.currentLocale)
+            .environment(\.locale, currentLocale)
         } label: {
             MenuBarLabel(usageViewModel: appState.usageViewModel)
         }

@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 
 enum StatsPeriod: String, CaseIterable {
     case daily = "Daily"
@@ -6,12 +6,12 @@ enum StatsPeriod: String, CaseIterable {
     case monthly = "Monthly"
     case yearly = "Yearly"
 
-    var localizedName: String {
+    var localizedName: LocalizedStringKey {
         switch self {
-        case .daily: return String(localized: "period.daily")
-        case .weekly: return String(localized: "period.weekly")
-        case .monthly: return String(localized: "period.monthly")
-        case .yearly: return String(localized: "period.yearly")
+        case .daily: return "period.daily"
+        case .weekly: return "period.weekly"
+        case .monthly: return "period.monthly"
+        case .yearly: return "period.yearly"
         }
     }
 

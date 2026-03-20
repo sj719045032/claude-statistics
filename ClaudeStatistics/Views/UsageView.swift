@@ -19,7 +19,7 @@ struct UsageView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .help(String(localized: "usage.viewOnline"))
+                .help("usage.viewOnline")
 
                 if viewModel.isLoading {
                     ProgressView()
@@ -30,7 +30,7 @@ struct UsageView: View {
                             .font(.system(size: 11))
                     }
                     .buttonStyle(.plain)
-                    .help(String(localized: "usage.refresh"))
+                    .help("usage.refresh")
                 }
             }
 
@@ -40,20 +40,20 @@ struct UsageView: View {
                 }
 
                 UsageWindowRow(
-                    title: String(localized: "usage.5hour"),
+                    title: "usage.5hour",
                     utilization: usage.fiveHour?.utilization ?? 0,
                     countdown: viewModel.fiveHourResetCountdown
                 )
 
                 UsageWindowRow(
-                    title: String(localized: "usage.7day"),
+                    title: "usage.7day",
                     utilization: usage.sevenDay?.utilization ?? 0,
                     countdown: viewModel.sevenDayResetCountdown
                 )
 
                 if let opus = usage.sevenDayOpus {
                     UsageWindowRow(
-                        title: String(localized: "usage.7dayOpus"),
+                        title: "usage.7dayOpus",
                         utilization: opus.utilization,
                         countdown: opus.timeUntilReset.map { TimeFormatter.countdown(from: $0) }
                     )
@@ -61,7 +61,7 @@ struct UsageView: View {
 
                 if let sonnet = usage.sevenDaySonnet {
                     UsageWindowRow(
-                        title: String(localized: "usage.7daySonnet"),
+                        title: "usage.7daySonnet",
                         utilization: sonnet.utilization,
                         countdown: sonnet.timeUntilReset.map { TimeFormatter.countdown(from: $0) }
                     )
@@ -96,7 +96,7 @@ struct UsageView: View {
                         .foregroundStyle(.secondary)
 
                     Button(action: { Task { await viewModel.forceRefresh() } }) {
-                        Label(String(localized: "usage.retry"), systemImage: "arrow.clockwise")
+                        Label("usage.retry", systemImage: "arrow.clockwise")
                             .font(.system(size: 12))
                     }
                     .buttonStyle(.bordered)
@@ -112,6 +112,7 @@ struct UsageView: View {
                     .foregroundStyle(.tertiary)
             }
         }
+        .textSelection(.enabled)
     }
 }
 
@@ -136,7 +137,7 @@ extension UsageView {
 }
 
 struct UsageWindowRow: View {
-    let title: String
+    let title: LocalizedStringKey
     let utilization: Double
     let countdown: String?
 

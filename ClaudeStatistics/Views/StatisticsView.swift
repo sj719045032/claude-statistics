@@ -21,6 +21,7 @@ struct StatisticsView: View {
                 statsContent
             }
         }
+        .textSelection(.enabled)
         .onAppear {
             // Store auto-loads; no manual trigger needed
         }
@@ -68,7 +69,7 @@ struct StatisticsView: View {
 
             // Period picker
             HStack {
-                Picker(String(localized: "stats.period"), selection: $store.selectedPeriod) {
+                Picker("stats.period", selection: $store.selectedPeriod) {
                     ForEach(StatsPeriod.allCases, id: \.self) { period in
                         Text(period.localizedName).tag(period)
                     }
@@ -84,7 +85,7 @@ struct StatisticsView: View {
                             .font(.system(size: 10))
                     }
                     .buttonStyle(.plain)
-                    .help(String(localized: "stats.refresh.help"))
+                    .help("stats.refresh.help")
                 }
             }
             .padding(.horizontal, 12)
@@ -114,21 +115,21 @@ struct StatisticsView: View {
     private var allTimeSummary: some View {
         SectionCard {
             HStack(spacing: 12) {
-                summaryItem(String(localized: "stats.totalCost"), value: formatCost(store.allTimeCost), icon: "dollarsign.circle", estimated: store.periodStats.contains { $0.hasEstimatedCost })
+                summaryItem("stats.totalCost", value: formatCost(store.allTimeCost), icon: "dollarsign.circle", estimated: store.periodStats.contains { $0.hasEstimatedCost })
                 Divider().frame(height: 28)
-                summaryItem(String(localized: "stats.sessions"), value: "\(store.allTimeSessions)", icon: "list.bullet")
+                summaryItem("stats.sessions", value: "\(store.allTimeSessions)", icon: "list.bullet")
                 Divider().frame(height: 28)
-                summaryItem(String(localized: "stats.tokens"), value: TimeFormatter.tokenCount(store.allTimeTokens), icon: "number")
+                summaryItem("stats.tokens", value: TimeFormatter.tokenCount(store.allTimeTokens), icon: "number")
                 Divider().frame(height: 28)
-                summaryItem(String(localized: "stats.messages"), value: "\(store.allTimeMessages)", icon: "message")
+                summaryItem("stats.messages", value: "\(store.allTimeMessages)", icon: "message")
             }
         }
     }
 
-    private func summaryItem(_ title: String, value: String, icon: String, estimated: Bool = false) -> some View {
+    private func summaryItem(_ title: LocalizedStringKey, value: String, icon: String, estimated: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Label(title, systemImage: icon)
-                .font(.system(size: 9))
+                .font(.system(size: 12))
                 .foregroundStyle(.tertiary)
             HStack(spacing: 1) {
                 if estimated {
@@ -149,7 +150,11 @@ struct StatisticsView: View {
     private var costChart: some View {
         SectionCard {
             VStack(alignment: .leading, spacing: 8) {
-                Label(String(localized: "stats.costByPeriod \(store.selectedPeriod.localizedName)"), systemImage: "chart.bar.fill")
+                Label {
+                    Text("stats.costByPeriod") + Text(" ") + Text(store.selectedPeriod.localizedName)
+                } icon: {
+                    Image(systemName: "chart.bar.fill")
+                }
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
 
@@ -188,7 +193,7 @@ struct StatisticsView: View {
         SectionCard {
             VStack(spacing: 6) {
                 HStack {
-                    Label(String(localized: "stats.modelBreakdown"), systemImage: "cpu")
+                    Label("stats.modelBreakdown", systemImage: "cpu")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -232,7 +237,11 @@ struct StatisticsView: View {
         SectionCard {
             VStack(spacing: 6) {
                 HStack {
-                    Label(String(localized: "stats.periodDetails \(store.selectedPeriod.localizedName)"), systemImage: "calendar")
+                    Label {
+                        Text("stats.periodDetails") + Text(" ") + Text(store.selectedPeriod.localizedName)
+                    } icon: {
+                        Image(systemName: "calendar")
+                    }
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -266,10 +275,10 @@ struct StatisticsView: View {
                             }
 
                             HStack(spacing: 12) {
-                                miniStat(String(localized: "stats.sessions"), value: "\(stat.sessionCount)")
-                                miniStat(String(localized: "stats.messages"), value: "\(stat.messageCount)")
-                                miniStat(String(localized: "stats.tokens"), value: TimeFormatter.tokenCount(stat.totalTokens))
-                                miniStat(String(localized: "stats.tools"), value: "\(stat.toolUseCount)")
+                                miniStat("stats.sessions", value: "\(stat.sessionCount)")
+                                miniStat("stats.messages", value: "\(stat.messageCount)")
+                                miniStat("stats.tokens", value: TimeFormatter.tokenCount(stat.totalTokens))
+                                miniStat("stats.tools", value: "\(stat.toolUseCount)")
                             }
                         }
                         .padding(.vertical, 4)
@@ -285,7 +294,7 @@ struct StatisticsView: View {
         }
     }
 
-    private func miniStat(_ label: String, value: String) -> some View {
+    private func miniStat(_ label: LocalizedStringKey, value: String) -> some View {
         VStack(spacing: 1) {
             Text(label)
                 .font(.system(size: 8))
@@ -340,7 +349,7 @@ struct PeriodModelBreakdownCard: View {
         SectionCard {
             VStack(spacing: 6) {
                 HStack {
-                    Label(String(localized: "stats.modelBreakdown"), systemImage: "cpu")
+                    Label("stats.modelBreakdown", systemImage: "cpu")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -398,19 +407,19 @@ struct PeriodModelBreakdownCard: View {
 
                             if isExpanded {
                                 Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 3) {
-                                    periodCostRow(String(localized: "token.input"), tokens: usage.inputTokens, rate: p.input)
-                                    periodCostRow(String(localized: "token.output"), tokens: usage.outputTokens, rate: p.output)
+                                    periodCostRow("token.input", tokens: usage.inputTokens, rate: p.input)
+                                    periodCostRow("token.output", tokens: usage.outputTokens, rate: p.output)
                                     if usage.cacheCreation5mTokens > 0 {
-                                        periodCostRow(String(localized: "token.cache5m"), tokens: usage.cacheCreation5mTokens, rate: p.cacheWrite5m)
+                                        periodCostRow("token.cache5m", tokens: usage.cacheCreation5mTokens, rate: p.cacheWrite5m)
                                     }
                                     if usage.cacheCreation1hTokens > 0 {
-                                        periodCostRow(String(localized: "token.cache1h"), tokens: usage.cacheCreation1hTokens, rate: p.cacheWrite1h)
+                                        periodCostRow("token.cache1h", tokens: usage.cacheCreation1hTokens, rate: p.cacheWrite1h)
                                     }
                                     if usage.cacheCreation5mTokens == 0 && usage.cacheCreation1hTokens == 0 && usage.cacheCreationTotalTokens > 0 {
-                                        periodCostRow(String(localized: "token.cacheWriteFull"), tokens: usage.cacheCreationTotalTokens, rate: p.cacheWrite1h)
+                                        periodCostRow("token.cacheWriteFull", tokens: usage.cacheCreationTotalTokens, rate: p.cacheWrite1h)
                                     }
                                     if usage.cacheReadTokens > 0 {
-                                        periodCostRow(String(localized: "token.cacheReadFull"), tokens: usage.cacheReadTokens, rate: p.cacheRead)
+                                        periodCostRow("token.cacheReadFull", tokens: usage.cacheReadTokens, rate: p.cacheRead)
                                     }
                                 }
                                 .padding(.top, 4)
@@ -429,7 +438,7 @@ struct PeriodModelBreakdownCard: View {
     }
 
     @ViewBuilder
-    private func periodCostRow(_ label: String, tokens: Int, rate: Double) -> some View {
+    private func periodCostRow(_ label: LocalizedStringKey, tokens: Int, rate: Double) -> some View {
         GridRow {
             Text(label)
                 .font(.system(size: 11))
@@ -485,11 +494,11 @@ struct PeriodDetailView: View {
                     // Overview
                     SectionCard {
                         HStack(spacing: 12) {
-                            overviewItem(String(localized: "stats.sessions"), value: "\(stat.sessionCount)", icon: "list.bullet")
+                            overviewItem("stats.sessions", value: "\(stat.sessionCount)", icon: "list.bullet")
                             Divider().frame(height: 28)
-                            overviewItem(String(localized: "stats.messages"), value: "\(stat.messageCount)", icon: "message")
+                            overviewItem("stats.messages", value: "\(stat.messageCount)", icon: "message")
                             Divider().frame(height: 28)
-                            overviewItem(String(localized: "stats.tools"), value: "\(stat.toolUseCount)", icon: "wrench")
+                            overviewItem("stats.tools", value: "\(stat.toolUseCount)", icon: "wrench")
                         }
                     }
 
@@ -500,7 +509,7 @@ struct PeriodDetailView: View {
                     SectionCard {
                         VStack(spacing: 6) {
                             HStack {
-                                Label(String(localized: "detail.tokens"), systemImage: "number")
+                                Label("detail.tokens", systemImage: "number")
                                     .font(.system(size: 11, weight: .medium))
                                     .foregroundStyle(.secondary)
                                 Spacer()
@@ -516,13 +525,13 @@ struct PeriodDetailView: View {
                             )
 
                             HStack(spacing: 12) {
-                                TokenLegend(color: .blue, label: String(localized: "token.input"), value: TimeFormatter.tokenCount(stat.totalInputTokens))
-                                TokenLegend(color: .green, label: String(localized: "token.output"), value: TimeFormatter.tokenCount(stat.totalOutputTokens))
+                                TokenLegend(color: .blue, label: "token.input", value: TimeFormatter.tokenCount(stat.totalInputTokens))
+                                TokenLegend(color: .green, label: "token.output", value: TimeFormatter.tokenCount(stat.totalOutputTokens))
                                 if stat.cacheCreationTotalTokens > 0 {
-                                    TokenLegend(color: .orange, label: String(localized: "token.cacheWrite"), value: TimeFormatter.tokenCount(stat.cacheCreationTotalTokens))
+                                    TokenLegend(color: .orange, label: "token.cacheWrite", value: TimeFormatter.tokenCount(stat.cacheCreationTotalTokens))
                                 }
                                 if stat.cacheReadTokens > 0 {
-                                    TokenLegend(color: .purple, label: String(localized: "token.cacheRead"), value: TimeFormatter.tokenCount(stat.cacheReadTokens))
+                                    TokenLegend(color: .purple, label: "token.cacheRead", value: TimeFormatter.tokenCount(stat.cacheReadTokens))
                                 }
                             }
                             .font(.system(size: 10))
@@ -537,7 +546,7 @@ struct PeriodDetailView: View {
 
     // MARK: - Helpers
 
-    private func overviewItem(_ title: String, value: String, icon: String) -> some View {
+    private func overviewItem(_ title: LocalizedStringKey, value: String, icon: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Label(title, systemImage: icon)
                 .font(.system(size: 10))
@@ -548,7 +557,7 @@ struct PeriodDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func costRow(_ label: String, tokens: Int) -> some View {
+    private func costRow(_ label: LocalizedStringKey, tokens: Int) -> some View {
         HStack {
             Text(label)
                 .font(.system(size: 11))

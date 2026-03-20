@@ -8,6 +8,7 @@ struct SettingsView: View {
     @AppStorage("refreshInterval") private var refreshInterval = 300.0
     @AppStorage("preferredTerminal") private var preferredTerminal = "Auto"
     @AppStorage("appLanguage") private var appLanguage = "auto"
+    @AppStorage("fontScale") private var fontScale = 1.0
     @State private var showPricing = false
     @State private var hasToken: Bool?
 
@@ -23,19 +24,24 @@ struct SettingsView: View {
 
     private var settingsContent: some View {
         Form {
-            Section(String(localized: "settings.terminal")) {
-                Picker(String(localized: "settings.resumeIn"), selection: $preferredTerminal) {
+            Section("settings.terminal") {
+                Picker("settings.resumeIn", selection: $preferredTerminal) {
                     ForEach(TerminalApp.allCases) { app in
-                        Text(app != .auto && !app.isInstalled ? String(localized: "settings.notFound \(app.rawValue)") : app.rawValue)
-                            .tag(app.rawValue)
+                        if app != .auto && !app.isInstalled {
+                            Text("settings.notFound \(app.rawValue)")
+                                .tag(app.rawValue)
+                        } else {
+                            Text(app.rawValue)
+                                .tag(app.rawValue)
+                        }
                     }
                 }
                 .pickerStyle(.menu)
                 .font(.system(size: 12))
             }
 
-            Section(String(localized: "settings.autoRefresh")) {
-                Toggle(String(localized: "settings.enableAutoRefresh"), isOn: $autoRefreshEnabled)
+            Section("settings.autoRefresh") {
+                Toggle("settings.enableAutoRefresh", isOn: $autoRefreshEnabled)
                     .onChange(of: autoRefreshEnabled) { _, newValue in
                         if newValue {
                             usageViewModel.autoRefreshInterval = refreshInterval
@@ -46,7 +52,7 @@ struct SettingsView: View {
                     }
 
                 if autoRefreshEnabled {
-                    Picker(String(localized: "settings.interval"), selection: $refreshInterval) {
+                    Picker("settings.interval", selection: $refreshInterval) {
                         Text("5min").tag(300.0)
                         Text("10min").tag(600.0)
                         Text("30min").tag(1800.0)
@@ -63,27 +69,50 @@ struct SettingsView: View {
                     .foregroundStyle(.tertiary)
             }
 
-            Section(String(localized: "settings.language")) {
-                Picker(String(localized: "settings.language"), selection: $appLanguage) {
-                    Text(String(localized: "language.auto")).tag("auto")
-                    Text(String(localized: "language.en")).tag("en")
-                    Text(String(localized: "language.zhHans")).tag("zh-Hans")
+            Section("settings.language") {
+                Picker("settings.language", selection: $appLanguage) {
+                    Text("language.auto").tag("auto")
+                    Text("language.en").tag("en")
+                    Text("language.zhHans").tag("zh-Hans")
                 }
                 .pickerStyle(.menu)
                 .font(.system(size: 12))
                 .onChange(of: appLanguage) { _, newValue in
                     LanguageManager.apply(newValue)
                 }
-
-                Text("language.restartHint")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
             }
 
-            Section(String(localized: "settings.pricing")) {
+            Section("settings.fontSize") {
+                HStack(spacing: 8) {
+                    Image(systemName: "textformat.size.smaller")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    Slider(value: $fontScale, in: 0.85...1.25, step: 0.05)
+                    Image(systemName: "textformat.size.larger")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Text(String(format: "%.0f%%", fontScale * 100))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if fontScale != 1.0 {
+                        Button("settings.resetDefault") {
+                            fontScale = 1.0
+                        }
+                        .font(.system(size: 11))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.blue)
+                    }
+                }
+            }
+
+            Section("settings.pricing") {
                 Button(action: { showPricing = true }) {
                     HStack {
-                        Label(String(localized: "settings.managePricing"), systemImage: "dollarsign.circle")
+                        Label("settings.managePricing", systemImage: "dollarsign.circle")
                         Spacer()
                         Text("settings.models \(ModelPricing.shared.models.count)")
                             .foregroundStyle(.secondary)
@@ -100,14 +129,14 @@ struct SettingsView: View {
                     .foregroundStyle(.tertiary)
             }
 
-            Section(String(localized: "settings.statusLine")) {
+            Section("settings.statusLine") {
                 StatusLineSection()
             }
 
-            Section(String(localized: "settings.tabOrder")) {
+            Section("settings.tabOrder") {
                 TabOrderEditor(tabOrder: $tabOrder)
 
-                Button(String(localized: "settings.resetDefault")) {
+                Button("settings.resetDefault") {
                     tabOrder = AppTab.defaultOrder
                     AppTab.saveOrder(tabOrder)
                 }
@@ -115,7 +144,7 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
             }
 
-            Section(String(localized: "settings.credentials")) {
+            Section("settings.credentials") {
                 HStack {
                     Text("settings.oauthToken")
                     Spacer()
@@ -149,7 +178,7 @@ struct SettingsView: View {
                     .foregroundStyle(.tertiary)
             }
 
-            Section(String(localized: "settings.about")) {
+            Section("settings.about") {
                 HStack {
                     Text("settings.version")
                     Spacer()
@@ -160,7 +189,7 @@ struct SettingsView: View {
 
                 Button(action: { updaterService.checkForUpdates() }) {
                     HStack {
-                        Label(String(localized: "settings.checkForUpdates"), systemImage: "arrow.triangle.2.circlepath")
+                        Label("settings.checkForUpdates", systemImage: "arrow.triangle.2.circlepath")
                         Spacer()
                     }
                     .font(.system(size: 12))
@@ -270,7 +299,7 @@ struct PricingManageView: View {
                 }
 
                 Button(action: fetchRemote) {
-                    Label(String(localized: "pricing.fetchLatest"), systemImage: "arrow.triangle.2.circlepath")
+                    Label("pricing.fetchLatest", systemImage: "arrow.triangle.2.circlepath")
                         .font(.system(size: 11))
                 }
                 .buttonStyle(.bordered)
@@ -374,19 +403,19 @@ struct PricingManageView: View {
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 4) {
-                editField(String(localized: "pricing.input"), text: $editInput)
-                editField(String(localized: "pricing.output"), text: $editOutput)
-                editField(String(localized: "pricing.5mW"), text: $editCache5m)
-                editField(String(localized: "pricing.1hW"), text: $editCache1h)
-                editField(String(localized: "pricing.read"), text: $editCacheRead)
+                editField("pricing.input", text: $editInput)
+                editField("pricing.output", text: $editOutput)
+                editField("pricing.5mW", text: $editCache5m)
+                editField("pricing.1hW", text: $editCache1h)
+                editField("pricing.read", text: $editCacheRead)
             }
 
             HStack {
-                Button(String(localized: "session.cancel")) { editingModel = nil }
+                Button("session.cancel") { editingModel = nil }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button(String(localized: "pricing.save")) { saveEditing(item.id) }
+                Button("pricing.save") { saveEditing(item.id) }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
             }
@@ -396,7 +425,7 @@ struct PricingManageView: View {
         .background(Color.blue.opacity(0.05))
     }
 
-    private func editField(_ label: String, text: Binding<String>) -> some View {
+    private func editField(_ label: LocalizedStringKey, text: Binding<String>) -> some View {
         VStack(spacing: 2) {
             Text(label)
                 .font(.system(size: 9))
@@ -495,7 +524,7 @@ struct StatusLineSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Label(String(localized: "statusLine.title"), systemImage: "terminal")
+                Label("statusLine.title", systemImage: "terminal")
                     .font(.system(size: 12))
                 Spacer()
                 if isInstalled {
@@ -515,17 +544,17 @@ struct StatusLineSection: View {
 
             HStack(spacing: 8) {
                 if isInstalled {
-                    Button(String(localized: "statusLine.update")) { install() }
+                    Button("statusLine.update") { install() }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                 } else {
-                    Button(String(localized: "statusLine.install")) { install() }
+                    Button("statusLine.install") { install() }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
                 }
 
                 if hasBackup {
-                    Button(String(localized: "statusLine.restore")) { restore() }
+                    Button("statusLine.restore") { restore() }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                 }
