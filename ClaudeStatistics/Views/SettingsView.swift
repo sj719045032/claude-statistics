@@ -25,7 +25,21 @@ struct SettingsView: View {
     }
 
     private var settingsContent: some View {
-        Form {
+        VStack(spacing: 0) {
+            // Account card (outside Form)
+            accountCard
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+                .task {
+                    if hasToken == nil {
+                        hasToken = CredentialService.shared.getAccessToken() != nil
+                    }
+                }
+
+            Divider()
+
+            Form {
             Section("settings.terminal") {
                 Picker("settings.resumeIn", selection: $preferredTerminal) {
                     ForEach(TerminalApp.allCases) { app in
@@ -179,40 +193,6 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
             }
 
-            Section("settings.credentials") {
-                HStack {
-                    Text("settings.oauthToken")
-                    Spacer()
-                    if let found = hasToken {
-                        if found {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                            Text("settings.found")
-                                .foregroundStyle(.green)
-                        } else {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.red)
-                            Text("settings.notFoundStatus")
-                                .foregroundStyle(.red)
-                        }
-                    } else {
-                        ProgressView()
-                            .scaleEffect(0.5)
-                    }
-                }
-                .font(.system(size: 12))
-                .task {
-                    if hasToken == nil {
-                        let result = CredentialService.shared.getAccessToken() != nil
-                        hasToken = result
-                    }
-                }
-
-                Text("settings.credentialHint")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-
             Section("settings.about") {
                 HStack {
                     Text("settings.version")
@@ -234,6 +214,106 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        } // VStack
+    }
+
+    // MARK: - Account Card
+
+    private var accountCard: some View {
+        HStack(spacing: 10) {
+            // Avatar
+            ZStack {
+                Circle()
+                    .fill(Color.blue.opacity(0.15))
+                    .frame(width: 36, height: 36)
+                Text(avatarInitial)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.blue)
+            }
+
+            if usageViewModel.profileLoading {
+                ProgressView().scaleEffect(0.5)
+            } else if let profile = usageViewModel.userProfile {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(profile.account?.displayName ?? "–")
+                        .font(.system(size: 13, weight: .medium))
+                    Text(profile.account?.email ?? "")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 3) {
+                    if let org = profile.organization {
+                        HStack(spacing: 4) {
+                            Text(org.orgTypeDisplayName)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(Color.gray.opacity(0.12))
+                                .cornerRadius(4)
+                            Text(org.tierDisplayName)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.blue)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(Color.blue.opacity(0.1))
+                                .cornerRadius(4)
+                        }
+                    }
+                    if let orgName = profile.organization?.name {
+                        Text(orgName)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            } else if hasToken == true {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.system(size: 10))
+                        Text("settings.found")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.green)
+                    }
+                    Text("settings.credentialHint")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+                Spacer()
+            } else if hasToken == false {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.red)
+                            .font(.system(size: 10))
+                        Text("settings.notFoundStatus")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.red)
+                    }
+                    Text("settings.credentialHint")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+                Spacer()
+            } else {
+                ProgressView().scaleEffect(0.5)
+                Spacer()
+            }
+        }
+        .padding(10)
+        .background(Color.gray.opacity(0.06))
+        .cornerRadius(8)
+    }
+
+    private var avatarInitial: String {
+        if let name = usageViewModel.userProfile?.account?.displayName, let first = name.first {
+            return String(first).uppercased()
+        }
+        return "?"
     }
 
     private func applyCustomInterval() {

@@ -4,6 +4,7 @@ final class UsageAPIService {
     static let shared = UsageAPIService()
 
     private let apiURL = "https://api.anthropic.com/api/oauth/usage"
+    private let profileURL = "https://api.anthropic.com/api/oauth/profile"
     private let cacheFileName = "usage-cache.json"
 
     /// Tracks when we can next call the API (set on 429)
@@ -74,6 +75,33 @@ final class UsageAPIService {
         saveToCache(usageData)
 
         return usageData
+    }
+
+    // MARK: - Fetch Profile
+
+    func fetchProfile() async throws -> UserProfile {
+        guard let token = CredentialService.shared.getAccessToken() else {
+            throw UsageError.noCredentials
+        }
+
+        guard let url = URL(string: profileURL) else {
+            throw UsageError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
+        request.timeoutInterval = 15
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw UsageError.invalidResponse
+        }
+
+        return try JSONDecoder().decode(UserProfile.self, from: data)
     }
 
     // MARK: - Cache

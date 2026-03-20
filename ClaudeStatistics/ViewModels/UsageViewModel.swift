@@ -8,6 +8,8 @@ final class UsageViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var lastFetchedAt: Date?
     @Published var autoRefreshInterval: TimeInterval = 300
+    @Published var userProfile: UserProfile?
+    @Published var profileLoading = false
 
     private var refreshTask: Task<Void, Never>?
     private var activeInterval: TimeInterval = 0
@@ -23,6 +25,22 @@ final class UsageViewModel: ObservableObject {
             }
             startAutoRefresh()
         }
+        // Load profile once on startup
+        Task { @MainActor in
+            await self.loadProfile()
+        }
+    }
+
+    func loadProfile() async {
+        guard userProfile == nil, !profileLoading else { return }
+        guard CredentialService.shared.getAccessToken() != nil else { return }
+        profileLoading = true
+        do {
+            userProfile = try await UsageAPIService.shared.fetchProfile()
+        } catch {
+            // Silent fail — settings will show token-only fallback
+        }
+        profileLoading = false
     }
 
     func loadCache() {

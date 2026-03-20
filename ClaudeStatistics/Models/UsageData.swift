@@ -96,6 +96,65 @@ struct HudUsageData: Codable {
     }
 }
 
+// MARK: - User Profile
+
+struct UserProfile: Codable {
+    let account: ProfileAccount?
+    let organization: ProfileOrganization?
+}
+
+struct ProfileAccount: Codable {
+    let fullName: String?
+    let displayName: String?
+    let email: String?
+    let hasClaudeMax: Bool?
+    let hasClaudePro: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case fullName = "full_name"
+        case displayName = "display_name"
+        case email
+        case hasClaudeMax = "has_claude_max"
+        case hasClaudePro = "has_claude_pro"
+    }
+}
+
+struct ProfileOrganization: Codable {
+    let name: String?
+    let organizationType: String?
+    let rateLimitTier: String?
+    let subscriptionStatus: String?
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case organizationType = "organization_type"
+        case rateLimitTier = "rate_limit_tier"
+        case subscriptionStatus = "subscription_status"
+    }
+
+    var orgTypeDisplayName: String {
+        switch organizationType {
+        case "claude_team": return "Team"
+        case "claude_enterprise": return "Enterprise"
+        case "claude_pro": return "Pro"
+        default: return organizationType?.replacingOccurrences(of: "claude_", with: "").capitalized ?? "–"
+        }
+    }
+
+    var tierDisplayName: String {
+        guard let tier = rateLimitTier else { return "–" }
+        if tier.contains("claude_max_5x") { return "Max 5x" }
+        if tier.contains("claude_max") { return "Max" }
+        if tier.contains("claude_pro") { return "Pro" }
+        return tier.replacingOccurrences(of: "default_", with: "")
+            .replacingOccurrences(of: "claude_", with: "")
+            .replacingOccurrences(of: "_", with: " ")
+            .capitalized
+    }
+}
+
+// MARK: - Usage API Response
+
 struct UsageAPIResponse: Codable {
     let fiveHour: UsageWindow?
     let sevenDay: UsageWindow?

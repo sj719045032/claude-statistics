@@ -107,11 +107,17 @@
 "settings.managePricing" = "管理模型定价";
 "settings.models %lld" = "%lld 个模型";
 "settings.pricingSource" = "来源：docs.anthropic.com/en/docs/about-claude/pricing";
+"settings.account" = "账号";
 "settings.credentials" = "凭据";
 "settings.oauthToken" = "OAuth 令牌";
 "settings.found" = "已找到";
 "settings.notFoundStatus" = "未找到";
 "settings.credentialHint" = "从 macOS 钥匙串或 ~/.claude/.credentials.json 读取";
+"settings.email" = "邮箱";
+"settings.displayName" = "名称";
+"settings.plan" = "套餐";
+"settings.organization" = "组织";
+"settings.loading" = "加载中...";
 "settings.tabOrder" = "标签排序";
 "settings.resetDefault" = "恢复默认";
 "settings.statusLine" = "状态行";

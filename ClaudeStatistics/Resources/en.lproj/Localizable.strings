@@ -107,11 +107,17 @@
 "settings.managePricing" = "Manage Model Pricing";
 "settings.models %lld" = "%lld models";
 "settings.pricingSource" = "Source: docs.anthropic.com/en/docs/about-claude/pricing";
+"settings.account" = "Account";
 "settings.credentials" = "Credentials";
 "settings.oauthToken" = "OAuth Token";
 "settings.found" = "Found";
 "settings.notFoundStatus" = "Not found";
 "settings.credentialHint" = "Reads from macOS Keychain or ~/.claude/.credentials.json";
+"settings.email" = "Email";
+"settings.displayName" = "Name";
+"settings.plan" = "Plan";
+"settings.organization" = "Organization";
+"settings.loading" = "Loading...";
 "settings.tabOrder" = "Tab Order";
 "settings.resetDefault" = "Reset to Default";
 "settings.statusLine" = "Status Line";
