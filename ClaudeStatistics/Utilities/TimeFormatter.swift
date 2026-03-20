@@ -54,7 +54,7 @@ enum TimeFormatter {
     static func relativeDate(_ date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
-        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.locale = LanguageManager.currentLocale
         return formatter.localizedString(for: date, relativeTo: Date())
     }
 

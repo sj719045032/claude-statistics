@@ -11,6 +11,7 @@ struct SessionDetailView: View {
 
     @State private var showDeleteConfirm = false
     @State private var isTopicExpanded = false
+    @State private var isPromptExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -20,7 +21,7 @@ struct SessionDetailView: View {
                     HStack(spacing: 3) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 11, weight: .semibold))
-                        Text("Back")
+                        Text("detail.back")
                             .font(.system(size: 12))
                     }
                 }
@@ -38,8 +39,15 @@ struct SessionDetailView: View {
                     .buttonStyle(.plain)
                 }
 
+                Button(action: { TerminalLauncher.openNewSession(session) }) {
+                    Label("detail.new", systemImage: "plus")
+                        .font(.system(size: 11))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
                 Button(action: { TerminalLauncher.openSession(session) }) {
-                    Label("Resume", systemImage: "terminal")
+                    Label("detail.resume", systemImage: "terminal")
                         .font(.system(size: 11))
                 }
                 .buttonStyle(.bordered)
@@ -69,7 +77,7 @@ struct SessionDetailView: View {
                                 // Show expand/collapse only when text is long enough
                                 if topic.count > 80 {
                                     Button(action: { isTopicExpanded.toggle() }) {
-                                        Text(isTopicExpanded ? "Collapse" : "More")
+                                        Text(isTopicExpanded ? String(localized: "detail.collapse") : String(localized: "detail.more"))
                                             .font(.system(size: 10))
                                             .foregroundStyle(.blue)
                                     }
@@ -84,7 +92,7 @@ struct SessionDetailView: View {
                             Spacer()
                             ProgressView()
                                 .scaleEffect(0.7)
-                            Text("Parsing...")
+                            Text("detail.parsing")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
@@ -100,19 +108,19 @@ struct SessionDetailView: View {
         .overlay(alignment: .bottom) {
             if showDeleteConfirm {
                 VStack(spacing: 8) {
-                    Text("Are you sure you want to delete this session?")
+                    Text("detail.deleteConfirm")
                         .font(.system(size: 12))
                         .multilineTextAlignment(.center)
-                    Text("This cannot be undone.")
+                    Text("session.deleteWarning")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     HStack(spacing: 12) {
-                        Button("Cancel") {
+                        Button(String(localized: "session.cancel")) {
                             showDeleteConfirm = false
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
-                        Button("Delete") {
+                        Button(String(localized: "session.delete")) {
                             showDeleteConfirm = false
                             onDelete?()
                         }
@@ -136,76 +144,82 @@ struct SessionDetailView: View {
         // Overview row
         SectionCard {
             HStack(spacing: 16) {
-                InfoCell(title: "Model", value: displayModel(stats.model), icon: "cpu")
+                InfoCell(title: String(localized: "detail.model"), value: displayModel(stats.model), icon: "cpu")
                 Divider().frame(height: 28)
                 if let duration = stats.duration {
-                    InfoCell(title: "Duration", value: TimeFormatter.duration(duration), icon: "clock")
+                    InfoCell(title: String(localized: "detail.duration"), value: TimeFormatter.duration(duration), icon: "clock")
                     Divider().frame(height: 28)
                 }
-                InfoCell(title: "Size", value: TimeFormatter.fileSize(session.fileSize), icon: "doc")
+                InfoCell(title: String(localized: "detail.size"), value: TimeFormatter.fileSize(session.fileSize), icon: "doc")
+            }
+        }
+
+        // Context window usage
+        if stats.contextTokens > 0 {
+            SectionCard {
+                VStack(spacing: 6) {
+                    HStack {
+                        Label(String(localized: "detail.contextWindow"), systemImage: "rectangle.stack")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text("\(TimeFormatter.tokenCount(stats.contextTokens)) / \(TimeFormatter.tokenCount(stats.contextWindowSize))")
+                            .font(.system(size: 11, design: .monospaced))
+                        Text(String(format: "%.0f%%", stats.contextUsagePercent))
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundStyle(contextColor(stats.contextUsagePercent))
+                    }
+
+                    ProgressView(value: stats.contextUsagePercent, total: 100)
+                        .tint(contextColor(stats.contextUsagePercent))
+                }
             }
         }
 
         if let start = stats.startTime {
             SectionCard {
-                HStack(spacing: 16) {
-                    InfoCell(title: "Started", value: TimeFormatter.absoluteDate(start), icon: "calendar")
-                    if let prompt = stats.lastPrompt, !prompt.isEmpty {
-                        Divider().frame(height: 28)
-                        InfoCell(title: "Last Prompt", value: prompt, icon: "text.bubble")
-                    }
-                }
-            }
-        }
-
-        // Cost card
-        SectionCard {
-            VStack(spacing: 8) {
-                HStack {
-                    Label("Estimated Cost", systemImage: "dollarsign.circle")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    HStack(spacing: 2) {
-                        if stats.isCostEstimated {
-                            Text("~")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(.orange)
+                VStack(spacing: 8) {
+                    HStack(spacing: 16) {
+                        InfoCell(title: String(localized: "detail.started"), value: TimeFormatter.absoluteDate(start), icon: "calendar")
+                        if let end = stats.endTime {
+                            Divider().frame(height: 28)
+                            InfoCell(title: String(localized: "detail.lastActive"), value: TimeFormatter.absoluteDate(end), icon: "clock.arrow.circlepath")
                         }
-                        Text(formatCost(stats.estimatedCost))
-                            .font(.system(size: 16, weight: .bold, design: .monospaced))
-                            .foregroundStyle(costColor(stats.estimatedCost))
                     }
-                }
-
-                Divider()
-
-                let pricing = ModelPricing.pricing(for: stats.model)
-                Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 4) {
-                    costGridRow("Input", tokens: stats.totalInputTokens, rate: pricing.input)
-                    costGridRow("Output", tokens: stats.totalOutputTokens, rate: pricing.output)
-                    if stats.cacheCreation5mTokens > 0 {
-                        costGridRow("Cache 5m", tokens: stats.cacheCreation5mTokens, rate: pricing.cacheWrite5m)
-                    }
-                    if stats.cacheCreation1hTokens > 0 {
-                        costGridRow("Cache 1h", tokens: stats.cacheCreation1hTokens, rate: pricing.cacheWrite1h)
-                    }
-                    // Fallback: show total if no 5m/1h breakdown
-                    if stats.cacheCreation5mTokens == 0 && stats.cacheCreation1hTokens == 0 && stats.cacheCreationTotalTokens > 0 {
-                        costGridRow("Cache Write", tokens: stats.cacheCreationTotalTokens, rate: pricing.cacheWrite1h)
-                    }
-                    if stats.cacheReadTokens > 0 {
-                        costGridRow("Cache Read", tokens: stats.cacheReadTokens, rate: pricing.cacheRead)
+                    if let prompt = stats.lastPrompt, !prompt.isEmpty {
+                        Divider()
+                        VStack(alignment: .leading, spacing: 4) {
+                            Label(String(localized: "detail.lastPrompt"), systemImage: "text.bubble")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                            Text(prompt)
+                                .font(.system(size: 12))
+                                .lineLimit(isPromptExpanded ? nil : 2)
+                                .animation(.easeInOut(duration: 0.2), value: isPromptExpanded)
+                                .textSelection(.enabled)
+                            if prompt.count > 80 {
+                                Button(action: { isPromptExpanded.toggle() }) {
+                                    Text(isPromptExpanded ? String(localized: "detail.collapse") : String(localized: "detail.more"))
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.blue)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
         }
+
+        // Cost & Models card (merged)
+        CostModelsCard(stats: stats)
 
         // Tokens card
         SectionCard {
             VStack(spacing: 6) {
                 HStack {
-                    Label("Tokens", systemImage: "number")
+                    Label(String(localized: "detail.tokens"), systemImage: "number")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -222,19 +236,19 @@ struct SessionDetailView: View {
 
                 // Legend
                 HStack(spacing: 12) {
-                    TokenLegend(color: .blue, label: "Input", value: TimeFormatter.tokenCount(stats.totalInputTokens))
-                    TokenLegend(color: .green, label: "Output", value: TimeFormatter.tokenCount(stats.totalOutputTokens))
+                    TokenLegend(color: .blue, label: String(localized: "token.input"), value: TimeFormatter.tokenCount(stats.totalInputTokens))
+                    TokenLegend(color: .green, label: String(localized: "token.output"), value: TimeFormatter.tokenCount(stats.totalOutputTokens))
                     if stats.cacheCreation5mTokens > 0 {
-                        TokenLegend(color: .yellow, label: "Cache 5m", value: TimeFormatter.tokenCount(stats.cacheCreation5mTokens))
+                        TokenLegend(color: .yellow, label: String(localized: "token.cache5m"), value: TimeFormatter.tokenCount(stats.cacheCreation5mTokens))
                     }
                     if stats.cacheCreation1hTokens > 0 {
-                        TokenLegend(color: .orange, label: "Cache 1h", value: TimeFormatter.tokenCount(stats.cacheCreation1hTokens))
+                        TokenLegend(color: .orange, label: String(localized: "token.cache1h"), value: TimeFormatter.tokenCount(stats.cacheCreation1hTokens))
                     }
                     if stats.cacheCreation5mTokens == 0 && stats.cacheCreation1hTokens == 0 && stats.cacheCreationTotalTokens > 0 {
-                        TokenLegend(color: .orange, label: "Cache W", value: TimeFormatter.tokenCount(stats.cacheCreationTotalTokens))
+                        TokenLegend(color: .orange, label: String(localized: "token.cacheWrite"), value: TimeFormatter.tokenCount(stats.cacheCreationTotalTokens))
                     }
                     if stats.cacheReadTokens > 0 {
-                        TokenLegend(color: .purple, label: "Cache R", value: TimeFormatter.tokenCount(stats.cacheReadTokens))
+                        TokenLegend(color: .purple, label: String(localized: "token.cacheRead"), value: TimeFormatter.tokenCount(stats.cacheReadTokens))
                     }
                 }
                 .font(.system(size: 10))
@@ -244,24 +258,25 @@ struct SessionDetailView: View {
         // Messages card
         SectionCard {
             HStack(spacing: 16) {
-                InfoCell(title: "Messages", value: "\(stats.messageCount)", icon: "message")
+                InfoCell(title: String(localized: "detail.messages"), value: "\(stats.messageCount)", icon: "message")
                 Divider().frame(height: 28)
-                InfoCell(title: "User", value: "\(stats.userMessageCount)", icon: "person")
+                InfoCell(title: String(localized: "detail.user"), value: "\(stats.userMessageCount)", icon: "person")
                 Divider().frame(height: 28)
-                InfoCell(title: "Assistant", value: "\(stats.assistantMessageCount)", icon: "brain")
+                InfoCell(title: String(localized: "detail.assistant"), value: "\(stats.assistantMessageCount)", icon: "brain")
             }
         }
+
 
         // Tool usage card
         if !stats.toolUseCounts.isEmpty {
             SectionCard {
                 VStack(spacing: 6) {
                     HStack {
-                        Label("Tools", systemImage: "wrench.and.screwdriver")
+                        Label(String(localized: "detail.tools"), systemImage: "wrench.and.screwdriver")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text("\(stats.toolUseTotal) calls")
+                        Text("detail.calls \(stats.toolUseTotal)")
                             .font(.system(size: 11))
                             .foregroundStyle(.tertiary)
                     }
@@ -307,6 +322,12 @@ struct SessionDetailView: View {
     private func costColor(_ cost: Double) -> Color {
         if cost > 1.0 { return .red }
         if cost > 0.1 { return .orange }
+        return .green
+    }
+
+    private func contextColor(_ percent: Double) -> Color {
+        if percent > 80 { return .red }
+        if percent > 50 { return .orange }
         return .green
     }
 
@@ -424,6 +445,184 @@ struct TokenBar: View {
         .frame(height: 8)
         .background(Color.gray.opacity(0.1))
         .cornerRadius(4)
+    }
+}
+
+// MARK: - Shared helpers (file-level)
+
+private func detailFormatCost(_ cost: Double) -> String {
+    if cost >= 1.0 { return String(format: "$%.2f", cost) }
+    if cost >= 0.01 { return String(format: "$%.3f", cost) }
+    return String(format: "$%.4f", cost)
+}
+
+private func detailCostColor(_ cost: Double) -> Color {
+    if cost > 1.0 { return .red }
+    if cost > 0.1 { return .orange }
+    return .green
+}
+
+private func detailDisplayModel(_ model: String) -> String {
+    model.replacingOccurrences(of: "claude-", with: "")
+        .replacingOccurrences(of: "-20", with: " (20")
+        .appending(model.contains("-20") ? ")" : "")
+}
+
+// MARK: - CostModelsCard
+
+struct CostModelsCard: View {
+    let models: [ModelUsage]
+    let totalCost: Double
+    let isEstimated: Bool
+    @State private var expandedModels: Set<String> = []
+
+    /// Convenience init from SessionStats
+    init(stats: SessionStats) {
+        self.models = stats.asModelUsages
+        self.totalCost = stats.estimatedCost
+        self.isEstimated = stats.isCostEstimated
+    }
+
+    /// Convenience init from PeriodStats
+    init(period: PeriodStats) {
+        self.models = period.modelBreakdown.values.sorted { $0.totalTokens > $1.totalTokens }
+        self.totalCost = period.totalCost
+        self.isEstimated = period.hasEstimatedCost
+    }
+
+    var body: some View {
+        SectionCard {
+            VStack(spacing: 8) {
+                // Header: total cost
+                HStack {
+                    Label(String(localized: "detail.estimatedCost"), systemImage: "dollarsign.circle")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if models.count > 1 {
+                        Text("detail.models \(models.count)")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
+                    HStack(spacing: 2) {
+                        if isEstimated {
+                            Text("~")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(.orange)
+                        }
+                        Text(detailFormatCost(totalCost))
+                            .font(.system(size: 16, weight: .bold, design: .monospaced))
+                            .foregroundStyle(detailCostColor(totalCost))
+                    }
+                }
+
+                Divider()
+
+                let maxTokens = max(1, models.first?.totalTokens ?? 1)
+                VStack(spacing: 0) {
+                    ForEach(Array(models.enumerated()), id: \.element.id) { idx, item in
+                        let isExpanded = expandedModels.contains(item.model)
+
+                        VStack(alignment: .leading, spacing: 0) {
+                            // Model summary row (tappable)
+                            Button(action: {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    if isExpanded { expandedModels.remove(item.model) }
+                                    else { expandedModels.insert(item.model) }
+                                }
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                                        .font(.system(size: 8, weight: .semibold))
+                                        .foregroundStyle(.tertiary)
+                                        .frame(width: 10)
+                                    Text(detailDisplayModel(item.model))
+                                        .font(.system(size: 11, weight: .medium))
+                                        .lineLimit(1)
+                                    Spacer()
+                                    if item.messageCount > 0 {
+                                        Text("detail.msgs \(item.messageCount)")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(.tertiary)
+                                    } else if item.sessionCount > 1 {
+                                        Text("detail.sessions \(item.sessionCount)")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                    Text(TimeFormatter.tokenCount(item.totalTokens))
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                    HStack(spacing: 1) {
+                                        if item.isEstimated {
+                                            Text("~").font(.system(size: 8)).foregroundStyle(.orange)
+                                        }
+                                        Text(detailFormatCost(item.cost))
+                                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                            .foregroundStyle(detailCostColor(item.cost))
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.vertical, 4)
+
+                            // Token bar
+                            ProgressView(value: Double(item.totalTokens), total: Double(maxTokens))
+                                .tint(item.isEstimated ? Color.orange.opacity(0.7) : Color.blue.opacity(0.7))
+                                .padding(.leading, 16)
+
+                            // Expandable cost detail
+                            if isExpanded {
+                                let p = ModelPricing.pricing(for: item.model)
+                                Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 3) {
+                                    costDetailRow(String(localized: "token.input"), tokens: item.inputTokens, rate: p.input)
+                                    costDetailRow(String(localized: "token.output"), tokens: item.outputTokens, rate: p.output)
+                                    if item.cacheCreation5mTokens > 0 {
+                                        costDetailRow(String(localized: "token.cache5m"), tokens: item.cacheCreation5mTokens, rate: p.cacheWrite5m)
+                                    }
+                                    if item.cacheCreation1hTokens > 0 {
+                                        costDetailRow(String(localized: "token.cache1h"), tokens: item.cacheCreation1hTokens, rate: p.cacheWrite1h)
+                                    }
+                                    if item.cacheCreation5mTokens == 0 && item.cacheCreation1hTokens == 0 && item.cacheCreationTotalTokens > 0 {
+                                        costDetailRow(String(localized: "token.cacheWriteFull"), tokens: item.cacheCreationTotalTokens, rate: p.cacheWrite1h)
+                                    }
+                                    if item.cacheReadTokens > 0 {
+                                        costDetailRow(String(localized: "token.cacheReadFull"), tokens: item.cacheReadTokens, rate: p.cacheRead)
+                                    }
+                                }
+                                .padding(.top, 4)
+                                .padding(.leading, 16)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                            }
+                        }
+
+                        if idx < models.count - 1 {
+                            Divider().padding(.vertical, 2)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func costDetailRow(_ label: String, tokens: Int, rate: Double) -> some View {
+        GridRow {
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .gridColumnAlignment(.leading)
+            Text(TimeFormatter.tokenCount(tokens))
+                .font(.system(size: 11, design: .monospaced))
+                .gridColumnAlignment(.trailing)
+            Text("x \(String(format: "$%.2f", rate))/M")
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+                .gridColumnAlignment(.leading)
+            Text(String(format: "$%.4f", Double(tokens) / 1_000_000 * rate))
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .gridColumnAlignment(.trailing)
+        }
     }
 }
 

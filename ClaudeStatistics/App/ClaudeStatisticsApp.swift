@@ -8,9 +8,27 @@ final class AppState: ObservableObject {
     let usageViewModel = UsageViewModel()
 }
 
+struct MenuBarLabel: View {
+    @ObservedObject var usageViewModel: UsageViewModel
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image("MenuBarIcon")
+                .renderingMode(.template)
+            Text(usageViewModel.menuBarText)
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+        }
+    }
+}
+
 @main
 struct ClaudeStatisticsApp: App {
     @StateObject private var appState = AppState()
+    @AppStorage("appLanguage") private var appLanguage = "auto"
+
+    init() {
+        LanguageManager.setup()
+    }
 
     var body: some Scene {
         MenuBarExtra {
@@ -20,13 +38,9 @@ struct ClaudeStatisticsApp: App {
                 statisticsViewModel: appState.statisticsViewModel,
                 store: appState.store
             )
+            .environment(\.locale, LanguageManager.currentLocale)
         } label: {
-            HStack(spacing: 3) {
-                Image("MenuBarIcon")
-                    .renderingMode(.template)
-                Text(appState.usageViewModel.menuBarText)
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-            }
+            MenuBarLabel(usageViewModel: appState.usageViewModel)
         }
         .menuBarExtraStyle(.window)
     }

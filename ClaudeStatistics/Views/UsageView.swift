@@ -5,10 +5,22 @@ struct UsageView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Subscription Usage")
+            HStack(spacing: 8) {
+                Text("usage.title")
                     .font(.headline)
                 Spacer()
+                Button(action: {
+                    if let url = URL(string: "https://claude.ai/settings/usage") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }) {
+                    Image(systemName: "safari")
+                        .font(.system(size: 11))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help(String(localized: "usage.viewOnline"))
+
                 if viewModel.isLoading {
                     ProgressView()
                         .scaleEffect(0.6)
@@ -18,46 +30,30 @@ struct UsageView: View {
                             .font(.system(size: 11))
                     }
                     .buttonStyle(.plain)
-                    .help("Refresh")
-                }
-            }
-
-            if let error = viewModel.errorMessage {
-                HStack(spacing: 4) {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                    Spacer()
-                    Button(action: {
-                        if let url = URL(string: "https://claude.ai/settings/usage") {
-                            NSWorkspace.shared.open(url)
-                        }
-                    }) {
-                        Label("View Online", systemImage: "safari")
-                            .font(.caption)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.blue)
+                    .help(String(localized: "usage.refresh"))
                 }
             }
 
             if let usage = viewModel.usageData {
+                if let error = viewModel.errorMessage {
+                    errorBanner(error)
+                }
+
                 UsageWindowRow(
-                    title: "5 Hour",
+                    title: String(localized: "usage.5hour"),
                     utilization: usage.fiveHour?.utilization ?? 0,
                     countdown: viewModel.fiveHourResetCountdown
                 )
 
                 UsageWindowRow(
-                    title: "7 Day",
+                    title: String(localized: "usage.7day"),
                     utilization: usage.sevenDay?.utilization ?? 0,
-                    countdown: viewModel.sevenDayResetCountdown,
-                    resetDate: usage.sevenDay?.resetsAtDate
+                    countdown: viewModel.sevenDayResetCountdown
                 )
 
                 if let opus = usage.sevenDayOpus {
                     UsageWindowRow(
-                        title: "7D Opus",
+                        title: String(localized: "usage.7dayOpus"),
                         utilization: opus.utilization,
                         countdown: opus.timeUntilReset.map { TimeFormatter.countdown(from: $0) }
                     )
@@ -65,7 +61,7 @@ struct UsageView: View {
 
                 if let sonnet = usage.sevenDaySonnet {
                     UsageWindowRow(
-                        title: "7D Sonnet",
+                        title: String(localized: "usage.7daySonnet"),
                         utilization: sonnet.utilization,
                         countdown: sonnet.timeUntilReset.map { TimeFormatter.countdown(from: $0) }
                     )
@@ -74,7 +70,7 @@ struct UsageView: View {
                 if let extra = usage.extraUsage, extra.isEnabled == true {
                     Divider()
                     HStack {
-                        Text("Extra Usage")
+                        Text("usage.extraUsage")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
@@ -85,16 +81,56 @@ struct UsageView: View {
                     }
                 }
             } else if !viewModel.isLoading {
-                Text("No usage data available")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                // No data — show error or empty state with retry action
+                if let error = viewModel.errorMessage {
+                    errorBanner(error)
+                }
+
+                VStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.icloud")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.tertiary)
+
+                    Text("usage.noData")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Button(action: { Task { await viewModel.forceRefresh() } }) {
+                        Label(String(localized: "usage.retry"), systemImage: "arrow.clockwise")
+                            .font(.system(size: 12))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
             }
 
             if let fetchedAt = viewModel.lastFetchedAt {
-                Text("Updated: \(TimeFormatter.absoluteDate(fetchedAt))")
+                Text("usage.updated \(TimeFormatter.absoluteDate(fetchedAt))")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
+        }
+    }
+}
+
+extension UsageView {
+    func errorBanner(_ error: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.caption2)
+                .foregroundStyle(.orange)
+            Text(error)
+                .font(.caption)
+                .foregroundStyle(.red)
+            Spacer()
+            Button(action: { Task { await viewModel.forceRefresh() } }) {
+                Text("usage.retry")
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.blue)
         }
     }
 }
@@ -103,7 +139,6 @@ struct UsageWindowRow: View {
     let title: String
     let utilization: Double
     let countdown: String?
-    var resetDate: Date? = nil
 
     private var color: Color {
         if utilization >= 80 { return .red }
@@ -123,7 +158,7 @@ struct UsageWindowRow: View {
                     .fontWeight(.medium)
                     .foregroundStyle(color)
                 if let countdown {
-                    Text("resets in \(countdown)")
+                    Text("usage.resetsIn \(countdown)")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -140,18 +175,6 @@ struct UsageWindowRow: View {
             }
             .frame(height: 6)
 
-            if let resetDate {
-                HStack {
-                    let daysLeft = max(0, Int(ceil(resetDate.timeIntervalSinceNow / 86400)))
-                    Text("\(daysLeft) days remaining")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                    Spacer()
-                    Text(TimeFormatter.absoluteDate(resetDate))
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-            }
         }
     }
 }

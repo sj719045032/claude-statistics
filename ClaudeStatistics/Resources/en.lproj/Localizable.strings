@@ -1,0 +1,150 @@
+/* Tabs */
+"tab.sessions" = "Sessions";
+"tab.stats" = "Stats";
+"tab.usage" = "Usage";
+"tab.settings" = "Settings";
+
+/* Footer */
+"app.quit" = "Quit";
+"app.name" = "Claude Statistics";
+
+/* Session List */
+"session.search" = "Search sessions...";
+"session.selected %lld" = "%lld selected";
+"session.selectAll" = "Select All";
+"session.delete" = "Delete";
+"session.cancel" = "Cancel";
+"session.count %lld" = "%lld sessions";
+"session.select.help" = "Select sessions";
+"session.refresh.help" = "Refresh session list";
+"session.deleteConfirm %lld" = "Delete %lld session(s)?";
+"session.deleteWarning" = "This cannot be undone.";
+"session.new.help" = "New session in same directory";
+"session.resume.help" = "Resume session";
+"session.delete.help" = "Delete session";
+
+/* Session Detail */
+"detail.back" = "Back";
+"detail.new" = "New";
+"detail.resume" = "Resume";
+"detail.parsing" = "Parsing...";
+"detail.deleteConfirm" = "Are you sure you want to delete this session?";
+"detail.model" = "Model";
+"detail.duration" = "Duration";
+"detail.size" = "Size";
+"detail.contextWindow" = "Context Window";
+"detail.started" = "Started";
+"detail.lastActive" = "Last Active";
+"detail.lastPrompt" = "Last Prompt";
+"detail.collapse" = "Collapse";
+"detail.more" = "More";
+"detail.tokens" = "Tokens";
+"detail.messages" = "Messages";
+"detail.user" = "User";
+"detail.assistant" = "Assistant";
+"detail.tools" = "Tools";
+"detail.calls %lld" = "%lld calls";
+"detail.estimatedCost" = "Estimated Cost";
+"detail.models %lld" = "%lld models";
+"detail.msgs %lld" = "%lld msgs";
+"detail.sessions %lld" = "%lld sessions";
+
+/* Token Labels */
+"token.input" = "Input";
+"token.output" = "Output";
+"token.cache5m" = "Cache 5m";
+"token.cache1h" = "Cache 1h";
+"token.cacheWrite" = "Cache W";
+"token.cacheRead" = "Cache R";
+"token.cacheWriteFull" = "Cache Write";
+"token.cacheReadFull" = "Cache Read";
+
+/* Statistics */
+"stats.noData" = "No session data";
+"stats.period" = "Period";
+"stats.refresh.help" = "Refresh statistics";
+"stats.allParsed" = "All sessions parsed";
+"stats.totalCost" = "Total Cost";
+"stats.sessions" = "Sessions";
+"stats.tokens" = "Tokens";
+"stats.messages" = "Messages";
+"stats.costByPeriod %@" = "Cost by %@ Period";
+"stats.modelBreakdown" = "Model Breakdown";
+"stats.models %lld" = "%lld models";
+"stats.periodDetails %@" = "%@ Details";
+"stats.periods %lld" = "%lld periods";
+"stats.tools" = "Tools";
+"stats.back" = "Stats";
+
+/* Usage */
+"usage.title" = "Subscription Usage";
+"usage.refresh" = "Refresh";
+"usage.viewOnline" = "View Online";
+"usage.5hour" = "5 Hour";
+"usage.7day" = "7 Day";
+"usage.7dayOpus" = "7 Day Opus";
+"usage.7daySonnet" = "7 Day Sonnet";
+"usage.extraUsage" = "Extra Usage";
+"usage.resetsIn %@" = "resets in %@";
+"usage.noData" = "No usage data available";
+"usage.retry" = "Retry";
+"usage.updated %@" = "Updated: %@";
+
+/* Settings */
+"settings.autoRefresh" = "Subscription Usage Auto Refresh";
+"settings.enableAutoRefresh" = "Auto refresh subscription usage";
+"settings.interval" = "Interval";
+"settings.autoRefreshHint" = "The usage API is rate-limited. A longer interval is recommended to avoid errors.";
+"settings.terminal" = "Terminal";
+"settings.resumeIn" = "Resume in";
+"settings.notFound %@" = "%@ (not found)";
+"settings.pricing" = "Pricing";
+"settings.managePricing" = "Manage Model Pricing";
+"settings.models %lld" = "%lld models";
+"settings.pricingSource" = "Source: docs.anthropic.com/en/docs/about-claude/pricing";
+"settings.credentials" = "Credentials";
+"settings.oauthToken" = "OAuth Token";
+"settings.found" = "Found";
+"settings.notFoundStatus" = "Not found";
+"settings.credentialHint" = "Reads from macOS Keychain or ~/.claude/.credentials.json";
+"settings.tabOrder" = "Tab Order";
+"settings.resetDefault" = "Reset to Default";
+"settings.statusLine" = "Status Line";
+"settings.about" = "About";
+"settings.version" = "Version";
+
+/* Pricing Management */
+"pricing.back" = "Settings";
+"pricing.fetchLatest" = "Fetch Latest";
+"pricing.model" = "Model";
+"pricing.input" = "Input";
+"pricing.output" = "Output";
+"pricing.5mW" = "5m W";
+"pricing.1hW" = "1h W";
+"pricing.read" = "Read";
+"pricing.save" = "Save";
+"pricing.updated %lld" = "Updated %lld models from Anthropic docs";
+
+/* Status Line */
+"statusLine.title" = "Claude Code Status Line";
+"statusLine.integrated" = "Integrated";
+"statusLine.notIntegrated" = "Not integrated";
+"statusLine.description" = "Use app's pricing and usage cache in status line, avoiding duplicate API calls and ensuring consistent cost calculations.";
+"statusLine.install" = "Install";
+"statusLine.update" = "Update";
+"statusLine.restore" = "Restore Original";
+"statusLine.installSuccess" = "Status line installed successfully";
+"statusLine.restoreSuccess" = "Original script restored";
+
+/* Language */
+"settings.language" = "Language";
+"language.auto" = "Auto (System)";
+"language.en" = "English";
+"language.zhHans" = "简体中文";
+"language.restartHint" = "Restart app to apply language change";
+
+/* Period Names */
+"period.daily" = "Daily";
+"period.weekly" = "Weekly";
+"period.monthly" = "Monthly";
+"period.yearly" = "Yearly";

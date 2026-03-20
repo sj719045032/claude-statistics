@@ -1,0 +1,150 @@
+/* Tabs */
+"tab.sessions" = "会话";
+"tab.stats" = "统计";
+"tab.usage" = "用量";
+"tab.settings" = "设置";
+
+/* Footer */
+"app.quit" = "退出";
+"app.name" = "Claude Statistics";
+
+/* Session List */
+"session.search" = "搜索会话…";
+"session.selected %lld" = "已选 %lld 项";
+"session.selectAll" = "全选";
+"session.delete" = "删除";
+"session.cancel" = "取消";
+"session.count %lld" = "%lld 个会话";
+"session.select.help" = "选择会话";
+"session.refresh.help" = "刷新会话列表";
+"session.deleteConfirm %lld" = "删除 %lld 个会话？";
+"session.deleteWarning" = "此操作不可撤销。";
+"session.new.help" = "在相同目录新建会话";
+"session.resume.help" = "恢复会话";
+"session.delete.help" = "删除会话";
+
+/* Session Detail */
+"detail.back" = "返回";
+"detail.new" = "新建";
+"detail.resume" = "恢复";
+"detail.parsing" = "解析中…";
+"detail.deleteConfirm" = "确定要删除这个会话吗？";
+"detail.model" = "模型";
+"detail.duration" = "时长";
+"detail.size" = "大小";
+"detail.contextWindow" = "上下文窗口";
+"detail.started" = "开始时间";
+"detail.lastActive" = "最后活跃";
+"detail.lastPrompt" = "最近提示";
+"detail.collapse" = "收起";
+"detail.more" = "展开";
+"detail.tokens" = "Token";
+"detail.messages" = "消息";
+"detail.user" = "用户";
+"detail.assistant" = "助手";
+"detail.tools" = "工具";
+"detail.calls %lld" = "%lld 次调用";
+"detail.estimatedCost" = "预估费用";
+"detail.models %lld" = "%lld 个模型";
+"detail.msgs %lld" = "%lld 条消息";
+"detail.sessions %lld" = "%lld 个会话";
+
+/* Token Labels */
+"token.input" = "输入";
+"token.output" = "输出";
+"token.cache5m" = "缓存 5m";
+"token.cache1h" = "缓存 1h";
+"token.cacheWrite" = "缓存写入";
+"token.cacheRead" = "缓存读取";
+"token.cacheWriteFull" = "缓存写入";
+"token.cacheReadFull" = "缓存读取";
+
+/* Statistics */
+"stats.noData" = "暂无会话数据";
+"stats.period" = "周期";
+"stats.refresh.help" = "刷新统计";
+"stats.allParsed" = "所有会话已解析";
+"stats.totalCost" = "总费用";
+"stats.sessions" = "会话";
+"stats.tokens" = "Token";
+"stats.messages" = "消息";
+"stats.costByPeriod %@" = "%@费用趋势";
+"stats.modelBreakdown" = "模型明细";
+"stats.models %lld" = "%lld 个模型";
+"stats.periodDetails %@" = "%@明细";
+"stats.periods %lld" = "%lld 个周期";
+"stats.tools" = "工具";
+"stats.back" = "统计";
+
+/* Usage */
+"usage.title" = "订阅用量";
+"usage.refresh" = "刷新";
+"usage.viewOnline" = "在线查看";
+"usage.5hour" = "5 小时";
+"usage.7day" = "7 天";
+"usage.7dayOpus" = "7 天 Opus";
+"usage.7daySonnet" = "7 天 Sonnet";
+"usage.extraUsage" = "额外用量";
+"usage.resetsIn %@" = "%@ 后重置";
+"usage.noData" = "暂无用量数据";
+"usage.retry" = "重试";
+"usage.updated %@" = "更新于: %@";
+
+/* Settings */
+"settings.autoRefresh" = "订阅用量自动刷新";
+"settings.enableAutoRefresh" = "自动刷新订阅用量";
+"settings.interval" = "间隔";
+"settings.autoRefreshHint" = "用量接口容易限流，建议适当调大刷新间隔";
+"settings.terminal" = "终端";
+"settings.resumeIn" = "恢复终端";
+"settings.notFound %@" = "%@（未找到）";
+"settings.pricing" = "定价";
+"settings.managePricing" = "管理模型定价";
+"settings.models %lld" = "%lld 个模型";
+"settings.pricingSource" = "来源：docs.anthropic.com/en/docs/about-claude/pricing";
+"settings.credentials" = "凭据";
+"settings.oauthToken" = "OAuth 令牌";
+"settings.found" = "已找到";
+"settings.notFoundStatus" = "未找到";
+"settings.credentialHint" = "从 macOS 钥匙串或 ~/.claude/.credentials.json 读取";
+"settings.tabOrder" = "标签排序";
+"settings.resetDefault" = "恢复默认";
+"settings.statusLine" = "状态行";
+"settings.about" = "关于";
+"settings.version" = "版本";
+
+/* Pricing Management */
+"pricing.back" = "设置";
+"pricing.fetchLatest" = "获取最新";
+"pricing.model" = "模型";
+"pricing.input" = "输入";
+"pricing.output" = "输出";
+"pricing.5mW" = "5m 写";
+"pricing.1hW" = "1h 写";
+"pricing.read" = "读取";
+"pricing.save" = "保存";
+"pricing.updated %lld" = "已从 Anthropic 文档更新 %lld 个模型";
+
+/* Status Line */
+"statusLine.title" = "Claude Code 状态行";
+"statusLine.integrated" = "已集成";
+"statusLine.notIntegrated" = "未集成";
+"statusLine.description" = "使用 App 的定价和用量缓存显示状态行信息，避免重复 API 调用并确保费用计算一致。";
+"statusLine.install" = "安装";
+"statusLine.update" = "更新";
+"statusLine.restore" = "恢复原始脚本";
+"statusLine.installSuccess" = "状态行安装成功";
+"statusLine.restoreSuccess" = "已恢复原始脚本";
+
+/* Language */
+"settings.language" = "语言";
+"language.auto" = "自动（跟随系统）";
+"language.en" = "English";
+"language.zhHans" = "简体中文";
+"language.restartHint" = "重启应用以应用语言更改";
+
+/* Period Names */
+"period.daily" = "按天";
+"period.weekly" = "按周";
+"period.monthly" = "按月";
+"period.yearly" = "按年";

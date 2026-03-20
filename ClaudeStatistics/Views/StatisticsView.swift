@@ -49,7 +49,7 @@ struct StatisticsView: View {
             Image(systemName: "chart.bar")
                 .font(.system(size: 24))
                 .foregroundStyle(.tertiary)
-            Text("No session data")
+            Text("stats.noData")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -61,11 +61,16 @@ struct StatisticsView: View {
 
     private var statsContent: some View {
         VStack(spacing: 0) {
-            // Header
+            // All-time summary (fixed at top)
+            allTimeSummary
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+
+            // Period picker
             HStack {
-                Picker("Period", selection: $store.selectedPeriod) {
+                Picker(String(localized: "stats.period"), selection: $store.selectedPeriod) {
                     ForEach(StatsPeriod.allCases, id: \.self) { period in
-                        Text(period.rawValue).tag(period)
+                        Text(period.localizedName).tag(period)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -79,7 +84,7 @@ struct StatisticsView: View {
                             .font(.system(size: 10))
                     }
                     .buttonStyle(.plain)
-                    .help("Refresh statistics")
+                    .help(String(localized: "stats.refresh.help"))
                 }
             }
             .padding(.horizontal, 12)
@@ -87,9 +92,6 @@ struct StatisticsView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    // All-time summary
-                    allTimeSummary
-
                     // Bar chart
                     costChart
 
@@ -97,7 +99,7 @@ struct StatisticsView: View {
                     periodList
 
                     if store.isFullParseComplete {
-                        Text("All sessions parsed")
+                        Text("stats.allParsed")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
@@ -112,13 +114,13 @@ struct StatisticsView: View {
     private var allTimeSummary: some View {
         SectionCard {
             HStack(spacing: 12) {
-                summaryItem("Total Cost", value: formatCost(store.allTimeCost), icon: "dollarsign.circle", estimated: store.periodStats.contains { $0.hasEstimatedCost })
+                summaryItem(String(localized: "stats.totalCost"), value: formatCost(store.allTimeCost), icon: "dollarsign.circle", estimated: store.periodStats.contains { $0.hasEstimatedCost })
                 Divider().frame(height: 28)
-                summaryItem("Sessions", value: "\(store.allTimeSessions)", icon: "list.bullet")
+                summaryItem(String(localized: "stats.sessions"), value: "\(store.allTimeSessions)", icon: "list.bullet")
                 Divider().frame(height: 28)
-                summaryItem("Tokens", value: TimeFormatter.tokenCount(store.allTimeTokens), icon: "number")
+                summaryItem(String(localized: "stats.tokens"), value: TimeFormatter.tokenCount(store.allTimeTokens), icon: "number")
                 Divider().frame(height: 28)
-                summaryItem("Messages", value: "\(store.allTimeMessages)", icon: "message")
+                summaryItem(String(localized: "stats.messages"), value: "\(store.allTimeMessages)", icon: "message")
             }
         }
     }
@@ -147,7 +149,7 @@ struct StatisticsView: View {
     private var costChart: some View {
         SectionCard {
             VStack(alignment: .leading, spacing: 8) {
-                Label("Cost by \(store.selectedPeriod.rawValue) Period", systemImage: "chart.bar.fill")
+                Label(String(localized: "stats.costByPeriod \(store.selectedPeriod.localizedName)"), systemImage: "chart.bar.fill")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
 
@@ -186,11 +188,11 @@ struct StatisticsView: View {
         SectionCard {
             VStack(spacing: 6) {
                 HStack {
-                    Label("Model Breakdown", systemImage: "cpu")
+                    Label(String(localized: "stats.modelBreakdown"), systemImage: "cpu")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Text("\(store.visibleModelBreakdown.count) models")
+                    Text("stats.models \(store.visibleModelBreakdown.count)")
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
                 }
@@ -230,11 +232,11 @@ struct StatisticsView: View {
         SectionCard {
             VStack(spacing: 6) {
                 HStack {
-                    Label("\(store.selectedPeriod.rawValue) Details", systemImage: "calendar")
+                    Label(String(localized: "stats.periodDetails \(store.selectedPeriod.localizedName)"), systemImage: "calendar")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Text("\(store.periodStats.count) periods")
+                    Text("stats.periods \(store.periodStats.count)")
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
                 }
@@ -264,10 +266,10 @@ struct StatisticsView: View {
                             }
 
                             HStack(spacing: 12) {
-                                miniStat("Sessions", value: "\(stat.sessionCount)")
-                                miniStat("Messages", value: "\(stat.messageCount)")
-                                miniStat("Tokens", value: TimeFormatter.tokenCount(stat.totalTokens))
-                                miniStat("Tools", value: "\(stat.toolUseCount)")
+                                miniStat(String(localized: "stats.sessions"), value: "\(stat.sessionCount)")
+                                miniStat(String(localized: "stats.messages"), value: "\(stat.messageCount)")
+                                miniStat(String(localized: "stats.tokens"), value: TimeFormatter.tokenCount(stat.totalTokens))
+                                miniStat(String(localized: "stats.tools"), value: "\(stat.toolUseCount)")
                             }
                         }
                         .padding(.vertical, 4)
@@ -325,6 +327,127 @@ struct StatisticsView: View {
     }
 }
 
+// MARK: - PeriodModelBreakdownCard
+
+struct PeriodModelBreakdownCard: View {
+    let modelBreakdown: [String: ModelUsage]
+    let formatCost: (Double) -> String
+    let shortModel: (String) -> String
+
+    @State private var expandedModels: Set<String> = []
+
+    var body: some View {
+        SectionCard {
+            VStack(spacing: 6) {
+                HStack {
+                    Label(String(localized: "stats.modelBreakdown"), systemImage: "cpu")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("stats.models \(modelBreakdown.count)")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+
+                Divider()
+
+                let sorted = modelBreakdown.values.sorted { $0.cost > $1.cost }
+                let maxCost = sorted.first?.cost ?? 1.0
+                VStack(spacing: 0) {
+                    ForEach(Array(sorted.enumerated()), id: \.element.id) { idx, usage in
+                        let isExpanded = expandedModels.contains(usage.model)
+                        let p = ModelPricing.pricing(for: usage.model)
+
+                        VStack(alignment: .leading, spacing: 0) {
+                            Button(action: {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    if isExpanded { expandedModels.remove(usage.model) }
+                                    else { expandedModels.insert(usage.model) }
+                                }
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                                        .font(.system(size: 8, weight: .semibold))
+                                        .foregroundStyle(.tertiary)
+                                        .frame(width: 10)
+                                    Text(shortModel(usage.model))
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .lineLimit(1)
+                                    Spacer()
+                                    Text("detail.sessions \(usage.sessionCount)")
+                                        .font(.system(size: 8))
+                                        .foregroundStyle(.tertiary)
+                                    HStack(spacing: 1) {
+                                        if usage.isEstimated {
+                                            Text("~")
+                                                .font(.system(size: 8, weight: .medium))
+                                                .foregroundStyle(.orange)
+                                        }
+                                        Text(formatCost(usage.cost))
+                                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.vertical, 3)
+
+                            ProgressView(value: usage.cost, total: maxCost)
+                                .tint(usage.isEstimated ? Color.orange.opacity(0.7) : Color.blue.opacity(0.7))
+                                .padding(.leading, 16)
+
+                            if isExpanded {
+                                Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 3) {
+                                    periodCostRow(String(localized: "token.input"), tokens: usage.inputTokens, rate: p.input)
+                                    periodCostRow(String(localized: "token.output"), tokens: usage.outputTokens, rate: p.output)
+                                    if usage.cacheCreation5mTokens > 0 {
+                                        periodCostRow(String(localized: "token.cache5m"), tokens: usage.cacheCreation5mTokens, rate: p.cacheWrite5m)
+                                    }
+                                    if usage.cacheCreation1hTokens > 0 {
+                                        periodCostRow(String(localized: "token.cache1h"), tokens: usage.cacheCreation1hTokens, rate: p.cacheWrite1h)
+                                    }
+                                    if usage.cacheCreation5mTokens == 0 && usage.cacheCreation1hTokens == 0 && usage.cacheCreationTotalTokens > 0 {
+                                        periodCostRow(String(localized: "token.cacheWriteFull"), tokens: usage.cacheCreationTotalTokens, rate: p.cacheWrite1h)
+                                    }
+                                    if usage.cacheReadTokens > 0 {
+                                        periodCostRow(String(localized: "token.cacheReadFull"), tokens: usage.cacheReadTokens, rate: p.cacheRead)
+                                    }
+                                }
+                                .padding(.top, 4)
+                                .padding(.leading, 16)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                            }
+                        }
+
+                        if idx < sorted.count - 1 {
+                            Divider().padding(.vertical, 2)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func periodCostRow(_ label: String, tokens: Int, rate: Double) -> some View {
+        GridRow {
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .gridColumnAlignment(.leading)
+            Text(TimeFormatter.tokenCount(tokens))
+                .font(.system(size: 11, design: .monospaced))
+                .gridColumnAlignment(.trailing)
+            Text("x \(String(format: "$%.2f", rate))/M")
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+                .gridColumnAlignment(.leading)
+            Text(String(format: "$%.4f", Double(tokens) / 1_000_000 * rate))
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .gridColumnAlignment(.trailing)
+        }
+    }
+}
 // MARK: - Period Detail View
 
 struct PeriodDetailView: View {
@@ -340,7 +463,7 @@ struct PeriodDetailView: View {
                     HStack(spacing: 3) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 11, weight: .semibold))
-                        Text("Stats")
+                        Text("stats.back")
                             .font(.system(size: 12))
                     }
                 }
@@ -362,58 +485,22 @@ struct PeriodDetailView: View {
                     // Overview
                     SectionCard {
                         HStack(spacing: 12) {
-                            overviewItem("Sessions", value: "\(stat.sessionCount)", icon: "list.bullet")
+                            overviewItem(String(localized: "stats.sessions"), value: "\(stat.sessionCount)", icon: "list.bullet")
                             Divider().frame(height: 28)
-                            overviewItem("Messages", value: "\(stat.messageCount)", icon: "message")
+                            overviewItem(String(localized: "stats.messages"), value: "\(stat.messageCount)", icon: "message")
                             Divider().frame(height: 28)
-                            overviewItem("Tools", value: "\(stat.toolUseCount)", icon: "wrench")
+                            overviewItem(String(localized: "stats.tools"), value: "\(stat.toolUseCount)", icon: "wrench")
                         }
                     }
 
-                    // Cost breakdown
-                    SectionCard {
-                        VStack(spacing: 8) {
-                            HStack {
-                                Label("Cost Breakdown", systemImage: "dollarsign.circle")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                HStack(spacing: 2) {
-                                    if stat.hasEstimatedCost {
-                                        Text("~")
-                                            .font(.system(size: 12, weight: .medium))
-                                            .foregroundStyle(.orange)
-                                    }
-                                    Text(formatCost(stat.totalCost))
-                                        .font(.system(size: 16, weight: .bold, design: .monospaced))
-                                        .foregroundStyle(costColor(stat.totalCost))
-                                }
-                            }
-
-                            Divider()
-
-                            costRow("Input Tokens", tokens: stat.totalInputTokens)
-                            costRow("Output Tokens", tokens: stat.totalOutputTokens)
-                            if stat.cacheCreation5mTokens > 0 {
-                                costRow("Cache Write 5m", tokens: stat.cacheCreation5mTokens)
-                            }
-                            if stat.cacheCreation1hTokens > 0 {
-                                costRow("Cache Write 1h", tokens: stat.cacheCreation1hTokens)
-                            }
-                            if stat.cacheCreation5mTokens == 0 && stat.cacheCreation1hTokens == 0 && stat.cacheCreationTotalTokens > 0 {
-                                costRow("Cache Write", tokens: stat.cacheCreationTotalTokens)
-                            }
-                            if stat.cacheReadTokens > 0 {
-                                costRow("Cache Read", tokens: stat.cacheReadTokens)
-                            }
-                        }
-                    }
+                    // Cost & Models (merged, same as session detail)
+                    CostModelsCard(period: stat)
 
                     // Token bar
                     SectionCard {
                         VStack(spacing: 6) {
                             HStack {
-                                Label("Tokens", systemImage: "number")
+                                Label(String(localized: "detail.tokens"), systemImage: "number")
                                     .font(.system(size: 11, weight: .medium))
                                     .foregroundStyle(.secondary)
                                 Spacer()
@@ -429,67 +516,19 @@ struct PeriodDetailView: View {
                             )
 
                             HStack(spacing: 12) {
-                                TokenLegend(color: .blue, label: "Input", value: TimeFormatter.tokenCount(stat.totalInputTokens))
-                                TokenLegend(color: .green, label: "Output", value: TimeFormatter.tokenCount(stat.totalOutputTokens))
+                                TokenLegend(color: .blue, label: String(localized: "token.input"), value: TimeFormatter.tokenCount(stat.totalInputTokens))
+                                TokenLegend(color: .green, label: String(localized: "token.output"), value: TimeFormatter.tokenCount(stat.totalOutputTokens))
                                 if stat.cacheCreationTotalTokens > 0 {
-                                    TokenLegend(color: .orange, label: "Cache W", value: TimeFormatter.tokenCount(stat.cacheCreationTotalTokens))
+                                    TokenLegend(color: .orange, label: String(localized: "token.cacheWrite"), value: TimeFormatter.tokenCount(stat.cacheCreationTotalTokens))
                                 }
                                 if stat.cacheReadTokens > 0 {
-                                    TokenLegend(color: .purple, label: "Cache R", value: TimeFormatter.tokenCount(stat.cacheReadTokens))
+                                    TokenLegend(color: .purple, label: String(localized: "token.cacheRead"), value: TimeFormatter.tokenCount(stat.cacheReadTokens))
                                 }
                             }
                             .font(.system(size: 10))
                         }
                     }
 
-                    // Model breakdown for this period
-                    if !stat.modelBreakdown.isEmpty {
-                        SectionCard {
-                            VStack(spacing: 6) {
-                                HStack {
-                                    Label("Models", systemImage: "cpu")
-                                        .font(.system(size: 11, weight: .medium))
-                                        .foregroundStyle(.secondary)
-                                    Spacer()
-                                    Text("\(stat.modelBreakdown.count) models")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.tertiary)
-                                }
-
-                                Divider()
-
-                                let sorted = stat.modelBreakdown.values.sorted { $0.cost > $1.cost }
-                                let maxCost = sorted.first?.cost ?? 1.0
-                                ForEach(sorted) { usage in
-                                    HStack(spacing: 8) {
-                                        Text(shortModel(usage.model))
-                                            .font(.system(size: 10, design: .monospaced))
-                                            .lineLimit(1)
-                                            .frame(width: 110, alignment: .leading)
-
-                                        ProgressView(value: usage.cost, total: maxCost)
-                                            .tint(usage.isEstimated ? Color.orange.opacity(0.7) : Color.blue.opacity(0.7))
-
-                                        VStack(alignment: .trailing, spacing: 1) {
-                                            HStack(spacing: 1) {
-                                                if usage.isEstimated {
-                                                    Text("~")
-                                                        .font(.system(size: 8, weight: .medium))
-                                                        .foregroundStyle(.orange)
-                                                }
-                                                Text(formatCost(usage.cost))
-                                                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                                            }
-                                            Text("\(usage.sessionCount) sessions")
-                                                .font(.system(size: 8))
-                                                .foregroundStyle(.tertiary)
-                                        }
-                                        .frame(width: 75, alignment: .trailing)
-                                    }
-                                }
-                            }
-                        }
-                    }
                 }
                 .padding(12)
             }

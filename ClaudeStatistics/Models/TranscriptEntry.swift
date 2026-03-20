@@ -130,6 +130,11 @@ enum TranscriptContent: Codable {
         if case .toolUse(let content) = self { return content.name }
         return nil
     }
+
+    var toolUseId: String? {
+        if case .toolUse(let content) = self { return content.id }
+        return nil
+    }
 }
 
 struct TranscriptUsage: Codable {

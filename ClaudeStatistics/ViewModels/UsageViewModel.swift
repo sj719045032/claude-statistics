@@ -14,6 +14,16 @@ final class UsageViewModel: ObservableObject {
 
     init() {
         loadCache()
+        // Restore auto-refresh from persisted setting
+        let enabled = UserDefaults.standard.bool(forKey: "autoRefreshEnabled")
+        let interval = UserDefaults.standard.double(forKey: "refreshInterval")
+        if enabled {
+            autoRefreshInterval = interval > 0 ? interval : 300
+            Task { @MainActor in
+                await self.refresh()
+            }
+            startAutoRefresh()
+        }
     }
 
     func loadCache() {
@@ -23,13 +33,9 @@ final class UsageViewModel: ObservableObject {
         }
     }
 
-    /// Auto-refresh: only call API if cache is stale
+    /// Auto-refresh: always attempt API call (timer already controls the interval)
     func refresh() async {
-        loadCache()
-        let cacheAge = lastFetchedAt.map { Date().timeIntervalSince($0) } ?? .infinity
-        if cacheAge > 300 {
-            await callAPI()
-        }
+        await callAPI()
     }
 
     /// Manual refresh: try API, but show meaningful feedback on 429
@@ -41,13 +47,6 @@ final class UsageViewModel: ObservableObject {
             let data = try await UsageAPIService.shared.fetchUsage()
             usageData = data
             lastFetchedAt = Date()
-        } catch let error as UsageError {
-            if case .rateLimited = error {
-                errorMessage = "API unavailable"
-            } else {
-                errorMessage = error.localizedDescription
-            }
-            if usageData == nil { loadCache() }
         } catch {
             errorMessage = error.localizedDescription
             if usageData == nil { loadCache() }
@@ -57,13 +56,9 @@ final class UsageViewModel: ObservableObject {
     }
 
     private func callAPI() async {
-        // Respect rate limit
+        // Respect rate limit — but still reload cache so UI timestamp updates
         if let retryAfter = UsageAPIService.shared.retryAfter, Date() < retryAfter {
-            // Have data → stay silent; no data → show error with web link
-            if usageData == nil {
-                let wait = max(1, Int(ceil(retryAfter.timeIntervalSinceNow)))
-                errorMessage = "Rate limited, retry in \(wait)s"
-            }
+            loadCache()
             return
         }
 
@@ -76,29 +71,36 @@ final class UsageViewModel: ObservableObject {
             lastFetchedAt = Date()
             errorMessage = nil
         } catch let error as UsageError {
-            if case .rateLimited = error, usageData != nil {
-                // Have cached data, don't show error
+            if case .rateLimited = error {
+                loadCache()
             } else {
                 errorMessage = error.localizedDescription
+                if usageData == nil { loadCache() }
             }
-            if usageData == nil { loadCache() }
         } catch {
-            if usageData == nil {
-                errorMessage = error.localizedDescription
-                loadCache()
-            }
+            errorMessage = error.localizedDescription
+            if usageData == nil { loadCache() }
         }
 
         isLoading = false
     }
 
     func startAutoRefresh() {
+        // Skip if timer already running with the same interval
+        if let existing = refreshTimer, existing.isValid,
+           existing.timeInterval == autoRefreshInterval {
+            return
+        }
         stopAutoRefresh()
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: autoRefreshInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                await self?.refresh()
+        let interval = autoRefreshInterval
+        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in
+                await self.refresh()
             }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        refreshTimer = timer
     }
 
     func stopAutoRefresh() {

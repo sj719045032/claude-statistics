@@ -6,6 +6,15 @@ enum StatsPeriod: String, CaseIterable {
     case monthly = "Monthly"
     case yearly = "Yearly"
 
+    var localizedName: String {
+        switch self {
+        case .daily: return String(localized: "period.daily")
+        case .weekly: return String(localized: "period.weekly")
+        case .monthly: return String(localized: "period.monthly")
+        case .yearly: return String(localized: "period.yearly")
+        }
+    }
+
     func startOfPeriod(for date: Date) -> Date {
         let cal = Calendar.current
         switch self {
@@ -87,14 +96,48 @@ struct PeriodStats: Identifiable {
         messageCount += stats.messageCount
         toolUseCount += stats.toolUseTotal
 
-        let model = stats.model
-        var usage = modelBreakdown[model] ?? ModelUsage(model: model)
-        usage.inputTokens += stats.totalInputTokens
-        usage.outputTokens += stats.totalOutputTokens
-        usage.cost += stats.estimatedCost
-        usage.sessionCount += 1
-        if stats.isCostEstimated { usage.isEstimated = true }
-        modelBreakdown[model] = usage
+        // Accumulate per-model breakdown from session's detailed model data
+        if stats.modelBreakdown.isEmpty {
+            // Fallback: session has no per-model breakdown, use session-level model
+            let model = stats.model
+            var usage = modelBreakdown[model] ?? ModelUsage(model: model)
+            usage.inputTokens += stats.totalInputTokens
+            usage.outputTokens += stats.totalOutputTokens
+            usage.cacheCreation5mTokens += stats.cacheCreation5mTokens
+            usage.cacheCreation1hTokens += stats.cacheCreation1hTokens
+            usage.cacheCreationTotalTokens += stats.cacheCreationTotalTokens
+            usage.cacheReadTokens += stats.cacheReadTokens
+            usage.cost += stats.estimatedCost
+            usage.sessionCount += 1
+            if stats.isCostEstimated { usage.isEstimated = true }
+            modelBreakdown[model] = usage
+        } else {
+            // Use precise per-model token data
+            for (model, mts) in stats.modelBreakdown {
+                var usage = modelBreakdown[model] ?? ModelUsage(model: model)
+                usage.inputTokens += mts.inputTokens
+                usage.outputTokens += mts.outputTokens
+                usage.cacheCreation5mTokens += mts.cacheCreation5mTokens
+                usage.cacheCreation1hTokens += mts.cacheCreation1hTokens
+                usage.cacheCreationTotalTokens += mts.cacheCreationTotalTokens
+                usage.cacheReadTokens += mts.cacheReadTokens
+                let cost = ModelPricing.estimateCost(
+                    model: model,
+                    inputTokens: mts.inputTokens,
+                    outputTokens: mts.outputTokens,
+                    cacheCreation5mTokens: mts.cacheCreation5mTokens,
+                    cacheCreation1hTokens: mts.cacheCreation1hTokens,
+                    cacheCreationTotalTokens: mts.cacheCreationTotalTokens,
+                    cacheReadTokens: mts.cacheReadTokens
+                )
+                usage.cost += cost
+                usage.sessionCount += 1
+                if !ModelPricing.shared.isExactMatch(for: model) {
+                    usage.isEstimated = true
+                }
+                modelBreakdown[model] = usage
+            }
+        }
     }
 }
 
@@ -102,10 +145,15 @@ struct ModelUsage: Identifiable {
     let model: String
     var inputTokens: Int = 0
     var outputTokens: Int = 0
+    var cacheCreation5mTokens: Int = 0
+    var cacheCreation1hTokens: Int = 0
+    var cacheCreationTotalTokens: Int = 0
+    var cacheReadTokens: Int = 0
     var cost: Double = 0
     var sessionCount: Int = 0
+    var messageCount: Int = 0
     var isEstimated: Bool = false
 
     var id: String { model }
-    var totalTokens: Int { inputTokens + outputTokens }
+    var totalTokens: Int { inputTokens + outputTokens + cacheCreationTotalTokens + cacheReadTokens }
 }

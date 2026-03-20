@@ -5,6 +5,8 @@ struct SettingsView: View {
     @Binding var tabOrder: [AppTab]
     @AppStorage("autoRefreshEnabled") private var autoRefreshEnabled = false
     @AppStorage("refreshInterval") private var refreshInterval = 300.0
+    @AppStorage("preferredTerminal") private var preferredTerminal = "Auto"
+    @AppStorage("appLanguage") private var appLanguage = "auto"
     @State private var showPricing = false
     @State private var hasToken: Bool?
 
@@ -20,8 +22,8 @@ struct SettingsView: View {
 
     private var settingsContent: some View {
         Form {
-            Section("Auto Refresh") {
-                Toggle("Enable auto refresh", isOn: $autoRefreshEnabled)
+            Section(String(localized: "settings.autoRefresh")) {
+                Toggle(String(localized: "settings.enableAutoRefresh"), isOn: $autoRefreshEnabled)
                     .onChange(of: autoRefreshEnabled) { _, newValue in
                         if newValue {
                             usageViewModel.autoRefreshInterval = refreshInterval
@@ -32,8 +34,7 @@ struct SettingsView: View {
                     }
 
                 if autoRefreshEnabled {
-                    Picker("Interval", selection: $refreshInterval) {
-                        Text("2min").tag(120.0)
+                    Picker(String(localized: "settings.interval"), selection: $refreshInterval) {
                         Text("5min").tag(300.0)
                         Text("10min").tag(600.0)
                         Text("30min").tag(1800.0)
@@ -44,14 +45,29 @@ struct SettingsView: View {
                         usageViewModel.startAutoRefresh()
                     }
                 }
+
+                Text("settings.autoRefreshHint")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
 
-            Section("Pricing") {
+            Section(String(localized: "settings.terminal")) {
+                Picker(String(localized: "settings.resumeIn"), selection: $preferredTerminal) {
+                    ForEach(TerminalApp.allCases) { app in
+                        Text(app != .auto && !app.isInstalled ? String(localized: "settings.notFound \(app.rawValue)") : app.rawValue)
+                            .tag(app.rawValue)
+                    }
+                }
+                .pickerStyle(.menu)
+                .font(.system(size: 12))
+            }
+
+            Section(String(localized: "settings.pricing")) {
                 Button(action: { showPricing = true }) {
                     HStack {
-                        Label("Manage Model Pricing", systemImage: "dollarsign.circle")
+                        Label(String(localized: "settings.managePricing"), systemImage: "dollarsign.circle")
                         Spacer()
-                        Text("\(ModelPricing.shared.models.count) models")
+                        Text("settings.models \(ModelPricing.shared.models.count)")
                             .foregroundStyle(.secondary)
                         Image(systemName: "chevron.right")
                             .font(.system(size: 10))
@@ -61,25 +77,25 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.plain)
 
-                Text("Source: docs.anthropic.com/en/docs/about-claude/pricing")
+                Text("settings.pricingSource")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
 
-            Section("Credentials") {
+            Section(String(localized: "settings.credentials")) {
                 HStack {
-                    Text("OAuth Token")
+                    Text("settings.oauthToken")
                     Spacer()
                     if let found = hasToken {
                         if found {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
-                            Text("Found")
+                            Text("settings.found")
                                 .foregroundStyle(.green)
                         } else {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundStyle(.red)
-                            Text("Not found")
+                            Text("settings.notFoundStatus")
                                 .foregroundStyle(.red)
                         }
                     } else {
@@ -95,15 +111,32 @@ struct SettingsView: View {
                     }
                 }
 
-                Text("Reads from macOS Keychain or ~/.claude/.credentials.json")
+                Text("settings.credentialHint")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
 
-            Section("Tab Order") {
+            Section(String(localized: "settings.language")) {
+                Picker(String(localized: "settings.language"), selection: $appLanguage) {
+                    Text(String(localized: "language.auto")).tag("auto")
+                    Text(String(localized: "language.en")).tag("en")
+                    Text(String(localized: "language.zhHans")).tag("zh-Hans")
+                }
+                .pickerStyle(.menu)
+                .font(.system(size: 12))
+                .onChange(of: appLanguage) { _, newValue in
+                    LanguageManager.apply(newValue)
+                }
+
+                Text("language.restartHint")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+
+            Section(String(localized: "settings.tabOrder")) {
                 TabOrderEditor(tabOrder: $tabOrder)
 
-                Button("Reset to Default") {
+                Button(String(localized: "settings.resetDefault")) {
                     tabOrder = AppTab.defaultOrder
                     AppTab.saveOrder(tabOrder)
                 }
@@ -111,9 +144,13 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
             }
 
-            Section("About") {
+            Section(String(localized: "settings.statusLine")) {
+                StatusLineSection()
+            }
+
+            Section(String(localized: "settings.about")) {
                 HStack {
-                    Text("Version")
+                    Text("settings.version")
                     Spacer()
                     Text("1.0.0")
                         .foregroundStyle(.secondary)
@@ -138,7 +175,7 @@ struct TabOrderEditor: View {
                 Image(systemName: tab.icon)
                     .frame(width: 16)
                     .foregroundStyle(selectedTab == tab ? Color.blue : .secondary)
-                Text(tab.rawValue)
+                Text(tab.localizedName)
                     .font(.system(size: 12))
                 Spacer()
 
@@ -207,7 +244,7 @@ struct PricingManageView: View {
                     HStack(spacing: 3) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 11, weight: .semibold))
-                        Text("Settings")
+                        Text("pricing.back")
                             .font(.system(size: 12))
                     }
                 }
@@ -222,7 +259,7 @@ struct PricingManageView: View {
                 }
 
                 Button(action: fetchRemote) {
-                    Label("Fetch Latest", systemImage: "arrow.triangle.2.circlepath")
+                    Label(String(localized: "pricing.fetchLatest"), systemImage: "arrow.triangle.2.circlepath")
                         .font(.system(size: 11))
                 }
                 .buttonStyle(.bordered)
@@ -251,17 +288,17 @@ struct PricingManageView: View {
                 VStack(spacing: 0) {
                     // Table header
                     HStack(spacing: 0) {
-                        Text("Model")
+                        Text("pricing.model")
                             .frame(width: 140, alignment: .leading)
-                        Text("Input")
+                        Text("pricing.input")
                             .frame(width: 55, alignment: .trailing)
-                        Text("Output")
+                        Text("pricing.output")
                             .frame(width: 55, alignment: .trailing)
-                        Text("5m W")
+                        Text("pricing.5mW")
                             .frame(width: 55, alignment: .trailing)
-                        Text("1h W")
+                        Text("pricing.1hW")
                             .frame(width: 55, alignment: .trailing)
-                        Text("Read")
+                        Text("pricing.read")
                             .frame(width: 50, alignment: .trailing)
                         Spacer()
                     }
@@ -326,19 +363,19 @@ struct PricingManageView: View {
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 4) {
-                editField("Input", text: $editInput)
-                editField("Output", text: $editOutput)
-                editField("5m W", text: $editCache5m)
-                editField("1h W", text: $editCache1h)
-                editField("Read", text: $editCacheRead)
+                editField(String(localized: "pricing.input"), text: $editInput)
+                editField(String(localized: "pricing.output"), text: $editOutput)
+                editField(String(localized: "pricing.5mW"), text: $editCache5m)
+                editField(String(localized: "pricing.1hW"), text: $editCache1h)
+                editField(String(localized: "pricing.read"), text: $editCacheRead)
             }
 
             HStack {
-                Button("Cancel") { editingModel = nil }
+                Button(String(localized: "session.cancel")) { editingModel = nil }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Save") { saveEditing(item.id) }
+                Button(String(localized: "pricing.save")) { saveEditing(item.id) }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
             }
@@ -404,7 +441,7 @@ struct PricingManageView: View {
                 await MainActor.run {
                     ModelPricing.shared.updateModels(fetched)
                     loadModels()
-                    fetchMessage = "Updated \(fetched.count) models from Anthropic docs"
+                    fetchMessage = String(localized: "pricing.updated \(fetched.count)")
                     fetchIsError = false
                     isFetching = false
                 }
@@ -433,5 +470,87 @@ struct PricingManageView: View {
 
     private func shortModelName(_ id: String) -> String {
         id.replacingOccurrences(of: "claude-", with: "")
+    }
+}
+
+// MARK: - Status Line Integration
+
+struct StatusLineSection: View {
+    @State private var isInstalled = StatusLineInstaller.isInstalled
+    @State private var hasBackup = StatusLineInstaller.hasBackup
+    @State private var message: String?
+    @State private var isError = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Label(String(localized: "statusLine.title"), systemImage: "terminal")
+                    .font(.system(size: 12))
+                Spacer()
+                if isInstalled {
+                    Text("statusLine.integrated")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.green)
+                } else {
+                    Text("statusLine.notIntegrated")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Text("statusLine.description")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+
+            HStack(spacing: 8) {
+                if isInstalled {
+                    Button(String(localized: "statusLine.update")) { install() }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                } else {
+                    Button(String(localized: "statusLine.install")) { install() }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                }
+
+                if hasBackup {
+                    Button(String(localized: "statusLine.restore")) { restore() }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                }
+            }
+
+            if let message {
+                Text(message)
+                    .font(.system(size: 10))
+                    .foregroundStyle(isError ? .red : .green)
+            }
+        }
+    }
+
+    private func install() {
+        do {
+            try StatusLineInstaller.install()
+            isInstalled = true
+            hasBackup = StatusLineInstaller.hasBackup
+            message = String(localized: "statusLine.installSuccess")
+            isError = false
+        } catch {
+            message = error.localizedDescription
+            isError = true
+        }
+    }
+
+    private func restore() {
+        do {
+            try StatusLineInstaller.restore()
+            isInstalled = false
+            hasBackup = false
+            message = String(localized: "statusLine.restoreSuccess")
+            isError = false
+        } catch {
+            message = error.localizedDescription
+            isError = true
+        }
     }
 }

@@ -8,6 +8,15 @@ enum AppTab: String, CaseIterable, Identifiable, Codable {
 
     var id: String { rawValue }
 
+    var localizedName: String {
+        switch self {
+        case .sessions: return String(localized: "tab.sessions")
+        case .stats: return String(localized: "tab.stats")
+        case .usage: return String(localized: "tab.usage")
+        case .settings: return String(localized: "tab.settings")
+        }
+    }
+
     var icon: String {
         switch self {
         case .sessions: return "list.bullet"
@@ -48,7 +57,7 @@ struct MenuBarView: View {
             // Tab bar
             HStack(spacing: 0) {
                 ForEach(tabOrder) { tab in
-                    TabButton(title: tab.rawValue, icon: tab.icon, isSelected: selectedTab == tab) {
+                    TabButton(title: tab.localizedName, icon: tab.icon, isSelected: selectedTab == tab) {
                         selectedTab = tab
                     }
                 }
@@ -81,7 +90,7 @@ struct MenuBarView: View {
 
             // Footer
             HStack {
-                Button("Quit") {
+                Button(String(localized: "app.quit")) {
                     NSApplication.shared.terminate(nil)
                 }
                 .buttonStyle(.plain)
@@ -90,7 +99,7 @@ struct MenuBarView: View {
 
                 Spacer()
 
-                Text("Claude Statistics")
+                Text(String(localized: "app.name"))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }

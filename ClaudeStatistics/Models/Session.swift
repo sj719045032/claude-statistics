@@ -27,6 +27,22 @@ struct Session: Identifiable, Hashable {
     }
 }
 
+struct ModelTokenStats {
+    var inputTokens: Int = 0
+    var outputTokens: Int = 0
+    var cacheCreation5mTokens: Int = 0
+    var cacheCreation1hTokens: Int = 0
+    var cacheCreationTotalTokens: Int = 0
+    var cacheReadTokens: Int = 0
+    var messageCount: Int = 0
+
+    var totalTokens: Int { inputTokens + outputTokens + cacheCreationTotalTokens + cacheReadTokens }
+
+    var estimatedCost: Double {
+        0 // computed externally with model name
+    }
+}
+
 struct SessionStats {
     var model: String = "Unknown"
     var totalInputTokens: Int = 0
@@ -42,8 +58,72 @@ struct SessionStats {
     var startTime: Date?
     var endTime: Date?
     var lastPrompt: String?
+    var contextTokens: Int = 0          // last message's input context size (input + cache_read)
+    var modelBreakdown: [String: ModelTokenStats] = [:]
+
+    /// Context window size for the primary model
+    var contextWindowSize: Int {
+        let m = model.lowercased()
+        // Claude Code uses extended thinking with 1M context for latest models
+        if m.contains("opus-4-6") || m.contains("sonnet-4-6") || m.contains("opus-4-5") || m.contains("sonnet-4-5") {
+            return 1_000_000
+        }
+        // Older models or haiku use 200K
+        return 200_000
+    }
+
+    /// Context usage percentage (0-100), rounded to match Claude Code's Math.round()
+    var contextUsagePercent: Double {
+        guard contextWindowSize > 0, contextTokens > 0 else { return 0 }
+        return min(100, (Double(contextTokens) / Double(contextWindowSize) * 100).rounded())
+    }
 
     var totalTokens: Int { totalInputTokens + totalOutputTokens + cacheCreationTotalTokens + cacheReadTokens }
+
+    var sortedModelBreakdown: [(model: String, stats: ModelTokenStats)] {
+        modelBreakdown.sorted { $0.value.totalTokens > $1.value.totalTokens }
+            .map { (model: $0.key, stats: $0.value) }
+    }
+
+    /// Converts per-model token data to [ModelUsage] for use with CostModelsCard
+    var asModelUsages: [ModelUsage] {
+        if modelBreakdown.isEmpty {
+            // Single-model fallback
+            var u = ModelUsage(model: model)
+            u.inputTokens = totalInputTokens
+            u.outputTokens = totalOutputTokens
+            u.cacheCreation5mTokens = cacheCreation5mTokens
+            u.cacheCreation1hTokens = cacheCreation1hTokens
+            u.cacheCreationTotalTokens = cacheCreationTotalTokens
+            u.cacheReadTokens = cacheReadTokens
+            u.cost = estimatedCost
+            u.sessionCount = 1
+            u.isEstimated = isCostEstimated
+            return [u]
+        }
+        return modelBreakdown.map { (key, mts) in
+            var u = ModelUsage(model: key)
+            u.inputTokens = mts.inputTokens
+            u.outputTokens = mts.outputTokens
+            u.cacheCreation5mTokens = mts.cacheCreation5mTokens
+            u.cacheCreation1hTokens = mts.cacheCreation1hTokens
+            u.cacheCreationTotalTokens = mts.cacheCreationTotalTokens
+            u.cacheReadTokens = mts.cacheReadTokens
+            u.messageCount = mts.messageCount
+            u.cost = ModelPricing.estimateCost(
+                model: key,
+                inputTokens: mts.inputTokens,
+                outputTokens: mts.outputTokens,
+                cacheCreation5mTokens: mts.cacheCreation5mTokens,
+                cacheCreation1hTokens: mts.cacheCreation1hTokens,
+                cacheCreationTotalTokens: mts.cacheCreationTotalTokens,
+                cacheReadTokens: mts.cacheReadTokens
+            )
+            u.sessionCount = 1
+            u.isEstimated = !ModelPricing.shared.isExactMatch(for: key)
+            return u
+        }.sorted { $0.totalTokens > $1.totalTokens }
+    }
 
     var duration: TimeInterval? {
         guard let start = startTime, let end = endTime else { return nil }
@@ -65,7 +145,22 @@ struct SessionStats {
 
     /// Estimated cost in USD based on model pricing
     var estimatedCost: Double {
-        ModelPricing.estimateCost(
+        // If we have per-model breakdown, sum each model's cost accurately
+        if !modelBreakdown.isEmpty {
+            return modelBreakdown.reduce(0.0) { total, entry in
+                total + ModelPricing.estimateCost(
+                    model: entry.key,
+                    inputTokens: entry.value.inputTokens,
+                    outputTokens: entry.value.outputTokens,
+                    cacheCreation5mTokens: entry.value.cacheCreation5mTokens,
+                    cacheCreation1hTokens: entry.value.cacheCreation1hTokens,
+                    cacheCreationTotalTokens: entry.value.cacheCreationTotalTokens,
+                    cacheReadTokens: entry.value.cacheReadTokens
+                )
+            }
+        }
+        // Fallback: no breakdown, use session-level model
+        return ModelPricing.estimateCost(
             model: model,
             inputTokens: totalInputTokens,
             outputTokens: totalOutputTokens,

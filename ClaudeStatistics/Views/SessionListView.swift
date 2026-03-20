@@ -13,7 +13,7 @@ struct SessionListView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
                     .font(.system(size: 11))
-                TextField("Search sessions...", text: $viewModel.searchText)
+                TextField(String(localized: "session.search"), text: $viewModel.searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12))
                 if !viewModel.searchText.isEmpty {
@@ -35,18 +35,18 @@ struct SessionListView: View {
             // Header
             HStack(spacing: 8) {
                 if viewModel.isSelecting {
-                    Text("\(viewModel.selectedIds.count) selected")
+                    Text("session.selected \(viewModel.selectedIds.count)")
                         .font(.caption)
                         .foregroundStyle(Color.blue)
 
                     Spacer()
 
-                    Button("Select All") { viewModel.selectAll() }
+                    Button(String(localized: "session.selectAll")) { viewModel.selectAll() }
                         .font(.system(size: 10))
                         .buttonStyle(.plain)
                         .foregroundStyle(Color.blue)
 
-                    Button("Delete") {
+                    Button(String(localized: "session.delete")) {
                         deleteTarget = viewModel.selectedIds
                         showDeleteConfirm = true
                     }
@@ -55,12 +55,12 @@ struct SessionListView: View {
                     .foregroundStyle(.red)
                     .disabled(viewModel.selectedIds.isEmpty)
 
-                    Button("Cancel") { viewModel.exitSelecting() }
+                    Button(String(localized: "session.cancel")) { viewModel.exitSelecting() }
                         .font(.system(size: 10))
                         .buttonStyle(.plain)
                         .foregroundStyle(.secondary)
                 } else {
-                    Text("\(viewModel.filteredSessions.count) sessions")
+                    Text("session.count \(viewModel.filteredSessions.count)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
@@ -71,14 +71,14 @@ struct SessionListView: View {
                             .font(.system(size: 10))
                     }
                     .buttonStyle(.plain)
-                    .help("Select sessions")
+                    .help(String(localized: "session.select.help"))
 
                     Button(action: { store.forceRescan() }) {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 10))
                     }
                     .buttonStyle(.plain)
-                    .help("Refresh session list")
+                    .help(String(localized: "session.refresh.help"))
                 }
             }
             .padding(.horizontal, 12)
@@ -104,6 +104,7 @@ struct SessionListView: View {
                                     viewModel.selectSession(session)
                                 }
                             },
+                            onNewSession: { TerminalLauncher.openNewSession(session) },
                             onResume: { TerminalLauncher.openSession(session) },
                             onDelete: {
                                 deleteTarget = [session.id]
@@ -118,19 +119,19 @@ struct SessionListView: View {
         .overlay(alignment: .bottom) {
             if showDeleteConfirm {
                 VStack(spacing: 8) {
-                    Text("Delete \(deleteTarget.count) session\(deleteTarget.count == 1 ? "" : "s")?")
+                    Text("session.deleteConfirm \(deleteTarget.count)")
                         .font(.system(size: 12, weight: .medium))
-                    Text("This cannot be undone.")
+                    Text("session.deleteWarning")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     HStack(spacing: 12) {
-                        Button("Cancel") {
+                        Button(String(localized: "session.cancel")) {
                             showDeleteConfirm = false
                             deleteTarget = []
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
-                        Button("Delete") {
+                        Button(String(localized: "session.delete")) {
                             viewModel.deleteSessions(deleteTarget)
                             showDeleteConfirm = false
                             deleteTarget = []
@@ -159,6 +160,7 @@ struct SessionRow: View {
     let isSelecting: Bool
     let isChecked: Bool
     let onTap: () -> Void
+    let onNewSession: () -> Void
     let onResume: () -> Void
     let onDelete: () -> Void
     @State private var isHovered = false
@@ -228,13 +230,21 @@ struct SessionRow: View {
             Spacer()
 
             if !isSelecting && isHovered {
+                Button(action: onNewSession) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.green)
+                }
+                .buttonStyle(.plain)
+                .help(String(localized: "session.new.help"))
+
                 Button(action: onResume) {
                     Image(systemName: "terminal")
                         .font(.system(size: 10))
                         .foregroundStyle(Color.blue)
                 }
                 .buttonStyle(.plain)
-                .help("Resume in iTerm")
+                .help(String(localized: "session.resume.help"))
 
                 Button(action: onDelete) {
                     Image(systemName: "trash")
@@ -242,7 +252,7 @@ struct SessionRow: View {
                         .foregroundStyle(.red)
                 }
                 .buttonStyle(.plain)
-                .help("Delete session")
+                .help(String(localized: "session.delete.help"))
             }
 
             if !isSelecting {
