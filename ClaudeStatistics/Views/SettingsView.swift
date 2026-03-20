@@ -23,6 +23,17 @@ struct SettingsView: View {
 
     private var settingsContent: some View {
         Form {
+            Section(String(localized: "settings.terminal")) {
+                Picker(String(localized: "settings.resumeIn"), selection: $preferredTerminal) {
+                    ForEach(TerminalApp.allCases) { app in
+                        Text(app != .auto && !app.isInstalled ? String(localized: "settings.notFound \(app.rawValue)") : app.rawValue)
+                            .tag(app.rawValue)
+                    }
+                }
+                .pickerStyle(.menu)
+                .font(.system(size: 12))
+            }
+
             Section(String(localized: "settings.autoRefresh")) {
                 Toggle(String(localized: "settings.enableAutoRefresh"), isOn: $autoRefreshEnabled)
                     .onChange(of: autoRefreshEnabled) { _, newValue in
@@ -52,15 +63,21 @@ struct SettingsView: View {
                     .foregroundStyle(.tertiary)
             }
 
-            Section(String(localized: "settings.terminal")) {
-                Picker(String(localized: "settings.resumeIn"), selection: $preferredTerminal) {
-                    ForEach(TerminalApp.allCases) { app in
-                        Text(app != .auto && !app.isInstalled ? String(localized: "settings.notFound \(app.rawValue)") : app.rawValue)
-                            .tag(app.rawValue)
-                    }
+            Section(String(localized: "settings.language")) {
+                Picker(String(localized: "settings.language"), selection: $appLanguage) {
+                    Text(String(localized: "language.auto")).tag("auto")
+                    Text(String(localized: "language.en")).tag("en")
+                    Text(String(localized: "language.zhHans")).tag("zh-Hans")
                 }
                 .pickerStyle(.menu)
                 .font(.system(size: 12))
+                .onChange(of: appLanguage) { _, newValue in
+                    LanguageManager.apply(newValue)
+                }
+
+                Text("language.restartHint")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
 
             Section(String(localized: "settings.pricing")) {
@@ -81,6 +98,21 @@ struct SettingsView: View {
                 Text("settings.pricingSource")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
+            }
+
+            Section(String(localized: "settings.statusLine")) {
+                StatusLineSection()
+            }
+
+            Section(String(localized: "settings.tabOrder")) {
+                TabOrderEditor(tabOrder: $tabOrder)
+
+                Button(String(localized: "settings.resetDefault")) {
+                    tabOrder = AppTab.defaultOrder
+                    AppTab.saveOrder(tabOrder)
+                }
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
             }
 
             Section(String(localized: "settings.credentials")) {
@@ -115,38 +147,6 @@ struct SettingsView: View {
                 Text("settings.credentialHint")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
-            }
-
-            Section(String(localized: "settings.language")) {
-                Picker(String(localized: "settings.language"), selection: $appLanguage) {
-                    Text(String(localized: "language.auto")).tag("auto")
-                    Text(String(localized: "language.en")).tag("en")
-                    Text(String(localized: "language.zhHans")).tag("zh-Hans")
-                }
-                .pickerStyle(.menu)
-                .font(.system(size: 12))
-                .onChange(of: appLanguage) { _, newValue in
-                    LanguageManager.apply(newValue)
-                }
-
-                Text("language.restartHint")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-
-            Section(String(localized: "settings.tabOrder")) {
-                TabOrderEditor(tabOrder: $tabOrder)
-
-                Button(String(localized: "settings.resetDefault")) {
-                    tabOrder = AppTab.defaultOrder
-                    AppTab.saveOrder(tabOrder)
-                }
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            }
-
-            Section(String(localized: "settings.statusLine")) {
-                StatusLineSection()
             }
 
             Section(String(localized: "settings.about")) {
