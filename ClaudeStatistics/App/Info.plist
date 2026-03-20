@@ -30,5 +30,9 @@
     <string>https://raw.githubusercontent.com/sj719045032/claude-statistics/main/appcast.xml</string>
     <key>SUPublicEDKey</key>
     <string>nP5OEs3t9wgAKOS6BBKYxtGt4dHjgrpiIdBV60rK4D0=</string>
+    <key>SUAutomaticallyChecksForUpdates</key>
+    <true/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
 </dict>
 </plist>
