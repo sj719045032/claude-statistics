@@ -5,13 +5,13 @@
     <link>https://github.com/sj719045032/claude-statistics</link>
     <item>
       <title>Version 1.3.3</title>
-      <pubDate>Sat, 21 Mar 2026 01:46:18 +0800</pubDate>
+      <pubDate>Sat, 21 Mar 2026 01:48:33 +0800</pubDate>
       <sparkle:version>1.3.3</sparkle:version>
       <sparkle:shortVersionString>1.3.3</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v1.3.3/ClaudeStatistics-1.3.3.dmg"
                  type="application/octet-stream"
-                 sparkle:edSignature="tMnnwklDd2x9I1qoSvDoHR2Crk/va0GtVNBPPj+WJ6apHXnxZNt3JCX8bnS9SohPswfEJR5yhfc4gSsYQaZoAA==" length="2319791" />
+                 sparkle:edSignature="FOU0unGN95XFqG6U9KTK5l3lJHHnUQOpdffBk9IxFU871XMcaoHbu/oIzX/IT1V3J3VgLEvHVpkj1vgR6zoNAg==" length="2320130" />
     </item>
   </channel>
 </rss>

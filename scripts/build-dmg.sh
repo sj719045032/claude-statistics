@@ -20,6 +20,15 @@ if [ ! -f "${SPARKLE_BIN}/sign_update" ]; then
   tar xf /tmp/sparkle.tar.xz -C /tmp/sparkle
 fi
 
+# Update version in project.yml so xcodegen-generated project picks it up
+sed -i '' "s/MARKETING_VERSION: \".*\"/MARKETING_VERSION: \"${VERSION}\"/" project.yml
+sed -i '' "s/CURRENT_PROJECT_VERSION: \".*\"/CURRENT_PROJECT_VERSION: \"${VERSION}\"/" project.yml
+
+# Regenerate Xcode project with updated version
+if command -v xcodegen &>/dev/null; then
+  xcodegen generate 2>&1 | tail -1
+fi
+
 echo "==> Building ${APP_NAME} v${VERSION} (Release)..."
 xcodebuild -project ClaudeStatistics.xcodeproj \
   -scheme "${SCHEME}" \
