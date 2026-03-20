@@ -3,32 +3,38 @@ import SwiftUI
 
 @MainActor
 final class SessionViewModel: ObservableObject {
-    @Published var sessions: [Session] = []
+    let store: SessionDataStore
+
     @Published var selectedSession: Session?
     @Published var selectedSessionStats: SessionStats?
     @Published var isLoadingStats = false
     @Published var searchText = ""
-    @Published var quickStats: [String: TranscriptParser.QuickStats] = [:]
     @Published var isSelecting = false
     @Published var selectedIds: Set<String> = []
 
-    var filteredSessions: [Session] {
-        if searchText.isEmpty { return sessions }
-        let query = searchText.lowercased()
-        return sessions.filter {
-            $0.displayName.lowercased().contains(query) ||
-            $0.id.lowercased().contains(query)
-        }
+    init(store: SessionDataStore) {
+        self.store = store
     }
 
-    func loadSessions() {
-        sessions = SessionScanner.shared.scanSessions()
-        loadQuickStats()
+    var filteredSessions: [Session] {
+        if searchText.isEmpty { return store.sessions }
+        let query = searchText.lowercased()
+        return store.sessions.filter { session in
+            session.displayName.lowercased().contains(query) ||
+            session.id.lowercased().contains(query) ||
+            (store.quickStats[session.id]?.topic?.lowercased().contains(query) == true)
+        }
     }
 
     func selectSession(_ session: Session) {
         selectedSession = session
-        loadStats(for: session)
+
+        if let cached = store.parsedStats[session.id] {
+            selectedSessionStats = cached
+            isLoadingStats = false
+        } else {
+            loadStats(for: session)
+        }
     }
 
     func loadStats(for session: Session) {
@@ -44,22 +50,8 @@ final class SessionViewModel: ObservableObject {
         }
     }
 
-    /// Parse quick stats for visible sessions in background
-    private func loadQuickStats() {
-        let sessionsToLoad = sessions.prefix(50)
-        for session in sessionsToLoad {
-            if quickStats[session.id] != nil { continue }
-            Task.detached { [weak self] in
-                let stats = TranscriptParser.shared.parseSessionQuick(at: session.filePath)
-                await MainActor.run {
-                    self?.quickStats[session.id] = stats
-                }
-            }
-        }
-    }
-
     func quickStat(for session: Session) -> TranscriptParser.QuickStats? {
-        quickStats[session.id]
+        store.quickStats[session.id]
     }
 
     // MARK: - Selection & Delete
@@ -82,12 +74,7 @@ final class SessionViewModel: ObservableObject {
     }
 
     func deleteSessions(_ ids: Set<String>) {
-        let fm = FileManager.default
-        for session in sessions where ids.contains(session.id) {
-            try? fm.removeItem(atPath: session.filePath)
-            quickStats.removeValue(forKey: session.id)
-        }
-        sessions.removeAll { ids.contains($0.id) }
+        store.deleteSessions(ids)
         selectedIds.subtract(ids)
         if selectedIds.isEmpty {
             isSelecting = false
@@ -100,7 +87,7 @@ final class SessionViewModel: ObservableObject {
 
     // MARK: - Aggregate stats
 
-    var totalSessions: Int { sessions.count }
+    var totalSessions: Int { store.sessions.count }
 
     var projectGroups: [(project: String, count: Int, sessions: [Session])] {
         let grouped = Dictionary(grouping: filteredSessions) { $0.projectPath }

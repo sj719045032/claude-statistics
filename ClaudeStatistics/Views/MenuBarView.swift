@@ -39,6 +39,7 @@ struct MenuBarView: View {
     @ObservedObject var usageViewModel: UsageViewModel
     @ObservedObject var sessionViewModel: SessionViewModel
     @ObservedObject var statisticsViewModel: StatisticsViewModel
+    @ObservedObject var store: SessionDataStore
     @State private var selectedTab: AppTab = AppTab.loadOrder().first ?? .sessions
     @State private var tabOrder: [AppTab] = AppTab.loadOrder()
 
@@ -64,7 +65,7 @@ struct MenuBarView: View {
                 case .sessions:
                     sessionContent
                 case .stats:
-                    StatisticsView(viewModel: statisticsViewModel)
+                    StatisticsView(viewModel: statisticsViewModel, store: store)
                 case .usage:
                     ScrollView {
                         UsageView(viewModel: usageViewModel)
@@ -99,10 +100,14 @@ struct MenuBarView: View {
         .frame(width: 480, height: 520)
         .onAppear {
             usageViewModel.loadCache()
-            sessionViewModel.loadSessions()
+            store.start()
+            store.popoverDidOpen()
             if UserDefaults.standard.bool(forKey: "autoRefreshEnabled") {
                 usageViewModel.startAutoRefresh()
             }
+        }
+        .onDisappear {
+            store.popoverDidClose()
         }
     }
 
@@ -111,12 +116,18 @@ struct MenuBarView: View {
         if let session = sessionViewModel.selectedSession {
             SessionDetailView(
                 session: session,
+                topic: store.quickStats[session.id]?.topic,
                 stats: sessionViewModel.selectedSessionStats,
                 isLoading: sessionViewModel.isLoadingStats,
-                onBack: { sessionViewModel.selectedSession = nil; sessionViewModel.selectedSessionStats = nil }
+                onBack: { sessionViewModel.selectedSession = nil; sessionViewModel.selectedSessionStats = nil },
+                onDelete: {
+                    sessionViewModel.deleteSession(session)
+                    sessionViewModel.selectedSession = nil
+                    sessionViewModel.selectedSessionStats = nil
+                }
             )
         } else {
-            SessionListView(viewModel: sessionViewModel, statisticsViewModel: statisticsViewModel)
+            SessionListView(viewModel: sessionViewModel, store: store)
         }
     }
 }

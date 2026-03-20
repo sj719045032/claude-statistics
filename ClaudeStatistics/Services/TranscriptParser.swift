@@ -229,11 +229,6 @@ final class TranscriptParser {
             .trimmingCharacters(in: .whitespaces) ?? trimmed
 
         if firstLine.isEmpty { return nil }
-
-        // Truncate to reasonable length
-        if firstLine.count > 100 {
-            return String(firstLine.prefix(100)) + "…"
-        }
         return firstLine
     }
 }

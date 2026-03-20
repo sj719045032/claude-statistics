@@ -51,7 +51,8 @@ struct UsageView: View {
                 UsageWindowRow(
                     title: "7 Day",
                     utilization: usage.sevenDay?.utilization ?? 0,
-                    countdown: viewModel.sevenDayResetCountdown
+                    countdown: viewModel.sevenDayResetCountdown,
+                    resetDate: usage.sevenDay?.resetsAtDate
                 )
 
                 if let opus = usage.sevenDayOpus {
@@ -102,6 +103,7 @@ struct UsageWindowRow: View {
     let title: String
     let utilization: Double
     let countdown: String?
+    var resetDate: Date? = nil
 
     private var color: Color {
         if utilization >= 80 { return .red }
@@ -137,6 +139,19 @@ struct UsageWindowRow: View {
                 }
             }
             .frame(height: 6)
+
+            if let resetDate {
+                HStack {
+                    let daysLeft = max(0, Int(ceil(resetDate.timeIntervalSinceNow / 86400)))
+                    Text("\(daysLeft) days remaining")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                    Text(TimeFormatter.absoluteDate(resetDate))
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
         }
     }
 }

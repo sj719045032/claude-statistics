@@ -2,18 +2,19 @@ import SwiftUI
 
 struct StatisticsView: View {
     @ObservedObject var viewModel: StatisticsViewModel
+    @ObservedObject var store: SessionDataStore
     @State private var selectedPeriodDetail: PeriodStats?
 
     var body: some View {
         VStack(spacing: 0) {
-            if viewModel.isLoading {
+            if !store.isFullParseComplete && store.parsedStats.isEmpty {
                 loadingView
-            } else if viewModel.periodStats.isEmpty {
+            } else if store.periodStats.isEmpty {
                 emptyView
             } else if let detail = selectedPeriodDetail {
                 PeriodDetailView(
                     stat: detail,
-                    periodType: viewModel.selectedPeriod,
+                    periodType: store.selectedPeriod,
                     onBack: { selectedPeriodDetail = nil }
                 )
             } else {
@@ -21,9 +22,7 @@ struct StatisticsView: View {
             }
         }
         .onAppear {
-            if viewModel.periodStats.isEmpty && !viewModel.isLoading {
-                viewModel.loadStatistics()
-            }
+            // Store auto-loads; no manual trigger needed
         }
     }
 
@@ -34,7 +33,7 @@ struct StatisticsView: View {
             Spacer()
             ProgressView()
                 .scaleEffect(0.8)
-            if let progress = viewModel.progress {
+            if let progress = store.parseProgress {
                 Text(progress)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -64,18 +63,18 @@ struct StatisticsView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Picker("Period", selection: $viewModel.selectedPeriod) {
+                Picker("Period", selection: $store.selectedPeriod) {
                     ForEach(StatsPeriod.allCases, id: \.self) { period in
                         Text(period.rawValue).tag(period)
                     }
                 }
                 .pickerStyle(.segmented)
 
-                if viewModel.isLoading {
+                if !store.isFullParseComplete && store.parsedStats.isEmpty {
                     ProgressView()
                         .scaleEffect(0.5)
                 } else {
-                    Button(action: { viewModel.loadStatistics() }) {
+                    Button(action: { store.forceRescan() }) {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 10))
                     }
@@ -97,8 +96,8 @@ struct StatisticsView: View {
                     // Period list
                     periodList
 
-                    if let loadedAt = viewModel.lastLoadedAt {
-                        Text("Updated: \(TimeFormatter.relativeDate(loadedAt))")
+                    if store.isFullParseComplete {
+                        Text("All sessions parsed")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
@@ -113,13 +112,13 @@ struct StatisticsView: View {
     private var allTimeSummary: some View {
         SectionCard {
             HStack(spacing: 12) {
-                summaryItem("Total Cost", value: formatCost(viewModel.allTimeCost), icon: "dollarsign.circle", estimated: viewModel.periodStats.contains { $0.hasEstimatedCost })
+                summaryItem("Total Cost", value: formatCost(store.allTimeCost), icon: "dollarsign.circle", estimated: store.periodStats.contains { $0.hasEstimatedCost })
                 Divider().frame(height: 28)
-                summaryItem("Sessions", value: "\(viewModel.allTimeSessions)", icon: "list.bullet")
+                summaryItem("Sessions", value: "\(store.allTimeSessions)", icon: "list.bullet")
                 Divider().frame(height: 28)
-                summaryItem("Tokens", value: TimeFormatter.tokenCount(viewModel.allTimeTokens), icon: "number")
+                summaryItem("Tokens", value: TimeFormatter.tokenCount(store.allTimeTokens), icon: "number")
                 Divider().frame(height: 28)
-                summaryItem("Messages", value: "\(viewModel.allTimeMessages)", icon: "message")
+                summaryItem("Messages", value: "\(store.allTimeMessages)", icon: "message")
             }
         }
     }
@@ -148,11 +147,11 @@ struct StatisticsView: View {
     private var costChart: some View {
         SectionCard {
             VStack(alignment: .leading, spacing: 8) {
-                Label("Cost by \(viewModel.selectedPeriod.rawValue) Period", systemImage: "chart.bar.fill")
+                Label("Cost by \(store.selectedPeriod.rawValue) Period", systemImage: "chart.bar.fill")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
 
-                let items = Array(viewModel.visibleStats.reversed())
+                let items = Array(store.visibleStats.reversed())
                 let maxCost = items.map(\.totalCost).max() ?? 1.0
 
                 HStack(alignment: .bottom, spacing: 4) {
@@ -191,15 +190,15 @@ struct StatisticsView: View {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Text("\(viewModel.visibleModelBreakdown.count) models")
+                    Text("\(store.visibleModelBreakdown.count) models")
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
                 }
 
                 Divider()
 
-                let maxCost = viewModel.visibleModelBreakdown.first?.cost ?? 1.0
-                ForEach(viewModel.visibleModelBreakdown) { usage in
+                let maxCost = store.visibleModelBreakdown.first?.cost ?? 1.0
+                ForEach(store.visibleModelBreakdown) { usage in
                     HStack(spacing: 8) {
                         Text(shortModel(usage.model))
                             .font(.system(size: 10, design: .monospaced))
@@ -231,18 +230,18 @@ struct StatisticsView: View {
         SectionCard {
             VStack(spacing: 6) {
                 HStack {
-                    Label("\(viewModel.selectedPeriod.rawValue) Details", systemImage: "calendar")
+                    Label("\(store.selectedPeriod.rawValue) Details", systemImage: "calendar")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Text("\(viewModel.periodStats.count) periods")
+                    Text("\(store.periodStats.count) periods")
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
                 }
 
                 Divider()
 
-                ForEach(viewModel.periodStats) { stat in
+                ForEach(store.periodStats) { stat in
                     Button(action: { selectedPeriodDetail = stat }) {
                         VStack(spacing: 4) {
                             HStack {
@@ -276,7 +275,7 @@ struct StatisticsView: View {
                     }
                     .buttonStyle(.plain)
 
-                    if stat.id != viewModel.periodStats.last?.id {
+                    if stat.id != store.periodStats.last?.id {
                         Divider()
                     }
                 }

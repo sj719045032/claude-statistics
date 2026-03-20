@@ -1,0 +1,50 @@
+# === Xcode === #
+*.xcworkspace/
+DerivedData/
+build/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# === XcodeGen === #
+# Project file is generated from project.yml, but keep it for users without XcodeGen
+# *.xcodeproj
+
+# === Swift Package Manager === #
+.build/
+Packages/
+Package.resolved
+.swiftpm/
+
+# === CocoaPods === #
+Pods/
+Podfile.lock
+
+# === macOS system files === #
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+*.swp
+*.lock
+*~
+
+# === Environment / credentials === #
+.env
+.env.*
+*.pem
+*.p12
+*.key
+*.mobileprovision
+
+# === Miscellaneous === #
+*.log
+*.orig
+xcuserdata/

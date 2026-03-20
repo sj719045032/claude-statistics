@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SessionListView: View {
     @ObservedObject var viewModel: SessionViewModel
-    @ObservedObject var statisticsViewModel: StatisticsViewModel
+    @ObservedObject var store: SessionDataStore
     @State private var showDeleteConfirm = false
     @State private var deleteTarget: Set<String> = []
 
@@ -73,7 +73,7 @@ struct SessionListView: View {
                     .buttonStyle(.plain)
                     .help("Select sessions")
 
-                    Button(action: { viewModel.loadSessions() }) {
+                    Button(action: { store.forceRescan() }) {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 10))
                     }
@@ -93,7 +93,7 @@ struct SessionListView: View {
                         SessionRow(
                             session: session,
                             quickStats: viewModel.quickStat(for: session),
-                            cachedStats: statisticsViewModel.cachedResults.first(where: { $0.session.id == session.id })?.stats,
+                            cachedStats: store.parsedStats[session.id],
                             isSelected: viewModel.selectedSession?.id == session.id,
                             isSelecting: viewModel.isSelecting,
                             isChecked: viewModel.selectedIds.contains(session.id),
@@ -115,15 +115,39 @@ struct SessionListView: View {
                 .padding(.vertical, 4)
             }
         }
-        .alert("Delete Sessions", isPresented: $showDeleteConfirm) {
-            Button("Cancel", role: .cancel) { deleteTarget = [] }
-            Button("Delete", role: .destructive) {
-                viewModel.deleteSessions(deleteTarget)
-                deleteTarget = []
+        .overlay(alignment: .bottom) {
+            if showDeleteConfirm {
+                VStack(spacing: 8) {
+                    Text("Delete \(deleteTarget.count) session\(deleteTarget.count == 1 ? "" : "s")?")
+                        .font(.system(size: 12, weight: .medium))
+                    Text("This cannot be undone.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 12) {
+                        Button("Cancel") {
+                            showDeleteConfirm = false
+                            deleteTarget = []
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        Button("Delete") {
+                            viewModel.deleteSessions(deleteTarget)
+                            showDeleteConfirm = false
+                            deleteTarget = []
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                        .controlSize(.small)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity)
+                .background(.ultraThickMaterial)
+                .overlay(alignment: .top) { Divider() }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-        } message: {
-            Text("Are you sure you want to delete \(deleteTarget.count) session\(deleteTarget.count == 1 ? "" : "s")? This cannot be undone.")
         }
+        .animation(.easeInOut(duration: 0.2), value: showDeleteConfirm)
     }
 }
 

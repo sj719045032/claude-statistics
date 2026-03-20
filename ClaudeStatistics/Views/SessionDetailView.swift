@@ -3,9 +3,14 @@ import AppKit
 
 struct SessionDetailView: View {
     let session: Session
+    var topic: String? = nil
     let stats: SessionStats?
     let isLoading: Bool
     let onBack: () -> Void
+    var onDelete: (() -> Void)? = nil
+
+    @State private var showDeleteConfirm = false
+    @State private var isTopicExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -24,6 +29,15 @@ struct SessionDetailView: View {
 
                 Spacer()
 
+                if onDelete != nil {
+                    Button(action: { showDeleteConfirm = true }) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.red)
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 Button(action: { TerminalLauncher.openSession(session) }) {
                     Label("Resume", systemImage: "terminal")
                         .font(.system(size: 11))
@@ -40,13 +54,29 @@ struct SessionDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     // Title
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(session.displayName)
                             .font(.system(size: 14, weight: .semibold))
-                        Text(session.id)
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(.tertiary)
-                            .textSelection(.enabled)
+                            .lineLimit(1)
+                        if let topic, !topic.isEmpty {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(topic)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(isTopicExpanded ? nil : 2)
+                                    .animation(.easeInOut(duration: 0.2), value: isTopicExpanded)
+
+                                // Show expand/collapse only when text is long enough
+                                if topic.count > 80 {
+                                    Button(action: { isTopicExpanded.toggle() }) {
+                                        Text(isTopicExpanded ? "Collapse" : "More")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(.blue)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
                     }
 
                     if isLoading {
@@ -67,6 +97,38 @@ struct SessionDetailView: View {
                 .padding(12)
             }
         }
+        .overlay(alignment: .bottom) {
+            if showDeleteConfirm {
+                VStack(spacing: 8) {
+                    Text("Are you sure you want to delete this session?")
+                        .font(.system(size: 12))
+                        .multilineTextAlignment(.center)
+                    Text("This cannot be undone.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 12) {
+                        Button("Cancel") {
+                            showDeleteConfirm = false
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        Button("Delete") {
+                            showDeleteConfirm = false
+                            onDelete?()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                        .controlSize(.small)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity)
+                .background(.ultraThickMaterial)
+                .overlay(alignment: .top) { Divider() }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: showDeleteConfirm)
     }
 
     @ViewBuilder

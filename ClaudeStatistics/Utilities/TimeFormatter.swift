@@ -4,9 +4,13 @@ enum TimeFormatter {
     static func countdown(from interval: TimeInterval) -> String {
         guard interval > 0 else { return "已重置" }
 
-        let hours = Int(interval) / 3600
+        let days = Int(interval) / 86400
+        let hours = (Int(interval) % 86400) / 3600
         let minutes = (Int(interval) % 3600) / 60
 
+        if days > 0 {
+            return "\(days)d \(hours)h"
+        }
         if hours > 0 {
             return "\(hours)h \(minutes)m"
         }
