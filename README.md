@@ -134,6 +134,46 @@ ClaudeStatistics/
 └── Resources/              # Localizable.strings (en, zh-Hans)
 ```
 
+## Build & Release
+
+### Build DMG
+
+```bash
+./scripts/build-dmg.sh 1.2.3
+# Output: build/ClaudeStatistics-1.2.3.dmg + appcast.xml updated
+```
+
+The script will:
+1. Build a Release configuration with the specified version (sets both `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`)
+2. Bundle the app into a DMG with an Applications symlink for drag-to-install
+3. Sign the DMG with Sparkle's EdDSA key (for in-app update verification)
+4. Generate/update `appcast.xml` with the new version, download URL, and signature
+
+### Publish a Release
+
+```bash
+# 1. Commit the updated appcast
+git add appcast.xml && git commit -m "chore: update appcast for vX.Y.Z" && git push
+
+# 2. Create a GitHub Release with the DMG attached
+gh release create vX.Y.Z build/ClaudeStatistics-X.Y.Z.dmg --title "vX.Y.Z" --notes "Release notes here"
+```
+
+Existing users will receive the update via Sparkle's in-app update check (Settings → Check for Updates).
+
+### Sparkle Update Keys
+
+Sparkle uses EdDSA (Ed25519) signing to verify update integrity. The key pair is stored locally:
+
+- **Public key**: embedded in `Info.plist` (`SUPublicEDKey`)
+- **Private key**: stored in the developer's Keychain (managed by Sparkle's `generate_keys` / `sign_update` tools in `/tmp/sparkle/bin/`)
+
+The `appcast.xml` at the repo root is served via GitHub raw URL and checked by the app on launch or manual refresh.
+
+### Version Numbering
+
+Both `CFBundleShortVersionString` (marketing) and `CFBundleVersion` (build) use the same semver string (e.g., `1.2.3`). This is required because Sparkle compares `sparkle:version` in the appcast against `CFBundleVersion` — mismatched formats will break update detection.
+
 ## Configuration
 
 Model pricing is stored in `~/.claude-statistics/pricing.json` and can be edited manually or updated from the Settings tab. The file is created automatically on first launch with built-in defaults.

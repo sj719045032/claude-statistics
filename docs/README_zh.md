@@ -134,6 +134,46 @@ ClaudeStatistics/
 └── Resources/              # Localizable.strings（en、zh-Hans）
 ```
 
+## 构建与发布
+
+### 构建 DMG
+
+```bash
+./scripts/build-dmg.sh 1.2.3
+# 输出: build/ClaudeStatistics-1.2.3.dmg + appcast.xml 自动更新
+```
+
+脚本会自动完成：
+1. 以 Release 配置构建指定版本（同时设置 `MARKETING_VERSION` 和 `CURRENT_PROJECT_VERSION`）
+2. 将应用打包为 DMG，包含 Applications 快捷方式，支持拖拽安装
+3. 使用 Sparkle 的 EdDSA 密钥对 DMG 签名（用于应用内更新验证）
+4. 生成/更新 `appcast.xml`，写入新版本号、下载地址和签名
+
+### 发布版本
+
+```bash
+# 1. 提交更新后的 appcast
+git add appcast.xml && git commit -m "chore: update appcast for vX.Y.Z" && git push
+
+# 2. 创建 GitHub Release 并上传 DMG
+gh release create vX.Y.Z build/ClaudeStatistics-X.Y.Z.dmg --title "vX.Y.Z" --notes "发布说明"
+```
+
+已安装用户将通过 Sparkle 应用内更新收到新版本（设置 → 检查更新）。
+
+### Sparkle 更新密钥
+
+Sparkle 使用 EdDSA (Ed25519) 签名验证更新包的完整性。密钥对存储在本地：
+
+- **公钥**：内嵌在 `Info.plist` 中（`SUPublicEDKey`）
+- **私钥**：存储在开发者的 macOS 钥匙串中（由 `/tmp/sparkle/bin/` 下的 `generate_keys` / `sign_update` 工具管理）
+
+仓库根目录的 `appcast.xml` 通过 GitHub raw URL 提供，应用在启动或手动刷新时检查。
+
+### 版本号规则
+
+`CFBundleShortVersionString`（展示版本）和 `CFBundleVersion`（构建版本）使用相同的语义化版本号（如 `1.2.3`）。这是必需的，因为 Sparkle 将 appcast 中的 `sparkle:version` 与 `CFBundleVersion` 进行比较 — 格式不一致会导致更新检测失败。
+
 ## 配置说明
 
 模型定价存储在 `~/.claude-statistics/pricing.json`，可手动编辑或在设置标签页中更新。首次启动时自动创建并填入内置默认值。
