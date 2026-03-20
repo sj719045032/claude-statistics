@@ -15,12 +15,13 @@ final class UpdaterService: ObservableObject {
             userDriverDelegate: nil
         )
 
-        // Observe canCheckForUpdates from the updater
         controller.updater.publisher(for: \.canCheckForUpdates)
             .assign(to: &$canCheckForUpdates)
     }
 
     func checkForUpdates() {
+        // Bring app to front so Sparkle dialog is visible for background (LSUIElement) apps
+        NSApp.activate(ignoringOtherApps: true)
         controller.checkForUpdates(nil)
     }
 }
