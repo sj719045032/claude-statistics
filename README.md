@@ -67,10 +67,24 @@ Claude Statistics automatically discovers and parses all your Claude Code sessio
 ## Requirements
 
 - macOS 14.0+
-- Xcode 16.0+
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen)
 
-## Installation & Build
+## Installation
+
+### Download DMG (Recommended)
+
+Download the latest `.dmg` from [Releases](https://github.com/sj719045032/claude-statistics/releases), open it and drag **Claude Statistics** to the **Applications** folder.
+
+Since the app is not notarized, macOS may block it on first launch. To fix this, run:
+
+```bash
+xattr -cr /Applications/Claude\ Statistics.app
+```
+
+Or: right-click the app → Open → click "Open" in the dialog (first launch only).
+
+### Build from Source
+
+Requires Xcode 16.0+ and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
 
 ```bash
 # Clone the repository
@@ -84,6 +98,13 @@ xcodegen generate
 open ClaudeStatistics.xcodeproj
 
 # Build and run (Cmd+R)
+```
+
+To build a DMG for distribution:
+
+```bash
+./scripts/build-dmg.sh 1.1.0
+# Output: build/ClaudeStatistics-1.1.0.dmg
 ```
 
 ## How It Works

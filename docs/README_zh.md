@@ -67,10 +67,24 @@ Claude Statistics 自动发现并解析 `~/.claude/projects/` 下所有 Claude C
 ## 系统要求
 
 - macOS 14.0+
-- Xcode 16.0+
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen)
 
-## 安装与构建
+## 安装
+
+### 下载 DMG（推荐）
+
+从 [Releases](https://github.com/sj719045032/claude-statistics/releases) 下载最新的 `.dmg` 文件，打开后将 **Claude Statistics** 拖入 **Applications** 文件夹。
+
+由于应用未经过 Apple 公证，首次启动时 macOS 可能会拦截。解决方法：
+
+```bash
+xattr -cr /Applications/Claude\ Statistics.app
+```
+
+或者：右键点击应用 → 打开 → 在弹窗中点击「打开」（仅首次需要）。
+
+### 从源码构建
+
+需要 Xcode 16.0+ 和 [XcodeGen](https://github.com/yonaskolb/XcodeGen)。
 
 ```bash
 # 克隆仓库
@@ -84,6 +98,13 @@ xcodegen generate
 open ClaudeStatistics.xcodeproj
 
 # 构建并运行 (Cmd+R)
+```
+
+构建 DMG 分发包：
+
+```bash
+./scripts/build-dmg.sh 1.1.0
+# 输出: build/ClaudeStatistics-1.1.0.dmg
 ```
 
 ## 工作原理
