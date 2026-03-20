@@ -8,15 +8,11 @@ final class GentleReminderDelegate: NSObject, SPUStandardUserDriverDelegate {
     var supportsGentleScheduledUpdateReminders: Bool { true }
 
     func standardUserDriverWillHandleShowingUpdate(_ handleShowingUpdate: Bool, forUpdate update: SUAppcastItem, state: SPUUserUpdateState) {
-        // When an update is found (either scheduled or manual), bring app to front
-        if !state.userInitiated {
-            NSApp.setActivationPolicy(.regular)
-        }
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
     }
 
     func standardUserDriverDidReceiveUserAttention(forUpdate update: SUAppcastItem) {
-        // User saw the update dialog — revert to accessory app
         NSApp.setActivationPolicy(.accessory)
     }
 }
@@ -24,7 +20,8 @@ final class GentleReminderDelegate: NSObject, SPUStandardUserDriverDelegate {
 @MainActor
 final class UpdaterService: ObservableObject {
     let controller: SPUStandardUpdaterController
-    private let gentleDelegate = GentleReminderDelegate()
+    // Must be stored as a strong reference so Sparkle can use it
+    private static let _gentleDelegate = GentleReminderDelegate()
 
     @Published var canCheckForUpdates = false
 
@@ -32,7 +29,7 @@ final class UpdaterService: ObservableObject {
         controller = SPUStandardUpdaterController(
             startingUpdater: true,
             updaterDelegate: nil,
-            userDriverDelegate: gentleDelegate
+            userDriverDelegate: UpdaterService._gentleDelegate
         )
 
         controller.updater.publisher(for: \.canCheckForUpdates)
