@@ -112,6 +112,7 @@
 "settings.statusLine" = "状态行";
 "settings.about" = "关于";
 "settings.version" = "版本";
+"settings.checkForUpdates" = "检查更新";
 
 /* Pricing Management */
 "pricing.back" = "设置";

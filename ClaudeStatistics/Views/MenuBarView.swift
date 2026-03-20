@@ -49,6 +49,7 @@ struct MenuBarView: View {
     @ObservedObject var sessionViewModel: SessionViewModel
     @ObservedObject var statisticsViewModel: StatisticsViewModel
     @ObservedObject var store: SessionDataStore
+    @ObservedObject var updaterService: UpdaterService
     @State private var selectedTab: AppTab = AppTab.loadOrder().first ?? .sessions
     @State private var tabOrder: [AppTab] = AppTab.loadOrder()
 
@@ -81,7 +82,7 @@ struct MenuBarView: View {
                             .padding(12)
                     }
                 case .settings:
-                    SettingsView(usageViewModel: usageViewModel, tabOrder: $tabOrder)
+                    SettingsView(usageViewModel: usageViewModel, tabOrder: $tabOrder, updaterService: updaterService)
                 }
             }
             .frame(maxHeight: .infinity)

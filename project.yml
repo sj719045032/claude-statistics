@@ -12,18 +12,25 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     DEVELOPMENT_LANGUAGE: en
 
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.6.0"
+
 targets:
   ClaudeStatistics:
     type: application
     platform: macOS
     sources:
       - path: ClaudeStatistics
+    dependencies:
+      - package: Sparkle
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tinystone.ClaudeStatistics
         PRODUCT_NAME: Claude Statistics
-        MARKETING_VERSION: "1.0.0"
-        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "1.1.0"
+        CURRENT_PROJECT_VERSION: "2"
         INFOPLIST_FILE: ClaudeStatistics/App/Info.plist
         CODE_SIGN_ENTITLEMENTS: ClaudeStatistics/App/ClaudeStatistics.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

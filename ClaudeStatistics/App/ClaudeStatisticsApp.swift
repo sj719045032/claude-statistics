@@ -6,6 +6,7 @@ final class AppState: ObservableObject {
     lazy var sessionViewModel = SessionViewModel(store: store)
     lazy var statisticsViewModel = StatisticsViewModel(store: store)
     let usageViewModel = UsageViewModel()
+    let updaterService = UpdaterService()
 }
 
 struct MenuBarLabel: View {
@@ -36,7 +37,8 @@ struct ClaudeStatisticsApp: App {
                 usageViewModel: appState.usageViewModel,
                 sessionViewModel: appState.sessionViewModel,
                 statisticsViewModel: appState.statisticsViewModel,
-                store: appState.store
+                store: appState.store,
+                updaterService: appState.updaterService
             )
             .environment(\.locale, LanguageManager.currentLocale)
         } label: {

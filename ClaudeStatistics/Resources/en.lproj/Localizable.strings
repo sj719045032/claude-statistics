@@ -112,6 +112,7 @@
 "settings.statusLine" = "Status Line";
 "settings.about" = "About";
 "settings.version" = "Version";
+"settings.checkForUpdates" = "Check for Updates";
 
 /* Pricing Management */
 "pricing.back" = "Settings";

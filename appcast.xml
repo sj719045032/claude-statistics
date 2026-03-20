@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Claude Statistics</title>
+    <link>https://github.com/sj719045032/claude-statistics</link>
+    <item>
+      <title>Version 1.2.0</title>
+      <pubDate>Fri, 20 Mar 2026 19:31:50 +0800</pubDate>
+      <sparkle:version>1.2.0</sparkle:version>
+      <sparkle:shortVersionString>1.2.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v1.2.0/ClaudeStatistics-1.2.0.dmg"
+                 type="application/octet-stream"
+                 sparkle:edSignature="ZnHwt5/g3X2FLuytCdSBfaJ181LCRsgDy7ilwbqgpHR/NLTiGPOxkgbefiZrF5+EcU72Oymrw2xNQTRxl2kzCQ==" length="2246305" />
+    </item>
+  </channel>
+</rss>

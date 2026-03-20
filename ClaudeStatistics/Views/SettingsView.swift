@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var usageViewModel: UsageViewModel
     @Binding var tabOrder: [AppTab]
+    @ObservedObject var updaterService: UpdaterService
     @AppStorage("autoRefreshEnabled") private var autoRefreshEnabled = false
     @AppStorage("refreshInterval") private var refreshInterval = 300.0
     @AppStorage("preferredTerminal") private var preferredTerminal = "Auto"
@@ -152,10 +153,20 @@ struct SettingsView: View {
                 HStack {
                     Text("settings.version")
                     Spacer()
-                    Text("1.0.0")
+                    Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "–")
                         .foregroundStyle(.secondary)
                 }
                 .font(.system(size: 12))
+
+                Button(action: { updaterService.checkForUpdates() }) {
+                    HStack {
+                        Label(String(localized: "settings.checkForUpdates"), systemImage: "arrow.triangle.2.circlepath")
+                        Spacer()
+                    }
+                    .font(.system(size: 12))
+                }
+                .buttonStyle(.plain)
+                .disabled(!updaterService.canCheckForUpdates)
             }
         }
         .formStyle(.grouped)
