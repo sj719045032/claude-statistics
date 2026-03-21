@@ -55,6 +55,10 @@ final class UsageAPIService {
             throw UsageError.rateLimited(retryInSeconds: retrySeconds)
         }
 
+        if httpResponse.statusCode == 401 {
+            throw UsageError.unauthorized
+        }
+
         guard httpResponse.statusCode == 200 else {
             throw UsageError.httpError(statusCode: httpResponse.statusCode)
         }
@@ -75,6 +79,25 @@ final class UsageAPIService {
         saveToCache(usageData)
 
         return usageData
+    }
+
+    // MARK: - Token Refresh
+
+    /// Trigger Claude Code CLI to refresh the OAuth token
+    func refreshToken() async -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["claude", "auth", "status"]
+        process.standardOutput = Pipe()
+        process.standardError = Pipe()
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            return false
+        }
     }
 
     // MARK: - Fetch Profile
@@ -177,6 +200,7 @@ enum UsageError: LocalizedError {
     case invalidResponse
     case httpError(statusCode: Int)
     case rateLimited(retryInSeconds: Int)
+    case unauthorized
     case decodingFailed(detail: String, raw: String)
 
     var errorDescription: String? {
@@ -186,6 +210,7 @@ enum UsageError: LocalizedError {
         case .invalidResponse: return "Invalid response"
         case .httpError(let code): return "HTTP error: \(code)"
         case .rateLimited(let seconds): return "Rate limited, retry in \(seconds)s"
+        case .unauthorized: return "Token expired — open Claude Code to refresh"
         case .decodingFailed(let detail, _): return "Decoding error: \(detail)"
         }
     }

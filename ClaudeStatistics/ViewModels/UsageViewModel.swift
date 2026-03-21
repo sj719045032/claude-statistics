@@ -76,9 +76,27 @@ final class UsageViewModel: ObservableObject {
             lastFetchedAt = Date()
             errorMessage = nil
         } catch let error as UsageError {
-            if case .rateLimited = error {
+            switch error {
+            case .rateLimited:
                 loadCache()
-            } else {
+            case .unauthorized:
+                // Ask Claude Code CLI to refresh the token, then retry
+                let refreshed = await UsageAPIService.shared.refreshToken()
+                if refreshed {
+                    do {
+                        let data = try await UsageAPIService.shared.fetchUsage()
+                        usageData = data
+                        lastFetchedAt = Date()
+                        errorMessage = nil
+                    } catch {
+                        errorMessage = error.localizedDescription
+                        if usageData == nil { loadCache() }
+                    }
+                } else {
+                    errorMessage = UsageError.unauthorized.localizedDescription
+                    if usageData == nil { loadCache() }
+                }
+            default:
                 errorMessage = error.localizedDescription
                 if usageData == nil { loadCache() }
             }
