@@ -90,6 +90,8 @@
 "usage.7daySonnet" = "7 Day Sonnet";
 "usage.extraUsage" = "Extra Usage";
 "usage.resetsIn %@" = "resets in %@";
+"usage.exhaustEstimate %@" = "At current rate, exhausts in %@";
+"usage.safeEstimate %@" = "At current rate, resets before exhaustion (%@ remaining)";
 "usage.noData" = "No usage data available";
 "usage.retry" = "Retry";
 "usage.updated %@" = "Updated: %@";

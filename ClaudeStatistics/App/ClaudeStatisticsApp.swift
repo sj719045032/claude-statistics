@@ -22,6 +22,7 @@ struct MenuBarLabel: View {
                 .renderingMode(.template)
             Text(usageViewModel.menuBarText)
                 .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(usageViewModel.menuBarColor)
         }
     }
 }

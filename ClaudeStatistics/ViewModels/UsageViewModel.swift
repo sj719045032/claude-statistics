@@ -136,6 +136,28 @@ final class UsageViewModel: ObservableObject {
         return TimeFormatter.countdown(from: interval)
     }
 
+    /// Predicts when the 5-hour window will be exhausted at the current consumption rate.
+    /// Returns (estimate string, will exhaust before reset), or nil if utilization < 10%.
+    var fiveHourExhaustEstimate: (text: String, willExhaust: Bool)? {
+        guard let window = usageData?.fiveHour,
+              window.utilization >= 10,
+              let timeUntilReset = window.timeUntilReset else { return nil }
+
+        let windowDuration: TimeInterval = 5 * 3600
+        let elapsed = windowDuration - timeUntilReset
+        guard elapsed > 0 else { return nil }
+
+        let rate = window.utilization / elapsed
+        guard rate > 0 else { return nil }
+
+        let remaining = 100.0 - window.utilization
+        guard remaining > 0 else { return nil }
+
+        let secondsToExhaust = remaining / rate
+        let willExhaust = secondsToExhaust < timeUntilReset
+        return (text: TimeFormatter.countdown(from: secondsToExhaust), willExhaust: willExhaust)
+    }
+
     var statusColor: Color {
         let maxUtil = max(fiveHourPercent, sevenDayPercent)
         if maxUtil >= 80 { return .red }
@@ -144,7 +166,15 @@ final class UsageViewModel: ObservableObject {
     }
 
     var menuBarText: String {
-        let pct = fiveHourPercent
-        return "\(Int(pct))%"
+        let pct = Int(fiveHourPercent)
+        if fiveHourPercent >= 80 { return "\u{26A0} \(pct)%" }
+        if fiveHourPercent >= 50 { return "\u{26A1} \(pct)%" }
+        return "\(pct)%"
+    }
+
+    var menuBarColor: Color {
+        if fiveHourPercent >= 80 { return .red }
+        if fiveHourPercent >= 50 { return .orange }
+        return .primary
     }
 }

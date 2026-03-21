@@ -200,6 +200,15 @@ struct SettingsView: View {
                     Spacer()
                     Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "–")
                         .foregroundStyle(.secondary)
+                    #if DEBUG
+                    Text("DEBUG")
+                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(Color.orange)
+                        .cornerRadius(3)
+                    #endif
                     if let newVersion = updaterService.availableVersion {
                         Text("v\(newVersion)")
                             .font(.system(size: 9, weight: .medium))

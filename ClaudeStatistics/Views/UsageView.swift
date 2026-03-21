@@ -45,6 +45,18 @@ struct UsageView: View {
                     countdown: viewModel.fiveHourResetCountdown
                 )
 
+                if let estimate = viewModel.fiveHourExhaustEstimate {
+                    if estimate.willExhaust {
+                        Text("usage.exhaustEstimate \(estimate.text)")
+                            .font(.caption2)
+                            .foregroundStyle(.red)
+                    } else {
+                        Text("usage.safeEstimate \(estimate.text)")
+                            .font(.caption2)
+                            .foregroundStyle(.green)
+                    }
+                }
+
                 UsageWindowRow(
                     title: "usage.7day",
                     utilization: usage.sevenDay?.utilization ?? 0,
