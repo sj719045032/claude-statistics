@@ -4,14 +4,14 @@
     <title>Claude Statistics</title>
     <link>https://github.com/sj719045032/claude-statistics</link>
     <item>
-      <title>Version 1.3.8</title>
-      <pubDate>Sat, 21 Mar 2026 02:00:23 +0800</pubDate>
-      <sparkle:version>1.3.8</sparkle:version>
-      <sparkle:shortVersionString>1.3.8</sparkle:shortVersionString>
+      <title>Version 1.3.9</title>
+      <pubDate>Sat, 21 Mar 2026 10:04:15 +0800</pubDate>
+      <sparkle:version>1.3.9</sparkle:version>
+      <sparkle:shortVersionString>1.3.9</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v1.3.8/ClaudeStatistics-1.3.8.dmg"
+      <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v1.3.9/ClaudeStatistics-1.3.9.dmg"
                  type="application/octet-stream"
-                 sparkle:edSignature="sBtuEA1pc7xj09JGpDkUdeMJRPSxckI8I3VDZxj3ZJEvFZcf34E2cXRp8LqeagNKUAZs6F9BJ78xepufsmcTAQ==" length="2329581" />
+                 sparkle:edSignature="dmaS4m1ya9D/XjD4Fq6VKgnjkT/NrxV2Zw3TIeP/97iCeux5/vYA1b8eLndXIMB2QJUK+WCqHMUr2poUYe6hBw==" length="2331995" />
     </item>
   </channel>
 </rss>
