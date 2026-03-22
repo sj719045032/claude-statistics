@@ -1,4 +1,5 @@
 import SwiftUI
+import ServiceManagement
 
 struct SettingsView: View {
     @ObservedObject var usageViewModel: UsageViewModel
@@ -14,6 +15,7 @@ struct SettingsView: View {
     @State private var customMinutes = ""
     @State private var showPricing = false
     @State private var hasToken: Bool?
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
         VStack(spacing: 0) {
@@ -41,6 +43,21 @@ struct SettingsView: View {
             Divider()
 
             Form {
+            Section("settings.general") {
+                Toggle("settings.launchAtLogin", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { _, newValue in
+                        do {
+                            if newValue {
+                                try SMAppService.mainApp.register()
+                            } else {
+                                try SMAppService.mainApp.unregister()
+                            }
+                        } catch {
+                            launchAtLogin = SMAppService.mainApp.status == .enabled
+                        }
+                    }
+            }
+
             Section("settings.terminal") {
                 Picker("settings.resumeIn", selection: $preferredTerminal) {
                     ForEach(TerminalApp.allCases) { app in

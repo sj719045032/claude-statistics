@@ -102,6 +102,8 @@
 "settings.interval" = "Interval";
 "settings.autoRefreshHint" = "The usage API is rate-limited. A longer interval is recommended to avoid errors.";
 "settings.fontSize" = "Font Size";
+"settings.general" = "General";
+"settings.launchAtLogin" = "Launch at login";
 "settings.terminal" = "Terminal";
 "settings.resumeIn" = "Resume in";
 "settings.notFound %@" = "%@ (not found)";

@@ -166,15 +166,6 @@ final class UsageViewModel: ObservableObject {
     }
 
     var menuBarText: String {
-        let pct = Int(fiveHourPercent)
-        if fiveHourPercent >= 80 { return "\u{26A0} \(pct)%" }
-        if fiveHourPercent >= 50 { return "\u{26A1} \(pct)%" }
-        return "\(pct)%"
-    }
-
-    var menuBarColor: Color {
-        if fiveHourPercent >= 80 { return .red }
-        if fiveHourPercent >= 50 { return .orange }
-        return .primary
+        "\(Int(fiveHourPercent))%"
     }
 }

@@ -102,6 +102,8 @@
 "settings.interval" = "间隔";
 "settings.autoRefreshHint" = "用量接口容易限流，建议适当调大刷新间隔";
 "settings.fontSize" = "字体大小";
+"settings.general" = "通用";
+"settings.launchAtLogin" = "开机自动启动";
 "settings.terminal" = "终端";
 "settings.resumeIn" = "恢复终端";
 "settings.notFound %@" = "%@（未找到）";
