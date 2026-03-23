@@ -142,12 +142,87 @@ final class TranscriptParser {
         return stats
     }
 
+    /// Parse JSONL into time-bucketed trend data points for chart display
+    func parseTrendData(from filePath: String, granularity: TrendGranularity) -> [TrendDataPoint] {
+        guard let data = FileManager.default.contents(atPath: filePath),
+              let content = String(data: data, encoding: .utf8) else {
+            return []
+        }
+
+        let decoder = JSONDecoder()
+        let lines = content.components(separatedBy: "\n")
+
+        // Per-message: track last entry (streaming dedup), keyed by message ID
+        struct MsgData {
+            var timestamp: Date
+            var model: String
+            var inputTokens: Int = 0
+            var outputTokens: Int = 0
+            var cacheCreationTotalTokens: Int = 0
+            var cacheReadTokens: Int = 0
+            var cacheCreation5mTokens: Int = 0
+            var cacheCreation1hTokens: Int = 0
+        }
+        var messageData: [String: MsgData] = [:]
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, let lineData = trimmed.data(using: .utf8) else { continue }
+            guard let entry = try? decoder.decode(TranscriptEntry.self, from: lineData) else { continue }
+            guard entry.type == "assistant",
+                  let message = entry.message,
+                  let usage = message.usage,
+                  let timestamp = entry.timestampDate else { continue }
+
+            let isSynthetic = message.model == "<synthetic>"
+            guard !isSynthetic else { continue }
+
+            let msgId = message.id ?? UUID().uuidString
+            let model = message.model ?? "Unknown"
+
+            messageData[msgId] = MsgData(
+                timestamp: timestamp,
+                model: model,
+                inputTokens: usage.inputTokens ?? 0,
+                outputTokens: usage.outputTokens ?? 0,
+                cacheCreationTotalTokens: usage.cacheCreationInputTokens ?? 0,
+                cacheReadTokens: usage.cacheReadInputTokens ?? 0,
+                cacheCreation5mTokens: usage.cacheCreation?.ephemeral5mInputTokens ?? 0,
+                cacheCreation1hTokens: usage.cacheCreation?.ephemeral1hInputTokens ?? 0
+            )
+        }
+
+        // Bucket by granularity
+        var buckets: [Date: (tokens: Int, cost: Double)] = [:]
+        for (_, msg) in messageData {
+            let bucket = granularity.bucketStart(for: msg.timestamp)
+            let tokens = msg.inputTokens + msg.outputTokens + msg.cacheCreationTotalTokens + msg.cacheReadTokens
+            let cost = ModelPricing.estimateCost(
+                model: msg.model,
+                inputTokens: msg.inputTokens,
+                outputTokens: msg.outputTokens,
+                cacheCreation5mTokens: msg.cacheCreation5mTokens,
+                cacheCreation1hTokens: msg.cacheCreation1hTokens,
+                cacheCreationTotalTokens: msg.cacheCreationTotalTokens,
+                cacheReadTokens: msg.cacheReadTokens
+            )
+            var existing = buckets[bucket, default: (tokens: 0, cost: 0)]
+            existing.tokens += tokens
+            existing.cost += cost
+            buckets[bucket] = existing
+        }
+
+        return buckets.map { TrendDataPoint(time: $0.key, tokens: $0.value.tokens, cost: $0.value.cost) }
+            .sorted { $0.time < $1.time }
+    }
+
     /// Parse only basic info (fast, reads first few lines)
     struct QuickStats {
         var startTime: Date?
         var model: String?
         var topic: String?
         var lastPrompt: String?
+        var sessionName: String?
         var messageCount: Int = 0
         var userMessageCount: Int = 0
         var totalTokens: Int = 0
@@ -256,21 +331,34 @@ final class TranscriptParser {
         let tailData = handle.readData(ofLength: Int(tailSize))
         if let tailContent = String(data: tailData, encoding: .utf8) {
             let tailLines = tailContent.components(separatedBy: "\n")
+            var foundPrompt = false
+            var latestSlug: String?
+            var latestCustomTitle: String?
             for line in tailLines.reversed() {
                 let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmed.isEmpty,
                       let lineData = trimmed.data(using: .utf8),
                       let entry = try? decoder.decode(TranscriptEntry.self, from: lineData) else { continue }
-                if entry.type == "user" || entry.type == "human" {
+
+                // Extract session name (customTitle from /rename, or auto-generated slug)
+                if latestCustomTitle == nil, let ct = entry.customTitle {
+                    latestCustomTitle = ct
+                }
+                if latestSlug == nil, let s = entry.slug {
+                    latestSlug = s
+                }
+
+                if !foundPrompt, entry.type == "user" || entry.type == "human" {
                     if let text = Self.extractUserText(from: entry) {
                         let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
                         if !cleaned.isEmpty {
                             quick.lastPrompt = cleaned.count > 200 ? String(cleaned.prefix(200)) + "…" : cleaned
-                            break
+                            foundPrompt = true
                         }
                     }
                 }
             }
+            quick.sessionName = latestCustomTitle ?? latestSlug
         }
 
         return quick
