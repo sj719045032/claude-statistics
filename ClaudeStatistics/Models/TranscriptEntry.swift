@@ -7,6 +7,8 @@ struct TranscriptEntry: Codable {
     let message: TranscriptMessage?
     let lastPrompt: String?
     let uuid: String?
+    let slug: String?
+    let customTitle: String?
 
     var timestampDate: Date? {
         guard let timestamp else { return nil }

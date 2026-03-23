@@ -132,6 +132,7 @@ struct MenuBarView: View {
             SessionDetailView(
                 session: session,
                 topic: store.quickStats[session.id]?.topic,
+                sessionName: store.quickStats[session.id]?.sessionName,
                 stats: sessionViewModel.selectedSessionStats,
                 isLoading: sessionViewModel.isLoadingStats,
                 onBack: { sessionViewModel.selectedSession = nil; sessionViewModel.selectedSessionStats = nil },

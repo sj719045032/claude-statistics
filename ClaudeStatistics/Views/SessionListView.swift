@@ -195,7 +195,12 @@ struct SessionRow: View {
                     }
                 }
 
-                if let topic = quickStats?.topic {
+                if let name = quickStats?.sessionName {
+                    Text(name)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.primary.opacity(0.75))
+                        .lineLimit(1)
+                } else if let topic = quickStats?.topic {
                     Text(topic)
                         .font(.system(size: 11))
                         .foregroundStyle(.primary.opacity(0.75))

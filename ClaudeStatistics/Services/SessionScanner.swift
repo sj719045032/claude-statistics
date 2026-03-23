@@ -52,12 +52,12 @@ final class SessionScanner {
         return sessions.sorted { $0.lastModified > $1.lastModified }
     }
 
-    /// Read cwd from first few lines of JSONL (very fast, only reads ~4KB)
+    /// Read cwd from first few lines of JSONL (reads up to 64KB to handle large first entries like file-history-snapshot)
     private func readCwd(from path: String) -> String? {
         guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
         defer { handle.closeFile() }
 
-        let data = handle.readData(ofLength: 4096)
+        let data = handle.readData(ofLength: 65536)
         guard let content = String(data: data, encoding: .utf8) else { return nil }
 
         for line in content.components(separatedBy: "\n") {

@@ -15,7 +15,8 @@ struct Session: Identifiable, Hashable {
         if let cwd, !cwd.isEmpty {
             return cwd
         }
-        return "~"
+        // Fallback: show project folder name as-is (can't reliably convert - to /)
+        return (projectPath as NSString).lastPathComponent
     }
 
     func hash(into hasher: inout Hasher) {

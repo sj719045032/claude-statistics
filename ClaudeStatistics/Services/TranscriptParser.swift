@@ -212,8 +212,15 @@ final class TranscriptParser {
             buckets[bucket] = existing
         }
 
-        return buckets.map { TrendDataPoint(time: $0.key, tokens: $0.value.tokens, cost: $0.value.cost) }
-            .sorted { $0.time < $1.time }
+        // Sort by time, then accumulate into running totals
+        let sorted = buckets.sorted { $0.key < $1.key }
+        var cumTokens = 0
+        var cumCost = 0.0
+        return sorted.map { (time, val) in
+            cumTokens += val.tokens
+            cumCost += val.cost
+            return TrendDataPoint(time: time, tokens: cumTokens, cost: cumCost)
+        }
     }
 
     /// Parse only basic info (fast, reads first few lines)
