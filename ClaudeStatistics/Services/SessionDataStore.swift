@@ -296,6 +296,34 @@ final class SessionDataStore: ObservableObject {
         modelBreakdown(for: visibleStats)
     }
 
+    /// Aggregate trend data for a given period from parsed session stats
+    func aggregateTrendData(for period: PeriodStats, periodType: StatsPeriod) -> [TrendDataPoint] {
+        let granularity = periodType.trendGranularity
+
+        var buckets: [Date: (tokens: Int, cost: Double)] = [:]
+
+        for (sessionId, stats) in parsedStats {
+            guard let session = sessions.first(where: { $0.id == sessionId }) else { continue }
+            let sessionDate = stats.startTime ?? session.lastModified
+            let sessionPeriodStart = periodType.startOfPeriod(for: sessionDate)
+
+            // Only include sessions in this period
+            guard sessionPeriodStart == period.period else { continue }
+
+            let bucket = granularity.bucketStart(for: sessionDate)
+            let tokens = stats.totalTokens
+            let cost = stats.estimatedCost
+
+            var existing = buckets[bucket, default: (tokens: 0, cost: 0)]
+            existing.tokens += tokens
+            existing.cost += cost
+            buckets[bucket] = existing
+        }
+
+        return buckets.map { TrendDataPoint(time: $0.key, tokens: $0.value.tokens, cost: $0.value.cost) }
+            .sorted { $0.time < $1.time }
+    }
+
     var globalModelBreakdown: [ModelUsage] {
         modelBreakdown(for: periodStats)
     }
