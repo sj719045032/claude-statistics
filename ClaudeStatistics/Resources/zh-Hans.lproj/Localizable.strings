@@ -45,6 +45,7 @@
 "detail.user" = "用户";
 "detail.assistant" = "助手";
 "detail.tools" = "工具";
+"detail.trend" = "趋势";
 "detail.calls %lld" = "%lld 次调用";
 "detail.estimatedCost" = "预估费用";
 "detail.models %lld" = "%lld 个模型";

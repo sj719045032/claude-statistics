@@ -45,6 +45,7 @@
 "detail.user" = "User";
 "detail.assistant" = "Assistant";
 "detail.tools" = "Tools";
+"detail.trend" = "Trend";
 "detail.calls %lld" = "%lld calls";
 "detail.estimatedCost" = "Estimated Cost";
 "detail.models %lld" = "%lld models";

@@ -4,6 +4,7 @@ import AppKit
 struct SessionDetailView: View {
     let session: Session
     var topic: String? = nil
+    var sessionName: String? = nil
     let stats: SessionStats?
     let isLoading: Bool
     let onBack: () -> Void
@@ -12,6 +13,9 @@ struct SessionDetailView: View {
     @State private var showDeleteConfirm = false
     @State private var isTopicExpanded = false
     @State private var isPromptExpanded = false
+    @State private var trendGranularity: TrendGranularity = .hour
+    @State private var trendData: [TrendDataPoint] = []
+    @State private var isTrendLoading = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -75,6 +79,11 @@ struct SessionDetailView: View {
                                 .foregroundStyle(.tertiary)
                                 .lineLimit(1)
                             CopyButton(text: session.id, help: "detail.copyId")
+                        }
+                        if let sessionName, !sessionName.isEmpty {
+                            Text(sessionName)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.blue)
                         }
                         if let topic, !topic.isEmpty {
                             VStack(alignment: .leading, spacing: 2) {
@@ -169,6 +178,41 @@ struct SessionDetailView: View {
                 }
                 InfoCell(title: "detail.size", value: TimeFormatter.fileSize(session.fileSize), icon: "doc")
             }
+        }
+
+        // Trend chart
+        SectionCard {
+            VStack(spacing: 8) {
+                HStack {
+                    Label("detail.trend", systemImage: "chart.line.uptrend.xyaxis")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Picker("", selection: $trendGranularity) {
+                        ForEach(TrendGranularity.sessionCases, id: \.self) { g in
+                            Text(g.rawValue.capitalized).tag(g)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 180)
+                }
+
+                if isTrendLoading {
+                    ProgressView()
+                        .scaleEffect(0.6)
+                        .frame(height: 100)
+                        .frame(maxWidth: .infinity)
+                } else {
+                    TrendChartView(dataPoints: trendData, granularity: trendGranularity)
+                }
+            }
+        }
+        .task {
+            trendGranularity = TrendGranularity.autoSelect(for: stats.duration)
+            await loadTrendData()
+        }
+        .onChange(of: trendGranularity) { _, _ in
+            Task { await loadTrendData() }
         }
 
         // Context window usage
@@ -329,6 +373,17 @@ struct SessionDetailView: View {
     }
 
     // MARK: - Helpers
+
+    private func loadTrendData() async {
+        isTrendLoading = true
+        let path = session.filePath
+        let gran = trendGranularity
+        let data = await Task.detached {
+            TranscriptParser.shared.parseTrendData(from: path, granularity: gran)
+        }.value
+        isTrendLoading = false
+        trendData = data
+    }
 
     private func displayModel(_ model: String) -> String {
         model.replacingOccurrences(of: "claude-", with: "")
