@@ -14,6 +14,7 @@ struct StatisticsView: View {
                 PeriodDetailView(
                     stat: detail,
                     periodType: store.selectedPeriod,
+                    store: store,
                     onBack: { selectedPeriodDetail = nil }
                 )
             } else {
@@ -461,7 +462,10 @@ struct PeriodModelBreakdownCard: View {
 struct PeriodDetailView: View {
     let stat: PeriodStats
     let periodType: StatsPeriod
+    let store: SessionDataStore
     let onBack: () -> Void
+
+    @State private var trendData: [TrendDataPoint] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -499,6 +503,21 @@ struct PeriodDetailView: View {
                             Divider().frame(height: 28)
                             overviewItem("stats.tools", value: "\(stat.toolUseCount)", icon: "wrench")
                         }
+                    }
+
+                    // Trend chart
+                    SectionCard {
+                        VStack(spacing: 8) {
+                            Label("detail.trend", systemImage: "chart.line.uptrend.xyaxis")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                            TrendChartView(dataPoints: trendData, granularity: periodType.trendGranularity)
+                        }
+                    }
+                    .task {
+                        trendData = store.aggregateTrendData(for: stat, periodType: periodType)
                     }
 
                     // Cost & Models (merged, same as session detail)
