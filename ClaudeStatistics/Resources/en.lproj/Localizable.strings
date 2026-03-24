@@ -22,6 +22,8 @@
 "session.new.help" = "New session in same directory";
 "session.resume.help" = "Resume session";
 "session.delete.help" = "Delete session";
+"session.projectCount %lld" = "%lld projects";
+"session.untitled" = "Untitled Session";
 
 /* Session Detail */
 "detail.back" = "Back";

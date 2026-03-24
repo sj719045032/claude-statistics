@@ -48,6 +48,12 @@ enum TerminalLauncher {
         launchInTerminal(command: command)
     }
 
+    /// Open a new Claude session in a specific directory
+    static func openNewSessionInDirectory(_ path: String) {
+        let command = "cd \(shellEscape(path)) && claude"
+        launchInTerminal(command: command)
+    }
+
     private static func launchInTerminal(command: String) {
         let preferred = TerminalApp.preferred
         // Extract cwd from command for terminal apps that need it separately

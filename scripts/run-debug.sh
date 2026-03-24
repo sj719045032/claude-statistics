@@ -6,10 +6,10 @@ BUILD_DIR="/tmp/claude-stats-build"
 APP_PATH="${BUILD_DIR}/Build/Products/Debug/${APP_NAME}.app"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
 
-# 1. Kill all running instances
+# 1. Kill all running instances and wait for full exit
 echo "==> Killing old instances..."
 killall "${APP_NAME}" 2>/dev/null || true
-sleep 1
+while pgrep -x "${APP_NAME}" >/dev/null 2>&1; do sleep 0.2; done
 
 # 2. Clean up any stale DerivedData builds to avoid bundle ID conflicts
 echo "==> Cleaning stale builds..."

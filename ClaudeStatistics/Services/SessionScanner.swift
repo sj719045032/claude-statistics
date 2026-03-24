@@ -52,20 +52,24 @@ final class SessionScanner {
         return sessions.sorted { $0.lastModified > $1.lastModified }
     }
 
-    /// Read cwd from first few lines of JSONL (reads up to 64KB to handle large first entries like file-history-snapshot)
+    /// Read cwd from JSONL file by reading in 64KB chunks until found
     private func readCwd(from path: String) -> String? {
         guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
         defer { handle.closeFile() }
 
-        let data = handle.readData(ofLength: 65536)
-        guard let content = String(data: data, encoding: .utf8) else { return nil }
+        var buffer = Data()
+        let chunkSize = 65536
 
-        for line in content.components(separatedBy: "\n") {
-            // Quick string search instead of full JSON decode
-            if let range = line.range(of: "\"cwd\":\"") {
+        while buffer.count < 1_048_576 {
+            let chunk = handle.readData(ofLength: chunkSize)
+            if chunk.isEmpty { break }
+            buffer.append(chunk)
+
+            if let content = String(data: buffer, encoding: .utf8),
+               let range = content.range(of: "\"cwd\":\"") {
                 let start = range.upperBound
-                if let end = line[start...].firstIndex(of: "\"") {
-                    return String(line[start..<end])
+                if let end = content[start...].firstIndex(of: "\"") {
+                    return String(content[start..<end])
                 }
             }
         }

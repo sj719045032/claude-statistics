@@ -1,6 +1,28 @@
 import SwiftUI
 import AppKit
 
+// MARK: - Helpers
+
+private func shortModel(_ id: String) -> String {
+    id.replacingOccurrences(of: "claude-", with: "")
+        .replacingOccurrences(of: "-2025", with: "")
+        .replacingOccurrences(of: "-2024", with: "")
+}
+
+private func formatCost(_ cost: Double) -> String {
+    if cost >= 1.0 { return String(format: "$%.2f", cost) }
+    if cost >= 0.01 { return String(format: "$%.3f", cost) }
+    return String(format: "$%.4f", cost)
+}
+
+private func costColor(_ cost: Double) -> Color {
+    if cost > 1.0 { return .red }
+    if cost > 0.1 { return .orange }
+    return .green
+}
+
+// MARK: - SessionListView
+
 struct SessionListView: View {
     @ObservedObject var viewModel: SessionViewModel
     @ObservedObject var store: SessionDataStore
@@ -34,7 +56,7 @@ struct SessionListView: View {
             .padding(.bottom, 4)
 
             // Header
-            HStack(spacing: 8) {
+            HStack(spacing: 4) {
                 if viewModel.isSelecting {
                     Text("session.selected \(viewModel.selectedIds.count)")
                         .font(.caption)
@@ -64,6 +86,12 @@ struct SessionListView: View {
                     Text("session.count \(viewModel.filteredSessions.count)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Text("·")
+                        .font(.caption)
+                        .foregroundStyle(.quaternary)
+                    Text("session.projectCount \(viewModel.projectGroups.count)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
                     Spacer()
 
@@ -87,31 +115,50 @@ struct SessionListView: View {
 
             Divider()
 
-            // Session list
+            // Grouped session list
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 1) {
-                    ForEach(viewModel.filteredSessions) { session in
-                        SessionRow(
-                            session: session,
-                            quickStats: viewModel.quickStat(for: session),
-                            cachedStats: store.parsedStats[session.id],
-                            isSelected: viewModel.selectedSession?.id == session.id,
-                            isSelecting: viewModel.isSelecting,
-                            isChecked: viewModel.selectedIds.contains(session.id),
-                            onTap: {
-                                if viewModel.isSelecting {
-                                    viewModel.toggleSelect(session)
-                                } else {
-                                    viewModel.selectSession(session)
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(viewModel.projectGroups) { group in
+                        ProjectGroupHeader(
+                            group: group,
+                            store: store,
+                            isExpanded: viewModel.isProjectExpanded(group.projectPath),
+                            onToggle: {
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    viewModel.toggleProjectExpanded(group.projectPath)
                                 }
                             },
-                            onNewSession: { TerminalLauncher.openNewSession(session) },
-                            onResume: { TerminalLauncher.openSession(session) },
-                            onDelete: {
-                                deleteTarget = [session.id]
-                                showDeleteConfirm = true
+                            onNewSession: {
+                                TerminalLauncher.openNewSessionInDirectory(group.cwdPath)
                             }
                         )
+
+                        if viewModel.isProjectExpanded(group.projectPath) {
+                            ForEach(group.sessions) { session in
+                                SessionRow(
+                                    session: session,
+                                    quickStats: viewModel.quickStat(for: session),
+                                    cachedStats: store.parsedStats[session.id],
+                                    isSelected: viewModel.selectedSession?.id == session.id,
+                                    isSelecting: viewModel.isSelecting,
+                                    isChecked: viewModel.selectedIds.contains(session.id),
+                                    grouped: true,
+                                    onTap: {
+                                        if viewModel.isSelecting {
+                                            viewModel.toggleSelect(session)
+                                        } else {
+                                            viewModel.selectSession(session)
+                                        }
+                                    },
+                                    onNewSession: { TerminalLauncher.openNewSession(session) },
+                                    onResume: { TerminalLauncher.openSession(session) },
+                                    onDelete: {
+                                        deleteTarget = [session.id]
+                                        showDeleteConfirm = true
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
                 .padding(.vertical, 4)
@@ -153,6 +200,68 @@ struct SessionListView: View {
     }
 }
 
+// MARK: - ProjectGroupHeader
+
+struct ProjectGroupHeader: View {
+    let group: ProjectGroup
+    @ObservedObject var store: SessionDataStore
+    let isExpanded: Bool
+    let onToggle: () -> Void
+    let onNewSession: () -> Void
+    @State private var isHovered = false
+
+    private var groupCost: Double {
+        group.sessions.compactMap { store.parsedStats[$0.id]?.estimatedCost }.reduce(0, +)
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+                .frame(width: 10)
+
+            Image(systemName: "folder.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(.orange)
+
+            Text(group.shortPath)
+                .font(.system(size: 12, weight: .semibold))
+                .lineLimit(1)
+
+            Spacer()
+
+            if isHovered {
+                Button(action: onNewSession) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.green)
+                }
+                .buttonStyle(.plain)
+                .help("session.new.help")
+            }
+
+            Text("\(group.sessions.count)")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.secondary)
+
+            if groupCost > 0 {
+                Text(formatCost(groupCost))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(costColor(groupCost))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(isHovered ? Color.gray.opacity(0.06) : Color.clear)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onToggle)
+        .onHover { isHovered = $0 }
+    }
+}
+
+// MARK: - SessionRow
+
 struct SessionRow: View {
     let session: Session
     let quickStats: TranscriptParser.QuickStats?
@@ -160,11 +269,30 @@ struct SessionRow: View {
     let isSelected: Bool
     let isSelecting: Bool
     let isChecked: Bool
+    var grouped: Bool = false
     let onTap: () -> Void
     let onNewSession: () -> Void
     let onResume: () -> Void
     let onDelete: () -> Void
     @State private var isHovered = false
+
+    private var primaryTitle: String {
+        if grouped {
+            return quickStats?.sessionName ?? quickStats?.topic ?? String(localized: "session.untitled")
+        }
+        return session.displayName
+    }
+
+    private var subtitle: String? {
+        if grouped {
+            // Show topic as subtitle only when sessionName was used as title
+            if quickStats?.sessionName != nil {
+                return quickStats?.topic
+            }
+            return nil
+        }
+        return quickStats?.sessionName ?? quickStats?.topic
+    }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -176,7 +304,7 @@ struct SessionRow: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Text(session.displayName)
+                    Text(primaryTitle)
                         .font(.system(size: 12, weight: .medium))
                         .lineLimit(1)
 
@@ -195,13 +323,8 @@ struct SessionRow: View {
                     }
                 }
 
-                if let name = quickStats?.sessionName {
-                    Text(name)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.primary.opacity(0.75))
-                        .lineLimit(1)
-                } else if let topic = quickStats?.topic {
-                    Text(topic)
+                if let sub = subtitle {
+                    Text(sub)
                         .font(.system(size: 11))
                         .foregroundStyle(.primary.opacity(0.75))
                         .lineLimit(1)
@@ -244,13 +367,15 @@ struct SessionRow: View {
             Spacer()
 
             if !isSelecting && isHovered {
-                Button(action: onNewSession) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.green)
+                if !grouped {
+                    Button(action: onNewSession) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.green)
+                    }
+                    .buttonStyle(.plain)
+                    .help("session.new.help")
                 }
-                .buttonStyle(.plain)
-                .help("session.new.help")
 
                 Button(action: onResume) {
                     Image(systemName: "terminal")
@@ -275,7 +400,8 @@ struct SessionRow: View {
                     .foregroundStyle(.tertiary)
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.leading, grouped ? 20 : 12)
+        .padding(.trailing, 12)
         .padding(.vertical, 6)
         .background(
             isSelecting && isChecked ? Color.blue.opacity(0.1) :
@@ -299,25 +425,9 @@ struct SessionRow: View {
             .background(color.opacity(0.1))
             .cornerRadius(3)
     }
-
-    private func shortModel(_ id: String) -> String {
-        id.replacingOccurrences(of: "claude-", with: "")
-            .replacingOccurrences(of: "-2025", with: "")
-            .replacingOccurrences(of: "-2024", with: "")
-    }
-
-    private func formatCost(_ cost: Double) -> String {
-        if cost >= 1.0 { return String(format: "$%.2f", cost) }
-        if cost >= 0.01 { return String(format: "$%.3f", cost) }
-        return String(format: "$%.4f", cost)
-    }
-
-    private func costColor(_ cost: Double) -> Color {
-        if cost > 1.0 { return .red }
-        if cost > 0.1 { return .orange }
-        return .green
-    }
 }
+
+// MARK: - CopyButton
 
 struct CopyButton: View {
     let text: String

@@ -267,11 +267,8 @@ struct StatusLineInstaller {
         # ---------------------------------------------------------------------------
         # Nerd Font icons
         # ---------------------------------------------------------------------------
-        icon_user=$'\\uf007'
-        icon_host=$'\\uf108'
         icon_folder=$'\\uf07c'
         icon_git=$'\\ue725'
-        icon_time=$'\\uf017'
         icon_ctx=$'\\uf1c0'
         icon_quota=$'\\uf0e4'
         icon_cost=$'\\uf155'
@@ -286,10 +283,7 @@ struct StatusLineInstaller {
         # ---------------------------------------------------------------------------
         # Basic identity
         # ---------------------------------------------------------------------------
-        user=$(whoami)
-        host=$(hostname -s)
         short_dir="${cwd/#$HOME/~}"
-        time_str=$(date +%H:%M:%S)
 
         # ---------------------------------------------------------------------------
         # Git information
@@ -468,10 +462,10 @@ struct StatusLineInstaller {
         fi
 
         # ---------------------------------------------------------------------------
-        # LINE 1: identity  path  git-branch  time
+        # LINE 1: path  git-branch
         # ---------------------------------------------------------------------------
-        printf "${bold}${blue}#${reset} ${cyan}${icon_user} %s${reset} ${gray}@ ${green}${icon_host} %s${reset} ${gray}in ${bold}${yellow}${icon_folder} %s${reset}%s  ${gray}${icon_time} ${lgray}%s${reset}\\n" \\
-          "$user" "$host" "$short_dir" "$git_section" "$time_str"
+        printf "${bold}${yellow}${icon_folder} %s${reset}%s\\n" \\
+          "$short_dir" "$git_section"
 
         # ---------------------------------------------------------------------------
         # LINE 2: model ctx | quota | cost tokens | worktree

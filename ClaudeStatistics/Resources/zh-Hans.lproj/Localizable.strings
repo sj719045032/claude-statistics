@@ -22,6 +22,8 @@
 "session.new.help" = "在相同目录新建会话";
 "session.resume.help" = "恢复会话";
 "session.delete.help" = "删除会话";
+"session.projectCount %lld" = "%lld 个项目";
+"session.untitled" = "未命名会话";
 
 /* Session Detail */
 "detail.back" = "返回";

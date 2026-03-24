@@ -1,6 +1,34 @@
 import Foundation
 import SwiftUI
 
+struct ProjectGroup: Identifiable {
+    var id: String { projectPath }
+    let projectPath: String
+    let sessions: [Session]
+
+    var displayName: String {
+        let path = sessions.first?.displayName ?? projectPath
+        return (path as NSString).lastPathComponent
+    }
+
+    var shortPath: String {
+        let home = NSHomeDirectory()
+        let path = sessions.first?.cwd
+            ?? TerminalLauncher.decodeProjectPath(projectPath)
+            ?? projectPath
+        if path.hasPrefix(home) {
+            return "~" + path.dropFirst(home.count)
+        }
+        return path
+    }
+
+    var cwdPath: String {
+        sessions.first?.cwd
+            ?? TerminalLauncher.decodeProjectPath(projectPath)
+            ?? NSHomeDirectory()
+    }
+}
+
 @MainActor
 final class SessionViewModel: ObservableObject {
     let store: SessionDataStore
@@ -11,6 +39,7 @@ final class SessionViewModel: ObservableObject {
     @Published var searchText = ""
     @Published var isSelecting = false
     @Published var selectedIds: Set<String> = []
+    @Published var collapsedProjects: Set<String> = []
 
     init(store: SessionDataStore) {
         self.store = store
@@ -23,6 +52,32 @@ final class SessionViewModel: ObservableObject {
             session.displayName.lowercased().contains(query) ||
             session.id.lowercased().contains(query) ||
             (store.quickStats[session.id]?.topic?.lowercased().contains(query) == true)
+        }
+    }
+
+    var projectGroups: [ProjectGroup] {
+        let grouped = Dictionary(grouping: filteredSessions) { $0.projectPath }
+        return grouped.map { key, sessions in
+            ProjectGroup(
+                projectPath: key,
+                sessions: sessions.sorted { $0.lastModified > $1.lastModified }
+            )
+        }
+        .sorted { ($0.sessions.first?.lastModified ?? .distantPast) > ($1.sessions.first?.lastModified ?? .distantPast) }
+    }
+
+    @Published var expandedProjects: Set<String> = []
+
+    func isProjectExpanded(_ projectPath: String) -> Bool {
+        if !searchText.isEmpty { return true }
+        return expandedProjects.contains(projectPath)
+    }
+
+    func toggleProjectExpanded(_ projectPath: String) {
+        if expandedProjects.contains(projectPath) {
+            expandedProjects.remove(projectPath)
+        } else {
+            expandedProjects.insert(projectPath)
         }
     }
 
@@ -88,10 +143,4 @@ final class SessionViewModel: ObservableObject {
     // MARK: - Aggregate stats
 
     var totalSessions: Int { store.sessions.count }
-
-    var projectGroups: [(project: String, count: Int, sessions: [Session])] {
-        let grouped = Dictionary(grouping: filteredSessions) { $0.projectPath }
-        return grouped.map { (project: $0.value.first?.displayName ?? $0.key, count: $0.value.count, sessions: $0.value) }
-            .sorted { $0.count > $1.count }
-    }
 }
