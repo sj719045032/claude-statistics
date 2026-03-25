@@ -213,6 +213,33 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
             }
 
+            Section("settings.diagnostics") {
+                Button(action: {
+                    let logPath = DiagnosticLogger.shared.logFilePath
+                    if FileManager.default.fileExists(atPath: logPath) {
+                        NSWorkspace.shared.selectFile(logPath, inFileViewerRootedAtPath: "")
+                    } else {
+                        // Create empty log and open containing folder
+                        FileManager.default.createFile(atPath: logPath, contents: nil)
+                        NSWorkspace.shared.selectFile(logPath, inFileViewerRootedAtPath: "")
+                    }
+                }) {
+                    HStack {
+                        Label("settings.exportLog", systemImage: "doc.text.magnifyingglass")
+                        Spacer()
+                        Image(systemName: "arrow.up.forward.square")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .font(.system(size: 12))
+                }
+                .buttonStyle(.plain)
+
+                Text("settings.exportLogHint")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+
             Section("settings.about") {
                 HStack {
                     Text("settings.version")

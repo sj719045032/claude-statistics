@@ -131,6 +131,9 @@
 "settings.tabOrder" = "标签排序";
 "settings.resetDefault" = "恢复默认";
 "settings.statusLine" = "状态行";
+"settings.diagnostics" = "诊断";
+"settings.exportLog" = "打开诊断日志";
+"settings.exportLogHint" = "反馈问题时请附带此日志。路径：~/.claude/claude-statistics-diagnostic.log";
 "settings.about" = "关于";
 "settings.version" = "版本";
 "settings.checkForUpdates" = "检查更新";

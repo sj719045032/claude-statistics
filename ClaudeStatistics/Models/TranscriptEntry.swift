@@ -10,6 +10,23 @@ struct TranscriptEntry: Codable {
     let slug: String?
     let customTitle: String?
 
+    enum CodingKeys: String, CodingKey {
+        case type, timestamp, sessionId, message, lastPrompt, uuid, slug, customTitle
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        // Use try? per field so one bad field doesn't discard the entire entry
+        type = try? container.decodeIfPresent(String.self, forKey: .type)
+        timestamp = try? container.decodeIfPresent(String.self, forKey: .timestamp)
+        sessionId = try? container.decodeIfPresent(String.self, forKey: .sessionId)
+        message = try? container.decodeIfPresent(TranscriptMessage.self, forKey: .message)
+        lastPrompt = try? container.decodeIfPresent(String.self, forKey: .lastPrompt)
+        uuid = try? container.decodeIfPresent(String.self, forKey: .uuid)
+        slug = try? container.decodeIfPresent(String.self, forKey: .slug)
+        customTitle = try? container.decodeIfPresent(String.self, forKey: .customTitle)
+    }
+
     var timestampDate: Date? {
         guard let timestamp else { return nil }
         let formatter = ISO8601DateFormatter()
@@ -36,11 +53,12 @@ struct TranscriptMessage: Codable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        role = try container.decodeIfPresent(String.self, forKey: .role)
-        model = try container.decodeIfPresent(String.self, forKey: .model)
-        usage = try container.decodeIfPresent(TranscriptUsage.self, forKey: .usage)
-        id = try container.decodeIfPresent(String.self, forKey: .id)
-        stopReason = try container.decodeIfPresent(String.self, forKey: .stopReason)
+        // Use try? per field so one bad field doesn't discard the entire message
+        role = try? container.decodeIfPresent(String.self, forKey: .role)
+        model = try? container.decodeIfPresent(String.self, forKey: .model)
+        usage = try? container.decodeIfPresent(TranscriptUsage.self, forKey: .usage)
+        id = try? container.decodeIfPresent(String.self, forKey: .id)
+        stopReason = try? container.decodeIfPresent(String.self, forKey: .stopReason)
 
         // content can be a string or an array
         if let str = try? container.decodeIfPresent(String.self, forKey: .content) {
@@ -153,6 +171,15 @@ struct TranscriptUsage: Codable {
         case cacheReadInputTokens = "cache_read_input_tokens"
         case cacheCreation = "cache_creation"
     }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        inputTokens = try? container.decodeIfPresent(Int.self, forKey: .inputTokens)
+        outputTokens = try? container.decodeIfPresent(Int.self, forKey: .outputTokens)
+        cacheCreationInputTokens = try? container.decodeIfPresent(Int.self, forKey: .cacheCreationInputTokens)
+        cacheReadInputTokens = try? container.decodeIfPresent(Int.self, forKey: .cacheReadInputTokens)
+        cacheCreation = try? container.decodeIfPresent(CacheCreationDetail.self, forKey: .cacheCreation)
+    }
 }
 
 struct CacheCreationDetail: Codable {
@@ -162,6 +189,12 @@ struct CacheCreationDetail: Codable {
     enum CodingKeys: String, CodingKey {
         case ephemeral5mInputTokens = "ephemeral_5m_input_tokens"
         case ephemeral1hInputTokens = "ephemeral_1h_input_tokens"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        ephemeral5mInputTokens = try? container.decodeIfPresent(Int.self, forKey: .ephemeral5mInputTokens)
+        ephemeral1hInputTokens = try? container.decodeIfPresent(Int.self, forKey: .ephemeral1hInputTokens)
     }
 }
 

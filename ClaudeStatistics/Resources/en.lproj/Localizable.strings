@@ -131,6 +131,9 @@
 "settings.tabOrder" = "Tab Order";
 "settings.resetDefault" = "Reset to Default";
 "settings.statusLine" = "Status Line";
+"settings.diagnostics" = "Diagnostics";
+"settings.exportLog" = "Open Diagnostic Log";
+"settings.exportLogHint" = "Share this log when reporting issues. Path: ~/.claude/claude-statistics-diagnostic.log";
 "settings.about" = "About";
 "settings.version" = "Version";
 "settings.checkForUpdates" = "Check for Updates";

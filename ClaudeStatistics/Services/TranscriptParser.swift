@@ -19,22 +19,32 @@ final class TranscriptParser {
     func parseSession(at path: String) -> SessionStats {
         var stats = SessionStats()
 
-        guard let data = FileManager.default.contents(atPath: path),
-              let content = String(data: data, encoding: .utf8) else {
+        guard let data = FileManager.default.contents(atPath: path) else {
             return stats
         }
+        // Use String(decoding:as:) — never returns nil; replaces invalid UTF-8 with U+FFFD
+        let content = String(decoding: data, as: UTF8.self)
 
         let decoder = JSONDecoder()
         let lines = content.components(separatedBy: "\n")
         // Store per-message data; last entry wins (streaming sends partial then final usage)
         var messageData: [String: MessageAccum] = [:]
         var seenToolUseIds: Set<String> = []
+        let logger = DiagnosticLogger.shared
+        var skippedLines = 0
 
-        for line in lines {
+        for (lineIndex, line) in lines.enumerated() {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty, let lineData = trimmed.data(using: .utf8) else { continue }
 
-            guard let entry = try? decoder.decode(TranscriptEntry.self, from: lineData) else { continue }
+            let entry: TranscriptEntry
+            do {
+                entry = try decoder.decode(TranscriptEntry.self, from: lineData)
+            } catch {
+                skippedLines += 1
+                logger.parsingError(file: path, line: lineIndex + 1, error: error)
+                continue
+            }
 
             // Track timestamps
             if let date = entry.timestampDate {
@@ -118,6 +128,8 @@ final class TranscriptParser {
             }
         }
 
+        logger.parsingSummary(file: path, totalLines: lines.count, skippedLines: skippedLines)
+
         // Sum final per-message usage data
         for (_, accum) in messageData {
             stats.totalInputTokens += accum.inputTokens
@@ -144,10 +156,10 @@ final class TranscriptParser {
 
     /// Parse JSONL into time-bucketed trend data points for chart display
     func parseTrendData(from filePath: String, granularity: TrendGranularity) -> [TrendDataPoint] {
-        guard let data = FileManager.default.contents(atPath: filePath),
-              let content = String(data: data, encoding: .utf8) else {
+        guard let data = FileManager.default.contents(atPath: filePath) else {
             return []
         }
+        let content = String(decoding: data, as: UTF8.self)
 
         let decoder = JSONDecoder()
         let lines = content.components(separatedBy: "\n")
@@ -168,8 +180,8 @@ final class TranscriptParser {
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty, let lineData = trimmed.data(using: .utf8) else { continue }
-            guard let entry = try? decoder.decode(TranscriptEntry.self, from: lineData) else { continue }
-            guard entry.type == "assistant",
+            guard let entry = try? decoder.decode(TranscriptEntry.self, from: lineData),
+                  entry.type == "assistant",
                   let message = entry.message,
                   let usage = message.usage,
                   let timestamp = entry.timestampDate else { continue }
@@ -250,9 +262,7 @@ final class TranscriptParser {
 
         // Read first 16KB for quick info
         let data = handle.readData(ofLength: 16384)
-        guard let content = String(data: data, encoding: .utf8) else {
-            return quick
-        }
+        let content = String(decoding: data, as: UTF8.self)
 
         let decoder = JSONDecoder()
         let lines = content.components(separatedBy: "\n")
@@ -336,7 +346,8 @@ final class TranscriptParser {
         let tailOffset = fileSize - tailSize
         handle.seek(toFileOffset: tailOffset)
         let tailData = handle.readData(ofLength: Int(tailSize))
-        if let tailContent = String(data: tailData, encoding: .utf8) {
+        do {
+            let tailContent = String(decoding: tailData, as: UTF8.self)
             let tailLines = tailContent.components(separatedBy: "\n")
             var foundPrompt = false
             var latestSlug: String?
@@ -366,7 +377,7 @@ final class TranscriptParser {
                 }
             }
             quick.sessionName = latestCustomTitle ?? latestSlug
-        }
+        }  // end do
 
         return quick
     }
