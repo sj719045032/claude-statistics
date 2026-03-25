@@ -463,8 +463,13 @@ struct StatusLineInstaller {
 
         # ---------------------------------------------------------------------------
         # LINE 1: path  git-branch
+        # OSC 8 hyperlink: cmd+click opens directory in VS Code
         # ---------------------------------------------------------------------------
-        printf "${bold}${yellow}${icon_folder} %s${reset}%s\\n" \\
+        osc_start=$'\\033]8;;'
+        osc_end=$'\\033]8;;\\007'
+        vscode_url="vscode://file${cwd}"
+
+        printf "${bold}${yellow}${icon_folder} ${osc_start}${vscode_url}\\007%s${osc_end}${reset}%s\\n" \\
           "$short_dir" "$git_section"
 
         # ---------------------------------------------------------------------------
