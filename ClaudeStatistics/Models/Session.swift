@@ -135,6 +135,45 @@ struct SessionStats {
         toolUseCounts.values.reduce(0, +)
     }
 
+    // MARK: - Per-day breakdown (for accurate daily statistics)
+
+    /// Per-day token/cost data, keyed by startOfDay in local timezone.
+    /// Sessions spanning multiple days have tokens attributed to each day.
+    var daySlices: [Date: DaySlice] = [:]
+
+    struct DaySlice {
+        var totalInputTokens: Int = 0
+        var totalOutputTokens: Int = 0
+        var cacheCreation5mTokens: Int = 0
+        var cacheCreation1hTokens: Int = 0
+        var cacheCreationTotalTokens: Int = 0
+        var cacheReadTokens: Int = 0
+        var messageCount: Int = 0
+        var toolUseCounts: [String: Int] = [:]
+        var modelBreakdown: [String: ModelTokenStats] = [:]
+
+        var toolUseTotal: Int { toolUseCounts.values.reduce(0, +) }
+        var totalTokens: Int { totalInputTokens + totalOutputTokens + cacheCreationTotalTokens + cacheReadTokens }
+
+        var estimatedCost: Double {
+            modelBreakdown.reduce(0.0) { total, entry in
+                total + ModelPricing.estimateCost(
+                    model: entry.key,
+                    inputTokens: entry.value.inputTokens,
+                    outputTokens: entry.value.outputTokens,
+                    cacheCreation5mTokens: entry.value.cacheCreation5mTokens,
+                    cacheCreation1hTokens: entry.value.cacheCreation1hTokens,
+                    cacheCreationTotalTokens: entry.value.cacheCreationTotalTokens,
+                    cacheReadTokens: entry.value.cacheReadTokens
+                )
+            }
+        }
+
+        var isCostEstimated: Bool {
+            modelBreakdown.keys.contains { !ModelPricing.shared.isExactMatch(for: $0) }
+        }
+    }
+
     var sortedToolUses: [(name: String, count: Int)] {
         toolUseCounts.sorted { $0.value > $1.value }.map { (name: $0.key, count: $0.value) }
     }

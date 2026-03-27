@@ -83,6 +83,43 @@ struct PeriodStats: Identifiable {
         totalInputTokens + totalOutputTokens + cacheCreationTotalTokens + cacheReadTokens
     }
 
+    mutating func accumulate(daySlice slice: SessionStats.DaySlice) {
+        totalInputTokens += slice.totalInputTokens
+        totalOutputTokens += slice.totalOutputTokens
+        cacheCreation5mTokens += slice.cacheCreation5mTokens
+        cacheCreation1hTokens += slice.cacheCreation1hTokens
+        cacheCreationTotalTokens += slice.cacheCreationTotalTokens
+        cacheReadTokens += slice.cacheReadTokens
+        totalCost += slice.estimatedCost
+        if slice.isCostEstimated { hasEstimatedCost = true }
+        messageCount += slice.messageCount
+        toolUseCount += slice.toolUseTotal
+
+        for (model, mts) in slice.modelBreakdown {
+            var usage = modelBreakdown[model] ?? ModelUsage(model: model)
+            usage.inputTokens += mts.inputTokens
+            usage.outputTokens += mts.outputTokens
+            usage.cacheCreation5mTokens += mts.cacheCreation5mTokens
+            usage.cacheCreation1hTokens += mts.cacheCreation1hTokens
+            usage.cacheCreationTotalTokens += mts.cacheCreationTotalTokens
+            usage.cacheReadTokens += mts.cacheReadTokens
+            usage.cost += ModelPricing.estimateCost(
+                model: model,
+                inputTokens: mts.inputTokens,
+                outputTokens: mts.outputTokens,
+                cacheCreation5mTokens: mts.cacheCreation5mTokens,
+                cacheCreation1hTokens: mts.cacheCreation1hTokens,
+                cacheCreationTotalTokens: mts.cacheCreationTotalTokens,
+                cacheReadTokens: mts.cacheReadTokens
+            )
+            usage.sessionCount += 1
+            if !ModelPricing.shared.isExactMatch(for: model) {
+                usage.isEstimated = true
+            }
+            modelBreakdown[model] = usage
+        }
+    }
+
     mutating func accumulate(stats: SessionStats) {
         totalInputTokens += stats.totalInputTokens
         totalOutputTokens += stats.totalOutputTokens

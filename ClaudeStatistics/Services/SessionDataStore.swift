@@ -210,19 +210,41 @@ final class SessionDataStore: ObservableObject {
         guard !parsedStats.isEmpty else { return }
 
         var buckets: [Date: PeriodStats] = [:]
+        var periodSessionIds: [Date: Set<String>] = [:]
 
         for (sessionId, stats) in parsedStats {
-            let session = sessions.first { $0.id == sessionId }
-            let date = stats.startTime ?? session?.lastModified ?? Date.distantPast
-            let periodStart = selectedPeriod.startOfPeriod(for: date)
-
-            if buckets[periodStart] == nil {
-                buckets[periodStart] = PeriodStats(
-                    period: periodStart,
-                    periodLabel: selectedPeriod.label(for: periodStart)
-                )
+            if !stats.daySlices.isEmpty {
+                // Use per-day data for accurate period attribution
+                for (dayStart, slice) in stats.daySlices {
+                    let periodStart = selectedPeriod.startOfPeriod(for: dayStart)
+                    if buckets[periodStart] == nil {
+                        buckets[periodStart] = PeriodStats(
+                            period: periodStart,
+                            periodLabel: selectedPeriod.label(for: periodStart)
+                        )
+                    }
+                    buckets[periodStart]?.accumulate(daySlice: slice)
+                    periodSessionIds[periodStart, default: []].insert(sessionId)
+                }
+            } else {
+                // Fallback for sessions without day slices
+                let session = sessions.first { $0.id == sessionId }
+                let date = stats.startTime ?? session?.lastModified ?? Date.distantPast
+                let periodStart = selectedPeriod.startOfPeriod(for: date)
+                if buckets[periodStart] == nil {
+                    buckets[periodStart] = PeriodStats(
+                        period: periodStart,
+                        periodLabel: selectedPeriod.label(for: periodStart)
+                    )
+                }
+                buckets[periodStart]?.accumulate(stats: stats)
+                periodSessionIds[periodStart, default: []].insert(sessionId)
             }
-            buckets[periodStart]?.accumulate(stats: stats)
+        }
+
+        // Set accurate session counts (one session counted once per period)
+        for (period, ids) in periodSessionIds {
+            buckets[period]?.sessionCount = ids.count
         }
 
         periodStats = buckets.values.sorted { $0.period > $1.period }
@@ -312,21 +334,29 @@ final class SessionDataStore: ObservableObject {
         var buckets: [Date: (tokens: Int, cost: Double)] = [:]
 
         for (sessionId, stats) in parsedStats {
-            guard let session = sessions.first(where: { $0.id == sessionId }) else { continue }
-            let sessionDate = stats.startTime ?? session.lastModified
-            let sessionPeriodStart = periodType.startOfPeriod(for: sessionDate)
+            if !stats.daySlices.isEmpty {
+                for (dayStart, slice) in stats.daySlices {
+                    let slicePeriodStart = periodType.startOfPeriod(for: dayStart)
+                    guard slicePeriodStart == period.period else { continue }
 
-            // Only include sessions in this period
-            guard sessionPeriodStart == period.period else { continue }
+                    let bucket = granularity.bucketStart(for: dayStart)
+                    var existing = buckets[bucket, default: (tokens: 0, cost: 0)]
+                    existing.tokens += slice.totalTokens
+                    existing.cost += slice.estimatedCost
+                    buckets[bucket] = existing
+                }
+            } else {
+                guard let session = sessions.first(where: { $0.id == sessionId }) else { continue }
+                let sessionDate = stats.startTime ?? session.lastModified
+                let sessionPeriodStart = periodType.startOfPeriod(for: sessionDate)
+                guard sessionPeriodStart == period.period else { continue }
 
-            let bucket = granularity.bucketStart(for: sessionDate)
-            let tokens = stats.totalTokens
-            let cost = stats.estimatedCost
-
-            var existing = buckets[bucket, default: (tokens: 0, cost: 0)]
-            existing.tokens += tokens
-            existing.cost += cost
-            buckets[bucket] = existing
+                let bucket = granularity.bucketStart(for: sessionDate)
+                var existing = buckets[bucket, default: (tokens: 0, cost: 0)]
+                existing.tokens += stats.totalTokens
+                existing.cost += stats.estimatedCost
+                buckets[bucket] = existing
+            }
         }
 
         // Sort by time, then accumulate into running totals

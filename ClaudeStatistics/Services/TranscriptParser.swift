@@ -8,6 +8,7 @@ final class TranscriptParser {
     /// Per-message accumulated data (streaming produces multiple entries; we keep the last/final one)
     private struct MessageAccum {
         var model: String
+        var timestamp: Date?
         var inputTokens: Int = 0
         var outputTokens: Int = 0
         var cacheCreationTotalTokens: Int = 0
@@ -30,6 +31,9 @@ final class TranscriptParser {
         // Store per-message data; last entry wins (streaming sends partial then final usage)
         var messageData: [String: MessageAccum] = [:]
         var seenToolUseIds: Set<String> = []
+        var toolUseDays: [(Date, String)] = []   // (dayStart, toolName) for per-day bucketing
+        var userMessageDays: [Date] = []          // dayStarts for user messages
+        let cal = Calendar.current
         let logger = DiagnosticLogger.shared
         var skippedLines = 0
 
@@ -60,6 +64,9 @@ final class TranscriptParser {
             case "user", "human":
                 stats.userMessageCount += 1
                 stats.messageCount += 1
+                if let ts = entry.timestampDate {
+                    userMessageDays.append(cal.startOfDay(for: ts))
+                }
                 // Track last user text for "Last Prompt"
                 if let text = Self.extractUserText(from: entry) {
                     let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -100,6 +107,7 @@ final class TranscriptParser {
                     if let usage = message.usage {
                         messageData[msgId] = MessageAccum(
                             model: currentModel,
+                            timestamp: entry.timestampDate,
                             inputTokens: usage.inputTokens ?? 0,
                             outputTokens: usage.outputTokens ?? 0,
                             cacheCreationTotalTokens: usage.cacheCreationInputTokens ?? 0,
@@ -117,6 +125,9 @@ final class TranscriptParser {
                                 if !seenToolUseIds.contains(toolId) {
                                     seenToolUseIds.insert(toolId)
                                     stats.toolUseCounts[toolName, default: 0] += 1
+                                    if let ts = entry.timestampDate {
+                                        toolUseDays.append((cal.startOfDay(for: ts), toolName))
+                                    }
                                 }
                             }
                         }
@@ -147,6 +158,37 @@ final class TranscriptParser {
             ms.cacheCreation1hTokens += accum.cacheCreation1hTokens
             ms.messageCount += 1
             stats.modelBreakdown[accum.model] = ms
+
+            // Per-day breakdown for accurate daily statistics
+            if let ts = accum.timestamp {
+                let dayStart = cal.startOfDay(for: ts)
+                var slice = stats.daySlices[dayStart] ?? SessionStats.DaySlice()
+                slice.totalInputTokens += accum.inputTokens
+                slice.totalOutputTokens += accum.outputTokens
+                slice.cacheCreationTotalTokens += accum.cacheCreationTotalTokens
+                slice.cacheReadTokens += accum.cacheReadTokens
+                slice.cacheCreation5mTokens += accum.cacheCreation5mTokens
+                slice.cacheCreation1hTokens += accum.cacheCreation1hTokens
+                slice.messageCount += 1
+                var dms = slice.modelBreakdown[accum.model, default: ModelTokenStats()]
+                dms.inputTokens += accum.inputTokens
+                dms.outputTokens += accum.outputTokens
+                dms.cacheCreationTotalTokens += accum.cacheCreationTotalTokens
+                dms.cacheReadTokens += accum.cacheReadTokens
+                dms.cacheCreation5mTokens += accum.cacheCreation5mTokens
+                dms.cacheCreation1hTokens += accum.cacheCreation1hTokens
+                dms.messageCount += 1
+                slice.modelBreakdown[accum.model] = dms
+                stats.daySlices[dayStart] = slice
+            }
+        }
+
+        // Assign user messages and tool uses to day slices
+        for day in userMessageDays {
+            stats.daySlices[day, default: SessionStats.DaySlice()].messageCount += 1
+        }
+        for (day, toolName) in toolUseDays {
+            stats.daySlices[day, default: SessionStats.DaySlice()].toolUseCounts[toolName, default: 0] += 1
         }
 
         logger.parsingSummary(
