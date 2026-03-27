@@ -212,18 +212,6 @@ enum TerminalLauncher {
         "'" + str.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
-    /// Escape for keystroke-based terminals (avoids quote auto-pairing)
-    private static func backslashEscape(_ str: String) -> String {
-        var result = ""
-        for char in str {
-            if " '\"\\()&|;$`!{}[]#~?*<>".contains(char) {
-                result.append("\\")
-            }
-            result.append(char)
-        }
-        return result
-    }
-
     private static func escapeAppleScript(_ str: String) -> String {
         str.replacingOccurrences(of: "\\", with: "\\\\")
            .replacingOccurrences(of: "\"", with: "\\\"")
