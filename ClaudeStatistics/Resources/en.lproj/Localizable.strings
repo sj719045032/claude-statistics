@@ -132,12 +132,25 @@
 "settings.tabOrder" = "Tab Order";
 "settings.resetDefault" = "Reset to Default";
 "settings.statusLine" = "Status Line";
+"settings.notifications" = "Notifications";
 "settings.diagnostics" = "Diagnostics";
 "settings.exportLog" = "Open Diagnostic Log";
 "settings.exportLogHint" = "Share this log when reporting issues. Path: ~/.claude/claude-statistics-diagnostic.log";
 "settings.about" = "About";
 "settings.version" = "Version";
 "settings.checkForUpdates" = "Check for Updates";
+"settings.resetReminder" = "Notify when a full 5-hour window resets";
+"settings.notificationStatus" = "Permission";
+"settings.allowNotifications" = "Allow Notifications";
+"settings.testNotification" = "Test";
+"settings.notificationAuthorized" = "Enabled";
+"settings.notificationDenied" = "Denied";
+"settings.notificationNotDetermined" = "Not Requested";
+"settings.notificationHint" = "Turn this on after granting macOS notification permission. Reminders are only scheduled when a provider's 5-hour usage reaches 100% or more.";
+"settings.notificationDeniedHint" = "Notifications are currently blocked. Enable Claude Statistics in System Settings > Notifications, then return here and test again.";
+"settings.notificationReady" = "Reset reminders are enabled.";
+"settings.notificationTestSent" = "Test notification scheduled.";
+"settings.notificationNeedsPermission" = "Notification permission is required before sending a test.";
 
 /* Pricing Management */
 "pricing.back" = "Settings";
@@ -174,3 +187,28 @@
 "period.weekly" = "Weekly";
 "period.monthly" = "Monthly";
 "period.yearly" = "Yearly";
+
+/* Z.ai Usage */
+"zai.title" = "Z.ai Usage";
+"zai.modelUsage" = "Model Usage";
+"zai.today" = "Today";
+"zai.7days" = "7 Days";
+"zai.totalCalls" = "Total Calls";
+"zai.totalTokens" = "Total Tokens";
+"zai.monthlySearch" = "Monthly Search";
+"zai.5hours" = "5 Hours";
+"zai.weekly" = "Weekly";
+"zai.toolUsage" = "Tool Usage";
+"zai.noData" = "No Z.ai usage data available";
+"zai.noChartData" = "No data for this period";
+"zai.settings" = "Z.ai";
+"zai.enableUsage" = "Enable Z.ai usage";
+"zai.authTokenPlaceholder" = "Paste Auth Token here";
+"zai.authTokenConfigured" = "Auth Token configured";
+"zai.authTokenNotConfigured" = "Not configured";
+"zai.addAuthToken" = "Add Auth Token";
+"zai.editAuthToken" = "Edit";
+"zai.deleteAuthToken" = "Remove";
+"zai.settingsHint" = "Enter your Z.ai Auth Token to display subscription usage.";
+"zai.authTokenDescription" = "Saved locally in Keychain and only used for usage sync.";
+"zai.usageSummary %lld %lld" = "%lld used, %lld remaining";

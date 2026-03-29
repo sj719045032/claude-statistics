@@ -1,21 +1,31 @@
 import SwiftUI
 import ServiceManagement
+import UserNotifications
 
 struct SettingsView: View {
     @ObservedObject var usageViewModel: UsageViewModel
     @ObservedObject var profileViewModel: ProfileViewModel
+    @ObservedObject var zaiUsageViewModel: ZaiUsageViewModel
     @Binding var tabOrder: [AppTab]
     @ObservedObject var updaterService: UpdaterService
+    @ObservedObject var notificationService: UsageResetNotificationService
     @AppStorage("autoRefreshEnabled") private var autoRefreshEnabled = false
     @AppStorage("refreshInterval") private var refreshInterval = 300.0
     @AppStorage("preferredTerminal") private var preferredTerminal = "Auto"
     @AppStorage("appLanguage") private var appLanguage = "auto"
     @AppStorage("fontScale") private var fontScale = 1.0
     @AppStorage("customInterval") private var customInterval = false
+    @AppStorage("zaiUsageEnabled") private var zaiUsageEnabled = false
+    @AppStorage("usageResetReminderEnabled") private var usageResetReminderEnabled = false
     @State private var customMinutes = ""
     @State private var showPricing = false
     @State private var hasToken: Bool?
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var isEditingZaiKey = false
+    @State private var zaiApiKeyInput = ""
+    @State private var zaiHasApiKey = false
+    @State private var isUpdatingReminderPreference = false
+    @State private var notificationFeedback: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -40,6 +50,8 @@ struct SettingsView: View {
                     if tokenFound && profileViewModel.userProfile == nil {
                         await profileViewModel.loadProfile()
                     }
+                    zaiHasApiKey = await ZaiCredentialService.shared.hasAPIKeyAsync()
+                    await notificationService.refreshAuthorizationStatus()
                 }
 
             Divider()
@@ -79,12 +91,7 @@ struct SettingsView: View {
             Section("settings.autoRefresh") {
                 Toggle("settings.enableAutoRefresh", isOn: $autoRefreshEnabled)
                     .onChange(of: autoRefreshEnabled) { _, newValue in
-                        if newValue {
-                            usageViewModel.autoRefreshInterval = refreshInterval
-                            usageViewModel.startAutoRefresh()
-                        } else {
-                            usageViewModel.stopAutoRefresh()
-                        }
+                        applySharedAutoRefreshSettings(enabled: newValue)
                     }
 
                 if autoRefreshEnabled {
@@ -92,9 +99,7 @@ struct SettingsView: View {
                         ForEach([5, 10, 30], id: \.self) { min in
                             Button {
                                 customInterval = false
-                                refreshInterval = Double(min * 60)
-                                usageViewModel.autoRefreshInterval = refreshInterval
-                                usageViewModel.startAutoRefresh()
+                                setRefreshInterval(Double(min * 60))
                             } label: {
                                 Text("\(min)min")
                                     .font(.system(size: 11))
@@ -136,6 +141,90 @@ struct SettingsView: View {
                 Text("settings.autoRefreshHint")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
+            }
+
+            Section("zai.settings") {
+                Toggle("zai.enableUsage", isOn: $zaiUsageEnabled)
+                    .onChange(of: zaiUsageEnabled) { _, newValue in
+                        if !newValue {
+                            isEditingZaiKey = false
+                        }
+
+                        zaiUsageViewModel.applyAutoRefreshSettings(
+                            enabled: autoRefreshEnabled && newValue,
+                            interval: refreshInterval
+                        )
+
+                        if newValue && zaiUsageViewModel.isConfigured {
+                            Task { @MainActor in
+                                await zaiUsageViewModel.forceRefresh()
+                            }
+                        }
+                    }
+
+                if zaiUsageEnabled {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .center, spacing: 10) {
+                            zaiTokenStatusBadge
+                            Spacer(minLength: 12)
+                            zaiTokenActionGroup
+                        }
+
+                        if isEditingZaiKey {
+                            SecureField("zai.authTokenPlaceholder", text: $zaiApiKeyInput)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(size: 11, design: .monospaced))
+                        }
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("zai.settingsHint")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                            Text("zai.authTokenDescription")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+
+            Section("settings.notifications") {
+                Toggle("settings.resetReminder", isOn: $usageResetReminderEnabled)
+                    .onChange(of: usageResetReminderEnabled) { _, newValue in
+                        guard !isUpdatingReminderPreference else { return }
+                        Task { @MainActor in
+                            isUpdatingReminderPreference = true
+                            usageResetReminderEnabled = await notificationService.setRemindersEnabled(newValue)
+                            notificationFeedback = usageResetReminderEnabled
+                                ? String(localized: "settings.notificationReady")
+                                : nil
+                            isUpdatingReminderPreference = false
+                        }
+                    }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .center, spacing: 10) {
+                        notificationStatusBadge
+                        Spacer(minLength: 12)
+                        notificationActionGroup
+                    }
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(notificationHintText)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+
+                        if let notificationFeedback {
+                            Text(notificationFeedback)
+                                .font(.caption2)
+                                .foregroundStyle(notificationFeedbackColor)
+                        }
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.vertical, 4)
             }
 
             Section("settings.language") {
@@ -393,9 +482,217 @@ struct SettingsView: View {
             return
         }
         customInterval = true
-        refreshInterval = Double(minutes * 60)
-        usageViewModel.autoRefreshInterval = refreshInterval
-        usageViewModel.startAutoRefresh()
+        setRefreshInterval(Double(minutes * 60))
+    }
+
+    private func setRefreshInterval(_ seconds: Double) {
+        refreshInterval = seconds
+        usageViewModel.applyAutoRefreshSettings(enabled: autoRefreshEnabled, interval: refreshInterval)
+        zaiUsageViewModel.applyAutoRefreshSettings(enabled: autoRefreshEnabled && zaiUsageEnabled, interval: refreshInterval)
+    }
+
+    private func applySharedAutoRefreshSettings(enabled: Bool) {
+        usageViewModel.applyAutoRefreshSettings(enabled: enabled, interval: refreshInterval)
+        zaiUsageViewModel.applyAutoRefreshSettings(enabled: enabled && zaiUsageEnabled, interval: refreshInterval)
+    }
+
+    // MARK: - Z.ai API Key
+
+    private func saveZaiKey() {
+        let key = trimmedZaiAPIKeyInput
+        guard !key.isEmpty else { return }
+
+        do {
+            try ZaiCredentialService.shared.saveAPIKey(key)
+            zaiHasApiKey = true
+            isEditingZaiKey = false
+            zaiUsageViewModel.onAPIKeyChanged(hasAPIKey: true)
+        } catch {
+            Task { @MainActor in
+                zaiHasApiKey = await ZaiCredentialService.shared.hasAPIKeyAsync()
+            }
+        }
+    }
+
+    private func deleteZaiKey() {
+        do {
+            try ZaiCredentialService.shared.deleteAPIKey()
+        } catch {
+            // Ignore delete errors
+        }
+        zaiHasApiKey = false
+        zaiUsageViewModel.onAPIKeyChanged(hasAPIKey: false)
+    }
+
+    private var zaiTokenStatusBadge: some View {
+        HStack(spacing: 6) {
+            Image(systemName: zaiHasApiKey ? "checkmark.circle.fill" : "key.fill")
+                .font(.system(size: 10, weight: .semibold))
+            Text(zaiHasApiKey ? "zai.authTokenConfigured" : "zai.authTokenNotConfigured")
+                .font(.system(size: 11, weight: .medium))
+        }
+        .foregroundStyle(zaiHasApiKey ? Color.green : .secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(
+            Capsule(style: .continuous)
+                .fill(zaiHasApiKey ? Color.green.opacity(0.12) : Color.gray.opacity(0.12))
+        )
+    }
+
+    private var zaiTokenActionGroup: some View {
+        ControlGroup {
+            if isEditingZaiKey {
+                Button("session.cancel") { isEditingZaiKey = false }
+                Button("pricing.save") { saveZaiKey() }
+                    .disabled(trimmedZaiAPIKeyInput.isEmpty)
+            } else {
+                Button(zaiHasApiKey ? "zai.editAuthToken" : "zai.addAuthToken") {
+                    zaiApiKeyInput = ""
+                    isEditingZaiKey = true
+                }
+
+                if zaiHasApiKey {
+                    Button("zai.deleteAuthToken", role: .destructive) { deleteZaiKey() }
+                }
+            }
+        }
+        .controlSize(.small)
+        .fixedSize()
+    }
+
+    private var trimmedZaiAPIKeyInput: String {
+        zaiApiKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var notificationStatusBadge: some View {
+        HStack(spacing: 6) {
+            Image(systemName: notificationStatusIconName)
+                .font(.system(size: 10, weight: .semibold))
+            Text("settings.notificationStatus")
+                .font(.system(size: 11))
+            Text(notificationStatusText)
+                .font(.system(size: 11, weight: .medium))
+        }
+        .foregroundStyle(notificationStatusColor)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(
+            Capsule(style: .continuous)
+                .fill(notificationStatusBackgroundColor)
+        )
+    }
+
+    private var notificationActionGroup: some View {
+        ControlGroup {
+            if shouldShowAllowNotificationsButton {
+                Button("settings.allowNotifications") {
+                    Task { @MainActor in
+                        await notificationService.refreshAuthorizationStatus()
+                        let enabled = await notificationService.setRemindersEnabled(true)
+                        usageResetReminderEnabled = enabled
+                        notificationFeedback = enabled ? String(localized: "settings.notificationReady") : nil
+                    }
+                }
+            }
+
+            Button("settings.testNotification") {
+                Task { @MainActor in
+                    let sent = await notificationService.sendTestNotification()
+                    notificationFeedback = sent ? String(localized: "settings.notificationTestSent") : String(localized: "settings.notificationNeedsPermission")
+                    await notificationService.refreshAuthorizationStatus()
+                }
+            }
+        }
+        .controlSize(.small)
+        .fixedSize()
+    }
+
+    private var shouldShowAllowNotificationsButton: Bool {
+        NotificationActionVisibility.shouldShowAllowButton(
+            notificationsAuthorized: isNotificationAuthorized
+        )
+    }
+
+    private var isNotificationAuthorized: Bool {
+        switch notificationService.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private var notificationStatusText: LocalizedStringKey {
+        switch notificationService.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            return "settings.notificationAuthorized"
+        case .denied:
+            return "settings.notificationDenied"
+        default:
+            return "settings.notificationNotDetermined"
+        }
+    }
+
+    private var notificationStatusColor: Color {
+        switch notificationService.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            return .green
+        case .denied:
+            return .red
+        default:
+            return .secondary
+        }
+    }
+
+    private var notificationStatusBackgroundColor: Color {
+        switch notificationService.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            return Color.green.opacity(0.12)
+        case .denied:
+            return Color.red.opacity(0.12)
+        default:
+            return Color.gray.opacity(0.12)
+        }
+    }
+
+    private var notificationStatusIconName: String {
+        switch notificationService.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            return "bell.badge.fill"
+        case .denied:
+            return "bell.slash.fill"
+        default:
+            return "bell.fill"
+        }
+    }
+
+    private var notificationHintText: LocalizedStringKey {
+        switch notificationService.authorizationStatus {
+        case .denied:
+            return "settings.notificationDeniedHint"
+        default:
+            return "settings.notificationHint"
+        }
+    }
+
+    private var notificationFeedbackColor: Color {
+        guard let notificationFeedback else { return Color.secondary }
+
+        let successMessages = [
+            String(localized: "settings.notificationReady"),
+            String(localized: "settings.notificationTestSent")
+        ]
+
+        if successMessages.contains(notificationFeedback) {
+            return .green
+        }
+
+        if notificationFeedback == String(localized: "settings.notificationNeedsPermission") {
+            return .red
+        }
+
+        return .secondary
     }
 
 }

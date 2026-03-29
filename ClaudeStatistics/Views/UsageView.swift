@@ -21,17 +21,10 @@ struct UsageView: View {
                 .foregroundStyle(.secondary)
                 .help("usage.viewOnline")
 
-                if viewModel.isLoading {
-                    ProgressView()
-                        .scaleEffect(0.6)
-                } else {
-                    Button(action: { Task { await viewModel.forceRefresh() } }) {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 11))
-                    }
-                    .buttonStyle(.plain)
-                    .help("usage.refresh")
+                RefreshIconButton(isLoading: viewModel.isLoading) {
+                    Task { await viewModel.forceRefresh() }
                 }
+                .help("usage.refresh")
             }
 
             if let usage = viewModel.usageData {
@@ -92,7 +85,7 @@ struct UsageView: View {
                         }
                     }
                 }
-            } else if !viewModel.isLoading {
+            } else {
                 // No data — show error or empty state with retry action
                 if let error = viewModel.errorMessage {
                     errorBanner(error)
@@ -189,5 +182,96 @@ struct UsageWindowRow: View {
             .frame(height: 6)
 
         }
+    }
+}
+
+struct RefreshIconButton: View {
+    let isLoading: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 11, weight: .medium))
+                    .opacity(isLoading ? 0 : 1)
+                ProgressView()
+                    .controlSize(.small)
+                    .scaleEffect(0.7)
+                    .opacity(isLoading ? 1 : 0)
+            }
+            .frame(width: 16, height: 16)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .disabled(isLoading)
+    }
+}
+
+struct UsageCardContainer<Content: View>: View {
+    private let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            content
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.gray.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+struct InlineUsageProgressRow: View {
+    let title: LocalizedStringKey
+    let utilization: Double
+    let countdown: String?
+
+    private var color: Color {
+        if utilization >= 80 { return .red }
+        if utilization >= 50 { return .orange }
+        return .green
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 14) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                if let countdown {
+                    Text("usage.resetsIn \(countdown)")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+
+            Spacer(minLength: 16)
+
+            HStack(spacing: 10) {
+                Text("\(Int(utilization))%")
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(color)
+                    .frame(width: 42, alignment: .trailing)
+
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.gray.opacity(0.2))
+                        Capsule()
+                            .fill(color.opacity(0.82))
+                            .frame(width: geo.size.width * min(utilization / 100.0, 1.0))
+                    }
+                }
+                .frame(width: 140, height: 8)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

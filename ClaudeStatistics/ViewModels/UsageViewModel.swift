@@ -35,6 +35,9 @@ final class UsageViewModel: ObservableObject {
         if let cached = UsageAPIService.shared.loadFromCache() {
             usageData = cached.data
             lastFetchedAt = cached.fetchedAt
+            Task { @MainActor in
+                await self.updateResetReminderState()
+            }
         }
     }
 
@@ -52,6 +55,7 @@ final class UsageViewModel: ObservableObject {
             let data = try await UsageAPIService.shared.fetchUsage()
             usageData = data
             lastFetchedAt = Date()
+            await updateResetReminderState()
         } catch {
             errorMessage = error.localizedDescription
             if usageData == nil { loadCache() }
@@ -75,6 +79,7 @@ final class UsageViewModel: ObservableObject {
             usageData = data
             lastFetchedAt = Date()
             errorMessage = nil
+            await updateResetReminderState()
         } catch let error as UsageError {
             switch error {
             case .rateLimited:
@@ -88,6 +93,7 @@ final class UsageViewModel: ObservableObject {
                         usageData = data
                         lastFetchedAt = Date()
                         errorMessage = nil
+                        await updateResetReminderState()
                     } catch {
                         errorMessage = error.localizedDescription
                         if usageData == nil { loadCache() }
@@ -116,10 +122,24 @@ final class UsageViewModel: ObservableObject {
         autoRefresh?.stop()
     }
 
+    func applyAutoRefreshSettings(enabled: Bool, interval: TimeInterval) {
+        autoRefreshInterval = interval > 0 ? interval : 300
+
+        if enabled {
+            startAutoRefresh()
+        } else {
+            stopAutoRefresh()
+        }
+    }
+
     // MARK: - Computed display properties
 
     var fiveHourPercent: Double {
         usageData?.fiveHour?.utilization ?? 0
+    }
+
+    var menuBarFiveHourPercent: Double? {
+        usageData?.fiveHour?.utilization
     }
 
     var sevenDayPercent: Double {
@@ -165,7 +185,16 @@ final class UsageViewModel: ObservableObject {
         return .green
     }
 
-    var menuBarText: String {
-        "\(Int(fiveHourPercent))%"
+    var hasDisplayableUsage: Bool {
+        usageData != nil || isLoading
+    }
+
+    private func updateResetReminderState() async {
+        await UsageResetNotificationService.shared.updateReminder(
+            provider: .claude,
+            utilization: usageData?.fiveHour?.utilization,
+            resetAt: usageData?.fiveHour?.resetsAtDate,
+            fetchedAt: lastFetchedAt
+        )
     }
 }

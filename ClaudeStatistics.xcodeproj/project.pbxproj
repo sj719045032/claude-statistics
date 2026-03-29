@@ -40,6 +40,15 @@
 		FA20F885511C5F92715056F9 /* FSEventsWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35EC230BC5F1EF207A984D87 /* FSEventsWatcher.swift */; };
 		FDBE2C2C6B6D044072235F42 /* UsageData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 370D33AC086199C95EC1E2CD /* UsageData.swift */; };
 		FEFC2968DA07D06063D40E24 /* ClaudeStatisticsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68083922F93D555879FAD90B /* ClaudeStatisticsApp.swift */; };
+		MB1001A1B2C3D4E5F6A7B8C9 /* MenuBarUsageSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = MB1F01A1B2C3D4E5F6A7B8C1 /* MenuBarUsageSelection.swift */; };
+		ZA1001A1B2C3D4E5F6A7B8C9 /* ZaiUsageData.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZA1F01A1B2C3D4E5F6A7B8C1 /* ZaiUsageData.swift */; };
+		ZA2002A1B2C3D4E5F6A7B8C9 /* ZaiCredentialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZA2F02A1B2C3D4E5F6A7B8C2 /* ZaiCredentialService.swift */; };
+		ZA3003A1B2C3D4E5F6A7B8C9 /* ZaiAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZA3F03A1B2C3D4E5F6A7B8C3 /* ZaiAPIService.swift */; };
+		ZA4004A1B2C3D4E5F6A7B8C9 /* ZaiUsageViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZA4F04A1B2C3D4E5F6A7B8C4 /* ZaiUsageViewModel.swift */; };
+		ZA5005A1B2C3D4E5F6A7B8C9 /* ZaiUsageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZA5F05A1B2C3D4E5F6A7B8C5 /* ZaiUsageView.swift */; };
+		ZA6006A1B2C3D4E5F6A7B8C9 /* ZaiModelUsageChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZA6F06A1B2C3D4E5F6A7B8C6 /* ZaiModelUsageChartView.swift */; };
+		ZA7007A1B2C3D4E5F6A7B8C9 /* UsageFeatureSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZA7F07A1B2C3D4E5F6A7B8C7 /* UsageFeatureSupport.swift */; };
+		ZA8008A1B2C3D4E5F6A7B8C9 /* UsageResetNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZA8F08A1B2C3D4E5F6A7B8C8 /* UsageResetNotificationService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -62,6 +71,7 @@
 		5CA29EE31F9DA05A4CB0442F /* TrendDataPoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendDataPoint.swift; sourceTree = "<group>"; };
 		609271D9D2750E6DBBCFFAC5 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		68083922F93D555879FAD90B /* ClaudeStatisticsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatisticsApp.swift; sourceTree = "<group>"; };
+		MB1F01A1B2C3D4E5F6A7B8C1 /* MenuBarUsageSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarUsageSelection.swift; sourceTree = "<group>"; };
 		6E1B839DD5F15A6A55AE3727 /* StatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsView.swift; sourceTree = "<group>"; };
 		77339C38F26D780CFD6D03EB /* ClaudeStatistics.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClaudeStatistics.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7D3BC22C81208BA2B853C240 /* UsageAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageAPIService.swift; sourceTree = "<group>"; };
@@ -79,6 +89,14 @@
 		F79555858F7CDF21C9301D11 /* TranscriptParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptParser.swift; sourceTree = "<group>"; };
 		FA42F7AC4BB41556CDC7EFCC /* TerminalLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalLauncher.swift; sourceTree = "<group>"; };
 		FAAFBA5B9EEDC2BB22BAF700 /* AutoRefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoRefreshCoordinator.swift; sourceTree = "<group>"; };
+		ZA1F01A1B2C3D4E5F6A7B8C1 /* ZaiUsageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZaiUsageData.swift; sourceTree = "<group>"; };
+		ZA2F02A1B2C3D4E5F6A7B8C2 /* ZaiCredentialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZaiCredentialService.swift; sourceTree = "<group>"; };
+		ZA3F03A1B2C3D4E5F6A7B8C3 /* ZaiAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZaiAPIService.swift; sourceTree = "<group>"; };
+		ZA4F04A1B2C3D4E5F6A7B8C4 /* ZaiUsageViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZaiUsageViewModel.swift; sourceTree = "<group>"; };
+		ZA5F05A1B2C3D4E5F6A7B8C5 /* ZaiUsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZaiUsageView.swift; sourceTree = "<group>"; };
+		ZA6F06A1B2C3D4E5F6A7B8C6 /* ZaiModelUsageChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZaiModelUsageChartView.swift; sourceTree = "<group>"; };
+		ZA7F07A1B2C3D4E5F6A7B8C7 /* UsageFeatureSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageFeatureSupport.swift; sourceTree = "<group>"; };
+		ZA8F08A1B2C3D4E5F6A7B8C8 /* UsageResetNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageResetNotificationService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -125,6 +143,9 @@
 				F79555858F7CDF21C9301D11 /* TranscriptParser.swift */,
 				B7AD5E89B648F5018E34233A /* UpdaterService.swift */,
 				7D3BC22C81208BA2B853C240 /* UsageAPIService.swift */,
+				ZA8F08A1B2C3D4E5F6A7B8C8 /* UsageResetNotificationService.swift */,
+				ZA2F02A1B2C3D4E5F6A7B8C2 /* ZaiCredentialService.swift */,
+				ZA3F03A1B2C3D4E5F6A7B8C3 /* ZaiAPIService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -158,6 +179,7 @@
 				1850A208EA7AE5CDF9896207 /* ProfileViewModel.swift */,
 				58B71B5593D63536AB462D70 /* SessionViewModel.swift */,
 				5306E49F4AF08425229312F0 /* UsageViewModel.swift */,
+				ZA4F04A1B2C3D4E5F6A7B8C4 /* ZaiUsageViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -184,10 +206,13 @@
 			isa = PBXGroup;
 			children = (
 				2EDF09CC0594DB9C35748FF4 /* AggregateStats.swift */,
+				MB1F01A1B2C3D4E5F6A7B8C1 /* MenuBarUsageSelection.swift */,
 				36F9BBB23CB057720EA99A7B /* Session.swift */,
 				42AB2ACAC763533BC9654BE5 /* TranscriptEntry.swift */,
 				5CA29EE31F9DA05A4CB0442F /* TrendDataPoint.swift */,
 				370D33AC086199C95EC1E2CD /* UsageData.swift */,
+				ZA7F07A1B2C3D4E5F6A7B8C7 /* UsageFeatureSupport.swift */,
+				ZA1F01A1B2C3D4E5F6A7B8C1 /* ZaiUsageData.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -202,6 +227,8 @@
 				6E1B839DD5F15A6A55AE3727 /* StatisticsView.swift */,
 				EEDC6DF1C15355DC5AE2FCF9 /* TrendChartView.swift */,
 				3511F107E29217FB16567AF9 /* UsageView.swift */,
+				ZA5F05A1B2C3D4E5F6A7B8C5 /* ZaiUsageView.swift */,
+				ZA6F06A1B2C3D4E5F6A7B8C6 /* ZaiModelUsageChartView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -290,6 +317,7 @@
 				552244856F222EE6F9AFE7DA /* DiagnosticLogger.swift in Sources */,
 				FA20F885511C5F92715056F9 /* FSEventsWatcher.swift in Sources */,
 				E04B621B671D090DB9155348 /* LanguageManager.swift in Sources */,
+				MB1001A1B2C3D4E5F6A7B8C9 /* MenuBarUsageSelection.swift in Sources */,
 				F3272760285AF18F519D8E80 /* MenuBarView.swift in Sources */,
 				4809D9A533DA37D1B71D1592 /* PricingFetchService.swift in Sources */,
 				0BD1DED6EC1DFF9326A1CAE5 /* ProfileViewModel.swift in Sources */,
@@ -311,8 +339,16 @@
 				3AD8ED72F8D42B9DB0614F77 /* UpdaterService.swift in Sources */,
 				E19A0BCA11B03CD13E4A1F04 /* UsageAPIService.swift in Sources */,
 				FDBE2C2C6B6D044072235F42 /* UsageData.swift in Sources */,
+				ZA7007A1B2C3D4E5F6A7B8C9 /* UsageFeatureSupport.swift in Sources */,
+				ZA8008A1B2C3D4E5F6A7B8C9 /* UsageResetNotificationService.swift in Sources */,
 				F7761B0329D579925F2DB98E /* UsageView.swift in Sources */,
 				C48BDE19A5E58235BAB61F51 /* UsageViewModel.swift in Sources */,
+				ZA1001A1B2C3D4E5F6A7B8C9 /* ZaiUsageData.swift in Sources */,
+				ZA2002A1B2C3D4E5F6A7B8C9 /* ZaiCredentialService.swift in Sources */,
+				ZA3003A1B2C3D4E5F6A7B8C9 /* ZaiAPIService.swift in Sources */,
+				ZA4004A1B2C3D4E5F6A7B8C9 /* ZaiUsageViewModel.swift in Sources */,
+				ZA5005A1B2C3D4E5F6A7B8C9 /* ZaiUsageView.swift in Sources */,
+				ZA6006A1B2C3D4E5F6A7B8C9 /* ZaiModelUsageChartView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

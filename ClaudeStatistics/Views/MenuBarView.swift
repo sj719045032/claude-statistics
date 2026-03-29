@@ -50,9 +50,12 @@ struct MenuBarView: View {
     @ObservedObject var sessionViewModel: SessionViewModel
     @ObservedObject var store: SessionDataStore
     @ObservedObject var updaterService: UpdaterService
+    @ObservedObject var notificationService: UsageResetNotificationService
+    @ObservedObject var zaiUsageViewModel: ZaiUsageViewModel
     @State private var selectedTab: AppTab = AppTab.loadOrder().first ?? .sessions
     @State private var tabOrder: [AppTab] = AppTab.loadOrder()
     @AppStorage("fontScale") private var fontScale = 1.0
+    @AppStorage("zaiUsageEnabled") private var zaiUsageEnabled = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -85,11 +88,39 @@ struct MenuBarView: View {
                         StatisticsView(store: store)
                     case .usage:
                         ScrollView {
-                            UsageView(viewModel: usageViewModel)
-                                .padding(12)
+                            let sections = UsageContentOrder.sections(
+                                claudeHasDisplayableUsage: usageViewModel.hasDisplayableUsage,
+                                zaiEnabled: zaiUsageEnabled,
+                                zaiConfigured: zaiUsageViewModel.isConfigured
+                            )
+
+                            VStack(spacing: 16) {
+                                ForEach(sections, id: \.rawValue) { section in
+                                    switch section {
+                                    case .claude:
+                                        UsageView(viewModel: usageViewModel)
+                                            .padding(12)
+                                    case .zai:
+                                        ZaiUsageView(viewModel: zaiUsageViewModel)
+                                            .padding(12)
+                                    }
+
+                                    if section != sections.last {
+                                        Divider()
+                                            .padding(.horizontal, 12)
+                                    }
+                                }
+                            }
                         }
                     case .settings:
-                        SettingsView(usageViewModel: usageViewModel, profileViewModel: profileViewModel, tabOrder: $tabOrder, updaterService: updaterService)
+                        SettingsView(
+                            usageViewModel: usageViewModel,
+                            profileViewModel: profileViewModel,
+                            zaiUsageViewModel: zaiUsageViewModel,
+                            tabOrder: $tabOrder,
+                            updaterService: updaterService,
+                            notificationService: notificationService
+                        )
                     }
                 }
                 .frame(width: geo.size.width / fontScale, height: geo.size.height / fontScale, alignment: .topLeading)

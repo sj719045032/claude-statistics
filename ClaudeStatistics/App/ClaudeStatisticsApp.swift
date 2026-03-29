@@ -7,22 +7,43 @@ final class AppState: ObservableObject {
     let usageViewModel = UsageViewModel()
     let profileViewModel = ProfileViewModel()
     let updaterService = UpdaterService()
+    let notificationService = UsageResetNotificationService.shared
+    let zaiUsageViewModel = ZaiUsageViewModel()
 
     init() {
         store.start()
+        notificationService.configure()
+        zaiUsageViewModel.setup()
+    }
+
+    func setupZai() {
+        zaiUsageViewModel.setup()
     }
 }
 
 struct MenuBarLabel: View {
     @ObservedObject var usageViewModel: UsageViewModel
+    @ObservedObject var zaiUsageViewModel: ZaiUsageViewModel
+    @AppStorage("zaiUsageEnabled") private var zaiUsageEnabled = false
 
     var body: some View {
         HStack(spacing: 3) {
             Image("MenuBarIcon")
                 .renderingMode(.template)
-            Text(usageViewModel.menuBarText)
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
+            if let text = menuBarText {
+                Text(text)
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+            }
         }
+    }
+
+    private var menuBarText: String? {
+        MenuBarUsageSelection.text(
+            claudeFiveHourPercent: usageViewModel.menuBarFiveHourPercent,
+            zaiFiveHourPercent: zaiUsageViewModel.fiveHourPercent,
+            zaiEnabled: zaiUsageEnabled,
+            authMode: CredentialService.shared.currentAuthMode()
+        )
     }
 }
 
@@ -50,11 +71,19 @@ struct ClaudeStatisticsApp: App {
                 profileViewModel: appState.profileViewModel,
                 sessionViewModel: appState.sessionViewModel,
                 store: appState.store,
-                updaterService: appState.updaterService
+                updaterService: appState.updaterService,
+                notificationService: appState.notificationService,
+                zaiUsageViewModel: appState.zaiUsageViewModel
             )
             .environment(\.locale, currentLocale)
+            .onAppear {
+                appState.setupZai()
+            }
         } label: {
-            MenuBarLabel(usageViewModel: appState.usageViewModel)
+            MenuBarLabel(
+                usageViewModel: appState.usageViewModel,
+                zaiUsageViewModel: appState.zaiUsageViewModel
+            )
         }
         .menuBarExtraStyle(.window)
     }

@@ -132,12 +132,25 @@
 "settings.tabOrder" = "标签排序";
 "settings.resetDefault" = "恢复默认";
 "settings.statusLine" = "状态行";
+"settings.notifications" = "通知";
 "settings.diagnostics" = "诊断";
 "settings.exportLog" = "打开诊断日志";
 "settings.exportLogHint" = "反馈问题时请附带此日志。路径：~/.claude/claude-statistics-diagnostic.log";
 "settings.about" = "关于";
 "settings.version" = "版本";
 "settings.checkForUpdates" = "检查更新";
+"settings.resetReminder" = "5 小时用量满额后在窗口重置时提醒我";
+"settings.notificationStatus" = "权限状态";
+"settings.allowNotifications" = "开启通知";
+"settings.testNotification" = "Test";
+"settings.notificationAuthorized" = "已开启";
+"settings.notificationDenied" = "已拒绝";
+"settings.notificationNotDetermined" = "未请求";
+"settings.notificationHint" = "授权 macOS 通知后再开启此选项。只有当某个订阅的 5 小时用量达到或超过 100% 时，才会安排重置提醒。";
+"settings.notificationDeniedHint" = "当前通知权限被阻止。请在“系统设置 > 通知”中启用 Claude Statistics，然后返回这里测试。";
+"settings.notificationReady" = "重置提醒已开启。";
+"settings.notificationTestSent" = "测试通知已安排。";
+"settings.notificationNeedsPermission" = "发送测试通知前需要先授予通知权限。";
 
 /* Pricing Management */
 "pricing.back" = "设置";
@@ -174,3 +187,28 @@
 "period.weekly" = "按周";
 "period.monthly" = "按月";
 "period.yearly" = "按年";
+
+/* Z.ai Usage */
+"zai.title" = "Z.ai 用量";
+"zai.modelUsage" = "模型用量";
+"zai.today" = "当日";
+"zai.7days" = "7日";
+"zai.totalCalls" = "总调用次数";
+"zai.totalTokens" = "总 Token 数";
+"zai.monthlySearch" = "月度搜索";
+"zai.5hours" = "5 小时";
+"zai.weekly" = "每周";
+"zai.toolUsage" = "工具用量";
+"zai.noData" = "暂无 Z.ai 用量数据";
+"zai.noChartData" = "该时段暂无数据";
+"zai.settings" = "Z.ai";
+"zai.enableUsage" = "启用 Z.ai 用量";
+"zai.authTokenPlaceholder" = "在此粘贴 Auth Token";
+"zai.authTokenConfigured" = "Auth Token 已配置";
+"zai.authTokenNotConfigured" = "未配置";
+"zai.addAuthToken" = "添加 Auth Token";
+"zai.editAuthToken" = "编辑";
+"zai.deleteAuthToken" = "移除";
+"zai.settingsHint" = "输入你的 Z.ai Auth Token 以显示订阅用量。";
+"zai.authTokenDescription" = "保存在本地钥匙串中，仅用于同步用量数据。";
+"zai.usageSummary %lld %lld" = "已用 %lld，剩余 %lld";
