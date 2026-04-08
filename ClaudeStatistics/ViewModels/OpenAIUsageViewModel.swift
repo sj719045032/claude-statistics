@@ -123,6 +123,7 @@ final class OpenAIUsageViewModel: ObservableObject {
     }
 
     private func fetchUsage(clearError: Bool) async {
+        guard !isLoading else { return }
         syncAuthState()
 
         guard authState.isConfigured else {

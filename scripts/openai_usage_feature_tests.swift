@@ -150,6 +150,7 @@ final class FakeOpenAIUsageService: OpenAIUsageServicing {
             accountEmail: nil
         )
     )
+    var fetchDelayNanoseconds: UInt64 = 0
     private(set) var fetchCallCount = 0
 
     init(
@@ -166,6 +167,9 @@ final class FakeOpenAIUsageService: OpenAIUsageServicing {
 
     func fetchUsage() async throws -> OpenAIUsageData {
         fetchCallCount += 1
+        if fetchDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: fetchDelayNanoseconds)
+        }
         return try fetchResult.get()
     }
 }
@@ -267,6 +271,24 @@ func runOpenAIUsageViewModelTests() async {
     expect(recoveringVM.isConfigured, "Expected forceRefresh to transition the VM to configured")
     expect(recoveringVM.usageData == refreshed, "Expected recovered auth to allow a successful fetch")
     expect(recoveringFake.fetchCallCount == 1, "Expected recovered auth to trigger a fetch")
+
+    let overlappingFake = FakeOpenAIUsageService(authState: configuredAuthState())
+    overlappingFake.fetchResult = .success(refreshed)
+    overlappingFake.fetchDelayNanoseconds = 100_000_000
+    let overlappingVM = OpenAIUsageViewModel(service: overlappingFake)
+
+    overlappingVM.setup()
+    await withTaskGroup(of: Void.self) { group in
+        group.addTask {
+            await overlappingVM.forceRefresh()
+        }
+        group.addTask {
+            await overlappingVM.forceRefresh()
+        }
+    }
+
+    expect(overlappingFake.fetchCallCount == 1, "Expected overlapping refresh attempts to coalesce into one fetch")
+    expect(overlappingVM.usageData == refreshed, "Expected overlapping refresh guard to keep the successful result")
 
     let states: [OpenAIAuthStatus] = [.notFound, .unsupportedMode, .invalidAuth]
     for state in states {
