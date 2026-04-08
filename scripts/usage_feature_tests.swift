@@ -195,8 +195,7 @@ func runMenuBarUsageSelectionTests() {
         zaiFiveHourPercent: 64.2,
         openAIFiveHourPercent: 31.8,
         zaiEnabled: true,
-        openAIEnabled: true,
-        authMode: .oauth
+        openAIEnabled: true
     )
     expect(
         compactItems.map(\.providerLabel) == ["C", "Z", "O"],
@@ -209,6 +208,51 @@ func runMenuBarUsageSelectionTests() {
     expect(
         MenuBarUsageSelection.compactText(from: compactItems) == "C 42% Z 64% O 31%",
         "Expected compact menu text to flatten provider labels and percentages"
+    )
+
+    let missingMiddleItems = MenuBarUsageSelection.items(
+        claudeFiveHourPercent: 42.9,
+        zaiFiveHourPercent: nil,
+        openAIFiveHourPercent: 31.8,
+        zaiEnabled: true,
+        openAIEnabled: true
+    )
+    expect(
+        missingMiddleItems.map(\.providerLabel) == ["C", "O"],
+        "Expected missing-middle provider cases to keep the remaining providers in fixed order"
+    )
+    expect(
+        MenuBarUsageSelection.compactText(from: missingMiddleItems) == "C 42% O 31%",
+        "Expected compact text to skip missing providers without adding extra separators"
+    )
+
+    let singleProviderItems = MenuBarUsageSelection.items(
+        claudeFiveHourPercent: nil,
+        zaiFiveHourPercent: nil,
+        openAIFiveHourPercent: 31.8,
+        zaiEnabled: false,
+        openAIEnabled: true
+    )
+    expect(
+        singleProviderItems.map(\.providerLabel) == ["O"],
+        "Expected single-provider cases to preserve the available provider"
+    )
+    expect(
+        MenuBarUsageSelection.compactText(from: singleProviderItems) == "O 31%",
+        "Expected compact text to render a single provider without extra spacing"
+    )
+
+    let noProviderItems = MenuBarUsageSelection.items(
+        claudeFiveHourPercent: nil,
+        zaiFiveHourPercent: nil,
+        openAIFiveHourPercent: nil,
+        zaiEnabled: false,
+        openAIEnabled: false
+    )
+    expect(noProviderItems.isEmpty, "Expected no-provider cases to produce no compact menu items")
+    expect(
+        MenuBarUsageSelection.compactText(from: noProviderItems) == nil,
+        "Expected compact text to be nil when there are no compact menu items"
     )
 
     expect(
