@@ -219,6 +219,23 @@ func runMenuBarUsageSelectionTests() {
         MenuBarUsageSelection.compactText(from: compactItems) == "C 42% Z 64% O 31%",
         "Expected compact menu text to flatten provider labels and percentages"
     )
+    let compactFragments = MenuBarUsageSelection.styledFragments(from: compactItems)
+    expect(
+        compactFragments.map(\.text) == ["C", " ", "42%", " ", "Z", " ", "64%", " ", "O", " ", "31%"],
+        "Expected styled fragments to preserve provider labels, separators, and percentages in order"
+    )
+    expect(
+        compactFragments[2].style == .percentage(.green),
+        "Expected Claude percentage fragments to carry a green usage tint role"
+    )
+    expect(
+        compactFragments[6].style == .percentage(.green),
+        "Expected Z.ai percentage fragments to carry a green usage tint role"
+    )
+    expect(
+        compactFragments[10].style == .percentage(.green),
+        "Expected OpenAI percentage fragments to carry a green usage tint role"
+    )
 
     let missingMiddleItems = MenuBarUsageSelection.items(
         claudeFiveHourPercent: 42.9,
@@ -270,12 +287,24 @@ func runMenuBarUsageSelectionTests() {
         "Expected 69 used percent to remain green"
     )
     expect(
-        MenuBarUsageSelection.colorRole(forUsedPercent: 70) == .warning,
-        "Expected 70 used percent to switch to warning"
+        MenuBarUsageSelection.colorRole(forUsedPercent: 70) == .yellow,
+        "Expected 70 used percent to switch to yellow like Quotio's used-percent menu tint"
     )
     expect(
         MenuBarUsageSelection.colorRole(forUsedPercent: 90) == .critical,
         "Expected 90 used percent to switch to critical"
+    )
+    expect(
+        MenuBarUsageSelection.compactPercentFontSize == 10,
+        "Expected compact menu percentage text to use the smaller 10pt size"
+    )
+    expect(
+        MenuBarUsageSelection.compactProviderFontSize == 11,
+        "Expected provider labels to use the larger 11pt size"
+    )
+    expect(
+        MenuBarUsageSelection.compactProviderFontSize > MenuBarUsageSelection.compactPercentFontSize,
+        "Expected provider labels to render larger than the colored percentages"
     )
 }
 

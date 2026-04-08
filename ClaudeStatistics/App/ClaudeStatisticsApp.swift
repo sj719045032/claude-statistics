@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 @MainActor
@@ -41,10 +42,10 @@ struct MenuBarLabel: View {
                 .foregroundStyle(.secondary)
                 .fixedSize()
         } else {
-            // MenuBarExtra labels reliably render a single Text view; nested stacks
-            // can collapse down to only the first segment in the status bar.
-            menuBarDisplayText
-                .lineLimit(1)
+            // MenuBarExtra normalizes Text labels to the system menu bar foreground color.
+            // Render a non-template image so Quotio-style per-provider tinting survives.
+            Image(nsImage: menuBarDisplayImage)
+                .renderingMode(.original)
                 .fixedSize()
         }
     }
@@ -63,26 +64,61 @@ struct MenuBarLabel: View {
         switch role {
         case .green:
             return .green
-        case .warning:
-            return .orange
+        case .yellow:
+            return .yellow
         case .critical:
             return .red
         }
     }
 
-    private var menuBarDisplayText: Text {
-        menuBarItems.enumerated().reduce(Text("")) { partial, entry in
-            let (index, item) = entry
-            let spacing = index == 0 ? Text("") : Text(" ")
-            return partial
-                + spacing
-                + Text(item.providerLabel)
-                    .font(.system(size: 9, weight: .semibold, design: .rounded))
-                    .foregroundColor(.secondary)
-                + Text(" ")
-                + Text(item.percentText)
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundColor(color(for: item.colorRole))
+    private var menuBarDisplayImage: NSImage {
+        let fragments = MenuBarUsageSelection.styledFragments(from: menuBarItems)
+        let attributedString = NSMutableAttributedString()
+
+        for fragment in fragments {
+            attributedString.append(
+                NSAttributedString(
+                    string: fragment.text,
+                    attributes: attributes(for: fragment.style)
+                )
+            )
+        }
+
+        let measuredSize = attributedString.size()
+        let imageSize = NSSize(
+            width: ceil(measuredSize.width),
+            height: max(14, ceil(measuredSize.height))
+        )
+        let image = NSImage(size: imageSize)
+        image.lockFocus()
+        attributedString.draw(
+            at: NSPoint(
+                x: 0,
+                y: floor((imageSize.height - measuredSize.height) / 2)
+            )
+        )
+        image.unlockFocus()
+        image.isTemplate = false
+        return image
+    }
+
+    private func attributes(for style: MenuBarUsageTextStyle) -> [NSAttributedString.Key: Any] {
+        switch style {
+        case .providerLabel:
+            return [
+                .font: NSFont.systemFont(ofSize: MenuBarUsageSelection.compactProviderFontSize, weight: .semibold),
+                .foregroundColor: NSColor.white
+            ]
+        case .separator:
+            return [
+                .font: NSFont.systemFont(ofSize: MenuBarUsageSelection.compactProviderFontSize, weight: .regular),
+                .foregroundColor: NSColor.white
+            ]
+        case let .percentage(role):
+            return [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: MenuBarUsageSelection.compactPercentFontSize, weight: .bold),
+                .foregroundColor: NSColor(color(for: role))
+            ]
         }
     }
 }

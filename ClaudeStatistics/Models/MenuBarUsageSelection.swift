@@ -8,7 +8,7 @@ enum ClaudeAuthMode: Equatable {
 
 enum MenuBarUsageColorRole: Equatable {
     case green
-    case warning
+    case yellow
     case critical
 }
 
@@ -18,7 +18,21 @@ struct MenuBarUsageItem: Equatable {
     let colorRole: MenuBarUsageColorRole
 }
 
+enum MenuBarUsageTextStyle: Equatable {
+    case providerLabel
+    case separator
+    case percentage(MenuBarUsageColorRole)
+}
+
+struct MenuBarUsageTextFragment: Equatable {
+    let text: String
+    let style: MenuBarUsageTextStyle
+}
+
 enum MenuBarUsageSelection {
+    static let compactProviderFontSize = 11.0
+    static let compactPercentFontSize = 10.0
+
     static func text(
         claudeFiveHourPercent: Double?,
         zaiFiveHourPercent: Double?,
@@ -66,12 +80,31 @@ enum MenuBarUsageSelection {
             .joined(separator: " ")
     }
 
+    static func styledFragments(from items: [MenuBarUsageItem]) -> [MenuBarUsageTextFragment] {
+        guard let firstItem = items.first else { return [] }
+
+        var fragments: [MenuBarUsageTextFragment] = [
+            MenuBarUsageTextFragment(text: firstItem.providerLabel, style: .providerLabel),
+            MenuBarUsageTextFragment(text: " ", style: .separator),
+            MenuBarUsageTextFragment(text: firstItem.percentText, style: .percentage(firstItem.colorRole))
+        ]
+
+        for item in items.dropFirst() {
+            fragments.append(MenuBarUsageTextFragment(text: " ", style: .separator))
+            fragments.append(MenuBarUsageTextFragment(text: item.providerLabel, style: .providerLabel))
+            fragments.append(MenuBarUsageTextFragment(text: " ", style: .separator))
+            fragments.append(MenuBarUsageTextFragment(text: item.percentText, style: .percentage(item.colorRole)))
+        }
+
+        return fragments
+    }
+
     static func colorRole(forUsedPercent usedPercent: Double) -> MenuBarUsageColorRole {
         switch usedPercent {
         case ..<70:
             return .green
         case 70..<90:
-            return .warning
+            return .yellow
         default:
             return .critical
         }
