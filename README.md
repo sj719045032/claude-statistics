@@ -47,16 +47,19 @@ Claude Statistics automatically discovers and parses all your Claude Code sessio
 ### Usage (Subscription)
 
 - Fetches Claude subscription usage via the Anthropic OAuth API
+- Fetches Z.ai quota and model usage via your local Auth Token
+- Fetches OpenAI current-window and weekly usage via the Codex OAuth state in `~/.codex/auth.json`
 - Displays **5-hour** and **7-day** rate limit utilization with progress bars and reset countdowns
 - Per-model windows (Opus, Sonnet) when available
 - Extra Usage credit tracking (used / monthly limit)
 - Auto-refresh with configurable interval (5 / 10 / 30 min); the usage API is rate-limited, so a longer interval is recommended
-- Menu bar status text updates reactively with usage data
+- Menu bar status text updates reactively with compact multi-provider items such as `C 42% Z 64% O 31%`
 - Error display with retry button and direct link to [claude.ai/settings/usage](https://claude.ai/settings/usage)
 
 ### Settings
 
 - **Subscription usage auto-refresh** toggle with interval selection (5 / 10 / 30 min)
+- Separate usage toggles for **Z.ai** and **OpenAI**
 - **Preferred terminal** selection (Auto / Terminal / iTerm2 / Warp / Kitty / Alacritty)
 - **Model pricing management**: view and edit per-model pricing, fetch latest pricing from Anthropic docs
 - **Status line integration**: install/update a Claude Code status line script that shares the app's pricing and usage cache
@@ -109,11 +112,15 @@ To build a DMG for distribution:
 
 ## How It Works
 
-Claude Statistics reads data from two sources:
+Claude Statistics reads data from multiple local and remote sources:
 
 1. **Local session data** — parses JSONL transcript files from `~/.claude/projects/` to extract session metadata, token counts, model info, tool usage, and timestamps. Streaming entries are deduplicated by message ID (last entry wins, capturing final output token counts). Cost is estimated using built-in model pricing tables (configurable in `~/.claude-statistics/pricing.json`), with per-model accuracy for multi-model sessions.
 
-2. **Anthropic OAuth API** — fetches your subscription rate limit utilization (5-hour / 7-day windows) using the OAuth token stored in your macOS Keychain or `~/.claude/.credentials.json` (written by Claude Code during login).
+2. **Anthropic OAuth API** — fetches your Claude subscription rate limit utilization (5-hour / 7-day windows) using the OAuth token stored in your macOS Keychain or `~/.claude/.credentials.json` (written by Claude Code during login).
+
+3. **Z.ai usage API** — fetches quota and model-usage data with the Auth Token you store locally in Keychain from the Settings tab.
+
+4. **OpenAI ChatGPT usage API** — fetches current-window and weekly usage from `https://chatgpt.com/backend-api/wham/usage` using the local Codex OAuth state in `~/.codex/auth.json`, with token refresh persisted back to that file when needed.
 
 All data is processed locally. No data is sent to any third-party service.
 
@@ -123,13 +130,16 @@ All data is processed locally. No data is sent to any third-party service.
 ClaudeStatistics/
 ├── App/                    # App entry point (MenuBarExtra), Info.plist, entitlements
 ├── Models/                 # Session, SessionStats, ModelPricing, AggregateStats,
-│                           # TranscriptEntry
-├── ViewModels/             # SessionViewModel, StatisticsViewModel, UsageViewModel
+│                           # TranscriptEntry, OpenAIUsageData
+├── ViewModels/             # SessionViewModel, StatisticsViewModel, UsageViewModel,
+│                           # ZaiUsageViewModel, OpenAIUsageViewModel
 ├── Views/                  # MenuBarView, SessionListView, SessionDetailView,
-│                           # StatisticsView, UsageView, SettingsView
+│                           # StatisticsView, UsageView, ZaiUsageView,
+│                           # OpenAIUsageView, SettingsView
 ├── Services/               # SessionDataStore, FSEventsWatcher, TranscriptParser,
 │                           # SessionScanner, CredentialService, PricingFetchService,
-│                           # StatusLineInstaller, UsageAPIService
+│                           # StatusLineInstaller, UsageAPIService,
+│                           # ZaiAPIService, OpenAIUsageAPIService
 ├── Utilities/              # TimeFormatter, TerminalLauncher, LanguageManager
 └── Resources/              # Localizable.strings (en, zh-Hans)
 ```

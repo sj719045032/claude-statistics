@@ -47,16 +47,19 @@ Claude Statistics 自动发现并解析 `~/.claude/projects/` 下所有 Claude C
 ### 用量监控（订阅）
 
 - 通过 Anthropic OAuth API 获取订阅用量
+- 通过本地 Auth Token 获取 Z.ai 配额和模型用量
+- 通过 `~/.codex/auth.json` 中的 Codex OAuth 登录态获取 OpenAI 当前窗口和周用量
 - 展示 **5小时**和 **7天**速率限制使用率，含进度条和重置倒计时
 - 按模型窗口展示（Opus、Sonnet）
 - 额外用量额度追踪（已用 / 月度限额）
 - 支持自动刷新，间隔可配置（5 / 10 / 30 分钟）；用量接口容易限流，建议适当调大间隔
-- 菜单栏状态文字随用量数据实时更新
+- 菜单栏状态文字会以紧凑多 provider 形式实时更新，例如 `C 42% Z 64% O 31%`
 - 错误展示 + 重试按钮，支持直接跳转 [claude.ai/settings/usage](https://claude.ai/settings/usage) 在线查看
 
 ### 设置
 
 - **订阅用量自动刷新**开关，间隔可选（5 / 10 / 30 分钟）
+- **Z.ai** 和 **OpenAI** 的独立用量开关
 - **偏好终端**选择（自动 / Terminal / iTerm2 / Warp / Kitty / Alacritty）
 - **模型定价管理**：查看和编辑按模型定价，从 Anthropic 文档获取最新价格
 - **状态行集成**：安装/更新 Claude Code 状态行脚本，共享应用的定价和用量缓存
@@ -109,11 +112,15 @@ open ClaudeStatistics.xcodeproj
 
 ## 工作原理
 
-Claude Statistics 从两个数据源读取数据：
+Claude Statistics 从多种本地和远程来源读取数据：
 
 1. **本地会话数据** — 解析 `~/.claude/projects/` 下的 JSONL 转录文件，提取会话元数据、Token 计数、模型信息、工具使用和时间戳。流式条目按消息 ID 去重（取最后一条，获取最终的输出 Token 计数）。费用使用内置模型定价表估算（可在 `~/.claude-statistics/pricing.json` 中配置），多模型会话按模型精确计算。
 
-2. **Anthropic OAuth API** — 使用存储在 macOS 钥匙串或 `~/.claude/.credentials.json` 中的 OAuth 令牌（Claude Code 登录时写入）获取订阅速率限制使用情况。
+2. **Anthropic OAuth API** — 使用存储在 macOS 钥匙串或 `~/.claude/.credentials.json` 中的 OAuth 令牌（Claude Code 登录时写入）获取 Claude 订阅速率限制使用情况。
+
+3. **Z.ai 用量 API** — 使用你在设置页本地保存到钥匙串的 Auth Token 获取配额和模型用量数据。
+
+4. **OpenAI ChatGPT 用量 API** — 使用 `~/.codex/auth.json` 中的本地 Codex OAuth 登录态请求 `https://chatgpt.com/backend-api/wham/usage` 获取当前窗口和周用量，并在需要时把刷新后的 token 写回该文件。
 
 所有数据在本地处理，不会发送到任何第三方服务。
 
@@ -123,13 +130,16 @@ Claude Statistics 从两个数据源读取数据：
 ClaudeStatistics/
 ├── App/                    # 应用入口（MenuBarExtra）、Info.plist、权限配置
 ├── Models/                 # Session、SessionStats、ModelPricing、AggregateStats、
-│                           # TranscriptEntry
-├── ViewModels/             # SessionViewModel、StatisticsViewModel、UsageViewModel
+│                           # TranscriptEntry、OpenAIUsageData
+├── ViewModels/             # SessionViewModel、StatisticsViewModel、UsageViewModel、
+│                           # ZaiUsageViewModel、OpenAIUsageViewModel
 ├── Views/                  # MenuBarView、SessionListView、SessionDetailView、
-│                           # StatisticsView、UsageView、SettingsView
+│                           # StatisticsView、UsageView、ZaiUsageView、
+│                           # OpenAIUsageView、SettingsView
 ├── Services/               # SessionDataStore、FSEventsWatcher、TranscriptParser、
 │                           # SessionScanner、CredentialService、PricingFetchService、
-│                           # StatusLineInstaller、UsageAPIService
+│                           # StatusLineInstaller、UsageAPIService、
+│                           # ZaiAPIService、OpenAIUsageAPIService
 ├── Utilities/              # TimeFormatter、TerminalLauncher、LanguageManager
 └── Resources/              # Localizable.strings（en、zh-Hans）
 ```
