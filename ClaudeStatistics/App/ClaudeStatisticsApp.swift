@@ -9,34 +9,73 @@ final class AppState: ObservableObject {
     let updaterService = UpdaterService()
     let notificationService = UsageResetNotificationService.shared
     let zaiUsageViewModel = ZaiUsageViewModel()
+    let openAIUsageViewModel = OpenAIUsageViewModel()
 
     init() {
         store.start()
         notificationService.configure()
         zaiUsageViewModel.setup()
+        openAIUsageViewModel.setup()
     }
 
     func setupZai() {
         zaiUsageViewModel.setup()
+    }
+
+    func setupOpenAI() {
+        openAIUsageViewModel.setup()
     }
 }
 
 struct MenuBarLabel: View {
     @ObservedObject var usageViewModel: UsageViewModel
     @ObservedObject var zaiUsageViewModel: ZaiUsageViewModel
+    @ObservedObject var openAIUsageViewModel: OpenAIUsageViewModel
     @AppStorage("zaiUsageEnabled") private var zaiUsageEnabled = false
+    @AppStorage("openAIUsageEnabled") private var openAIUsageEnabled = false
 
     var body: some View {
-        Text(menuBarText ?? "--")
-            .font(.system(size: 11, weight: .medium, design: .monospaced))
+        HStack(spacing: 3) {
+            if menuBarItems.isEmpty {
+                Text("--")
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            } else {
+                HStack(spacing: 4) {
+                    ForEach(Array(menuBarItems.enumerated()), id: \.offset) { _, item in
+                        HStack(spacing: 2) {
+                            Text(item.providerLabel)
+                                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.secondary)
+                            Text(item.percentText)
+                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .foregroundStyle(color(for: item.colorRole))
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    private var menuBarText: String? {
-        MenuBarUsageSelection.compactText(from: MenuBarUsageSelection.items(
+    private var menuBarItems: [MenuBarUsageItem] {
+        MenuBarUsageSelection.items(
             claudeFiveHourPercent: usageViewModel.menuBarFiveHourPercent,
             zaiFiveHourPercent: zaiUsageViewModel.fiveHourPercent,
-            zaiEnabled: zaiUsageEnabled
-        ))
+            openAIFiveHourPercent: openAIUsageViewModel.currentWindowPercent,
+            zaiEnabled: zaiUsageEnabled,
+            openAIEnabled: openAIUsageEnabled
+        )
+    }
+
+    private func color(for role: MenuBarUsageColorRole) -> Color {
+        switch role {
+        case .green:
+            return .green
+        case .warning:
+            return .orange
+        case .critical:
+            return .red
+        }
     }
 }
 
@@ -66,16 +105,19 @@ struct ClaudeStatisticsApp: App {
                 store: appState.store,
                 updaterService: appState.updaterService,
                 notificationService: appState.notificationService,
-                zaiUsageViewModel: appState.zaiUsageViewModel
+                zaiUsageViewModel: appState.zaiUsageViewModel,
+                openAIUsageViewModel: appState.openAIUsageViewModel
             )
             .environment(\.locale, currentLocale)
             .onAppear {
                 appState.setupZai()
+                appState.setupOpenAI()
             }
         } label: {
             MenuBarLabel(
                 usageViewModel: appState.usageViewModel,
-                zaiUsageViewModel: appState.zaiUsageViewModel
+                zaiUsageViewModel: appState.zaiUsageViewModel,
+                openAIUsageViewModel: appState.openAIUsageViewModel
             )
         }
         .menuBarExtraStyle(.window)

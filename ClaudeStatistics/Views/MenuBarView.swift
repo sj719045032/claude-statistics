@@ -52,10 +52,12 @@ struct MenuBarView: View {
     @ObservedObject var updaterService: UpdaterService
     @ObservedObject var notificationService: UsageResetNotificationService
     @ObservedObject var zaiUsageViewModel: ZaiUsageViewModel
+    @ObservedObject var openAIUsageViewModel: OpenAIUsageViewModel
     @State private var selectedTab: AppTab = AppTab.loadOrder().first ?? .sessions
     @State private var tabOrder: [AppTab] = AppTab.loadOrder()
     @AppStorage("fontScale") private var fontScale = 1.0
     @AppStorage("zaiUsageEnabled") private var zaiUsageEnabled = false
+    @AppStorage("openAIUsageEnabled") private var openAIUsageEnabled = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -91,7 +93,11 @@ struct MenuBarView: View {
                             let sections = UsageContentOrder.sections(
                                 claudeHasDisplayableUsage: usageViewModel.hasDisplayableUsage,
                                 zaiEnabled: zaiUsageEnabled,
-                                zaiConfigured: zaiUsageViewModel.isConfigured
+                                zaiConfigured: zaiUsageViewModel.isConfigured,
+                                openAIEnabled: openAIUsageEnabled,
+                                openAIConfigured: openAIUsageViewModel.isConfigured
+                                    || openAIUsageViewModel.hasDisplayableUsage
+                                    || openAIUsageViewModel.errorMessage != nil
                             )
 
                             VStack(spacing: 16) {
@@ -102,6 +108,9 @@ struct MenuBarView: View {
                                             .padding(12)
                                     case .zai:
                                         ZaiUsageView(viewModel: zaiUsageViewModel)
+                                            .padding(12)
+                                    case .openAI:
+                                        OpenAIUsageView(viewModel: openAIUsageViewModel)
                                             .padding(12)
                                     }
 
@@ -117,6 +126,7 @@ struct MenuBarView: View {
                             usageViewModel: usageViewModel,
                             profileViewModel: profileViewModel,
                             zaiUsageViewModel: zaiUsageViewModel,
+                            openAIUsageViewModel: openAIUsageViewModel,
                             tabOrder: $tabOrder,
                             updaterService: updaterService,
                             notificationService: notificationService

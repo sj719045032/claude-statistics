@@ -212,3 +212,17 @@
 "zai.settingsHint" = "输入你的 Z.ai Auth Token 以显示订阅用量。";
 "zai.authTokenDescription" = "保存在本地钥匙串中，仅用于同步用量数据。";
 "zai.usageSummary %lld %lld" = "已用 %lld，剩余 %lld";
+
+/* OpenAI Usage */
+"openai.title" = "OpenAI 用量";
+"openai.currentWindow" = "当前窗口";
+"openai.weeklyUsage" = "周用量";
+"openai.noData" = "暂无 OpenAI 用量数据";
+"openai.settings" = "OpenAI";
+"openai.enableUsage" = "启用 OpenAI 用量";
+"openai.settingsHint" = "读取本机 Codex OAuth 登录态以显示 OpenAI 订阅用量。";
+"openai.authDescription" = "仅读取 ~/.codex/auth.json，不支持 API Key 和应用内登录。";
+"openai.authConfigured" = "已配置";
+"openai.authNotFound" = "未找到认证文件";
+"openai.authUnsupported" = "认证模式不受支持";
+"openai.authInvalid" = "认证状态无效";

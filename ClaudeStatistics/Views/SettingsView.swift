@@ -6,6 +6,7 @@ struct SettingsView: View {
     @ObservedObject var usageViewModel: UsageViewModel
     @ObservedObject var profileViewModel: ProfileViewModel
     @ObservedObject var zaiUsageViewModel: ZaiUsageViewModel
+    @ObservedObject var openAIUsageViewModel: OpenAIUsageViewModel
     @Binding var tabOrder: [AppTab]
     @ObservedObject var updaterService: UpdaterService
     @ObservedObject var notificationService: UsageResetNotificationService
@@ -16,6 +17,7 @@ struct SettingsView: View {
     @AppStorage("fontScale") private var fontScale = 1.0
     @AppStorage("customInterval") private var customInterval = false
     @AppStorage("zaiUsageEnabled") private var zaiUsageEnabled = false
+    @AppStorage("openAIUsageEnabled") private var openAIUsageEnabled = false
     @AppStorage("usageResetReminderEnabled") private var usageResetReminderEnabled = false
     @State private var customMinutes = ""
     @State private var showPricing = false
@@ -52,6 +54,7 @@ struct SettingsView: View {
                     }
                     zaiHasApiKey = await ZaiCredentialService.shared.hasAPIKeyAsync()
                     await notificationService.refreshAuthorizationStatus()
+                    openAIUsageViewModel.refreshAuthState()
                 }
 
             Divider()
@@ -185,6 +188,53 @@ struct SettingsView: View {
                                 .foregroundStyle(.tertiary)
                         }
                         .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+
+            Section("openai.settings") {
+                Toggle("openai.enableUsage", isOn: $openAIUsageEnabled)
+                    .onChange(of: openAIUsageEnabled) { _, newValue in
+                        openAIUsageViewModel.refreshAuthState()
+                        openAIUsageViewModel.applyAutoRefreshSettings(
+                            enabled: autoRefreshEnabled && newValue,
+                            interval: refreshInterval
+                        )
+
+                        if newValue && openAIUsageViewModel.isConfigured {
+                            Task { @MainActor in
+                                await openAIUsageViewModel.forceRefresh()
+                            }
+                        }
+                    }
+
+                if openAIUsageEnabled {
+                    VStack(alignment: .leading, spacing: 8) {
+                        openAIStatusBadge
+
+                        if let accountEmail = openAIUsageViewModel.authState.accountEmail {
+                            Text(accountEmail)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("openai.settingsHint")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                            Text("openai.authDescription")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                        .fixedSize(horizontal: false, vertical: true)
+
+                        if let error = openAIUsageViewModel.errorMessage {
+                            Text(error)
+                                .font(.caption2)
+                                .foregroundStyle(.red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                     .padding(.vertical, 4)
                 }
@@ -489,11 +539,13 @@ struct SettingsView: View {
         refreshInterval = seconds
         usageViewModel.applyAutoRefreshSettings(enabled: autoRefreshEnabled, interval: refreshInterval)
         zaiUsageViewModel.applyAutoRefreshSettings(enabled: autoRefreshEnabled && zaiUsageEnabled, interval: refreshInterval)
+        openAIUsageViewModel.applyAutoRefreshSettings(enabled: autoRefreshEnabled && openAIUsageEnabled, interval: refreshInterval)
     }
 
     private func applySharedAutoRefreshSettings(enabled: Bool) {
         usageViewModel.applyAutoRefreshSettings(enabled: enabled, interval: refreshInterval)
         zaiUsageViewModel.applyAutoRefreshSettings(enabled: enabled && zaiUsageEnabled, interval: refreshInterval)
+        openAIUsageViewModel.applyAutoRefreshSettings(enabled: enabled && openAIUsageEnabled, interval: refreshInterval)
     }
 
     // MARK: - Z.ai API Key
@@ -583,6 +635,22 @@ struct SettingsView: View {
         )
     }
 
+    private var openAIStatusBadge: some View {
+        HStack(spacing: 6) {
+            Image(systemName: openAIStatusIconName)
+                .font(.system(size: 10, weight: .semibold))
+            Text(openAIStatusText)
+                .font(.system(size: 11, weight: .medium))
+        }
+        .foregroundStyle(openAIStatusColor)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(
+            Capsule(style: .continuous)
+                .fill(openAIStatusBackgroundColor)
+        )
+    }
+
     private var notificationActionGroup: some View {
         ControlGroup {
             if shouldShowAllowNotificationsButton {
@@ -620,6 +688,58 @@ struct SettingsView: View {
             return true
         default:
             return false
+        }
+    }
+
+    private var openAIStatusText: LocalizedStringKey {
+        switch openAIUsageViewModel.authState.status {
+        case .configured:
+            return "openai.authConfigured"
+        case .notFound:
+            return "openai.authNotFound"
+        case .unsupportedMode:
+            return "openai.authUnsupported"
+        case .invalidAuth:
+            return "openai.authInvalid"
+        }
+    }
+
+    private var openAIStatusIconName: String {
+        switch openAIUsageViewModel.authState.status {
+        case .configured:
+            return "checkmark.circle.fill"
+        case .notFound:
+            return "xmark.circle.fill"
+        case .unsupportedMode:
+            return "exclamationmark.circle.fill"
+        case .invalidAuth:
+            return "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var openAIStatusColor: Color {
+        switch openAIUsageViewModel.authState.status {
+        case .configured:
+            return .green
+        case .notFound:
+            return .secondary
+        case .unsupportedMode:
+            return .orange
+        case .invalidAuth:
+            return .red
+        }
+    }
+
+    private var openAIStatusBackgroundColor: Color {
+        switch openAIUsageViewModel.authState.status {
+        case .configured:
+            return Color.green.opacity(0.12)
+        case .notFound:
+            return Color.gray.opacity(0.12)
+        case .unsupportedMode:
+            return Color.orange.opacity(0.12)
+        case .invalidAuth:
+            return Color.red.opacity(0.12)
         }
     }
 

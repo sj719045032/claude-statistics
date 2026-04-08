@@ -68,6 +68,13 @@ final class OpenAIUsageViewModel: ObservableObject {
         await fetchUsage(clearError: true)
     }
 
+    func refreshAuthState() {
+        syncAuthState()
+        if !authState.isConfigured {
+            errorMessage = OpenAIUsageError.notConfigured(authState.status).localizedDescription
+        }
+    }
+
     func applyAutoRefreshSettings(enabled: Bool, interval: TimeInterval) {
         autoRefreshInterval = interval > 0 ? interval : 300
 

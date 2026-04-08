@@ -212,3 +212,17 @@
 "zai.settingsHint" = "Enter your Z.ai Auth Token to display subscription usage.";
 "zai.authTokenDescription" = "Saved locally in Keychain and only used for usage sync.";
 "zai.usageSummary %lld %lld" = "%lld used, %lld remaining";
+
+/* OpenAI Usage */
+"openai.title" = "OpenAI Usage";
+"openai.currentWindow" = "Current Window";
+"openai.weeklyUsage" = "Weekly Usage";
+"openai.noData" = "No OpenAI usage data available";
+"openai.settings" = "OpenAI";
+"openai.enableUsage" = "Enable OpenAI usage";
+"openai.settingsHint" = "Read local Codex OAuth state to display OpenAI subscription usage.";
+"openai.authDescription" = "Reads ~/.codex/auth.json only. API keys and in-app login are not supported.";
+"openai.authConfigured" = "Configured";
+"openai.authNotFound" = "Auth file not found";
+"openai.authUnsupported" = "Unsupported auth mode";
+"openai.authInvalid" = "Invalid auth state";
