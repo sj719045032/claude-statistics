@@ -53,6 +53,7 @@ struct MenuBarView: View {
     @State private var selectedTab: AppTab = AppTab.loadOrder().first ?? .sessions
     @State private var tabOrder: [AppTab] = AppTab.loadOrder()
     @AppStorage("fontScale") private var fontScale = 1.0
+    @Namespace private var tabNamespace
 
     var body: some View {
         VStack(spacing: 0) {
@@ -63,10 +64,14 @@ struct MenuBarView: View {
                         title: tab.localizedName,
                         icon: tab.icon,
                         isSelected: selectedTab == tab,
-                        showBadge: tab == .settings && updaterService.hasUpdate
-                    ) {
-                        selectedTab = tab
-                    }
+                        showBadge: tab == .settings && updaterService.hasUpdate,
+                        action: {
+                            withAnimation(Theme.tabAnimation) {
+                                selectedTab = tab
+                            }
+                        },
+                        namespace: tabNamespace
+                    )
                 }
             }
             .padding(.horizontal, 8)
@@ -94,9 +99,9 @@ struct MenuBarView: View {
                 }
                 .frame(width: geo.size.width / fontScale, height: geo.size.height / fontScale, alignment: .topLeading)
                 .scaleEffect(fontScale, anchor: .topLeading)
+                .transition(.opacity.animation(Theme.quickSpring))
             }
-
-            Divider()
+            .id(selectedTab)
 
             // Footer
             HStack {
@@ -115,6 +120,7 @@ struct MenuBarView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
+            .background(.ultraThinMaterial)
         }
         .frame(minWidth: 480, maxWidth: 800, minHeight: 520, maxHeight: 900)
     }
@@ -156,14 +162,20 @@ struct TabButton: View {
     let isSelected: Bool
     var showBadge: Bool = false
     let action: () -> Void
+    let namespace: Namespace.ID
     @State private var isHovered = false
+    @State private var bounceCount = 0
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 2) {
+            VStack(spacing: 4) {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: icon)
                         .font(.system(size: 14))
+                        .symbolEffect(.bounce, value: bounceCount)
+                        .onChange(of: isSelected) { _, newValue in
+                            if newValue { bounceCount += 1 }
+                        }
                     if showBadge {
                         Circle()
                             .fill(.red)
@@ -172,17 +184,23 @@ struct TabButton: View {
                     }
                 }
                 Text(title)
-                    .font(.system(size: 10))
+                    .font(.system(size: 10, weight: isSelected ? .medium : .regular))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
             .contentShape(Rectangle())
             .foregroundStyle(isSelected ? .primary : isHovered ? .primary : .secondary)
-            .background(isSelected ? Color.blue.opacity(0.1) : isHovered ? Color.gray.opacity(0.1) : Color.clear)
-            .cornerRadius(6)
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
+        .overlay(alignment: .bottom) {
+            if isSelected {
+                Capsule()
+                    .fill(Color.accentColor)
+                    .frame(width: 24, height: 2.5)
+                    .matchedGeometryEffect(id: "tab_indicator", in: namespace)
+            }
+        }
     }
 }
 

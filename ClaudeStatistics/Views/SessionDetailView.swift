@@ -41,7 +41,7 @@ struct SessionDetailView: View {
                             .font(.system(size: 11))
                             .foregroundStyle(.red)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.hoverScale)
                 }
 
                 if let onViewTranscript {
@@ -333,21 +333,8 @@ struct SessionDetailView: View {
                     Divider()
 
                     let maxCount = stats.sortedToolUses.first?.count ?? 1
-                    ForEach(stats.sortedToolUses, id: \.name) { tool in
-                        HStack(spacing: 8) {
-                            Text(tool.name)
-                                .font(.system(size: 11, design: .monospaced))
-                                .lineLimit(1)
-                                .frame(width: 100, alignment: .leading)
-
-                            ProgressView(value: Double(tool.count), total: Double(maxCount))
-                                .tint(Color.blue.opacity(0.7))
-
-                            Text("\(tool.count)")
-                                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                                .frame(width: 35, alignment: .trailing)
-                        }
+                    ForEach(Array(stats.sortedToolUses.enumerated()), id: \.element.name) { index, tool in
+                        ToolBarRow(name: tool.name, count: tool.count, maxCount: maxCount, delay: Double(index) * 0.03)
                     }
                 }
             }
@@ -440,13 +427,7 @@ struct SectionCard<Content: View>: View {
         VStack(alignment: .leading, spacing: 0) {
             content()
         }
-        .padding(10)
-        .background(.background.opacity(0.6))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-        )
-        .cornerRadius(8)
+        .cardStyle()
     }
 }
 
@@ -503,9 +484,11 @@ struct CostCell: View {
                 Text(detailFormatCost(cost))
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundStyle(detailCostColor(cost))
+                    .contentTransition(.numericText())
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(Theme.quickSpring, value: cost)
     }
 }
 
@@ -520,8 +503,10 @@ struct TokenCell: View {
             Text(TimeFormatter.tokenCount(tokens))
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundStyle(.blue)
+                .contentTransition(.numericText())
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(Theme.quickSpring, value: tokens)
     }
 }
 
@@ -738,6 +723,51 @@ struct CostModelsCard: View {
             Text(String(format: "$%.4f", Double(tokens) / 1_000_000 * rate))
                 .font(.system(size: 11, weight: .medium, design: .monospaced))
                 .gridColumnAlignment(.trailing)
+        }
+    }
+}
+
+struct ToolBarRow: View {
+    let name: String
+    let count: Int
+    let maxCount: Int
+    let delay: Double
+    @State private var animatedWidth: CGFloat = 0
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(name)
+                .font(.system(size: 11, design: .monospaced))
+                .lineLimit(1)
+                .frame(width: 100, alignment: .leading)
+
+            GeometryReader { geo in
+                let target = geo.size.width * CGFloat(count) / CGFloat(max(1, maxCount))
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.gray.opacity(0.1))
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.blue.opacity(0.5), Color.blue.opacity(0.8)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: animatedWidth)
+                }
+                .onAppear {
+                    withAnimation(.easeOut(duration: 0.5).delay(delay)) {
+                        animatedWidth = target
+                    }
+                }
+            }
+            .frame(height: 6)
+
+            Text("\(count)")
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .frame(width: 35, alignment: .trailing)
         }
     }
 }

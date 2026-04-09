@@ -294,8 +294,15 @@ struct SettingsView: View {
             // Avatar
             ZStack {
                 Circle()
-                    .fill(Color.blue.opacity(0.15))
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.blue.opacity(0.2), Color.purple.opacity(0.15)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .frame(width: 36, height: 36)
+                    .shadow(color: .blue.opacity(0.15), radius: 4, y: 1)
                 Text(avatarInitial)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.blue)
@@ -320,17 +327,17 @@ struct SettingsView: View {
                             Text(org.orgTypeDisplayName)
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundStyle(.secondary)
-                                .padding(.horizontal, 5)
+                                .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Color.gray.opacity(0.12))
-                                .cornerRadius(4)
+                                .background(Color.gray.opacity(0.1))
+                                .clipShape(Capsule())
                             Text(org.tierDisplayName)
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundStyle(.blue)
-                                .padding(.horizontal, 5)
+                                .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(Color.blue.opacity(0.1))
-                                .cornerRadius(4)
+                                .clipShape(Capsule())
                         }
                     }
                     if let orgName = profile.organization?.name {
@@ -375,8 +382,9 @@ struct SettingsView: View {
             }
         }
         .padding(10)
-        .background(Color.gray.opacity(0.06))
-        .cornerRadius(8)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .shadow(color: Theme.cardShadowColor, radius: Theme.cardShadowRadius, y: Theme.cardShadowY)
     }
 
     private var avatarInitial: String {

@@ -21,6 +21,7 @@
 		686EC93B311494291E5BCE75 /* StatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E1B839DD5F15A6A55AE3727 /* StatisticsView.swift */; };
 		6BA90267FC02621878E80D2A /* TrendChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEDC6DF1C15355DC5AE2FCF9 /* TrendChartView.swift */; };
 		A1B2C3D4E5F60718A9B0C1D2 /* UsageTrendChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718A9B0C1D3 /* UsageTrendChartView.swift */; };
+		AABB00112233445566778899 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABB001122334455667788AA /* Theme.swift */; };
 		7674AC8643AF2C6126880D3C /* TranscriptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73D3015C65881224ECFCC5BB /* TranscriptView.swift */; };
 		7FEDE160B6E6484B272C2078 /* TerminalLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA42F7AC4BB41556CDC7EFCC /* TerminalLauncher.swift */; };
 		861A6FDE8151A6DF1D571793 /* TimeFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15FB669CCF4C2F10D4550624 /* TimeFormatter.swift */; };
@@ -91,6 +92,7 @@
 		E3E1273546BE9434362C72E0 /* ClaudeStatistics.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ClaudeStatistics.entitlements; sourceTree = "<group>"; };
 		EEDC6DF1C15355DC5AE2FCF9 /* TrendChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendChartView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718A9B0C1D3 /* UsageTrendChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageTrendChartView.swift; sourceTree = "<group>"; };
+		AABB001122334455667788AA /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		F79555858F7CDF21C9301D11 /* TranscriptParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptParser.swift; sourceTree = "<group>"; };
 		FA42F7AC4BB41556CDC7EFCC /* TerminalLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalLauncher.swift; sourceTree = "<group>"; };
 		FAAFBA5B9EEDC2BB22BAF700 /* AutoRefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoRefreshCoordinator.swift; sourceTree = "<group>"; };
@@ -233,6 +235,7 @@
 				73D3015C65881224ECFCC5BB /* TranscriptView.swift */,
 				EEDC6DF1C15355DC5AE2FCF9 /* TrendChartView.swift */,
 				A1B2C3D4E5F60718A9B0C1D3 /* UsageTrendChartView.swift */,
+				AABB001122334455667788AA /* Theme.swift */,
 				3511F107E29217FB16567AF9 /* UsageView.swift */,
 			);
 			path = Views;
@@ -347,6 +350,7 @@
 				7674AC8643AF2C6126880D3C /* TranscriptView.swift in Sources */,
 				6BA90267FC02621878E80D2A /* TrendChartView.swift in Sources */,
 				A1B2C3D4E5F60718A9B0C1D2 /* UsageTrendChartView.swift in Sources */,
+				AABB00112233445566778899 /* Theme.swift in Sources */,
 				BC876DE9A69A88B6272F0842 /* TrendDataPoint.swift in Sources */,
 				3AD8ED72F8D42B9DB0614F77 /* UpdaterService.swift in Sources */,
 				E19A0BCA11B03CD13E4A1F04 /* UsageAPIService.swift in Sources */,

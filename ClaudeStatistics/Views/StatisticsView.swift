@@ -68,28 +68,9 @@ struct StatisticsView: View {
                 .padding(.top, 8)
 
             // Period picker
-            HStack {
-                Picker("stats.period", selection: $store.selectedPeriod) {
-                    ForEach(StatsPeriod.allCases, id: \.self) { period in
-                        Text(period.localizedName).tag(period)
-                    }
-                }
-                .pickerStyle(.segmented)
-
-                if !store.isFullParseComplete && store.parsedStats.isEmpty {
-                    ProgressView()
-                        .scaleEffect(0.5)
-                } else {
-                    Button(action: { store.forceRescan() }) {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 10))
-                    }
-                    .buttonStyle(.plain)
-                    .help("stats.refresh.help")
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            PeriodPicker(selection: $store.selectedPeriod)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
@@ -140,9 +121,11 @@ struct StatisticsView: View {
                 Text(value)
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .lineLimit(1)
+                    .contentTransition(.numericText())
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(Theme.quickSpring, value: value)
     }
 
     // MARK: - Cost Chart
@@ -162,26 +145,19 @@ struct StatisticsView: View {
                 let maxCost = items.map(\.totalCost).max() ?? 1.0
 
                 HStack(alignment: .bottom, spacing: 4) {
-                    ForEach(items, id: \.id) { stat in
-                        VStack(spacing: 4) {
-                            Text(formatCostShort(stat.totalCost))
-                                .font(.system(size: 8, design: .monospaced))
-                                .foregroundStyle(.secondary)
-
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(barColor(stat.totalCost))
-                                .frame(height: max(4, CGFloat(stat.totalCost / maxCost) * 80))
-
-                            Text(stat.periodLabel)
-                                .font(.system(size: 9))
-                                .foregroundStyle(.tertiary)
-                                .lineLimit(1)
-                        }
-                        .frame(maxWidth: .infinity)
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, stat in
+                        BarChartColumn(
+                            cost: stat.totalCost,
+                            maxCost: maxCost,
+                            label: stat.periodLabel,
+                            delay: Double(index) * 0.04
+                        )
+                        .frame(maxWidth: 60)
                         .contentShape(Rectangle())
                         .onTapGesture { selectedPeriodDetail = stat }
                     }
                 }
+                .frame(maxWidth: .infinity)
                 .frame(height: 110)
             }
         }
@@ -234,76 +210,35 @@ struct StatisticsView: View {
     // MARK: - Period List
 
     private var periodList: some View {
-        SectionCard {
-            VStack(spacing: 6) {
-                HStack {
-                    Label {
-                        Text("stats.periodDetails") + Text(" ") + Text(store.selectedPeriod.localizedName)
-                    } icon: {
-                        Image(systemName: "calendar")
-                    }
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("stats.periods \(store.periodStats.count)")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+        VStack(spacing: 0) {
+            HStack {
+                Label {
+                    Text("stats.periodDetails") + Text(" ") + Text(store.selectedPeriod.localizedName)
+                } icon: {
+                    Image(systemName: "calendar")
                 }
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("stats.periods \(store.periodStats.count)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.bottom, 8)
 
-                Divider()
-
-                ForEach(store.periodStats) { stat in
-                    Button(action: { selectedPeriodDetail = stat }) {
-                        VStack(spacing: 4) {
-                            HStack {
-                                Text(stat.periodLabel)
-                                    .font(.system(size: 11, weight: .medium))
-                                Spacer()
-                                HStack(spacing: 1) {
-                                    if stat.hasEstimatedCost {
-                                        Text("~")
-                                            .font(.system(size: 9, weight: .medium))
-                                            .foregroundStyle(.orange)
-                                    }
-                                    Text(formatCost(stat.totalCost))
-                                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                                        .foregroundStyle(costColor(stat.totalCost))
-                                }
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 9))
-                                    .foregroundStyle(.tertiary)
-                            }
-
-                            HStack(spacing: 12) {
-                                miniStat("stats.sessions", value: "\(stat.sessionCount)")
-                                miniStat("stats.messages", value: "\(stat.messageCount)")
-                                miniStat("stats.tokens", value: TimeFormatter.tokenCount(stat.totalTokens))
-                                miniStat("stats.tools", value: "\(stat.toolUseCount)")
-                            }
-                        }
-                        .padding(.vertical, 4)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-
-                    if stat.id != store.periodStats.last?.id {
-                        Divider()
-                    }
+            VStack(spacing: 4) {
+                ForEach(Array(store.periodStats.enumerated()), id: \.element.id) { index, stat in
+                    PeriodRow(
+                        stat: stat,
+                        formatCost: formatCost,
+                        costColor: costColor,
+                        onTap: { selectedPeriodDetail = stat }
+                    )
+                    .modifier(StaggerSlideIn(index: index))
                 }
             }
+            .id(store.selectedPeriod)
         }
-    }
-
-    private func miniStat(_ label: LocalizedStringKey, value: String) -> some View {
-        VStack(spacing: 1) {
-            Text(label)
-                .font(.system(size: 8))
-                .foregroundStyle(.tertiary)
-            Text(value)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Helpers
@@ -325,14 +260,201 @@ struct StatisticsView: View {
         return .green
     }
 
-    private func barColor(_ cost: Double) -> Color {
-        if cost > 5.0 { return .red.opacity(0.7) }
-        if cost > 1.0 { return .orange.opacity(0.7) }
-        return .blue.opacity(0.7)
-    }
-
     private func shortModel(_ id: String) -> String {
         id.replacingOccurrences(of: "claude-", with: "")
+    }
+}
+
+// MARK: - Animated Bar Chart Column
+
+private struct BarChartColumn: View {
+    let cost: Double
+    let maxCost: Double
+    let label: String
+    let delay: Double
+
+    @State private var animatedHeight: CGFloat = 0
+    @State private var isHovered = false
+
+    private var targetHeight: CGFloat {
+        max(4, CGFloat(cost / maxCost) * 80)
+    }
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(formatCostShort(cost))
+                .font(.system(size: 8, design: .monospaced))
+                .foregroundStyle(.secondary)
+
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Theme.barGradient(cost))
+                .frame(height: animatedHeight)
+                .scaleEffect(x: isHovered ? 1.08 : 1.0, anchor: .bottom)
+
+            Text(label)
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+        .onHover { hovering in
+            withAnimation(Theme.quickSpring) { isHovered = hovering }
+        }
+        .onAppear {
+            withAnimation(Theme.springAnimation.delay(delay)) {
+                animatedHeight = targetHeight
+            }
+        }
+        .onChange(of: cost) { _, _ in
+            withAnimation(Theme.springAnimation) {
+                animatedHeight = targetHeight
+            }
+        }
+    }
+
+    private func formatCostShort(_ cost: Double) -> String {
+        if cost >= 1.0 { return String(format: "$%.1f", cost) }
+        return String(format: "$%.2f", cost)
+    }
+}
+
+// MARK: - Period Picker with Sliding Capsule
+
+struct PeriodPicker: View {
+    @Binding var selection: StatsPeriod
+    @Namespace private var pickerNamespace
+    @State private var isHovered: StatsPeriod?
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(StatsPeriod.allCases, id: \.self) { period in
+                Button {
+                    withAnimation(Theme.tabAnimation) {
+                        selection = period
+                    }
+                } label: {
+                    Text(period.localizedName)
+                        .font(.system(size: 12, weight: selection == period ? .semibold : .regular))
+                        .foregroundStyle(selection == period ? .primary : .secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .background {
+                    if selection == period {
+                        Capsule()
+                            .fill(Color.accentColor.opacity(0.15))
+                            .matchedGeometryEffect(id: "period_bg", in: pickerNamespace)
+                    }
+                }
+                .onHover { hovering in
+                    withAnimation(Theme.quickSpring) {
+                        isHovered = hovering ? period : nil
+                    }
+                }
+            }
+        }
+        .padding(3)
+        .background(Color.gray.opacity(0.08))
+        .clipShape(Capsule())
+    }
+}
+
+// MARK: - Stagger Slide In
+
+private struct StaggerSlideIn: ViewModifier {
+    let index: Int
+    @State private var appeared = false
+
+    func body(content: Content) -> some View {
+        content
+            .offset(x: appeared ? 0 : 40)
+            .opacity(appeared ? 1 : 0)
+            .onAppear {
+                withAnimation(Theme.quickSpring.delay(Double(index) * 0.04)) {
+                    appeared = true
+                }
+            }
+    }
+}
+
+// MARK: - Period Row
+
+private struct PeriodRow: View {
+    let stat: PeriodStats
+    let formatCost: (Double) -> String
+    let costColor: (Double) -> Color
+    let onTap: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(stat.periodLabel)
+                        .font(.system(size: 11, weight: .semibold))
+                    HStack(spacing: 8) {
+                        HStack(spacing: 1) {
+                            if stat.hasEstimatedCost {
+                                Text("~")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(.orange)
+                            }
+                            Text(formatCost(stat.totalCost))
+                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                .foregroundStyle(costColor(stat.totalCost))
+                        }
+                        Text(TimeFormatter.tokenCount(stat.totalTokens))
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.blue)
+                    }
+                }
+                .frame(minWidth: 90, alignment: .leading)
+
+                Spacer()
+
+                HStack(spacing: 12) {
+                    miniStat("stats.sessions", value: "\(stat.sessionCount)")
+                    miniStat("stats.messages", value: "\(stat.messageCount)")
+                    miniStat("stats.tools", value: "\(stat.toolUseCount)")
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(isHovered ? Color.primary.opacity(0.06) : .clear)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .leading) {
+            if isHovered {
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(Color.accentColor)
+                    .frame(width: 3)
+                    .padding(.vertical, 6)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .shadow(color: Theme.cardShadowColor, radius: 4, y: 1)
+        .padding(.bottom, 4)
+        .onHover { hovering in
+            withAnimation(Theme.quickSpring) { isHovered = hovering }
+        }
+    }
+
+    private func miniStat(_ label: LocalizedStringKey, value: String) -> some View {
+        VStack(spacing: 2) {
+            Text(label)
+                .font(.system(size: 8))
+                .foregroundStyle(.tertiary)
+            Text(value)
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(.secondary)
+        }
     }
 }
 

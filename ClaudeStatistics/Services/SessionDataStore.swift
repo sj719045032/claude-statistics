@@ -319,19 +319,19 @@ final class SessionDataStore: ObservableObject {
     // MARK: - Computed (convenience for views)
 
     var allTimeCost: Double {
-        periodStats.reduce(0) { $0 + $1.totalCost }
+        parsedStats.values.reduce(0) { $0 + $1.estimatedCost }
     }
 
     var allTimeSessions: Int {
-        periodStats.reduce(0) { $0 + $1.sessionCount }
+        parsedStats.count
     }
 
     var allTimeTokens: Int {
-        periodStats.reduce(0) { $0 + $1.totalTokens }
+        parsedStats.values.reduce(0) { $0 + $1.totalTokens }
     }
 
     var allTimeMessages: Int {
-        periodStats.reduce(0) { $0 + $1.messageCount }
+        parsedStats.values.reduce(0) { $0 + $1.messageCount }
     }
 
     var visibleStats: [PeriodStats] {

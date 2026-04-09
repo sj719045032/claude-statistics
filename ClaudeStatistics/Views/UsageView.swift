@@ -19,7 +19,7 @@ struct UsageView: View {
                     Image(systemName: "safari")
                         .font(.system(size: 11))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.hoverScale)
                 .foregroundStyle(.secondary)
                 .help("usage.viewOnline")
 
@@ -31,7 +31,7 @@ struct UsageView: View {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 11))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.hoverScale)
                     .help("usage.refresh")
                 }
             }
@@ -222,10 +222,10 @@ struct UsageWindowRow: View {
     let countdown: String?
     var exhaustEstimate: (text: String, willExhaust: Bool)? = nil
 
+    @State private var animatedWidth: CGFloat = 0
+
     private var color: Color {
-        if utilization >= 80 { return .red }
-        if utilization >= 50 { return .orange }
-        return .green
+        Theme.utilizationColor(utilization)
     }
 
     var body: some View {
@@ -244,6 +244,8 @@ struct UsageWindowRow: View {
                     .font(.caption)
                     .fontWeight(.medium)
                     .foregroundStyle(color)
+                    .contentTransition(.numericText())
+                    .animation(Theme.quickSpring, value: utilization)
                 if let countdown {
                     Text("usage.resetsIn \(countdown)")
                         .font(.caption2)
@@ -253,15 +255,25 @@ struct UsageWindowRow: View {
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(Color.gray.opacity(0.2))
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(color.opacity(0.8))
-                        .frame(width: max(0, geo.size.width * min(utilization / 100.0, 1.0)))
+                    Capsule()
+                        .fill(Color.gray.opacity(0.15))
+                    Capsule()
+                        .fill(Theme.utilizationGradient(utilization))
+                        .frame(width: animatedWidth)
+                        .shadow(color: utilization >= 80 ? color.opacity(0.4) : .clear, radius: 4)
+                }
+                .onAppear {
+                    withAnimation(Theme.springAnimation) {
+                        animatedWidth = max(0, geo.size.width * min(utilization / 100.0, 1.0))
+                    }
+                }
+                .onChange(of: utilization) { _, newValue in
+                    withAnimation(Theme.springAnimation) {
+                        animatedWidth = max(0, geo.size.width * min(newValue / 100.0, 1.0))
+                    }
                 }
             }
-            .frame(height: 6)
-
+            .frame(height: Theme.progressBarHeight)
         }
     }
 }

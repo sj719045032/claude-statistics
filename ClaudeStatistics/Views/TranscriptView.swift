@@ -61,13 +61,13 @@ struct TranscriptView: View {
                             Image(systemName: "chevron.up")
                                 .font(.system(size: 10, weight: .semibold))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.hoverScale)
 
                         Button(action: jumpToNext) {
                             Image(systemName: "chevron.down")
                                 .font(.system(size: 10, weight: .semibold))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.hoverScale)
                     } else {
                         Text("transcript.noMatch")
                             .font(.system(size: 10))
@@ -79,7 +79,7 @@ struct TranscriptView: View {
                             .foregroundStyle(.secondary)
                             .font(.system(size: 10))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.hoverScale)
                 }
             }
             .padding(8)
@@ -484,7 +484,7 @@ private struct ToolCallRow: View {
                                     .font(.system(size: 8, weight: .semibold))
                                     .foregroundStyle(.tertiary)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.hoverScale)
                         }
                     }
 

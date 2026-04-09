@@ -8,6 +8,11 @@ struct UsageTrendChartView: View {
     let windowStart: Date
     let windowEnd: Date
 
+    @State private var hoverDate: Date?
+    @State private var hoverValues: (tokens: Int, cost: Double)?
+    @State private var hoverLocation: CGPoint = .zero
+    @State private var animationProgress: CGFloat = 0
+
     private var maxTokens: Int {
         dataPoints.map(\.tokens).max() ?? 0
     }
@@ -31,6 +36,25 @@ struct UsageTrendChartView: View {
         } else {
             chartContent
                 .frame(height: 180)
+                .mask(alignment: .leading) {
+                    GeometryReader { geo in
+                        Rectangle()
+                            .frame(width: geo.size.width * animationProgress)
+                            .padding(.vertical, -20)
+                    }
+                }
+                .onAppear {
+                    animationProgress = 0
+                    withAnimation(.easeOut(duration: 0.8)) {
+                        animationProgress = 1
+                    }
+                }
+                .onChange(of: dataPoints.count) { _, _ in
+                    animationProgress = 0
+                    withAnimation(.easeOut(duration: 0.8)) {
+                        animationProgress = 1
+                    }
+                }
         }
     }
 
@@ -56,6 +80,11 @@ struct UsageTrendChartView: View {
         let useSingleAxis = maxTokens == 0 || maxCost == 0
 
         Chart {
+            if let date = hoverDate {
+                RuleMark(x: .value("Selected", date))
+                    .foregroundStyle(Color.primary.opacity(0.2))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+            }
             ForEach(dataPoints) { point in
                 if maxTokens > 0 {
                     LineMark(
@@ -65,14 +94,6 @@ struct UsageTrendChartView: View {
                     )
                     .foregroundStyle(.blue)
                     .lineStyle(StrokeStyle(lineWidth: 1.5))
-                    .interpolationMethod(.monotone)
-
-                    AreaMark(
-                        x: .value("Time", point.time),
-                        y: .value("Tokens", point.tokens),
-                        series: .value("Series", "Tokens")
-                    )
-                    .foregroundStyle(.blue.opacity(0.08))
                     .interpolationMethod(.monotone)
                 }
 
@@ -84,14 +105,6 @@ struct UsageTrendChartView: View {
                     )
                     .foregroundStyle(.orange)
                     .lineStyle(StrokeStyle(lineWidth: 1.5))
-                    .interpolationMethod(.monotone)
-
-                    AreaMark(
-                        x: .value("Time", point.time),
-                        y: .value("Tokens", useSingleAxis ? Int(point.cost * 1000) : Int(point.cost * scaleFactor)),
-                        series: .value("Series", "Cost")
-                    )
-                    .foregroundStyle(.orange.opacity(0.08))
                     .interpolationMethod(.monotone)
                 }
             }
@@ -144,6 +157,74 @@ struct UsageTrendChartView: View {
             }
             .font(.system(size: 10))
         }
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                let plotFrame = proxy.plotFrame.map { geo[$0] } ?? .zero
+                Rectangle()
+                    .fill(Color.clear)
+                    .contentShape(Rectangle())
+                    .onContinuousHover { phase in
+                        switch phase {
+                        case .active(let location):
+                            let plotX = location.x - plotFrame.origin.x
+                            guard plotX >= 0, plotX <= plotFrame.width,
+                                  location.y >= plotFrame.origin.y,
+                                  location.y <= plotFrame.origin.y + plotFrame.height,
+                                  let date: Date = proxy.value(atX: plotX) else {
+                                hoverDate = nil
+                                hoverValues = nil
+                                return
+                            }
+                            hoverDate = date
+                            hoverLocation = CGPoint(x: location.x, y: location.y)
+                            hoverValues = ChartInterpolation.interpolate(at: date, in: dataPoints)
+                        case .ended:
+                            hoverDate = nil
+                            hoverValues = nil
+                        }
+                    }
+                    .overlay {
+                        if let date = hoverDate, let values = hoverValues {
+                            chartTooltip(date: date, tokens: values.tokens, cost: values.cost)
+                                .fixedSize()
+                                .position(
+                                    x: min(max(hoverLocation.x, 50), geo.size.width - 50),
+                                    y: max(hoverLocation.y - 40, 10)
+                                )
+                                .allowsHitTesting(false)
+                        }
+                    }
+            }
+        }
+        .animation(Theme.quickSpring, value: hoverDate)
+    }
+
+    @ViewBuilder
+    private func chartTooltip(date: Date, tokens: Int, cost: Double) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(formatXAxisLabel(date))
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.secondary)
+            if maxTokens > 0 {
+                HStack(spacing: 3) {
+                    Circle().fill(.blue).frame(width: 5, height: 5)
+                    Text(abbreviateNumber(tokens))
+                        .font(.system(size: 9, design: .monospaced))
+                }
+            }
+            if maxCost > 0 {
+                HStack(spacing: 3) {
+                    Circle().fill(.orange).frame(width: 5, height: 5)
+                    Text(abbreviateCost(cost))
+                        .font(.system(size: 9, design: .monospaced))
+                }
+            }
+        }
+        .padding(6)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .shadow(color: .black.opacity(0.08), radius: 4, y: 1)
+        .padding(4)
     }
 
     private func legendItem(color: Color, label: String) -> some View {

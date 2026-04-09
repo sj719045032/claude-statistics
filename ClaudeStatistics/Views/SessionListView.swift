@@ -16,9 +16,7 @@ private func formatCost(_ cost: Double) -> String {
 }
 
 private func costColor(_ cost: Double) -> Color {
-    if cost > 1.0 { return .red }
-    if cost > 0.1 { return .orange }
-    return .green
+    Theme.costColor(cost)
 }
 
 // MARK: - SessionListView
@@ -29,16 +27,21 @@ struct SessionListView: View {
     @State private var showDeleteConfirm = false
     @State private var deleteTarget: Set<String> = []
 
+    @FocusState private var isSearchFocused: Bool
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Search bar
             HStack {
                 Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(isSearchFocused ? .primary : .secondary)
                     .font(.system(size: 11))
+                    .scaleEffect(isSearchFocused ? 1.1 : 1.0)
+                    .animation(Theme.quickSpring, value: isSearchFocused)
                 TextField("session.search", text: $viewModel.searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12))
+                    .focused($isSearchFocused)
                 if !viewModel.searchText.isEmpty {
                     Button(action: { viewModel.searchText = "" }) {
                         Image(systemName: "xmark.circle.fill")
@@ -49,8 +52,13 @@ struct SessionListView: View {
                 }
             }
             .padding(8)
-            .background(Color.gray.opacity(0.1))
-            .cornerRadius(6)
+            .background(Color.gray.opacity(isSearchFocused ? 0.15 : 0.08))
+            .overlay(
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(isSearchFocused ? Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1.5)
+            )
+            .cornerRadius(7)
+            .animation(Theme.quickSpring, value: isSearchFocused)
             .padding(.horizontal, 8)
             .padding(.top, 8)
             .padding(.bottom, 4)
@@ -99,14 +107,14 @@ struct SessionListView: View {
                         Image(systemName: "checkmark.circle")
                             .font(.system(size: 10))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.hoverScale)
                     .help("session.select.help")
 
                     Button(action: { store.forceRescan() }) {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 10))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.hoverScale)
                     .help("session.refresh.help")
                 }
             }
@@ -156,7 +164,7 @@ struct SessionListView: View {
                             store: store,
                             isExpanded: viewModel.isProjectExpanded(group.projectPath),
                             onToggle: {
-                                withAnimation(.easeInOut(duration: 0.15)) {
+                                withAnimation(Theme.quickSpring) {
                                     viewModel.toggleProjectExpanded(group.projectPath)
                                 }
                             },
@@ -166,7 +174,7 @@ struct SessionListView: View {
                         )
 
                         if viewModel.isProjectExpanded(group.projectPath) {
-                            ForEach(group.sessions) { session in
+                            ForEach(Array(group.sessions.enumerated()), id: \.element.id) { index, session in
                                 SessionRow(
                                     session: session,
                                     quickStats: viewModel.quickStat(for: session),
@@ -201,6 +209,11 @@ struct SessionListView: View {
                                         showDeleteConfirm = true
                                     }
                                 )
+                                .transition(.asymmetric(
+                                    insertion: .push(from: .bottom),
+                                    removal: .push(from: .top)
+                                ))
+                                .animation(Theme.quickSpring.delay(Double(index) * 0.02), value: viewModel.isProjectExpanded(group.projectPath))
                             }
                         }
                     }
@@ -260,10 +273,11 @@ struct ProjectGroupHeader: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+            Image(systemName: "chevron.right")
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
                 .frame(width: 10)
+                .rotationEffect(.degrees(isExpanded ? 90 : 0))
 
             Image(systemName: "folder.fill")
                 .font(.system(size: 11))
@@ -281,7 +295,7 @@ struct ProjectGroupHeader: View {
                         .font(.system(size: 12))
                         .foregroundStyle(.green)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.hoverScale)
                 .help("session.new.help")
             }
 
@@ -297,10 +311,13 @@ struct ProjectGroupHeader: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(isHovered ? Color.gray.opacity(0.06) : Color.clear)
+        .background(isHovered ? Color.primary.opacity(0.04) : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .contentShape(Rectangle())
         .onTapGesture(perform: onToggle)
-        .onHover { isHovered = $0 }
+        .onHover { hovering in
+            withAnimation(Theme.quickSpring) { isHovered = hovering }
+        }
     }
 }
 
@@ -353,11 +370,11 @@ struct SessionRow: View {
                     if let model = cachedStats?.model ?? quickStats?.model {
                         Text(shortModel(model))
                             .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Theme.modelBadgeForeground(for: model))
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(3)
+                            .background(Theme.modelBadgeBackground(for: model))
+                            .cornerRadius(Theme.badgeRadius)
                     }
 
                     if isHovered && !isSelecting {
@@ -431,7 +448,7 @@ struct SessionRow: View {
                             .font(.system(size: 10))
                             .foregroundStyle(.green)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.hoverScale)
                     .help("session.new.help")
                 }
 
@@ -441,7 +458,7 @@ struct SessionRow: View {
                             .font(.system(size: 10))
                             .foregroundStyle(.orange)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.hoverScale)
                     .help("session.transcript.help")
                 }
 
@@ -450,7 +467,7 @@ struct SessionRow: View {
                         .font(.system(size: 10))
                         .foregroundStyle(Color.blue)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.hoverScale)
                 .help("session.resume.help")
 
                 Button(action: onDelete) {
@@ -458,7 +475,7 @@ struct SessionRow: View {
                         .font(.system(size: 10))
                         .foregroundStyle(.red)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.hoverScale)
                 .help("session.delete.help")
             }
 
@@ -473,13 +490,24 @@ struct SessionRow: View {
         .padding(.vertical, 6)
         .background(
             isSelecting && isChecked ? Color.blue.opacity(0.1) :
-            isSelected ? Color.blue.opacity(0.15) :
-            isHovered ? Color.gray.opacity(0.06) : Color.clear
+            isSelected ? Color.blue.opacity(0.12) :
+            isHovered ? Color.primary.opacity(0.04) : Color.clear
         )
-        .cornerRadius(4)
+        .overlay(alignment: .leading) {
+            if isHovered && !isSelecting {
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(Color.accentColor)
+                    .frame(width: 3)
+                    .padding(.vertical, 4)
+                    .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .leading)))
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
-        .onHover { isHovered = $0 }
+        .onHover { hovering in
+            withAnimation(Theme.quickSpring) { isHovered = hovering }
+        }
     }
 
     private func contextBadge(_ stats: SessionStats) -> some View {
@@ -534,11 +562,11 @@ struct RecentSessionRow: View {
                     if let model = cachedStats?.model ?? quickStats?.model {
                         Text(shortModel(model))
                             .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Theme.modelBadgeForeground(for: model))
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(3)
+                            .background(Theme.modelBadgeBackground(for: model))
+                            .cornerRadius(Theme.badgeRadius)
                     }
 
                     if isHovered {
@@ -603,7 +631,7 @@ struct RecentSessionRow: View {
                             .font(.system(size: 10))
                             .foregroundStyle(.orange)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.hoverScale)
                     .help("session.transcript.help")
                 }
 
@@ -612,7 +640,7 @@ struct RecentSessionRow: View {
                         .font(.system(size: 10))
                         .foregroundStyle(.green)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.hoverScale)
                 .help("session.new.help")
 
                 Button(action: onResume) {
@@ -620,7 +648,7 @@ struct RecentSessionRow: View {
                         .font(.system(size: 10))
                         .foregroundStyle(.blue)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.hoverScale)
                 .help("session.resume.help")
             }
 
@@ -630,11 +658,22 @@ struct RecentSessionRow: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
-        .background(isSelected ? Color.blue.opacity(0.15) : isHovered ? Color.gray.opacity(0.06) : Color.clear)
-        .cornerRadius(4)
+        .background(isSelected ? Color.blue.opacity(0.12) : isHovered ? Color.primary.opacity(0.04) : Color.clear)
+        .overlay(alignment: .leading) {
+            if isHovered {
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(Color.accentColor)
+                    .frame(width: 3)
+                    .padding(.vertical, 4)
+                    .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .leading)))
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
-        .onHover { isHovered = $0 }
+        .onHover { hovering in
+            withAnimation(Theme.quickSpring) { isHovered = hovering }
+        }
     }
 }
 
@@ -685,7 +724,7 @@ struct CopyButton: View {
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.hoverScale)
         .help(help)
     }
 }
