@@ -48,3 +48,4 @@ Podfile.lock
 *.log
 *.orig
 xcuserdata/
+.cs-launch
