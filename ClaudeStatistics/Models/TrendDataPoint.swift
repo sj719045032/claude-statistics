@@ -72,7 +72,7 @@ extension StatsPeriod {
         switch self {
         case .daily:   return .hour
         case .weekly:  return .day
-        case .monthly: return .week
+        case .monthly: return .day
         case .yearly:  return .month
         }
     }

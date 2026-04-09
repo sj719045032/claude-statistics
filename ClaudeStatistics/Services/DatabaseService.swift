@@ -33,6 +33,7 @@ final class DatabaseService {
         execute("PRAGMA synchronous = NORMAL")
 
         createTables()
+        migrateIfNeeded()
     }
 
     func close() {
@@ -64,6 +65,25 @@ final class DatabaseService {
                 stats_json TEXT
             )
         """)
+    }
+
+    /// Current schema version — bump to force full reparse of session cache
+    private static let currentSchemaVersion: Int32 = 3
+
+    private func migrateIfNeeded() {
+        var version: Int32 = 0
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, "PRAGMA user_version", -1, &stmt, nil) == SQLITE_OK,
+           sqlite3_step(stmt) == SQLITE_ROW {
+            version = sqlite3_column_int(stmt, 0)
+        }
+        sqlite3_finalize(stmt)
+
+        if version < Self.currentSchemaVersion {
+            // Clear session cache to force reparse with new hourSlices field
+            execute("DELETE FROM session_cache")
+            execute("PRAGMA user_version = \(Self.currentSchemaVersion)")
+        }
     }
 
     /// Drop all data and recreate tables (for schema migration or corruption recovery)

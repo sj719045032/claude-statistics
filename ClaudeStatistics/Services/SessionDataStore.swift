@@ -345,22 +345,26 @@ final class SessionDataStore: ObservableObject {
     /// Aggregate trend data for a given period from parsed session stats
     func aggregateTrendData(for period: PeriodStats, periodType: StatsPeriod) -> [TrendDataPoint] {
         let granularity = periodType.trendGranularity
-
         var buckets: [Date: (tokens: Int, cost: Double)] = [:]
 
+        // Daily view → hourSlices; weekly/monthly/yearly → daySlices (derived from hourSlices)
+        let useHourSlices = periodType == .daily
+
         for (sessionId, stats) in parsedStats {
-            if !stats.daySlices.isEmpty {
-                for (dayStart, slice) in stats.daySlices {
-                    let slicePeriodStart = periodType.startOfPeriod(for: dayStart)
+            let slices: [Date: SessionStats.DaySlice] = useHourSlices ? stats.hourSlices : stats.daySlices
+            if !slices.isEmpty {
+                for (sliceTime, slice) in slices {
+                    let slicePeriodStart = periodType.startOfPeriod(for: sliceTime)
                     guard slicePeriodStart == period.period else { continue }
 
-                    let bucket = granularity.bucketStart(for: dayStart)
+                    let bucket = granularity.bucketStart(for: sliceTime)
                     var existing = buckets[bucket, default: (tokens: 0, cost: 0)]
                     existing.tokens += slice.totalTokens
                     existing.cost += slice.estimatedCost
                     buckets[bucket] = existing
                 }
             } else {
+                // Fallback for sessions without hourSlice data
                 guard let session = sessions.first(where: { $0.id == sessionId }) else { continue }
                 let sessionDate = stats.startTime ?? session.lastModified
                 let sessionPeriodStart = periodType.startOfPeriod(for: sessionDate)
@@ -376,13 +380,27 @@ final class SessionDataStore: ObservableObject {
 
         // Sort by time, then accumulate into running totals
         let sorted = buckets.sorted { $0.key < $1.key }
+        let cal = Calendar.current
+        var result: [TrendDataPoint] = []
+
+        // Zero-origin at the period start
+        if !sorted.isEmpty {
+            result.append(TrendDataPoint(time: period.period, tokens: 0, cost: 0))
+        }
+
+        // Data points at the END of each bucket (cumulative up to that point)
         var cumTokens = 0
         var cumCost = 0.0
-        return sorted.map { (time, val) in
+        for (i, (time, val)) in sorted.enumerated() {
             cumTokens += val.tokens
             cumCost += val.cost
-            return TrendDataPoint(time: time, tokens: cumTokens, cost: cumCost)
+            // End of bucket = start of next granularity unit
+            // For the last bucket, cap at "now" to avoid showing future time
+            let bucketEnd = cal.date(byAdding: granularity.calendarComponent, value: 1, to: time)!
+            let dataTime = (i == sorted.count - 1) ? min(bucketEnd, Date()) : bucketEnd
+            result.append(TrendDataPoint(time: dataTime, tokens: cumTokens, cost: cumCost))
         }
+        return result
     }
 
     var globalModelBreakdown: [ModelUsage] {

@@ -31,11 +31,22 @@ final class TranscriptParser {
         // Store per-message data; last entry wins (streaming sends partial then final usage)
         var messageData: [String: MessageAccum] = [:]
         var seenToolUseIds: Set<String> = []
-        var toolUseDays: [(Date, String)] = []   // (dayStart, toolName) for per-day bucketing
-        var userMessageDays: [Date] = []          // dayStarts for user messages
+        var toolUseHours: [(Date, String)] = []   // (hourStart, toolName)
+        var userMessageHours: [Date] = []         // hourStarts for user messages
         let cal = Calendar.current
         let logger = DiagnosticLogger.shared
         var skippedLines = 0
+
+        /// Compute hourSlice key: truncate to hour, with 00:00 attributed to previous day's 23:00
+        func hourKey(for date: Date) -> Date {
+            let comps = cal.dateComponents([.year, .month, .day, .hour], from: date)
+            guard let hourStart = cal.date(from: comps) else { return date }
+            if comps.hour == 0 {
+                // Midnight belongs to the previous day — bucket as 23:00 of the prior day
+                return cal.date(byAdding: .hour, value: -1, to: hourStart)!
+            }
+            return hourStart
+        }
 
         for (lineIndex, line) in lines.enumerated() {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -63,9 +74,8 @@ final class TranscriptParser {
             switch entry.type {
             case "user", "human":
                 stats.userMessageCount += 1
-                stats.messageCount += 1
                 if let ts = entry.timestampDate {
-                    userMessageDays.append(cal.startOfDay(for: ts))
+                    userMessageHours.append(hourKey(for: ts))
                 }
                 // Track last user text for "Last Prompt"
                 if let text = Self.extractUserText(from: entry) {
@@ -82,7 +92,6 @@ final class TranscriptParser {
 
                     if isFirstOccurrence {
                         stats.assistantMessageCount += 1
-                        stats.messageCount += 1
                     }
 
                     // Track model (skip synthetic messages)
@@ -124,9 +133,8 @@ final class TranscriptParser {
                                 let toolId = item.toolUseId ?? UUID().uuidString
                                 if !seenToolUseIds.contains(toolId) {
                                     seenToolUseIds.insert(toolId)
-                                    stats.toolUseCounts[toolName, default: 0] += 1
                                     if let ts = entry.timestampDate {
-                                        toolUseDays.append((cal.startOfDay(for: ts), toolName))
+                                        toolUseHours.append((hourKey(for: ts), toolName))
                                     }
                                 }
                             }
@@ -139,30 +147,11 @@ final class TranscriptParser {
             }
         }
 
-        // Sum final per-message usage data
+        // Aggregate per-message usage into hourSlices (single source of truth)
         for (_, accum) in messageData {
-            stats.totalInputTokens += accum.inputTokens
-            stats.totalOutputTokens += accum.outputTokens
-            stats.cacheCreationTotalTokens += accum.cacheCreationTotalTokens
-            stats.cacheReadTokens += accum.cacheReadTokens
-            stats.cacheCreation5mTokens += accum.cacheCreation5mTokens
-            stats.cacheCreation1hTokens += accum.cacheCreation1hTokens
-
-            // Per-model breakdown
-            var ms = stats.modelBreakdown[accum.model, default: ModelTokenStats()]
-            ms.inputTokens += accum.inputTokens
-            ms.outputTokens += accum.outputTokens
-            ms.cacheCreationTotalTokens += accum.cacheCreationTotalTokens
-            ms.cacheReadTokens += accum.cacheReadTokens
-            ms.cacheCreation5mTokens += accum.cacheCreation5mTokens
-            ms.cacheCreation1hTokens += accum.cacheCreation1hTokens
-            ms.messageCount += 1
-            stats.modelBreakdown[accum.model] = ms
-
-            // Per-day breakdown for accurate daily statistics
             if let ts = accum.timestamp {
-                let dayStart = cal.startOfDay(for: ts)
-                var slice = stats.daySlices[dayStart] ?? SessionStats.DaySlice()
+                let hKey = hourKey(for: ts)
+                var slice = stats.hourSlices[hKey] ?? SessionStats.DaySlice()
                 slice.totalInputTokens += accum.inputTokens
                 slice.totalOutputTokens += accum.outputTokens
                 slice.cacheCreationTotalTokens += accum.cacheCreationTotalTokens
@@ -170,25 +159,25 @@ final class TranscriptParser {
                 slice.cacheCreation5mTokens += accum.cacheCreation5mTokens
                 slice.cacheCreation1hTokens += accum.cacheCreation1hTokens
                 slice.messageCount += 1
-                var dms = slice.modelBreakdown[accum.model, default: ModelTokenStats()]
-                dms.inputTokens += accum.inputTokens
-                dms.outputTokens += accum.outputTokens
-                dms.cacheCreationTotalTokens += accum.cacheCreationTotalTokens
-                dms.cacheReadTokens += accum.cacheReadTokens
-                dms.cacheCreation5mTokens += accum.cacheCreation5mTokens
-                dms.cacheCreation1hTokens += accum.cacheCreation1hTokens
-                dms.messageCount += 1
-                slice.modelBreakdown[accum.model] = dms
-                stats.daySlices[dayStart] = slice
+                var ms = slice.modelBreakdown[accum.model, default: ModelTokenStats()]
+                ms.inputTokens += accum.inputTokens
+                ms.outputTokens += accum.outputTokens
+                ms.cacheCreationTotalTokens += accum.cacheCreationTotalTokens
+                ms.cacheReadTokens += accum.cacheReadTokens
+                ms.cacheCreation5mTokens += accum.cacheCreation5mTokens
+                ms.cacheCreation1hTokens += accum.cacheCreation1hTokens
+                ms.messageCount += 1
+                slice.modelBreakdown[accum.model] = ms
+                stats.hourSlices[hKey] = slice
             }
         }
 
-        // Assign user messages and tool uses to day slices
-        for day in userMessageDays {
-            stats.daySlices[day, default: SessionStats.DaySlice()].messageCount += 1
+        // Assign user messages and tool uses to hour slices
+        for hour in userMessageHours {
+            stats.hourSlices[hour, default: SessionStats.DaySlice()].messageCount += 1
         }
-        for (day, toolName) in toolUseDays {
-            stats.daySlices[day, default: SessionStats.DaySlice()].toolUseCounts[toolName, default: 0] += 1
+        for (hour, toolName) in toolUseHours {
+            stats.hourSlices[hour, default: SessionStats.DaySlice()].toolUseCounts[toolName, default: 0] += 1
         }
 
         logger.parsingSummary(
