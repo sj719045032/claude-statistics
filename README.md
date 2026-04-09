@@ -2,89 +2,171 @@
 
 **[中文文档](docs/README_zh.md)**
 
-A native macOS menu bar app for monitoring your [Claude Code](https://docs.anthropic.com/en/docs/claude-code) usage, session history, and cost statistics in real time.
+A native macOS menu bar app for monitoring your [Claude Code](https://docs.anthropic.com/en/docs/claude-code) sessions, subscription usage, and token/cost analytics in real time.
 
-## Features
+## v2.0 Highlights
 
-### Session Management
+Claude Statistics 2.0 is a major UI and interaction overhaul:
 
-Claude Statistics automatically discovers and parses all your Claude Code sessions from `~/.claude/projects/`, giving you full visibility into your usage.
+- Unified design system with material cards, softer shadows, and polished spacing
+- Sliding capsule tab indicators and custom period pickers
+- Interactive charts with hover crosshair, interpolated tooltip, and animated entry
+- Refined session and statistics lists with richer hover states and smoother transitions
+- Better usage monitoring with animated progress bars and trend visualization
 
-**Session List**
+![Claude Statistics overview](docs/screenshots/hero-overview.png)
 
-- Search sessions by project name, topic, or session ID
-- Each session displays: project directory, topic summary, model badge, message count, token count, file size, and estimated cost
-- Cost color coding — green (< $0.1), orange ($0.1–$1), red (> $1) — for quick scanning
-- Batch selection mode: select multiple sessions and delete in bulk
-- Force rescan button to re-parse all sessions on demand
-- Real-time updates via macOS FSEvents — new or modified sessions appear automatically without manual refresh
+## Screenshots
 
-**Session Detail**
+### Conversation & Detail
 
-- **Cost breakdown**: per-model input, output, cache write (5m/1h), cache read tokens with exact cost calculation
-- **Multi-model tracking**: sessions using multiple models (e.g. Opus + Sonnet) show accurate per-model cost and token breakdown with visual progress bars
-- **Context window**: usage percentage with progress bar, matching Claude Code's calculation exactly
-- **Token distribution**: segmented bar chart showing input, output, and cache token proportions
-- **Message stats**: total, user, and assistant message counts
-- **Tool usage ranking**: all tools used in the session with call counts and progress bars
-- Expandable topic and last prompt display
-
-**Session Actions**
-
-- **Resume** any session in your preferred terminal (Terminal.app / iTerm2 / Warp / Kitty / Alacritty)
-- **New session** in the same project directory from any session
-- **Delete** single or multiple sessions with confirmation dialog
+| Session Detail | Transcript Search |
+|---|---|
+| ![Session detail](docs/screenshots/session-detail.png) | ![Transcript search](docs/screenshots/transcript-search.png) |
 
 ### Statistics
 
-- **All-time summary**: total cost, sessions, tokens, messages — displayed above period picker for quick reference
-- **Period-based aggregation**: Daily / Weekly / Monthly / Yearly views
-- Interactive cost bar chart with drill-down into period details
-- Per-period model breakdown with per-model cost calculation
-- Cache token breakdown (5-min write, 1-hour write, cache read)
-- Unified cost & model cards with expandable detail rows
+| Overview | Period Detail |
+|---|---|
+| ![Statistics overview](docs/screenshots/statistics-overview.png) | ![Statistics detail](docs/screenshots/statistics-detail.png) |
 
-### Usage (Subscription)
+### Usage
 
-- Fetches Claude subscription usage via the Anthropic OAuth API
-- Displays **5-hour** and **7-day** rate limit utilization with progress bars and reset countdowns
-- Per-model windows (Opus, Sonnet) when available
-- Extra Usage credit tracking (used / monthly limit)
-- Auto-refresh with configurable interval (5 / 10 / 30 min); the usage API is rate-limited, so a longer interval is recommended
-- Menu bar status text updates reactively with usage data
-- Error display with retry button and direct link to [claude.ai/settings/usage](https://claude.ai/settings/usage)
+![Usage hover](docs/screenshots/usage-hover.png)
 
-### Settings
+## Features
 
-- **Subscription usage auto-refresh** toggle with interval selection (5 / 10 / 30 min)
-- **Preferred terminal** selection (Auto / Terminal / iTerm2 / Warp / Kitty / Alacritty)
-- **Model pricing management**: view and edit per-model pricing, fetch latest pricing from Anthropic docs
-- **Status line integration**: install/update a Claude Code status line script that shares the app's pricing and usage cache
-- OAuth token status detection (reads from macOS Keychain or `~/.claude/.credentials.json`)
-- Customizable tab order
-- **Language selection**: Auto (follow system) / English / Simplified Chinese
+### Menu Bar Workflow
+
+Claude Statistics lives in your macOS menu bar and opens as a floating panel.
+
+- Native **NSStatusItem + floating panel** experience
+- Reactive menu bar status text based on subscription usage
+- Fast access to Sessions, Stats, Usage, and Settings from one compact panel
+- No dock icon — built as a lightweight menu bar utility
+
+### Session Management
+
+Claude Statistics automatically discovers and parses your Claude Code sessions from `~/.claude/projects/`.
+
+**Session List**
+
+- Search by project path, topic, session name, or session ID
+- Recent sessions section for quick access
+- Grouped by project directory with expandable/collapsible sections
+- Each session shows topic/title, model badge, message count, token count, cost, context usage, and timestamp
+- Model-aware color badges (Opus / Sonnet / Haiku)
+- Batch selection mode for bulk deletion
+- Real-time updates via macOS file watching — new or modified sessions appear automatically
+- Quick actions on hover: new session, resume session, open transcript, delete, copy path
+
+**Session Detail**
+
+- Per-session overview: model, duration, file size, start/end time
+- Accurate token accounting: input, output, cache write, cache read
+- Multi-model cost breakdown with per-model token usage
+- Context window utilization percentage and visual indicators
+- Token distribution bar with cache breakdown
+- Tool usage ranking with animated progress bars
+- Trend chart for session activity over time
+
+**Session Actions**
+
+- Resume any session in your preferred terminal
+- Start a new Claude Code session in the same project
+- Delete individual or multiple sessions with confirmation
+- Copy session path / identifiers quickly
+
+### Transcript Viewer & Search
+
+Built-in transcript browsing for full conversation history.
+
+- Full transcript viewer inside the app
+- Search across conversation content and tool calls
+- Match navigation (previous / next)
+- Search result highlighting inside markdown content
+- Dedicated rendering for tool calls, tool details, and message roles
+- Markdown rendering with code block support
+- Better visibility into Claude tool activity inside each session
+
+### Statistics & Cost Analytics
+
+Analyze usage from the local transcript data you already have.
+
+- All-time summary: total cost, sessions, tokens, messages
+- Period-based aggregation: **Daily / Weekly / Monthly / Yearly**
+- Interactive cost bar chart with drill-down into period detail
+- Period detail pages with overview, trend chart, token distribution, and model breakdown
+- Cache token breakdown (5-minute write, 1-hour write, cache read)
+- Period list optimized for fast scanning of cost and token-heavy windows
+- All-time summary is computed from parsed sessions directly, so it stays stable across period switches
+
+### Subscription Usage Monitoring
+
+Fetches live usage data from Anthropic's OAuth-backed usage API.
+
+- 5-hour and 7-day usage windows with utilization percentage and reset countdown
+- Per-model windows (such as Opus / Sonnet) when available from the API
+- Extra Usage credit tracking when available
+- Usage trend chart with cumulative token and cost view
+- Interpolated tooltip + crosshair for chart inspection
+- Animated progress bars for rate-limit usage
+- Error banner with retry action and direct link to [claude.ai/settings/usage](https://claude.ai/settings/usage)
+- Configurable auto-refresh interval
+
+### Settings & Integrations
+
+- Launch at login
+- Preferred terminal selection:
+  - Auto
+  - Ghostty
+  - Terminal.app
+  - iTerm2
+  - Warp
+  - Kitty
+  - Alacritty
+- Language selection: Auto / English / Simplified Chinese
+- Font scale control
+- Custom tab ordering
+- Model pricing management (view, edit, fetch latest pricing)
+- Claude Code status line integration using the app's pricing and usage cache
+- OAuth token detection from macOS Keychain or `~/.claude/.credentials.json`
+- Diagnostics log export
+- Sparkle-based in-app update checks
+
+### UI & Interaction Details
+
+v2.0 adds many small but meaningful interaction improvements:
+
+- Material-based cards with consistent design tokens (`Theme.swift`)
+- Hover scale animation for clickable icon buttons
+- Sliding capsule indicators for tab and period selection
+- Chevron rotation and push transitions for expandable groups
+- Chart reveal animation from left to right
+- Staggered list entry animations in statistics views
+- Improved hover feedback in session and statistics rows
 
 ## Requirements
 
 - macOS 14.0+
+- Xcode 16.0+ (for local development)
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen) (to generate the project from `project.yml`)
 
 ## Installation
 
 ### Download DMG (Recommended)
 
-Download the latest `.dmg` from [Releases](https://github.com/sj719045032/claude-statistics/releases), open it and drag **Claude Statistics** to the **Applications** folder.
+Download the latest `.dmg` from [Releases](https://github.com/sj719045032/claude-statistics/releases), open it, and drag **Claude Statistics** into **Applications**.
 
-Since the app is not notarized, macOS may block it on first launch. To fix this, run:
+Because the app is not notarized by Apple, macOS may block the first launch. If that happens:
 
 ```bash
 xattr -cr /Applications/Claude\ Statistics.app
 ```
 
-Or: right-click the app → Open → click "Open" in the dialog (first launch only).
+Or right-click the app → **Open** → confirm **Open** in the dialog.
 
 ### Build from Source
-
-Requires Xcode 16.0+ and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
 
 ```bash
 # Clone the repository
@@ -96,97 +178,120 @@ xcodegen generate
 
 # Open in Xcode
 open ClaudeStatistics.xcodeproj
-
-# Build and run (Cmd+R)
 ```
 
-To build a DMG for distribution:
+For local debug runs, use the provided script:
 
 ```bash
-./scripts/build-dmg.sh 1.1.0
-# Output: build/ClaudeStatistics-1.1.0.dmg
+bash scripts/run-debug.sh
 ```
+
+This script builds using the dedicated debug DerivedData path and relaunches the menu bar app safely.
 
 ## How It Works
 
-Claude Statistics reads data from two sources:
+Claude Statistics uses two local-first data sources:
 
-1. **Local session data** — parses JSONL transcript files from `~/.claude/projects/` to extract session metadata, token counts, model info, tool usage, and timestamps. Streaming entries are deduplicated by message ID (last entry wins, capturing final output token counts). Cost is estimated using built-in model pricing tables (configurable in `~/.claude-statistics/pricing.json`), with per-model accuracy for multi-model sessions.
+1. **Local transcript data**
+   - Parses JSONL transcript files under `~/.claude/projects/`
+   - Extracts session metadata, timestamps, token counts, model usage, tool calls, and cost estimates
+   - Uses built-in model pricing tables (customizable via settings / pricing file)
+   - Supports multi-model sessions and per-day slices for more accurate period attribution
 
-2. **Anthropic OAuth API** — fetches your subscription rate limit utilization (5-hour / 7-day windows) using the OAuth token stored in your macOS Keychain or `~/.claude/.credentials.json` (written by Claude Code during login).
+2. **Anthropic usage API**
+   - Uses the OAuth token stored by Claude Code in macOS Keychain or `~/.claude/.credentials.json`
+   - Fetches subscription usage windows (5h / 7d / per-model when available)
 
-All data is processed locally. No data is sent to any third-party service.
+All parsing and analytics happen locally on your machine.
 
 ## Architecture
 
-```
+```text
 ClaudeStatistics/
-├── App/                    # App entry point (MenuBarExtra), Info.plist, entitlements
-├── Models/                 # Session, SessionStats, ModelPricing, AggregateStats,
-│                           # TranscriptEntry
-├── ViewModels/             # SessionViewModel, StatisticsViewModel, UsageViewModel
-├── Views/                  # MenuBarView, SessionListView, SessionDetailView,
-│                           # StatisticsView, UsageView, SettingsView
-├── Services/               # SessionDataStore, FSEventsWatcher, TranscriptParser,
-│                           # SessionScanner, CredentialService, PricingFetchService,
-│                           # StatusLineInstaller, UsageAPIService
-├── Utilities/              # TimeFormatter, TerminalLauncher, LanguageManager
-└── Resources/              # Localizable.strings (en, zh-Hans)
+├── App/                    # App entry, status bar controller, floating panel
+├── Models/                 # Session, SessionStats, AggregateStats, UsageData, etc.
+├── Services/               # Parsing, scanning, storage, pricing fetch, usage API, logs
+├── Utilities/              # Terminal launching, time formatting, language handling
+├── ViewModels/             # SessionViewModel, UsageViewModel, ProfileViewModel
+├── Views/                  # Sessions, statistics, usage, transcript, settings, theme
+├── Resources/              # Localizable strings and assets
+└── scripts/                # Debug build/run and DMG release helpers
 ```
 
+Notable implementation details:
+
+- SwiftUI + AppKit hybrid architecture
+- `NSStatusItem` for menu bar presence
+- Custom floating panel managed by `StatusBarController`
+- `Theme.swift` design-token layer for shared styling and animation
+- Sparkle for in-app updates
+
 ## Build & Release
+
+### Debug Run
+
+```bash
+bash scripts/run-debug.sh
+```
+
+This script:
+
+1. Kills older app instances
+2. Cleans stale debug builds
+3. Builds with the dedicated `/tmp/claude-stats-build` DerivedData path
+4. Re-registers the app with Launch Services
+5. Launches the fresh binary directly
 
 ### Build DMG
 
 ```bash
-./scripts/build-dmg.sh 1.2.3
-# Output: build/ClaudeStatistics-1.2.3.dmg + appcast.xml updated
+bash scripts/build-dmg.sh 2.0.0
+# Output: build/ClaudeStatistics-2.0.0.dmg
 ```
 
 The script will:
-1. Build a Release configuration with the specified version (sets both `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`)
-2. Bundle the app into a DMG with an Applications symlink for drag-to-install
-3. Sign the DMG with Sparkle's EdDSA key (for in-app update verification)
-4. Generate/update `appcast.xml` with the new version, download URL, and signature
+
+1. Build a Release configuration with the specified version
+2. Create a drag-to-install DMG
+3. Sign the DMG with Sparkle's EdDSA key
+4. Update `appcast.xml`
 
 ### Publish a Release
 
 ```bash
-# 1. Commit the updated appcast
-git add appcast.xml && git commit -m "chore: update appcast for vX.Y.Z" && git push
+# 1. Commit and push appcast / version updates
+git add ClaudeStatistics.xcodeproj/project.pbxproj appcast.xml
+git commit -m "chore: update appcast for vX.Y.Z"
+git push
 
-# 2. Create a GitHub Release with the DMG attached
-gh release create vX.Y.Z build/ClaudeStatistics-X.Y.Z.dmg --title "vX.Y.Z" --notes "Release notes here"
+# 2. Switch to the publishing account
+gh auth switch --hostname github.com --user sj719045032
+
+# 3. Create the GitHub release
+gh release create vX.Y.Z build/ClaudeStatistics-X.Y.Z.dmg \
+  --title "vX.Y.Z" --notes "Release notes"
+
+# 4. Switch back if needed
+gh auth switch --hostname github.com --user tinystone007
 ```
 
-Existing users will receive the update via Sparkle's in-app update check (Settings → Check for Updates).
-
-### Sparkle Update Keys
-
-Sparkle uses EdDSA (Ed25519) signing to verify update integrity. The key pair is stored locally:
-
-- **Public key**: embedded in `Info.plist` (`SUPublicEDKey`)
-- **Private key**: stored in the developer's Keychain (managed by Sparkle's `generate_keys` / `sign_update` tools in `/tmp/sparkle/bin/`)
-
-The `appcast.xml` at the repo root is served via GitHub raw URL and checked by the app on launch or manual refresh.
-
-### Version Numbering
-
-Both `CFBundleShortVersionString` (marketing) and `CFBundleVersion` (build) use the same semver string (e.g., `1.2.3`). This is required because Sparkle compares `sparkle:version` in the appcast against `CFBundleVersion` — mismatched formats will break update detection.
+Existing users receive updates through Sparkle's in-app updater.
 
 ## Configuration
 
-Model pricing is stored in `~/.claude-statistics/pricing.json` and can be edited manually or updated from the Settings tab. The file is created automatically on first launch with built-in defaults.
+Model pricing is stored in `~/.claude-statistics/pricing.json` and can be edited manually or from the Settings tab.
 
 | Setting | Description |
 |---------|-------------|
-| Auto Refresh | Periodically refresh subscription usage data (API is rate-limited, longer intervals recommended) |
-| Refresh Interval | 5 / 10 / 30 minutes |
-| Preferred Terminal | Terminal app for session resume |
-| Model Pricing | View, edit, or fetch latest pricing per model |
-| Status Line | Install/update integrated status line for Claude Code |
-| Tab Order | Reorder the four main tabs |
-| Language | Auto (system) / English / Simplified Chinese |
+| Launch at Login | Start Claude Statistics automatically on login |
+| Auto Refresh | Refresh subscription usage data on an interval |
+| Preferred Terminal | Terminal app used for resuming Claude sessions |
+| Model Pricing | View, edit, or fetch latest model pricing |
+| Status Line | Install/update Claude Code status line integration |
+| Tab Order | Reorder the main tabs |
+| Language | Auto / English / Simplified Chinese |
+| Font Scale | Adjust panel content scale |
+| Diagnostics | Open/export app logs |
 
 ## License
 
