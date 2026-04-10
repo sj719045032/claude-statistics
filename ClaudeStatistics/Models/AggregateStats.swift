@@ -15,12 +15,22 @@ enum StatsPeriod: String, CaseIterable {
         }
     }
 
-    func startOfPeriod(for date: Date) -> Date {
+    func startOfPeriod(for date: Date, weeklyResetDate: Date? = nil) -> Date {
         let cal = Calendar.current
         switch self {
         case .daily:
             return cal.startOfDay(for: date)
         case .weekly:
+            if let resetDate = weeklyResetDate {
+                // Truncate to minute to avoid fractional-second boundary misalignment
+                let resetComps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: resetDate)
+                let anchor = cal.date(from: resetComps) ?? resetDate
+                let windowLength: TimeInterval = 7 * 86400
+                // Subtract 1s so data at exact boundary goes to previous period
+                let offset = date.timeIntervalSince(anchor) - 1
+                let periods = floor(offset / windowLength)
+                return anchor.addingTimeInterval(periods * windowLength)
+            }
             let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
             return cal.date(from: comps) ?? cal.startOfDay(for: date)
         case .monthly:
@@ -32,17 +42,20 @@ enum StatsPeriod: String, CaseIterable {
         }
     }
 
-    func label(for date: Date) -> String {
+    /// Full label for period rows and detail header
+    func label(for date: Date, weeklyResetDate: Date? = nil) -> String {
         let fmt = DateFormatter()
         switch self {
         case .daily:
             fmt.dateFormat = "MM/dd"
         case .weekly:
-            fmt.dateFormat = "MM/dd"
-            let end = Calendar.current.date(byAdding: .day, value: 6, to: date) ?? date
-            let fmtEnd = DateFormatter()
-            fmtEnd.dateFormat = "MM/dd"
-            return "\(fmt.string(from: date))~\(fmtEnd.string(from: end))"
+            let end: Date
+            if weeklyResetDate != nil {
+                end = Calendar.current.date(byAdding: .day, value: 7, to: date) ?? date
+            } else {
+                end = Calendar.current.date(byAdding: .day, value: 6, to: date) ?? date
+            }
+            return "\(Self.smartDate(date))~\(Self.smartDate(end))"
         case .monthly:
             fmt.dateFormat = "yyyy/MM"
         case .yearly:
@@ -51,10 +64,44 @@ enum StatsPeriod: String, CaseIterable {
         return fmt.string(from: date)
     }
 
+    /// Compact label for bar charts — start date only, date and time on separate lines
+    func chartLabel(for date: Date, weeklyResetDate: Date? = nil) -> String {
+        switch self {
+        case .weekly:
+            let cal = Calendar.current
+            let comps = cal.dateComponents([.hour, .minute], from: date)
+            let fmt = DateFormatter()
+            if comps.hour == 0 && comps.minute == 0 {
+                fmt.dateFormat = "MM/dd"
+                return fmt.string(from: date)
+            } else {
+                fmt.dateFormat = "MM/dd"
+                let fmtTime = DateFormatter()
+                fmtTime.dateFormat = "HH:mm"
+                return "\(fmt.string(from: date))\n\(fmtTime.string(from: date))"
+            }
+        default:
+            return label(for: date, weeklyResetDate: weeklyResetDate)
+        }
+    }
+
+    /// Format date: omit HH:mm when at midnight, include otherwise
+    static func smartDate(_ date: Date) -> String {
+        let cal = Calendar.current
+        let comps = cal.dateComponents([.hour, .minute], from: date)
+        let fmt = DateFormatter()
+        if comps.hour == 0 && comps.minute == 0 {
+            fmt.dateFormat = "MM/dd"
+        } else {
+            fmt.dateFormat = "MM/dd HH:mm"
+        }
+        return fmt.string(from: date)
+    }
+
     var displayCount: Int {
         switch self {
         case .daily: return 7
-        case .weekly: return 4
+        case .weekly: return 8
         case .monthly: return 12
         case .yearly: return 10
         }
@@ -64,6 +111,7 @@ enum StatsPeriod: String, CaseIterable {
 struct PeriodStats: Identifiable {
     let period: Date
     let periodLabel: String
+    let chartLabel: String
     var totalInputTokens: Int = 0
     var totalOutputTokens: Int = 0
     var cacheCreation5mTokens: Int = 0

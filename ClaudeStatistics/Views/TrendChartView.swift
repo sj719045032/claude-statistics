@@ -212,7 +212,7 @@ struct TrendChartView: View {
     @ViewBuilder
     private func chartTooltip(date: Date, tokens: Int, cost: Double) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(formatAxisDate(date))
+            Text(StatsPeriod.smartDate(date))
                 .font(.system(size: 9, weight: .medium))
                 .foregroundStyle(.secondary)
             if maxTokens > 0 {

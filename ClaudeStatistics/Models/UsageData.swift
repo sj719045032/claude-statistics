@@ -33,9 +33,18 @@ struct UsageWindow: Codable, Equatable {
         guard let resetsAt else { return nil }
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: resetsAt) { return date }
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: resetsAt)
+        let raw: Date?
+        if let date = formatter.date(from: resetsAt) {
+            raw = date
+        } else {
+            formatter.formatOptions = [.withInternetDateTime]
+            raw = formatter.date(from: resetsAt)
+        }
+        // Truncate to minute — removes fractional seconds that cause boundary misalignment
+        guard let date = raw else { return nil }
+        let cal = Calendar.current
+        let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        return cal.date(from: comps) ?? date
     }
 
     var timeUntilReset: TimeInterval? {

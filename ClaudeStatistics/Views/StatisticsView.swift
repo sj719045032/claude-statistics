@@ -149,7 +149,7 @@ struct StatisticsView: View {
                         BarChartColumn(
                             cost: stat.totalCost,
                             maxCost: maxCost,
-                            label: stat.periodLabel,
+                            label: stat.chartLabel,
                             delay: Double(index) * 0.04
                         )
                         .frame(maxWidth: 60)
@@ -294,7 +294,9 @@ private struct BarChartColumn: View {
             Text(label)
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
-                .lineLimit(1)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity)
         .onHover { hovering in

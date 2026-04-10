@@ -9,6 +9,7 @@ final class SessionDataStore: ObservableObject {
     @Published var quickStats: [String: TranscriptParser.QuickStats] = [:]
     @Published var parsedStats: [String: SessionStats] = [:]
     @Published var selectedPeriod: StatsPeriod = .daily { didSet { rebucket() } }
+    @Published var weeklyResetDate: Date? { didSet { if selectedPeriod == .weekly { rebucket() } } }
     @Published var periodStats: [PeriodStats] = []
     @Published var isFullParseComplete = false
     @Published var parseProgress: String?
@@ -244,15 +245,20 @@ final class SessionDataStore: ObservableObject {
         var buckets: [Date: PeriodStats] = [:]
         var periodSessionIds: [Date: Set<String>] = [:]
 
+        let resetDate = weeklyResetDate
+        // Use fiveMinSlices when weekly period has non-midnight boundary for accurate attribution
+        let useFineSlices = selectedPeriod == .weekly && resetDate != nil
+
         for (sessionId, stats) in parsedStats {
-            if !stats.daySlices.isEmpty {
-                // Use per-day data for accurate period attribution
-                for (dayStart, slice) in stats.daySlices {
-                    let periodStart = selectedPeriod.startOfPeriod(for: dayStart)
+            let slices = useFineSlices ? stats.fiveMinSlices : stats.daySlices
+            if !slices.isEmpty {
+                for (sliceStart, slice) in slices {
+                    let periodStart = selectedPeriod.startOfPeriod(for: sliceStart, weeklyResetDate: resetDate)
                     if buckets[periodStart] == nil {
                         buckets[periodStart] = PeriodStats(
                             period: periodStart,
-                            periodLabel: selectedPeriod.label(for: periodStart)
+                            periodLabel: selectedPeriod.label(for: periodStart, weeklyResetDate: resetDate),
+                            chartLabel: selectedPeriod.chartLabel(for: periodStart, weeklyResetDate: resetDate)
                         )
                     }
                     buckets[periodStart]?.accumulate(daySlice: slice)
@@ -262,11 +268,12 @@ final class SessionDataStore: ObservableObject {
                 // Fallback for sessions without day slices
                 let session = sessions.first { $0.id == sessionId }
                 let date = stats.startTime ?? session?.lastModified ?? Date.distantPast
-                let periodStart = selectedPeriod.startOfPeriod(for: date)
+                let periodStart = selectedPeriod.startOfPeriod(for: date, weeklyResetDate: resetDate)
                 if buckets[periodStart] == nil {
                     buckets[periodStart] = PeriodStats(
                         period: periodStart,
-                        periodLabel: selectedPeriod.label(for: periodStart)
+                        periodLabel: selectedPeriod.label(for: periodStart, weeklyResetDate: resetDate),
+                        chartLabel: selectedPeriod.chartLabel(for: periodStart, weeklyResetDate: resetDate)
                     )
                 }
                 buckets[periodStart]?.accumulate(stats: stats)
@@ -363,14 +370,16 @@ final class SessionDataStore: ObservableObject {
         let granularity = periodType.trendGranularity
         var buckets: [Date: (tokens: Int, cost: Double)] = [:]
 
-        // Daily view → fiveMinSlices; weekly/monthly/yearly → daySlices
-        let useFineSlices = periodType == .daily
+        // Use fiveMinSlices for daily view or weekly with non-midnight subscription boundary
+        let useFineSlices = periodType == .daily || (periodType == .weekly && weeklyResetDate != nil)
+
+        let resetDate = weeklyResetDate
 
         for (sessionId, stats) in parsedStats {
             let slices: [Date: SessionStats.DaySlice] = useFineSlices ? stats.fiveMinSlices : stats.daySlices
             if !slices.isEmpty {
                 for (sliceTime, slice) in slices {
-                    let slicePeriodStart = periodType.startOfPeriod(for: sliceTime)
+                    let slicePeriodStart = periodType.startOfPeriod(for: sliceTime, weeklyResetDate: resetDate)
                     guard slicePeriodStart == period.period else { continue }
 
                     let bucket = granularity.bucketStart(for: sliceTime)
@@ -383,7 +392,7 @@ final class SessionDataStore: ObservableObject {
                 // Fallback for sessions without hourSlice data
                 guard let session = sessions.first(where: { $0.id == sessionId }) else { continue }
                 let sessionDate = stats.startTime ?? session.lastModified
-                let sessionPeriodStart = periodType.startOfPeriod(for: sessionDate)
+                let sessionPeriodStart = periodType.startOfPeriod(for: sessionDate, weeklyResetDate: resetDate)
                 guard sessionPeriodStart == period.period else { continue }
 
                 let bucket = granularity.bucketStart(for: sessionDate)
@@ -431,8 +440,8 @@ final class SessionDataStore: ObservableObject {
         for stats in parsedStats.values {
             let slices: [Date: SessionStats.DaySlice] = useFineSlices ? stats.fiveMinSlices : stats.daySlices
             for (sliceTime, slice) in slices {
-                let sliceEnd = sliceTime.addingTimeInterval(sliceDuration)
-                guard sliceEnd > start, sliceTime < end else { continue }
+                // Exclusive start: data at exact boundary belongs to previous period
+                guard sliceTime > start, sliceTime < end else { continue }
 
                 let bucket = granularity.bucketStart(for: sliceTime)
                 var existing = buckets[bucket, default: (tokens: 0, cost: 0)]
@@ -505,8 +514,8 @@ final class SessionDataStore: ObservableObject {
         for stats in parsedStats.values {
             let slices: [Date: SessionStats.DaySlice] = useFineSlices ? stats.fiveMinSlices : stats.daySlices
             for (sliceTime, slice) in slices {
-                let sliceEnd = sliceTime.addingTimeInterval(sliceDuration)
-                guard sliceEnd > start, sliceTime < end else { continue }
+                // Exclusive start: data at exact boundary belongs to previous period
+                guard sliceTime > start, sliceTime < end else { continue }
 
                 for (model, modelStats) in slice.modelBreakdown {
                     if let filter = modelFilter, !filter(model) { continue }

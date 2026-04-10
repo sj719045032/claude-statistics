@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 @MainActor
 final class AppState: ObservableObject {
@@ -7,9 +8,19 @@ final class AppState: ObservableObject {
     let usageViewModel = UsageViewModel()
     let profileViewModel = ProfileViewModel()
     let updaterService = UpdaterService()
+    private var cancellables: Set<AnyCancellable> = []
 
     init() {
         store.start()
+
+        // Sync subscription weekly reset date to SessionDataStore
+        usageViewModel.$usageData
+            .map { $0?.sevenDay?.resetsAtDate }
+            .removeDuplicates()
+            .sink { [weak self] resetDate in
+                self?.store.weeklyResetDate = resetDate
+            }
+            .store(in: &cancellables)
     }
 }
 
