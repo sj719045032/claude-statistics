@@ -34,6 +34,7 @@
 		AD026F88B93877B8DC87E042 /* CredentialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42069DDFAB4457A16AF6492F /* CredentialService.swift */; };
 		B04844AD3BA910295978D241 /* StatusBarPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5486873DBEC29739725E366 /* StatusBarPanel.swift */; };
 		BC876DE9A69A88B6272F0842 /* TrendDataPoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CA29EE31F9DA05A4CB0442F /* TrendDataPoint.swift */; };
+		C1946155BDD0D0ABEB98F6B5 /* TelemetryDeck in Frameworks */ = {isa = PBXBuildFile; productRef = 0978977B964239E918826F41 /* TelemetryDeck */; };
 		C48BDE19A5E58235BAB61F51 /* UsageViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5306E49F4AF08425229312F0 /* UsageViewModel.swift */; };
 		D06D7B513EFFD60742C93431 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B5C4223D247CA4D681A19D53 /* Assets.xcassets */; };
 		D64171EFA61052FC0A315681 /* SessionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B71B5593D63536AB462D70 /* SessionViewModel.swift */; };
@@ -105,6 +106,7 @@
 			files = (
 				45389ED6B2BB7C7A180BE038 /* Sparkle in Frameworks */,
 				FF23B86D06717D1D06D1BC63 /* MarkdownView in Frameworks */,
+				C1946155BDD0D0ABEB98F6B5 /* TelemetryDeck in Frameworks */,
 				E19C7F4107E38E4F014A9A27 /* libsqlite3.tbd in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -260,7 +262,7 @@
 			packageProductDependencies = (
 				0065997B44AE9D9948026A26 /* Sparkle */,
 				D9B81B6A9F5F3A3C056BB0D3 /* MarkdownView */,
-				B8E4C2F310A95D7B2C6F3E1A /* TelemetryDeck */,
+				0978977B964239E918826F41 /* TelemetryDeck */,
 			);
 			productName = ClaudeStatistics;
 			productReference = 77339C38F26D780CFD6D03EB /* ClaudeStatistics.app */;
@@ -293,7 +295,7 @@
 			packageReferences = (
 				5F9FB62C1777AE296FFAEE72 /* XCRemoteSwiftPackageReference "MarkdownView" */,
 				C927BC02711A30BEB80F2218 /* XCRemoteSwiftPackageReference "Sparkle" */,
-				A7D3F1E209B84C6A1F5E2D0B /* XCRemoteSwiftPackageReference "SwiftSDK" */,
+				255F8D379D5F02BD63FCBDBD /* XCRemoteSwiftPackageReference "SwiftSDK" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1B498AB9E13809CA8F036D81 /* Products */;
@@ -385,11 +387,11 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2.1.1;
+				CURRENT_PROJECT_VERSION = 2.1.2;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = ClaudeStatistics/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.ClaudeStatistics;
 				PRODUCT_NAME = "Claude Statistics";
 				SDKROOT = macosx;
@@ -462,11 +464,11 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2.1.1;
+				CURRENT_PROJECT_VERSION = 2.1.2;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = ClaudeStatistics/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.ClaudeStatistics;
 				PRODUCT_NAME = "Claude Statistics";
 				SDKROOT = macosx;
@@ -562,6 +564,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		255F8D379D5F02BD63FCBDBD /* XCRemoteSwiftPackageReference "SwiftSDK" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/TelemetryDeck/SwiftSDK";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
 		5F9FB62C1777AE296FFAEE72 /* XCRemoteSwiftPackageReference "MarkdownView" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/LiYanan2004/MarkdownView";
@@ -578,14 +588,6 @@
 				minimumVersion = 2.6.0;
 			};
 		};
-		A7D3F1E209B84C6A1F5E2D0B /* XCRemoteSwiftPackageReference "SwiftSDK" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/TelemetryDeck/SwiftSDK";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.0.0;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -594,15 +596,15 @@
 			package = C927BC02711A30BEB80F2218 /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
 		};
+		0978977B964239E918826F41 /* TelemetryDeck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 255F8D379D5F02BD63FCBDBD /* XCRemoteSwiftPackageReference "SwiftSDK" */;
+			productName = TelemetryDeck;
+		};
 		D9B81B6A9F5F3A3C056BB0D3 /* MarkdownView */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 5F9FB62C1777AE296FFAEE72 /* XCRemoteSwiftPackageReference "MarkdownView" */;
 			productName = MarkdownView;
-		};
-		B8E4C2F310A95D7B2C6F3E1A /* TelemetryDeck */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A7D3F1E209B84C6A1F5E2D0B /* XCRemoteSwiftPackageReference "SwiftSDK" */;
-			productName = TelemetryDeck;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

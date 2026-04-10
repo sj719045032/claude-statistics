@@ -19,6 +19,9 @@ packages:
   MarkdownView:
     url: https://github.com/LiYanan2004/MarkdownView
     from: "2.6.1"
+  SwiftSDK:
+    url: https://github.com/TelemetryDeck/SwiftSDK
+    from: "2.0.0"
 
 targets:
   ClaudeStatistics:
@@ -30,13 +33,15 @@ targets:
       - package: Sparkle
       - package: MarkdownView
         product: MarkdownView
+      - package: SwiftSDK
+        product: TelemetryDeck
       - sdk: libsqlite3.tbd
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tinystone.ClaudeStatistics
         PRODUCT_NAME: Claude Statistics
-        MARKETING_VERSION: "2.1.1"
-        CURRENT_PROJECT_VERSION: "2.1.1"
+        MARKETING_VERSION: "2.1.2"
+        CURRENT_PROJECT_VERSION: "2.1.2"
         INFOPLIST_FILE: ClaudeStatistics/App/Info.plist
         CODE_SIGN_ENTITLEMENTS: ClaudeStatistics/App/ClaudeStatistics.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
