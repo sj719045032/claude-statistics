@@ -60,6 +60,8 @@ final class UpdaterService: ObservableObject {
     }
 
     func checkForUpdates() {
+        // Close the status bar panel so Sparkle's dialog appears on top
+        NSApp.windows.first { $0 is NSPanel && $0.level == .statusBar }?.orderOut(nil)
         NSApp.activate(ignoringOtherApps: true)
         controller.checkForUpdates(nil)
     }
