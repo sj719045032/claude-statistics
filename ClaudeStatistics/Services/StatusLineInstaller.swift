@@ -5,11 +5,25 @@ struct StatusLineInstaller {
     static let scriptPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusline-command.sh")
     static let backupPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusline-command.sh.bak")
     static let marker = "# Claude Statistics Integration v1"
+    static let settingsPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/settings.json")
+    static let settingsBackupPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusline-settings.bak.json")
+    private static let expectedCommand = "bash ~/.claude/statusline-command.sh"
 
-    /// Check if our integrated script is currently installed
+    /// Check if our integrated script is currently installed and settings.json is synced
     static var isInstalled: Bool {
-        guard let content = try? String(contentsOfFile: scriptPath, encoding: .utf8) else { return false }
-        return content.contains(marker)
+        guard let content = try? String(contentsOfFile: scriptPath, encoding: .utf8),
+              content.contains(marker) else { return false }
+        return isSettingsSynced
+    }
+
+    /// Check if settings.json statusLine points to our script
+    private static var isSettingsSynced: Bool {
+        guard let settings = readSettings(),
+              let statusLine = settings["statusLine"] as? [String: Any],
+              let command = statusLine["command"] as? String else {
+            return false
+        }
+        return command == expectedCommand
     }
 
     /// Check if a backup exists
@@ -37,6 +51,9 @@ struct StatusLineInstaller {
 
         // Make executable
         try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptPath)
+
+        // Sync settings.json to point statusLine to our script
+        try syncSettingsOnInstall()
     }
 
     /// Restore the backup script
@@ -50,11 +67,67 @@ struct StatusLineInstaller {
         }
         try fm.copyItem(atPath: backupPath, toPath: scriptPath)
         try fm.removeItem(atPath: backupPath)
+
+        // Restore original statusLine config in settings.json
+        try syncSettingsOnRestore()
     }
 
     enum StatusLineError: LocalizedError {
         case noBackup
         var errorDescription: String? { "No backup file found" }
+    }
+
+    // MARK: - Settings.json sync
+
+    private static func readSettings() -> [String: Any]? {
+        guard let data = FileManager.default.contents(atPath: settingsPath),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        return json
+    }
+
+    private static func writeSettings(_ settings: [String: Any]) throws {
+        let data = try JSONSerialization.data(
+            withJSONObject: settings,
+            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        )
+        try data.write(to: URL(fileURLWithPath: settingsPath), options: .atomic)
+    }
+
+    private static func syncSettingsOnInstall() throws {
+        var settings = readSettings() ?? [:]
+        let fm = FileManager.default
+
+        // Backup current statusLine config on first install only
+        if !fm.fileExists(atPath: settingsBackupPath),
+           let current = settings["statusLine"] {
+            let backupData = try JSONSerialization.data(withJSONObject: current, options: .prettyPrinted)
+            try backupData.write(to: URL(fileURLWithPath: settingsBackupPath), options: .atomic)
+        }
+
+        settings["statusLine"] = [
+            "type": "command",
+            "command": expectedCommand
+        ]
+
+        try writeSettings(settings)
+    }
+
+    private static func syncSettingsOnRestore() throws {
+        var settings = readSettings() ?? [:]
+        let fm = FileManager.default
+
+        if fm.fileExists(atPath: settingsBackupPath),
+           let data = fm.contents(atPath: settingsBackupPath),
+           let oldConfig = try? JSONSerialization.jsonObject(with: data) {
+            settings["statusLine"] = oldConfig
+            try fm.removeItem(atPath: settingsBackupPath)
+        } else {
+            settings.removeValue(forKey: "statusLine")
+        }
+
+        try writeSettings(settings)
     }
 
     // MARK: - Script generation
@@ -67,7 +140,7 @@ struct StatusLineInstaller {
         #!/usr/bin/env bash
         \(marker)
         # Two-line status bar based on oh-my-zsh "ys" theme
-        # Requires Nerd Font for icons
+        # Icons: auto-detects Nerd Font, falls back to plain text
         # Receives Claude Code JSON on stdin
         #
         # Cost: uses pricing from Claude Statistics app (\(pricingPath))
@@ -265,18 +338,24 @@ struct StatusLineInstaller {
         fi
 
         # ---------------------------------------------------------------------------
-        # Nerd Font icons
+        # Icons — Nerd Font with auto-detection, plain text fallback
         # ---------------------------------------------------------------------------
-        icon_folder=$'\\uf07c'
-        icon_git=$'\\ue725'
-        icon_ctx=$'\\uf1c0'
-        icon_quota=$'\\uf0e4'
-        icon_cost=$'\\uf155'
-        icon_up=$'\\uf062'
-        icon_down=$'\\uf063'
-        icon_cwrite=$'\\uf0ee'
-        icon_cread=$'\\uf0ed'
-        icon_tree=$'\\uf1bb'
+        _nf=false
+        for _d in "$HOME/Library/Fonts" "/Library/Fonts"; do
+          ls "$_d"/*Nerd* "$_d"/*nerd* "$_d"/MesloLGS* "$_d"/*NF-* "$_d"/*NFM-* 2>/dev/null | head -1 | grep -q . && _nf=true && break
+        done
+
+        if $_nf; then
+          icon_folder=$'\\uf07c'; icon_git=$'\\ue725'
+          icon_ctx=$'\\uf1c0';    icon_quota=$'\\uf0e4'
+          icon_cost=$'\\uf155';   icon_up=$'\\uf062';    icon_down=$'\\uf063'
+          icon_cwrite=$'\\uf0ee'; icon_cread=$'\\uf0ed';  icon_tree=$'\\uf1bb'
+        else
+          icon_folder="";  icon_git=""
+          icon_ctx="";     icon_quota=""
+          icon_cost="\\$";  icon_up="↑";    icon_down="↓"
+          icon_cwrite="⇡"; icon_cread="⇣"; icon_tree=""
+        fi
 
         sep="${gray} | ${reset}"
 
@@ -299,8 +378,9 @@ struct StatusLineInstaller {
           modified=$(echo "$porcelain" | grep -c '^.[MD]' 2>/dev/null || echo 0)
           untracked=$(echo "$porcelain" | grep -c '^??' 2>/dev/null || echo 0)
 
-          icon_dirty=$'\\uf06a'
-          icon_clean=$'\\uf00c'
+          if $_nf; then icon_dirty=$'\\uf06a'; icon_clean=$'\\uf00c'
+          else          icon_dirty="×";       icon_clean="✓"
+          fi
           if [ -n "$porcelain" ]; then
             git_dirty="${red}${icon_dirty}${reset}"
           else
@@ -325,7 +405,7 @@ struct StatusLineInstaller {
           [ "$modified" -gt 0 ] 2>/dev/null && git_detail="${git_detail} ${yellow}m${modified}${reset}"
           [ "$untracked" -gt 0 ] 2>/dev/null && git_detail="${git_detail} ${lgray}u${untracked}${reset}"
 
-          git_section=" ${blue}${icon_git} ${cyan}${git_branch}${reset} ${git_dirty}"
+          git_section=" ${icon_git:+${blue}${icon_git} }${cyan}${git_branch}${reset} ${git_dirty}"
           [ -n "$git_ab" ] && git_section="${git_section} ${git_ab}"
           git_section="${git_section}${git_detail}${git_stash}"
         fi
@@ -424,9 +504,9 @@ struct StatusLineInstaller {
         if [ -n "$used_pct" ]; then
           if [ "$ctx_window_size" -gt 0 ] 2>/dev/null; then
             ctx_total=$(format_tokens "$ctx_window_size")
-            ctx_str="${gray}${icon_ctx} $(color_pct "$used_pct")${gray}/${lgray}${ctx_total}${reset}"
+            ctx_str="${gray}${icon_ctx:+${icon_ctx} }$(color_pct "$used_pct")${gray}/${lgray}${ctx_total}${reset}"
           else
-            ctx_str="${gray}${icon_ctx} $(color_pct "$used_pct")"
+            ctx_str="${gray}${icon_ctx:+${icon_ctx} }$(color_pct "$used_pct")"
           fi
           [ -n "$meta" ] && meta="${meta} ${ctx_str}" || meta="${ctx_str}"
         fi
@@ -457,7 +537,7 @@ struct StatusLineInstaller {
 
         wt_part=""
         if [ -n "$wt_name" ]; then
-          wt_part="${lgray}${icon_tree} ${cyan}${wt_name}${reset}"
+          wt_part="${icon_tree:+${lgray}${icon_tree} }${cyan}${wt_name}${reset}"
           [ -n "$wt_branch" ] && wt_part="${wt_part} ${gray}> ${cyan}${wt_branch}${reset}"
         fi
 
@@ -469,14 +549,14 @@ struct StatusLineInstaller {
         osc_end=$'\\033]8;;\\007'
         vscode_url="vscode://file${cwd}"
 
-        printf "${bold}${yellow}${icon_folder} ${osc_start}${vscode_url}\\007%s${osc_end}${reset}%s\\n" \\
+        printf "${bold}${yellow}${icon_folder:+${icon_folder} }${osc_start}${vscode_url}\\007%s${osc_end}${reset}%s\\n" \\
           "$short_dir" "$git_section"
 
         # ---------------------------------------------------------------------------
         # LINE 2: model ctx | quota | cost tokens | worktree
         # ---------------------------------------------------------------------------
         line2="${meta}"
-        [ -n "$quota_section" ] && line2="${line2}${sep}${gray}${icon_quota} ${reset}${quota_section}"
+        [ -n "$quota_section" ] && line2="${line2}${sep}${icon_quota:+${gray}${icon_quota} ${reset}}${quota_section}"
         [ -n "$cost_section" ]  && line2="${line2}${sep}${cost_section}"
         [ -n "$wt_part" ]       && line2="${line2}${sep}${wt_part}"
         [ -n "$session_part" ]  && line2="${line2}${session_part}"

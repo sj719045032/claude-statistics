@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import TelemetryDeck
 
 @MainActor
 final class AppState: ObservableObject {
@@ -30,6 +31,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let appState = AppState()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let config = TelemetryDeck.Config(appID: "C5662554-D78C-4334-A745-3661642DBE3D")
+        TelemetryDeck.initialize(config: config)
+
         LanguageManager.setup()
         statusBarController = StatusBarController(appState: appState)
     }

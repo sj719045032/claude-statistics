@@ -260,6 +260,7 @@
 			packageProductDependencies = (
 				0065997B44AE9D9948026A26 /* Sparkle */,
 				D9B81B6A9F5F3A3C056BB0D3 /* MarkdownView */,
+				B8E4C2F310A95D7B2C6F3E1A /* TelemetryDeck */,
 			);
 			productName = ClaudeStatistics;
 			productReference = 77339C38F26D780CFD6D03EB /* ClaudeStatistics.app */;
@@ -292,6 +293,7 @@
 			packageReferences = (
 				5F9FB62C1777AE296FFAEE72 /* XCRemoteSwiftPackageReference "MarkdownView" */,
 				C927BC02711A30BEB80F2218 /* XCRemoteSwiftPackageReference "Sparkle" */,
+				A7D3F1E209B84C6A1F5E2D0B /* XCRemoteSwiftPackageReference "SwiftSDK" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1B498AB9E13809CA8F036D81 /* Products */;
@@ -576,6 +578,14 @@
 				minimumVersion = 2.6.0;
 			};
 		};
+		A7D3F1E209B84C6A1F5E2D0B /* XCRemoteSwiftPackageReference "SwiftSDK" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/TelemetryDeck/SwiftSDK";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -588,6 +598,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 5F9FB62C1777AE296FFAEE72 /* XCRemoteSwiftPackageReference "MarkdownView" */;
 			productName = MarkdownView;
+		};
+		B8E4C2F310A95D7B2C6F3E1A /* TelemetryDeck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A7D3F1E209B84C6A1F5E2D0B /* XCRemoteSwiftPackageReference "SwiftSDK" */;
+			productName = TelemetryDeck;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
