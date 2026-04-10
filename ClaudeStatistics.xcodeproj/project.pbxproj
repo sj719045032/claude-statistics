@@ -7,15 +7,22 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		045B57F787E37E71A5434B49 /* OpenAICredentialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B63D6ACC632BBF130F8F69 /* OpenAICredentialService.swift */; };
+		05B7BCA2FB62A164EC5B0858 /* ZaiUsageData.swift in Sources */ = {isa = PBXBuildFile; fileRef = F60AD35ACACA78BDCD7669D9 /* ZaiUsageData.swift */; };
 		09979C26D757D52202ED250D /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AF9820A8A06DCCE5C35C294 /* Theme.swift */; };
 		0BD1DED6EC1DFF9326A1CAE5 /* ProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1850A208EA7AE5CDF9896207 /* ProfileViewModel.swift */; };
+		0C02DF47ADAEB84E12AA9305 /* UsageResetNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9A24B3CC86C595A16F3D4ED /* UsageResetNotificationService.swift */; };
+		11AF5803393ECD1CB964FE7D /* OpenAIUsageViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FDECD39A70AE505FBC38DEB /* OpenAIUsageViewModel.swift */; };
 		1D84A21259B5673F6ABDFCC1 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36F9BBB23CB057720EA99A7B /* Session.swift */; };
+		2243C4B9AB063FDA94DE5E4F /* OpenAIUsageData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 767C851B0E765A9B6279A6FF /* OpenAIUsageData.swift */; };
+		2DA31EA7AF0FFF1572E257AC /* UsageFeatureSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2985E486A9910902706341F /* UsageFeatureSupport.swift */; };
 		3AD8ED72F8D42B9DB0614F77 /* UpdaterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7AD5E89B648F5018E34233A /* UpdaterService.swift */; };
 		3F7B6FCC8858E6DEECB776A0 /* SessionDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D5BA98DFF322E54A1E5B1F2 /* SessionDataStore.swift */; };
 		45389ED6B2BB7C7A180BE038 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 0065997B44AE9D9948026A26 /* Sparkle */; };
 		4809D9A533DA37D1B71D1592 /* PricingFetchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 054E2C5CD2CBA7B14AFF897A /* PricingFetchService.swift */; };
 		4A69484840B48CDE187957E0 /* AutoRefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAAFBA5B9EEDC2BB22BAF700 /* AutoRefreshCoordinator.swift */; };
 		552244856F222EE6F9AFE7DA /* DiagnosticLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B466FB316C76AB0C39E12E7B /* DiagnosticLogger.swift */; };
+		57DEF2286003E84C36B9E086 /* ZaiUsageViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C875A34034B31E06FDD67DF /* ZaiUsageViewModel.swift */; };
 		59FB58B0D4D4298AF8A3A1A6 /* AggregateStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EDF09CC0594DB9C35748FF4 /* AggregateStats.swift */; };
 		5ABBC48B689D173B40DDB85A /* TranscriptParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = F79555858F7CDF21C9301D11 /* TranscriptParser.swift */; };
 		5B8F2BC01D7A4526CD0AEAA4 /* TranscriptEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42AB2ACAC763533BC9654BE5 /* TranscriptEntry.swift */; };
@@ -24,8 +31,10 @@
 		7674AC8643AF2C6126880D3C /* TranscriptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73D3015C65881224ECFCC5BB /* TranscriptView.swift */; };
 		7FEDE160B6E6484B272C2078 /* TerminalLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA42F7AC4BB41556CDC7EFCC /* TerminalLauncher.swift */; };
 		831EA76C2D78A3EB01923445 /* UsageTrendChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8897EC95FCBE7A6D1A915AC7 /* UsageTrendChartView.swift */; };
+		837106F70CE107F0DCF2EF68 /* OpenAIUsageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B155B3F2BB0D4257FCC0074B /* OpenAIUsageView.swift */; };
 		861A6FDE8151A6DF1D571793 /* TimeFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15FB669CCF4C2F10D4550624 /* TimeFormatter.swift */; };
 		8D240F8C55163EE6DD3DAC08 /* SearchUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EBE034854D1539811ED0D5F /* SearchUtils.swift */; };
+		96B4F7C53D5C6232CDA20981 /* ZaiUsageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C3C7380671DCBE8C460C388 /* ZaiUsageView.swift */; };
 		9BE83C21285426ACBCAE6024 /* SessionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF9A88BAC1F779F77E517EB /* SessionListView.swift */; };
 		A795EC97A42092FD1CDDABEB /* StatusLineInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBCC86BBB585FC2927B58640 /* StatusLineInstaller.swift */; };
 		A808622B78A49E54748B910A /* SessionScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A4A95A6629B2D5258EA882D /* SessionScanner.swift */; };
@@ -33,12 +42,17 @@
 		AC5082113B4136915E426299 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 2710C957B5C3CF8708B02CC6 /* Localizable.strings */; };
 		AD026F88B93877B8DC87E042 /* CredentialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42069DDFAB4457A16AF6492F /* CredentialService.swift */; };
 		B04844AD3BA910295978D241 /* StatusBarPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5486873DBEC29739725E366 /* StatusBarPanel.swift */; };
+		B6BDC5BBD811160C485C9D64 /* MenuBarUsageSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73E299C4073DDC0A49A3A065 /* MenuBarUsageSelection.swift */; };
+		BACA337FB9AB7DA0D118C482 /* ZaiAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00900857BC319FC217E591DB /* ZaiAPIService.swift */; };
 		BC876DE9A69A88B6272F0842 /* TrendDataPoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CA29EE31F9DA05A4CB0442F /* TrendDataPoint.swift */; };
+		BF3422FB4857E4A1B8AEBD46 /* ZaiCredentialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0907D2D07215B3D7E388ED56 /* ZaiCredentialService.swift */; };
+		C335A3A1848EB6744EF95BDB /* ZaiModelUsageChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6EE73F58C14DA6053D07DD0 /* ZaiModelUsageChartView.swift */; };
 		C48BDE19A5E58235BAB61F51 /* UsageViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5306E49F4AF08425229312F0 /* UsageViewModel.swift */; };
 		D06D7B513EFFD60742C93431 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B5C4223D247CA4D681A19D53 /* Assets.xcassets */; };
 		D64171EFA61052FC0A315681 /* SessionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B71B5593D63536AB462D70 /* SessionViewModel.swift */; };
 		D73C2A7290E0250F8B50A372 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3374C538E77CED126DE3016 /* StatusBarController.swift */; };
 		E04B621B671D090DB9155348 /* LanguageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1519B833F38D44123500B58 /* LanguageManager.swift */; };
+		E09B487B5B16400C98D87D7B /* OpenAIUsageAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869DD78512156D8353633381 /* OpenAIUsageAPIService.swift */; };
 		E19A0BCA11B03CD13E4A1F04 /* UsageAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3BC22C81208BA2B853C240 /* UsageAPIService.swift */; };
 		E19C7F4107E38E4F014A9A27 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 7803032F49F6D004A094939E /* libsqlite3.tbd */; };
 		E26C6870A1E9540BCA9E7045 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 011E707E6F2F284A99ECF925 /* SettingsView.swift */; };
@@ -52,18 +66,22 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		00900857BC319FC217E591DB /* ZaiAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZaiAPIService.swift; sourceTree = "<group>"; };
 		011E707E6F2F284A99ECF925 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		054E2C5CD2CBA7B14AFF897A /* PricingFetchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PricingFetchService.swift; sourceTree = "<group>"; };
+		0907D2D07215B3D7E388ED56 /* ZaiCredentialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZaiCredentialService.swift; sourceTree = "<group>"; };
 		0AF9820A8A06DCCE5C35C294 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		15FB669CCF4C2F10D4550624 /* TimeFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeFormatter.swift; sourceTree = "<group>"; };
 		1850A208EA7AE5CDF9896207 /* ProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileViewModel.swift; sourceTree = "<group>"; };
 		1A4A95A6629B2D5258EA882D /* SessionScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionScanner.swift; sourceTree = "<group>"; };
 		1EBE034854D1539811ED0D5F /* SearchUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchUtils.swift; sourceTree = "<group>"; };
+		2C3C7380671DCBE8C460C388 /* ZaiUsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZaiUsageView.swift; sourceTree = "<group>"; };
 		2EDF09CC0594DB9C35748FF4 /* AggregateStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AggregateStats.swift; sourceTree = "<group>"; };
 		3511F107E29217FB16567AF9 /* UsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageView.swift; sourceTree = "<group>"; };
 		35EC230BC5F1EF207A984D87 /* FSEventsWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FSEventsWatcher.swift; sourceTree = "<group>"; };
 		36F9BBB23CB057720EA99A7B /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
 		370D33AC086199C95EC1E2CD /* UsageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageData.swift; sourceTree = "<group>"; };
+		3C875A34034B31E06FDD67DF /* ZaiUsageViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZaiUsageViewModel.swift; sourceTree = "<group>"; };
 		3D5BA98DFF322E54A1E5B1F2 /* SessionDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDataStore.swift; sourceTree = "<group>"; };
 		41054FA7DE043B7E25B4A88E /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		42069DDFAB4457A16AF6492F /* CredentialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialService.swift; sourceTree = "<group>"; };
@@ -76,23 +94,33 @@
 		68083922F93D555879FAD90B /* ClaudeStatisticsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatisticsApp.swift; sourceTree = "<group>"; };
 		6E1B839DD5F15A6A55AE3727 /* StatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsView.swift; sourceTree = "<group>"; };
 		73D3015C65881224ECFCC5BB /* TranscriptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptView.swift; sourceTree = "<group>"; };
+		73E299C4073DDC0A49A3A065 /* MenuBarUsageSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarUsageSelection.swift; sourceTree = "<group>"; };
+		767C851B0E765A9B6279A6FF /* OpenAIUsageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIUsageData.swift; sourceTree = "<group>"; };
 		77339C38F26D780CFD6D03EB /* ClaudeStatistics.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClaudeStatistics.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7803032F49F6D004A094939E /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		7D3BC22C81208BA2B853C240 /* UsageAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageAPIService.swift; sourceTree = "<group>"; };
+		869DD78512156D8353633381 /* OpenAIUsageAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIUsageAPIService.swift; sourceTree = "<group>"; };
 		8897EC95FCBE7A6D1A915AC7 /* UsageTrendChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageTrendChartView.swift; sourceTree = "<group>"; };
+		9FDECD39A70AE505FBC38DEB /* OpenAIUsageViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIUsageViewModel.swift; sourceTree = "<group>"; };
+		A0B63D6ACC632BBF130F8F69 /* OpenAICredentialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAICredentialService.swift; sourceTree = "<group>"; };
 		A776ADBF033757E89353F9E2 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		B155B3F2BB0D4257FCC0074B /* OpenAIUsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIUsageView.swift; sourceTree = "<group>"; };
 		B466FB316C76AB0C39E12E7B /* DiagnosticLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogger.swift; sourceTree = "<group>"; };
 		B5C4223D247CA4D681A19D53 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B7AD5E89B648F5018E34233A /* UpdaterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdaterService.swift; sourceTree = "<group>"; };
 		BF23C58F1F4E3E5605623ECE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		C2985E486A9910902706341F /* UsageFeatureSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageFeatureSupport.swift; sourceTree = "<group>"; };
 		C3374C538E77CED126DE3016 /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
 		CAF9A88BAC1F779F77E517EB /* SessionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListView.swift; sourceTree = "<group>"; };
 		CD0415091A24EBCDA6840A49 /* SessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetailView.swift; sourceTree = "<group>"; };
 		D1519B833F38D44123500B58 /* LanguageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageManager.swift; sourceTree = "<group>"; };
+		D9A24B3CC86C595A16F3D4ED /* UsageResetNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageResetNotificationService.swift; sourceTree = "<group>"; };
 		DBCC86BBB585FC2927B58640 /* StatusLineInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusLineInstaller.swift; sourceTree = "<group>"; };
 		E3E1273546BE9434362C72E0 /* ClaudeStatistics.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ClaudeStatistics.entitlements; sourceTree = "<group>"; };
 		EEDC6DF1C15355DC5AE2FCF9 /* TrendChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendChartView.swift; sourceTree = "<group>"; };
 		F5486873DBEC29739725E366 /* StatusBarPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarPanel.swift; sourceTree = "<group>"; };
+		F60AD35ACACA78BDCD7669D9 /* ZaiUsageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZaiUsageData.swift; sourceTree = "<group>"; };
+		F6EE73F58C14DA6053D07DD0 /* ZaiModelUsageChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZaiModelUsageChartView.swift; sourceTree = "<group>"; };
 		F79555858F7CDF21C9301D11 /* TranscriptParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptParser.swift; sourceTree = "<group>"; };
 		FA42F7AC4BB41556CDC7EFCC /* TerminalLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalLauncher.swift; sourceTree = "<group>"; };
 		FAAFBA5B9EEDC2BB22BAF700 /* AutoRefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoRefreshCoordinator.swift; sourceTree = "<group>"; };
@@ -147,6 +175,8 @@
 				6749A9BF125AC2A04C7043D5 /* DatabaseService.swift */,
 				B466FB316C76AB0C39E12E7B /* DiagnosticLogger.swift */,
 				35EC230BC5F1EF207A984D87 /* FSEventsWatcher.swift */,
+				A0B63D6ACC632BBF130F8F69 /* OpenAICredentialService.swift */,
+				869DD78512156D8353633381 /* OpenAIUsageAPIService.swift */,
 				054E2C5CD2CBA7B14AFF897A /* PricingFetchService.swift */,
 				3D5BA98DFF322E54A1E5B1F2 /* SessionDataStore.swift */,
 				1A4A95A6629B2D5258EA882D /* SessionScanner.swift */,
@@ -154,6 +184,9 @@
 				F79555858F7CDF21C9301D11 /* TranscriptParser.swift */,
 				B7AD5E89B648F5018E34233A /* UpdaterService.swift */,
 				7D3BC22C81208BA2B853C240 /* UsageAPIService.swift */,
+				D9A24B3CC86C595A16F3D4ED /* UsageResetNotificationService.swift */,
+				00900857BC319FC217E591DB /* ZaiAPIService.swift */,
+				0907D2D07215B3D7E388ED56 /* ZaiCredentialService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -184,9 +217,11 @@
 		630E776A88A7FDCBD895C84A /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				9FDECD39A70AE505FBC38DEB /* OpenAIUsageViewModel.swift */,
 				1850A208EA7AE5CDF9896207 /* ProfileViewModel.swift */,
 				58B71B5593D63536AB462D70 /* SessionViewModel.swift */,
 				5306E49F4AF08425229312F0 /* UsageViewModel.swift */,
+				3C875A34034B31E06FDD67DF /* ZaiUsageViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -216,10 +251,14 @@
 			isa = PBXGroup;
 			children = (
 				2EDF09CC0594DB9C35748FF4 /* AggregateStats.swift */,
+				73E299C4073DDC0A49A3A065 /* MenuBarUsageSelection.swift */,
+				767C851B0E765A9B6279A6FF /* OpenAIUsageData.swift */,
 				36F9BBB23CB057720EA99A7B /* Session.swift */,
 				42AB2ACAC763533BC9654BE5 /* TranscriptEntry.swift */,
 				5CA29EE31F9DA05A4CB0442F /* TrendDataPoint.swift */,
 				370D33AC086199C95EC1E2CD /* UsageData.swift */,
+				C2985E486A9910902706341F /* UsageFeatureSupport.swift */,
+				F60AD35ACACA78BDCD7669D9 /* ZaiUsageData.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -228,6 +267,7 @@
 			isa = PBXGroup;
 			children = (
 				41054FA7DE043B7E25B4A88E /* MenuBarView.swift */,
+				B155B3F2BB0D4257FCC0074B /* OpenAIUsageView.swift */,
 				CD0415091A24EBCDA6840A49 /* SessionDetailView.swift */,
 				CAF9A88BAC1F779F77E517EB /* SessionListView.swift */,
 				011E707E6F2F284A99ECF925 /* SettingsView.swift */,
@@ -237,6 +277,8 @@
 				EEDC6DF1C15355DC5AE2FCF9 /* TrendChartView.swift */,
 				8897EC95FCBE7A6D1A915AC7 /* UsageTrendChartView.swift */,
 				3511F107E29217FB16567AF9 /* UsageView.swift */,
+				F6EE73F58C14DA6053D07DD0 /* ZaiModelUsageChartView.swift */,
+				2C3C7380671DCBE8C460C388 /* ZaiUsageView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -328,7 +370,13 @@
 				552244856F222EE6F9AFE7DA /* DiagnosticLogger.swift in Sources */,
 				FA20F885511C5F92715056F9 /* FSEventsWatcher.swift in Sources */,
 				E04B621B671D090DB9155348 /* LanguageManager.swift in Sources */,
+				B6BDC5BBD811160C485C9D64 /* MenuBarUsageSelection.swift in Sources */,
 				F3272760285AF18F519D8E80 /* MenuBarView.swift in Sources */,
+				045B57F787E37E71A5434B49 /* OpenAICredentialService.swift in Sources */,
+				E09B487B5B16400C98D87D7B /* OpenAIUsageAPIService.swift in Sources */,
+				2243C4B9AB063FDA94DE5E4F /* OpenAIUsageData.swift in Sources */,
+				837106F70CE107F0DCF2EF68 /* OpenAIUsageView.swift in Sources */,
+				11AF5803393ECD1CB964FE7D /* OpenAIUsageViewModel.swift in Sources */,
 				4809D9A533DA37D1B71D1592 /* PricingFetchService.swift in Sources */,
 				0BD1DED6EC1DFF9326A1CAE5 /* ProfileViewModel.swift in Sources */,
 				8D240F8C55163EE6DD3DAC08 /* SearchUtils.swift in Sources */,
@@ -354,9 +402,17 @@
 				3AD8ED72F8D42B9DB0614F77 /* UpdaterService.swift in Sources */,
 				E19A0BCA11B03CD13E4A1F04 /* UsageAPIService.swift in Sources */,
 				FDBE2C2C6B6D044072235F42 /* UsageData.swift in Sources */,
+				2DA31EA7AF0FFF1572E257AC /* UsageFeatureSupport.swift in Sources */,
+				0C02DF47ADAEB84E12AA9305 /* UsageResetNotificationService.swift in Sources */,
 				831EA76C2D78A3EB01923445 /* UsageTrendChartView.swift in Sources */,
 				F7761B0329D579925F2DB98E /* UsageView.swift in Sources */,
 				C48BDE19A5E58235BAB61F51 /* UsageViewModel.swift in Sources */,
+				BACA337FB9AB7DA0D118C482 /* ZaiAPIService.swift in Sources */,
+				BF3422FB4857E4A1B8AEBD46 /* ZaiCredentialService.swift in Sources */,
+				C335A3A1848EB6744EF95BDB /* ZaiModelUsageChartView.swift in Sources */,
+				05B7BCA2FB62A164EC5B0858 /* ZaiUsageData.swift in Sources */,
+				96B4F7C53D5C6232CDA20981 /* ZaiUsageView.swift in Sources */,
+				57DEF2286003E84C36B9E086 /* ZaiUsageViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -383,11 +439,11 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2.1.0;
+				CURRENT_PROJECT_VERSION = 2.0.0;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = ClaudeStatistics/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 2.1.0;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.ClaudeStatistics;
 				PRODUCT_NAME = "Claude Statistics";
 				SDKROOT = macosx;
@@ -460,11 +516,11 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2.1.0;
+				CURRENT_PROJECT_VERSION = 2.0.0;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = ClaudeStatistics/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 2.1.0;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.ClaudeStatistics;
 				PRODUCT_NAME = "Claude Statistics";
 				SDKROOT = macosx;

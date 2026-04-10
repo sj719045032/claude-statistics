@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 @MainActor
@@ -7,9 +8,23 @@ final class AppState: ObservableObject {
     let usageViewModel = UsageViewModel()
     let profileViewModel = ProfileViewModel()
     let updaterService = UpdaterService()
+    let notificationService = UsageResetNotificationService.shared
+    let zaiUsageViewModel = ZaiUsageViewModel()
+    let openAIUsageViewModel = OpenAIUsageViewModel()
 
     init() {
         store.start()
+        notificationService.configure()
+        zaiUsageViewModel.setup()
+        openAIUsageViewModel.setup()
+    }
+
+    func setupZai() {
+        zaiUsageViewModel.setup()
+    }
+
+    func setupOpenAI() {
+        openAIUsageViewModel.setup()
     }
 }
 

@@ -50,9 +50,14 @@ struct MenuBarView: View {
     @ObservedObject var sessionViewModel: SessionViewModel
     @ObservedObject var store: SessionDataStore
     @ObservedObject var updaterService: UpdaterService
+    @ObservedObject var notificationService: UsageResetNotificationService
+    @ObservedObject var zaiUsageViewModel: ZaiUsageViewModel
+    @ObservedObject var openAIUsageViewModel: OpenAIUsageViewModel
     @State private var selectedTab: AppTab = AppTab.loadOrder().first ?? .sessions
     @State private var tabOrder: [AppTab] = AppTab.loadOrder()
     @AppStorage("fontScale") private var fontScale = 1.0
+    @AppStorage("zaiUsageEnabled") private var zaiUsageEnabled = false
+    @AppStorage("openAIUsageEnabled") private var openAIUsageEnabled = false
     @Namespace private var tabNamespace
 
     var body: some View {
@@ -91,11 +96,47 @@ struct MenuBarView: View {
                         StatisticsView(store: store)
                     case .usage:
                         ScrollView {
-                            UsageView(viewModel: usageViewModel, store: store)
-                                .padding(12)
+                            let sections = UsageContentOrder.sections(
+                                claudeHasDisplayableUsage: usageViewModel.hasDisplayableUsage,
+                                zaiEnabled: zaiUsageEnabled,
+                                zaiConfigured: zaiUsageViewModel.isConfigured,
+                                openAIEnabled: openAIUsageEnabled,
+                                openAIConfigured: openAIUsageViewModel.isConfigured
+                                    || openAIUsageViewModel.hasDisplayableUsage
+                                    || openAIUsageViewModel.errorMessage != nil
+                            )
+
+                            VStack(spacing: 16) {
+                                ForEach(sections, id: \.rawValue) { section in
+                                    switch section {
+                                    case .claude:
+                                        UsageView(viewModel: usageViewModel, store: store)
+                                            .padding(12)
+                                    case .zai:
+                                        ZaiUsageView(viewModel: zaiUsageViewModel)
+                                            .padding(12)
+                                    case .openAI:
+                                        OpenAIUsageView(viewModel: openAIUsageViewModel)
+                                            .padding(12)
+                                    }
+
+                                    if section != sections.last {
+                                        Divider()
+                                            .padding(.horizontal, 12)
+                                    }
+                                }
+                            }
                         }
                     case .settings:
-                        SettingsView(usageViewModel: usageViewModel, profileViewModel: profileViewModel, tabOrder: $tabOrder, updaterService: updaterService)
+                        SettingsView(
+                            usageViewModel: usageViewModel,
+                            profileViewModel: profileViewModel,
+                            zaiUsageViewModel: zaiUsageViewModel,
+                            openAIUsageViewModel: openAIUsageViewModel,
+                            tabOrder: $tabOrder,
+                            updaterService: updaterService,
+                            notificationService: notificationService
+                        )
                     }
                 }
                 .frame(width: geo.size.width / fontScale, height: geo.size.height / fontScale, alignment: .topLeading)
@@ -229,6 +270,9 @@ struct PanelContentView: View {
     @ObservedObject var sessionViewModel: SessionViewModel
     @ObservedObject var store: SessionDataStore
     @ObservedObject var updaterService: UpdaterService
+    @ObservedObject var notificationService: UsageResetNotificationService
+    @ObservedObject var zaiUsageViewModel: ZaiUsageViewModel
+    @ObservedObject var openAIUsageViewModel: OpenAIUsageViewModel
 
     private var currentLocale: Locale {
         switch appLanguage {
@@ -244,7 +288,10 @@ struct PanelContentView: View {
             profileViewModel: profileViewModel,
             sessionViewModel: sessionViewModel,
             store: store,
-            updaterService: updaterService
+            updaterService: updaterService,
+            notificationService: notificationService,
+            zaiUsageViewModel: zaiUsageViewModel,
+            openAIUsageViewModel: openAIUsageViewModel
         )
         .environment(\.locale, currentLocale)
     }

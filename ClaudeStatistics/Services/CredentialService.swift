@@ -8,6 +8,16 @@ final class CredentialService {
 
     private init() {}
 
+    func currentAuthMode() -> ClaudeAuthMode {
+        if hasPrimaryAPIKey() {
+            return .apiKey
+        }
+        if getAccessToken() != nil {
+            return .oauth
+        }
+        return .unknown
+    }
+
     func getAccessToken() -> String? {
         if let token = getTokenFromKeychain() { return token }
         return getTokenFromFile()
@@ -72,6 +82,28 @@ final class CredentialService {
             }
 
             return nil
+        } catch {
+            return nil
+        }
+    }
+
+    private func hasPrimaryAPIKey() -> Bool {
+        let configPath = (claudeConfigDir() as NSString).appendingPathComponent("config.json")
+
+        guard let data = FileManager.default.contents(atPath: configPath),
+              let jsonString = String(data: data, encoding: .utf8) else { return false }
+
+        return extractPrimaryAPIKey(from: jsonString) != nil
+    }
+
+    private func extractPrimaryAPIKey(from jsonString: String) -> String? {
+        guard let data = jsonString.data(using: .utf8) else { return nil }
+
+        do {
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            let value = json?["primaryApiKey"] as? String
+            let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed?.isEmpty == false ? trimmed : nil
         } catch {
             return nil
         }

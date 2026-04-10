@@ -30,8 +30,16 @@ final class GentleReminderDelegate: NSObject, SPUStandardUserDriverDelegate {
 final class UpdateCheckDelegate: NSObject, SPUUpdaterDelegate {
     weak var service: UpdaterService?
 
+    nonisolated private static func preferredVersionString(displayVersionString: String, versionString: String) -> String {
+        let displayVersion = displayVersionString
+        return displayVersion.isEmpty ? versionString : displayVersion
+    }
+
     nonisolated func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
-        let version = item.displayVersionString ?? item.versionString
+        let version = Self.preferredVersionString(
+            displayVersionString: item.displayVersionString,
+            versionString: item.versionString
+        )
         DispatchQueue.main.async { [weak self] in
             self?.service?.availableVersion = version
         }

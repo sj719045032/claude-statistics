@@ -48,4 +48,5 @@ Podfile.lock
 *.log
 *.orig
 xcuserdata/
+.worktrees/
 .cs-launch
