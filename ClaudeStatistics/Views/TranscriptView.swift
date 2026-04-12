@@ -1,6 +1,24 @@
 import SwiftUI
 import MarkdownView
 
+// MARK: - Scaled MarkdownView fonts
+
+private extension View {
+    func markdownFonts(baseSize: CGFloat = 11) -> some View {
+        self.font(.system(size: baseSize), for: .body)
+            .font(.system(size: baseSize - 1, design: .monospaced), for: .codeBlock)
+            .font(.system(size: baseSize + 5, weight: .bold), for: .h1)
+            .font(.system(size: baseSize + 4, weight: .bold), for: .h2)
+            .font(.system(size: baseSize + 3, weight: .semibold), for: .h3)
+            .font(.system(size: baseSize + 2, weight: .semibold), for: .h4)
+            .font(.system(size: baseSize + 1, weight: .medium), for: .h5)
+            .font(.system(size: baseSize, weight: .medium), for: .h6)
+            .font(.system(size: baseSize, design: .serif), for: .blockQuote)
+            .font(.system(size: baseSize - 1), for: .tableBody)
+            .font(.system(size: baseSize - 1, weight: .semibold), for: .tableHeader)
+    }
+}
+
 struct TranscriptView: View {
     let session: Session
     let initialSearchQuery: String?
@@ -14,6 +32,26 @@ struct TranscriptView: View {
     @State private var matchedIds: [String] = []
     @State private var currentMatchIndex = 0
     @State private var scrollPosition: String?
+    @State private var roleFilters: Set<String> = []  // empty = show all
+    @State private var toolFilters: Set<String> = []  // empty = show all tools
+
+    private static let roleOptions: [(key: String, label: String, icon: String)] = [
+        ("user", "User", "person.circle.fill"),
+        ("assistant", "Claude", "brain"),
+        ("tool", "Tools", "wrench.and.screwdriver"),
+    ]
+
+    private var availableTools: [String] {
+        Array(Set(messages.compactMap(\.toolName))).sorted()
+    }
+
+    private var filteredMessages: [TranscriptParser.DisplayMessage] {
+        messages.filter { msg in
+            if !roleFilters.isEmpty && !roleFilters.contains(msg.role) { return false }
+            if !toolFilters.isEmpty && msg.role == "tool" && !toolFilters.contains(msg.toolName ?? "") { return false }
+            return true
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -32,7 +70,7 @@ struct TranscriptView: View {
 
                 Spacer()
 
-                Text("transcript.title \(messages.count)")
+                Text("transcript.title \(filteredMessages.count)")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -88,16 +126,86 @@ struct TranscriptView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
 
+            // Filter bar
+            HStack(spacing: 4) {
+                ForEach(Self.roleOptions, id: \.key) { option in
+                    let isActive = roleFilters.contains(option.key)
+                    Button {
+                        if isActive {
+                            roleFilters.remove(option.key)
+                            if option.key == "tool" { toolFilters = [] }
+                        } else {
+                            roleFilters.insert(option.key)
+                        }
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: option.icon).font(.system(size: 9))
+                            Text(option.label).font(.system(size: 10))
+                        }
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(isActive ? Color.blue.opacity(0.2) : Color.gray.opacity(0.1))
+                        .foregroundStyle(isActive ? .blue : .secondary)
+                        .cornerRadius(4)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if roleFilters.contains("tool") && !availableTools.isEmpty {
+                    Divider().frame(height: 14)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 3) {
+                            ForEach(availableTools, id: \.self) { tool in
+                                let isActive = toolFilters.contains(tool)
+                                Button {
+                                    if isActive { toolFilters.remove(tool) } else { toolFilters.insert(tool) }
+                                } label: {
+                                    Text(tool)
+                                        .font(.system(size: 9, design: .monospaced))
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(isActive ? Color.orange.opacity(0.2) : Color.gray.opacity(0.08))
+                                        .foregroundStyle(isActive ? .orange : .secondary)
+                                        .cornerRadius(3)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+
+                Spacer()
+
+                if !roleFilters.isEmpty || !toolFilters.isEmpty {
+                    Button {
+                        roleFilters = []
+                        toolFilters = []
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Text("\(filteredMessages.count)")
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+
             Divider()
 
             // Messages — LazyVStack always present, loading as overlay
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(messages) { msg in
+                    ForEach(filteredMessages) { msg in
                         Group {
                             if msg.role == "tool" {
                                 ToolCallRow(message: msg, searchText: searchText,
-                                            isCurrentMatch: isCurrentMatch(msg.id))
+                                            isCurrentMatch: isCurrentMatch(msg.id),
+                                            sessionFilePath: session.filePath)
                             } else {
                                 MessageRow(message: msg, searchText: searchText,
                                            isCurrentMatch: isCurrentMatch(msg.id))
@@ -172,6 +280,12 @@ struct TranscriptView: View {
         .onChange(of: searchText) { _, newValue in
             updateMatches(query: newValue)
         }
+        .onChange(of: roleFilters) { _, _ in
+            updateMatches(query: searchText)
+        }
+        .onChange(of: toolFilters) { _, _ in
+            updateMatches(query: searchText)
+        }
     }
 
     // MARK: - Logic
@@ -197,7 +311,7 @@ struct TranscriptView: View {
             return
         }
 
-        matchedIds = messages.filter { msg in
+        matchedIds = filteredMessages.filter { msg in
             let allFields = [
                 SearchUtils.stripMarkdown(msg.text),
                 msg.text,
@@ -342,7 +456,7 @@ private struct MessageRow: View {
                 // Current search match: markdown with highlighted matches as yellow inline code
                 if isCurrentMatch && !searchText.isEmpty {
                     MarkdownView(SearchUtils.markdownWithHighlights(message.text, query: searchText))
-                        .font(.system(size: 11))
+                        .markdownFonts()
                         .foregroundStyle(.primary.opacity(0.85))
                         .tint(.yellow, for: .inlineCodeBlock)
                 }
@@ -360,7 +474,7 @@ private struct MessageRow: View {
                             .foregroundStyle(.primary.opacity(0.85))
                     } else {
                         MarkdownView(message.text)
-                            .font(.system(size: 11))
+                            .markdownFonts()
                             .foregroundStyle(.primary.opacity(0.85))
                     }
                 }
@@ -408,7 +522,10 @@ private struct ToolCallRow: View {
     let message: TranscriptParser.DisplayMessage
     let searchText: String
     let isCurrentMatch: Bool
+    var sessionFilePath: String = ""
     @State private var isExpanded = false
+    @State private var subagentMessages: [TranscriptParser.DisplayMessage]?
+    @State private var isLoadingSubagent = false
 
     private var toolDisplayName: String {
         switch message.toolName {
@@ -450,6 +567,7 @@ private struct ToolCallRow: View {
     }
 
     private var hasDetail: Bool {
+        if message.toolName == "Agent" { return true }
         if message.toolName == "Edit" && message.editOldString != nil { return true }
         return message.toolDetail != nil && !(message.toolDetail?.isEmpty ?? true)
     }
@@ -508,18 +626,49 @@ private struct ToolCallRow: View {
             .onTapGesture {
                 if hasDetail {
                     withAnimation(.easeInOut(duration: 0.15)) { isExpanded.toggle() }
+                    // Auto-load subagent conversation on expand
+                    if isExpanded && message.toolName == "Agent" && subagentMessages == nil && !isLoadingSubagent {
+                        loadSubagentConversation()
+                    }
                 }
             }
 
             // Expandable detail
             if isExpanded {
-                Group {
+                VStack(alignment: .leading, spacing: 4) {
                     if message.toolName == "Edit",
                        let oldStr = message.editOldString,
                        let newStr = message.editNewString {
                         editDiffView(oldStr: oldStr, newStr: newStr)
                     } else if let detail = message.toolDetail, !detail.isEmpty {
                         toolDetailView(detail)
+                    }
+
+                    // Subagent conversation
+                    if message.toolName == "Agent" {
+                        if let subMsgs = subagentMessages {
+                            Divider().padding(.vertical, 2)
+                            VStack(alignment: .leading, spacing: 0) {
+                                ForEach(subMsgs) { sub in
+                                    if sub.role == "tool" {
+                                        ToolCallRow(message: sub, searchText: "", isCurrentMatch: false)
+                                    } else {
+                                        MessageRow(message: sub, searchText: "", isCurrentMatch: false)
+                                    }
+                                }
+                            }
+                            .background(Color.gray.opacity(0.05))
+                            .cornerRadius(6)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                            )
+                        } else if isLoadingSubagent {
+                            HStack(spacing: 4) {
+                                ProgressView().scaleEffect(0.5).frame(width: 10, height: 10)
+                                Text("Loading...").font(.system(size: 10)).foregroundStyle(.secondary)
+                            }
+                        }
                     }
                 }
                 .padding(.leading, 40)
@@ -545,12 +694,66 @@ private struct ToolCallRow: View {
         }
     }
 
+    private func loadSubagentConversation() {
+        guard let toolTimestamp = message.timestamp else { return }
+        isLoadingSubagent = true
+
+        Task.detached {
+            let sessionId = ((sessionFilePath as NSString).lastPathComponent as NSString).deletingPathExtension
+            let subDir = ((sessionFilePath as NSString).deletingLastPathComponent as NSString)
+                .appendingPathComponent(sessionId).appending("/subagents")
+            let fm = FileManager.default
+
+            guard fm.fileExists(atPath: subDir),
+                  let files = try? fm.contentsOfDirectory(atPath: subDir) else {
+                await MainActor.run { isLoadingSubagent = false }
+                return
+            }
+
+            // Find subagent file by matching first timestamp (within 1 second)
+            var bestFile: String?
+            var bestDiff: TimeInterval = .greatestFiniteMagnitude
+            let isoFmt = ISO8601DateFormatter()
+            isoFmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let isoFallback = ISO8601DateFormatter()
+            isoFallback.formatOptions = [.withInternetDateTime]
+
+            for file in files where file.hasSuffix(".jsonl") {
+                let path = (subDir as NSString).appendingPathComponent(file)
+                guard let handle = FileHandle(forReadingAtPath: path) else { continue }
+                let chunk = handle.readData(ofLength: 4096)
+                handle.closeFile()
+                guard let firstLine = String(data: chunk, encoding: .utf8)?.components(separatedBy: "\n").first,
+                      let json = try? JSONSerialization.jsonObject(with: Data(firstLine.utf8)) as? [String: Any],
+                      let tsStr = json["timestamp"] as? String,
+                      let ts = isoFmt.date(from: tsStr) ?? isoFallback.date(from: tsStr) else { continue }
+
+                let diff = abs(ts.timeIntervalSince(toolTimestamp))
+                if diff < bestDiff {
+                    bestDiff = diff
+                    bestFile = path
+                }
+            }
+
+            guard let matchedFile = bestFile, bestDiff < 2.0 else {
+                await MainActor.run { isLoadingSubagent = false }
+                return
+            }
+
+            let messages = TranscriptParser.shared.parseMessages(at: matchedFile)
+            await MainActor.run {
+                subagentMessages = messages
+                isLoadingSubagent = false
+            }
+        }
+    }
+
     @ViewBuilder
     private func toolDetailView(_ detail: String) -> some View {
         let lang = toolLanguage
         let md = "```\(lang)\n\(detail)\n```"
         MarkdownView(md)
-            .font(.system(size: 10))
+            .markdownFonts(baseSize: 10)
             .codeBlockStyle(.default(lightTheme: "github", darkTheme: "github-dark"))
     }
 
@@ -725,6 +928,9 @@ private struct InlineImageView: View {
                     RoundedRectangle(cornerRadius: 6)
                         .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                 )
+                .onTapGesture {
+                    ImageWindowController.show(nsImage: nsImage, path: path)
+                }
         } else {
             HStack(spacing: 4) {
                 Image(systemName: "photo")
@@ -736,6 +942,38 @@ private struct InlineImageView: View {
                     .lineLimit(1)
             }
         }
+    }
+}
+
+// MARK: - Image Window Controller
+
+private final class ImageWindowController {
+    static func show(nsImage: NSImage, path: String) {
+        let screenSize = NSScreen.main?.visibleFrame.size ?? CGSize(width: 1200, height: 800)
+        let maxW = min(nsImage.size.width, screenSize.width * 0.85)
+        let maxH = min(nsImage.size.height, screenSize.height * 0.85)
+        let ratio = nsImage.size.width / nsImage.size.height
+        let winW = min(maxW, maxH * ratio)
+        let winH = winW / ratio + 36  // +36 for title bar
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: max(winW, 400), height: max(winH, 300)),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "\(Int(nsImage.size.width))×\(Int(nsImage.size.height)) — \((path as NSString).lastPathComponent)"
+        window.center()
+        window.isReleasedWhenClosed = false
+
+        let imageView = NSImageView(image: nsImage)
+        imageView.imageScaling = .scaleProportionallyUpOrDown
+        imageView.autoresizingMask = [.width, .height]
+        window.contentView = imageView
+
+        window.level = NSWindow.Level(Int(CGShieldingWindowLevel()))
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 }
 
