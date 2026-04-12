@@ -387,6 +387,31 @@ final class SessionDataStore: ObservableObject {
         db.search(query: query)
     }
 
+    /// Returns the period-over-period comparison for `stat` vs the preceding period.
+    /// `periodStats` is sorted newest-first, so the preceding period is at index+1.
+    func periodComparison(for stat: PeriodStats) -> PeriodComparison? {
+        guard let index = periodStats.firstIndex(where: { $0.id == stat.id }) else { return nil }
+        let prevIndex = index + 1
+        guard prevIndex < periodStats.count else { return nil }
+        let prev = periodStats[prevIndex]
+
+        func pct(_ cur: Double, _ pre: Double) -> Double {
+            guard pre > 0 else { return 0 }
+            return (cur - pre) / pre * 100
+        }
+        func pctI(_ cur: Int, _ pre: Int) -> Double {
+            guard pre > 0 else { return 0 }
+            return (Double(cur) - Double(pre)) / Double(pre) * 100
+        }
+
+        return PeriodComparison(
+            costDelta: pct(stat.totalCost, prev.totalCost),
+            tokenDelta: pctI(stat.totalTokens, prev.totalTokens),
+            messageDelta: pctI(stat.messageCount, prev.messageCount),
+            sessionDelta: pctI(stat.sessionCount, prev.sessionCount)
+        )
+    }
+
     // MARK: - Cached aggregates (updated in rebucket)
 
     @Published private(set) var allTimeCost: Double = 0
@@ -533,6 +558,75 @@ final class SessionDataStore: ObservableObject {
         }
 
         return result
+    }
+
+    /// Snapshots parsedStats for the given sessions, then computes trend data off the main thread.
+    func aggregateProjectTrendData(sessions: [Session], granularity: TrendGranularity = .day) async -> [TrendDataPoint] {
+        // Snapshot on main actor
+        let snapshot: [SessionStats] = sessions.compactMap { parsedStats[$0.id] }
+        // Compute off main thread
+        return await Task.detached {
+            Self.computeProjectTrend(stats: snapshot, granularity: granularity)
+        }.value
+    }
+
+    private nonisolated static func computeProjectTrend(stats: [SessionStats], granularity: TrendGranularity) -> [TrendDataPoint] {
+        var buckets: [Date: (tokens: Int, cost: Double)] = [:]
+        let cal = Calendar.current
+
+        for stat in stats {
+            for (time, slice) in stat.fiveMinSlices {
+                let bucket = granularity.bucketStart(for: time)
+                var existing = buckets[bucket, default: (tokens: 0, cost: 0.0)]
+                existing.tokens += slice.totalTokens
+                existing.cost += slice.estimatedCost
+                buckets[bucket] = existing
+            }
+        }
+
+        let sorted = buckets.sorted { $0.key < $1.key }
+        guard !sorted.isEmpty else { return [] }
+
+        var result: [TrendDataPoint] = [TrendDataPoint(time: sorted.first!.key, tokens: 0, cost: 0)]
+        var cumTokens = 0
+        var cumCost = 0.0
+        for (i, (time, val)) in sorted.enumerated() {
+            cumTokens += val.tokens
+            cumCost += val.cost
+            let bucketEnd = cal.date(byAdding: granularity.calendarComponent, value: granularity.stepValue, to: time)!
+            let dataTime = (i == sorted.count - 1) ? min(bucketEnd, Date()) : bucketEnd
+            result.append(TrendDataPoint(time: dataTime, tokens: cumTokens, cost: cumCost))
+        }
+        return result
+    }
+
+    /// Aggregates model breakdown for a specific set of sessions.
+    func aggregateProjectModelBreakdown(sessions: [Session]) -> [ModelUsage] {
+        var combined: [String: ModelUsage] = [:]
+        for session in sessions {
+            guard let stats = parsedStats[session.id] else { continue }
+            for (model, mts) in stats.modelBreakdown {
+                var usage = combined[model] ?? ModelUsage(model: model)
+                usage.inputTokens += mts.inputTokens
+                usage.outputTokens += mts.outputTokens
+                usage.cacheCreation5mTokens += mts.cacheCreation5mTokens
+                usage.cacheCreation1hTokens += mts.cacheCreation1hTokens
+                usage.cacheCreationTotalTokens += mts.cacheCreationTotalTokens
+                usage.cacheReadTokens += mts.cacheReadTokens
+                usage.cost += ModelPricing.estimateCost(
+                    model: model,
+                    inputTokens: mts.inputTokens,
+                    outputTokens: mts.outputTokens,
+                    cacheCreation5mTokens: mts.cacheCreation5mTokens,
+                    cacheCreation1hTokens: mts.cacheCreation1hTokens,
+                    cacheCreationTotalTokens: mts.cacheCreationTotalTokens,
+                    cacheReadTokens: mts.cacheReadTokens
+                )
+                usage.sessionCount += 1
+                combined[model] = usage
+            }
+        }
+        return combined.values.sorted { $0.cost > $1.cost }
     }
 
     func windowModelBreakdown(from start: Date, to end: Date, modelFilter: ((String) -> Bool)? = nil) -> [ModelUsage] {

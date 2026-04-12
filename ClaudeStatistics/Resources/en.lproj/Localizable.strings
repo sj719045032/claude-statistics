@@ -87,6 +87,8 @@
 "stats.periodDetails" = "Details";
 "stats.periods %lld" = "%lld periods";
 "stats.tools" = "Tools";
+"stats.toolUsage" = "Tool Usage";
+"stats.topProjects" = "Top Projects";
 "stats.back" = "Stats";
 
 /* Usage */

@@ -128,6 +128,8 @@ struct StatisticsView: View {
         .animation(Theme.quickSpring, value: value)
     }
 
+
+
     // MARK: - Cost Chart
 
     private var costChart: some View {
@@ -232,7 +234,8 @@ struct StatisticsView: View {
                         stat: stat,
                         formatCost: formatCost,
                         costColor: costColor,
-                        onTap: { selectedPeriodDetail = stat }
+                        onTap: { selectedPeriodDetail = stat },
+                        comparison: store.periodComparison(for: stat)
                     )
                     .modifier(StaggerSlideIn(index: index))
                 }
@@ -262,6 +265,29 @@ struct StatisticsView: View {
 
     private func shortModel(_ id: String) -> String {
         id.replacingOccurrences(of: "claude-", with: "")
+    }
+}
+
+// MARK: - Delta Badge
+
+private struct DeltaBadge: View {
+    let delta: Double
+    let isInverse: Bool  // true=花费增加是坏的，false=活跃度增加是好的
+
+    var body: some View {
+        let isPositive = delta >= 0
+        let isGood = isInverse ? !isPositive : isPositive
+        HStack(spacing: 2) {
+            Image(systemName: isPositive ? "arrow.up.right" : "arrow.down.right")
+                .font(.system(size: 7, weight: .bold))
+            Text(String(format: "%+.0f%%", delta))
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+        }
+        .foregroundStyle(isGood ? Color.green.opacity(0.85) : Color.red.opacity(0.85))
+        .padding(.horizontal, 4)
+        .padding(.vertical, 2)
+        .background((isGood ? Color.green : Color.red).opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
     }
 }
 
@@ -388,6 +414,7 @@ private struct PeriodRow: View {
     let formatCost: (Double) -> String
     let costColor: (Double) -> Color
     let onTap: () -> Void
+    let comparison: PeriodComparison?
     @State private var isHovered = false
 
     var body: some View {
@@ -420,6 +447,10 @@ private struct PeriodRow: View {
                     miniStat("stats.sessions", value: "\(stat.sessionCount)")
                     miniStat("stats.messages", value: "\(stat.messageCount)")
                     miniStat("stats.tools", value: "\(stat.toolUseCount)")
+                }
+
+                if let comparison = comparison {
+                    DeltaBadge(delta: comparison.costDelta, isInverse: true)
                 }
 
                 Image(systemName: "chevron.right")
@@ -620,17 +651,26 @@ struct PeriodDetailView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     // 1. Overview
                     SectionCard {
+                        let comparison = store.periodComparison(for: stat)
                         VStack(spacing: 8) {
                             HStack(spacing: 16) {
-                                CostCell(cost: stat.totalCost, isEstimated: stat.hasEstimatedCost)
+                                metricWithDelta(delta: comparison?.costDelta, isInverse: true) {
+                                    CostCell(cost: stat.totalCost, isEstimated: stat.hasEstimatedCost)
+                                }
                                 Divider().frame(height: 28)
-                                TokenCell(tokens: stat.totalTokens)
+                                metricWithDelta(delta: comparison?.tokenDelta, isInverse: false) {
+                                    TokenCell(tokens: stat.totalTokens)
+                                }
                             }
                             Divider()
                             HStack(spacing: 16) {
-                                overviewItem("stats.sessions", value: "\(stat.sessionCount)", icon: "list.bullet")
+                                metricWithDelta(delta: comparison?.sessionDelta, isInverse: false) {
+                                    overviewItem("stats.sessions", value: "\(stat.sessionCount)", icon: "list.bullet")
+                                }
                                 Divider().frame(height: 28)
-                                overviewItem("stats.messages", value: "\(stat.messageCount)", icon: "message")
+                                metricWithDelta(delta: comparison?.messageDelta, isInverse: false) {
+                                    overviewItem("stats.messages", value: "\(stat.messageCount)", icon: "message")
+                                }
                                 Divider().frame(height: 28)
                                 overviewItem("stats.tools", value: "\(stat.toolUseCount)", icon: "wrench")
                             }
@@ -655,6 +695,29 @@ struct PeriodDetailView: View {
                     // 3. Tokens + Models — unified breakdown
                     CostModelsCard(period: stat)
 
+                    // 4. Tool usage breakdown
+                    if !stat.toolUseCounts.isEmpty {
+                        SectionCard {
+                            VStack(spacing: 6) {
+                                HStack {
+                                    Label("stats.toolUsage", systemImage: "wrench.and.screwdriver")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text("\(stat.toolUseCount)")
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundStyle(.tertiary)
+                                }
+                                Divider()
+                                let sorted = stat.toolUseCounts.sorted { $0.value > $1.value }
+                                let maxCount = sorted.first?.value ?? 1
+                                ForEach(Array(sorted.prefix(15).enumerated()), id: \.element.key) { index, item in
+                                    ToolBarRow(name: item.key, count: item.value, maxCount: maxCount, delay: Double(index) * 0.03)
+                                }
+                            }
+                        }
+                    }
+
                 }
                 .padding(12)
             }
@@ -672,6 +735,23 @@ struct PeriodDetailView: View {
                 .font(.system(size: 14, weight: .semibold, design: .monospaced))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func metricWithDelta<Content: View>(delta: Double?, isInverse: Bool, @ViewBuilder content: () -> Content) -> some View {
+        content()
+            .overlay(alignment: .bottomTrailing) {
+                if let delta {
+                    let isPositive = delta >= 0
+                    let isGood = isInverse ? !isPositive : isPositive
+                    HStack(spacing: 2) {
+                        Image(systemName: isPositive ? "arrow.up.right" : "arrow.down.right")
+                            .font(.system(size: 7, weight: .bold))
+                        Text(String(format: "%+.1f%%", delta))
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    }
+                    .foregroundStyle(isGood ? Color.green.opacity(0.85) : Color.red.opacity(0.85))
+                }
+            }
     }
 
     private func costRow(_ label: LocalizedStringKey, tokens: Int) -> some View {

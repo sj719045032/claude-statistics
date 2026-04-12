@@ -20,6 +20,7 @@
 		5ABBC48B689D173B40DDB85A /* TranscriptParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = F79555858F7CDF21C9301D11 /* TranscriptParser.swift */; };
 		5B8F2BC01D7A4526CD0AEAA4 /* TranscriptEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42AB2ACAC763533BC9654BE5 /* TranscriptEntry.swift */; };
 		686EC93B311494291E5BCE75 /* StatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E1B839DD5F15A6A55AE3727 /* StatisticsView.swift */; };
+		AA11BB22CC33DD44EE55FF66 /* ProjectAnalyticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB22CC33DD44EE55FF668899 /* ProjectAnalyticsView.swift */; };
 		6BA90267FC02621878E80D2A /* TrendChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEDC6DF1C15355DC5AE2FCF9 /* TrendChartView.swift */; };
 		7674AC8643AF2C6126880D3C /* TranscriptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73D3015C65881224ECFCC5BB /* TranscriptView.swift */; };
 		7FEDE160B6E6484B272C2078 /* TerminalLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA42F7AC4BB41556CDC7EFCC /* TerminalLauncher.swift */; };
@@ -76,6 +77,7 @@
 		6749A9BF125AC2A04C7043D5 /* DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
 		68083922F93D555879FAD90B /* ClaudeStatisticsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatisticsApp.swift; sourceTree = "<group>"; };
 		6E1B839DD5F15A6A55AE3727 /* StatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsView.swift; sourceTree = "<group>"; };
+		BB22CC33DD44EE55FF668899 /* ProjectAnalyticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectAnalyticsView.swift; sourceTree = "<group>"; };
 		73D3015C65881224ECFCC5BB /* TranscriptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptView.swift; sourceTree = "<group>"; };
 		77339C38F26D780CFD6D03EB /* ClaudeStatistics.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClaudeStatistics.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7803032F49F6D004A094939E /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
@@ -230,6 +232,7 @@
 			isa = PBXGroup;
 			children = (
 				41054FA7DE043B7E25B4A88E /* MenuBarView.swift */,
+				BB22CC33DD44EE55FF668899 /* ProjectAnalyticsView.swift */,
 				CD0415091A24EBCDA6840A49 /* SessionDetailView.swift */,
 				CAF9A88BAC1F779F77E517EB /* SessionListView.swift */,
 				011E707E6F2F284A99ECF925 /* SettingsView.swift */,
@@ -334,6 +337,7 @@
 				E04B621B671D090DB9155348 /* LanguageManager.swift in Sources */,
 				F3272760285AF18F519D8E80 /* MenuBarView.swift in Sources */,
 				4809D9A533DA37D1B71D1592 /* PricingFetchService.swift in Sources */,
+				AA11BB22CC33DD44EE55FF66 /* ProjectAnalyticsView.swift in Sources */,
 				0BD1DED6EC1DFF9326A1CAE5 /* ProfileViewModel.swift in Sources */,
 				8D240F8C55163EE6DD3DAC08 /* SearchUtils.swift in Sources */,
 				1D84A21259B5673F6ABDFCC1 /* Session.swift in Sources */,

@@ -14,9 +14,6 @@ struct SessionDetailView: View {
     @State private var showDeleteConfirm = false
     @State private var isTopicExpanded = false
     @State private var isPromptExpanded = false
-    @State private var trendGranularity: TrendGranularity = .hour
-    @State private var trendData: [TrendDataPoint] = []
-    @State private var isTrendLoading = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -239,39 +236,14 @@ struct SessionDetailView: View {
         }
 
         // 3. Trend — how usage changed over time
-        SectionCard {
-            VStack(spacing: 8) {
-                HStack {
-                    Label("detail.trend", systemImage: "chart.line.uptrend.xyaxis")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Picker("", selection: $trendGranularity) {
-                        ForEach(TrendGranularity.sessionCases, id: \.self) { g in
-                            Text(g.rawValue.capitalized).tag(g)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 180)
-                }
-
-                if isTrendLoading {
-                    ProgressView()
-                        .scaleEffect(0.6)
-                        .frame(height: 100)
-                        .frame(maxWidth: .infinity)
-                } else {
-                    TrendChartView(dataPoints: trendData, granularity: trendGranularity)
-                }
+        TrendSection(
+            initialGranularity: TrendGranularity.autoSelect(for: stats.duration),
+            loadData: { gran in
+                await Task.detached {
+                    TranscriptParser.shared.parseTrendData(from: session.filePath, granularity: gran)
+                }.value
             }
-        }
-        .task {
-            trendGranularity = TrendGranularity.autoSelect(for: stats.duration)
-            await loadTrendData()
-        }
-        .onChange(of: trendGranularity) { _, _ in
-            Task { await loadTrendData() }
-        }
+        )
 
         // 4. Tokens + Models — unified breakdown
         CostModelsCard(stats: stats)
@@ -302,17 +274,6 @@ struct SessionDetailView: View {
     }
 
     // MARK: - Helpers
-
-    private func loadTrendData() async {
-        isTrendLoading = true
-        let path = session.filePath
-        let gran = trendGranularity
-        let data = await Task.detached {
-            TranscriptParser.shared.parseTrendData(from: path, granularity: gran)
-        }.value
-        isTrendLoading = false
-        trendData = data
-    }
 
     private func displayModel(_ model: String) -> String {
         model.replacingOccurrences(of: "claude-", with: "")
@@ -375,6 +336,59 @@ struct SessionDetailView: View {
             segments.append((.purple, stats.cacheReadTokens))
         }
         return segments
+    }
+}
+
+// MARK: - Trend Section (reusable)
+
+struct TrendSection: View {
+    let initialGranularity: TrendGranularity
+    let loadData: (TrendGranularity) async -> [TrendDataPoint]
+
+    @State private var granularity: TrendGranularity = .hour
+    @State private var trendData: [TrendDataPoint] = []
+    @State private var isLoading = false
+
+    var body: some View {
+        SectionCard {
+            VStack(spacing: 8) {
+                HStack {
+                    Label("detail.trend", systemImage: "chart.line.uptrend.xyaxis")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Picker("", selection: $granularity) {
+                        ForEach(TrendGranularity.sessionCases, id: \.self) { g in
+                            Text(g.rawValue.capitalized).tag(g)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 180)
+                }
+
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.6)
+                        .frame(height: 100)
+                        .frame(maxWidth: .infinity)
+                } else {
+                    TrendChartView(dataPoints: trendData, granularity: granularity)
+                }
+            }
+        }
+        .task {
+            granularity = initialGranularity
+            await reload()
+        }
+        .onChange(of: granularity) { _, _ in
+            Task { await reload() }
+        }
+    }
+
+    private func reload() async {
+        isLoading = true
+        trendData = await loadData(granularity)
+        isLoading = false
     }
 }
 
@@ -732,6 +746,7 @@ struct ToolBarRow: View {
                 }
             }
             .frame(height: 6)
+            .clipped()
 
             Text("\(count)")
                 .font(.system(size: 11, weight: .medium, design: .monospaced))

@@ -26,10 +26,28 @@ struct SessionListView: View {
     @ObservedObject var store: SessionDataStore
     @State private var showDeleteConfirm = false
     @State private var deleteTarget: Set<String> = []
+    @State private var selectedProjectForAnalytics: ProjectGroup?
 
     @FocusState private var isSearchFocused: Bool
 
     var body: some View {
+        if let project = selectedProjectForAnalytics {
+            ProjectAnalyticsView(
+                group: project,
+                store: viewModel.store,
+                onBack: {
+                    withAnimation(Theme.springAnimation) {
+                        selectedProjectForAnalytics = nil
+                    }
+                }
+            )
+        } else {
+            sessionListContent
+        }
+    }
+
+    @ViewBuilder
+    private var sessionListContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Search bar
             HStack {
@@ -169,6 +187,11 @@ struct SessionListView: View {
                             },
                             onNewSession: {
                                 TerminalLauncher.openNewSessionInDirectory(group.cwdPath)
+                            },
+                            onAnalytics: {
+                                withAnimation(Theme.springAnimation) {
+                                    selectedProjectForAnalytics = group
+                                }
                             }
                         )
 
@@ -263,6 +286,7 @@ struct ProjectGroupHeader: View {
     let isExpanded: Bool
     let onToggle: () -> Void
     let onNewSession: () -> Void
+    let onAnalytics: () -> Void
     @State private var isHovered = false
 
     var body: some View {
@@ -284,6 +308,15 @@ struct ProjectGroupHeader: View {
             Spacer()
 
             if isHovered {
+                Button(action: onAnalytics) {
+                    Image(systemName: "chart.bar.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
+                .help("View project analytics")
+                .transition(.opacity.combined(with: .scale(scale: 0.8)))
+
                 Button(action: onNewSession) {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 12))

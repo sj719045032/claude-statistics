@@ -13,6 +13,7 @@ final class AppState: ObservableObject {
 
     init() {
         store.start()
+        usageViewModel.store = store
 
         // Sync subscription weekly reset date to SessionDataStore
         usageViewModel.$usageData

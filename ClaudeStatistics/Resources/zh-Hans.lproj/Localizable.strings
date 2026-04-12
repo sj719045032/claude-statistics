@@ -87,6 +87,8 @@
 "stats.periodDetails" = "明细";
 "stats.periods %lld" = "%lld 个周期";
 "stats.tools" = "工具";
+"stats.toolUsage" = "工具使用";
+"stats.topProjects" = "热门项目";
 "stats.back" = "统计";
 
 /* Usage */

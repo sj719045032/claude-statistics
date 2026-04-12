@@ -10,6 +10,7 @@ final class UsageViewModel: ObservableObject {
     @Published var autoRefreshInterval: TimeInterval = 300
 
     private var autoRefresh: AutoRefreshCoordinator?
+    weak var store: SessionDataStore?
 
     init() {
         loadCache()
@@ -143,8 +144,8 @@ final class UsageViewModel: ObservableObject {
         return TimeFormatter.countdown(from: interval)
     }
 
-    /// Predicts when a usage window will be exhausted at the current consumption rate.
-    /// Returns (estimate string, will exhaust before reset), or nil if utilization < 10%.
+    /// Predicts when a usage window will be exhausted, using local session data to weight recent activity.
+    /// Falls back to simple linear extrapolation when local data is insufficient.
     private func exhaustEstimate(for window: UsageWindow?, windowDuration: TimeInterval) -> (text: String, willExhaust: Bool)? {
         guard let window,
               window.utilization >= 10,
@@ -153,15 +154,52 @@ final class UsageViewModel: ObservableObject {
         let elapsed = windowDuration - timeUntilReset
         guard elapsed > 0 else { return nil }
 
-        let rate = window.utilization / elapsed
-        guard rate > 0 else { return nil }
+        let avgRate = window.utilization / elapsed
+        guard avgRate > 0 else { return nil }
 
         let remaining = 100.0 - window.utilization
         guard remaining > 0 else { return nil }
 
-        let secondsToExhaust = remaining / rate
+        // Apply recent-activity multiplier from local session data if available
+        let effectiveRate = avgRate * (recentRateMultiplier(elapsed: elapsed) ?? 1.0)
+
+        let secondsToExhaust = remaining / effectiveRate
         let willExhaust = secondsToExhaust < timeUntilReset
         return (text: TimeFormatter.countdown(from: secondsToExhaust), willExhaust: willExhaust)
+    }
+
+    /// Computes how much faster/slower recent activity is vs the full window average,
+    /// using local fiveMinSlices cost data as a proxy. Returns nil if data is insufficient.
+    private func recentRateMultiplier(elapsed: TimeInterval) -> Double? {
+        guard let store else { return nil }
+
+        let recentWindow: TimeInterval = min(30 * 60, elapsed * 0.3)
+        let now = Date()
+        let recentStart = now.addingTimeInterval(-recentWindow)
+        let fullStart = now.addingTimeInterval(-elapsed)
+
+        var recentCost: Double = 0
+        var fullCost: Double = 0
+        var recentSliceCount = 0
+
+        for stats in store.parsedStats.values {
+            for (time, slice) in stats.fiveMinSlices {
+                guard time > fullStart, time <= now else { continue }
+                fullCost += slice.estimatedCost
+                if time > recentStart {
+                    recentCost += slice.estimatedCost
+                    recentSliceCount += 1
+                }
+            }
+        }
+
+        guard recentSliceCount >= 3, fullCost > 0 else { return nil }
+
+        let recentRate = recentCost / recentWindow
+        let fullRate = fullCost / elapsed
+        guard fullRate > 0 else { return nil }
+
+        return min(max(recentRate / fullRate, 0.1), 10.0)
     }
 
     var fiveHourExhaustEstimate: (text: String, willExhaust: Bool)? {

@@ -108,6 +108,13 @@ enum StatsPeriod: String, CaseIterable {
     }
 }
 
+struct PeriodComparison {
+    let costDelta: Double      // 百分比变化，正值=花费增加
+    let tokenDelta: Double
+    let messageDelta: Double
+    let sessionDelta: Double
+}
+
 struct PeriodStats: Identifiable {
     let period: Date
     let periodLabel: String
@@ -122,6 +129,7 @@ struct PeriodStats: Identifiable {
     var sessionCount: Int = 0
     var messageCount: Int = 0
     var toolUseCount: Int = 0
+    var toolUseCounts: [String: Int] = [:]
     var hasEstimatedCost: Bool = false
     var modelBreakdown: [String: ModelUsage] = [:]
 
@@ -142,6 +150,9 @@ struct PeriodStats: Identifiable {
         if slice.isCostEstimated { hasEstimatedCost = true }
         messageCount += slice.messageCount
         toolUseCount += slice.toolUseTotal
+        for (tool, count) in slice.toolUseCounts {
+            toolUseCounts[tool, default: 0] += count
+        }
 
         for (model, mts) in slice.modelBreakdown {
             var usage = modelBreakdown[model] ?? ModelUsage(model: model)
@@ -180,6 +191,9 @@ struct PeriodStats: Identifiable {
         sessionCount += 1
         messageCount += stats.messageCount
         toolUseCount += stats.toolUseTotal
+        for (tool, count) in stats.toolUseCounts {
+            toolUseCounts[tool, default: 0] += count
+        }
 
         // Accumulate per-model breakdown from session's detailed model data
         if stats.modelBreakdown.isEmpty {

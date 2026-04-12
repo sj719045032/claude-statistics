@@ -7,6 +7,9 @@ struct ProjectGroup: Identifiable {
     let projectPath: String
     let sessions: [Session]
     var totalCost: Double = 0
+    var totalTokens: Int = 0
+    var totalMessages: Int = 0
+    var toolUseCount: Int = 0
 
     var displayName: String {
         let path = sessions.first?.displayName ?? projectPath
@@ -133,8 +136,20 @@ final class SessionViewModel: ObservableObject {
         let grouped = Dictionary(grouping: filtered) { $0.cwd ?? $0.projectPath }
         projectGroups = grouped.map { key, sessions in
             let sorted = sessions.sorted { $0.lastModified > $1.lastModified }
-            let cost = sorted.reduce(0.0) { $0 + (statsMap[$1.id]?.estimatedCost ?? 0) }
-            return ProjectGroup(projectPath: key, sessions: sorted, totalCost: cost)
+            var cost = 0.0
+            var tokens = 0
+            var messages = 0
+            var toolUseCount = 0
+            for session in sorted {
+                if let stats = statsMap[session.id] {
+                    cost += stats.estimatedCost
+                    tokens += stats.totalTokens
+                    messages += stats.messageCount
+                    toolUseCount += stats.toolUseTotal
+                }
+            }
+            return ProjectGroup(projectPath: key, sessions: sorted, totalCost: cost,
+                                totalTokens: tokens, totalMessages: messages, toolUseCount: toolUseCount)
         }
         .sorted { ($0.sessions.first?.lastModified ?? .distantPast) > ($1.sessions.first?.lastModified ?? .distantPast) }
     }
