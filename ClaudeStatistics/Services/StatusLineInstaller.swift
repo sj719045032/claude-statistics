@@ -4,7 +4,7 @@ import Foundation
 struct StatusLineInstaller {
     static let scriptPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusline-command.sh")
     static let backupPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusline-command.sh.bak")
-    static let marker = "# Claude Statistics Integration v2"
+    static let marker = "# Claude Statistics Integration v3"
     private static let markerPrefix = "# Claude Statistics Integration"
     static let settingsPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/settings.json")
     static let settingsBackupPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusline-settings.bak.json")

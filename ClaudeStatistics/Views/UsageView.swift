@@ -80,9 +80,14 @@ struct UsageView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        if let used = extra.usedCredits, let limit = extra.monthlyLimit {
-                            Text("$\(String(format: "%.2f", used)) / $\(String(format: "%.0f", limit))")
-                                .font(.caption)
+                        if let used = extra.usedCredits {
+                            if let limit = extra.monthlyLimit {
+                                Text("$\(String(format: "%.2f", used)) / $\(String(format: "%.0f", limit))")
+                                    .font(.caption)
+                            } else {
+                                Text("$\(String(format: "%.2f", used))")
+                                    .font(.caption)
+                            }
                         }
                     }
                 }

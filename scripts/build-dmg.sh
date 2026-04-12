@@ -68,17 +68,25 @@ hdiutil create \
 
 rm -rf "${DMG_DIR}"
 
+# Create ZIP for Sparkle auto-update (Sparkle handles ZIP natively, DMG has mount issues)
+echo "==> Creating ZIP for Sparkle..."
+ZIP_OUTPUT="build/${DMG_NAME}-${VERSION}.zip"
+rm -f "${ZIP_OUTPUT}"
+cd "${BUILD_DIR}/Build/Products/Release"
+ditto -c -k --keepParent "${APP_NAME}.app" "${OLDPWD}/${ZIP_OUTPUT}"
+cd "${OLDPWD}"
+
 # Clean up intermediate build to avoid duplicate app registrations
 rm -rf "${BUILD_DIR}"
 
 DMG_SIZE=$(du -h "${DMG_OUTPUT}" | cut -f1 | xargs)
+ZIP_SIZE=$(du -h "${ZIP_OUTPUT}" | cut -f1 | xargs)
 
-echo "==> Signing DMG for Sparkle..."
-# sign_update outputs: sparkle:edSignature="..." length="..."
-SIGNATURE=$("${SPARKLE_BIN}/sign_update" "${DMG_OUTPUT}" 2>&1)
+echo "==> Signing ZIP for Sparkle..."
+SIGNATURE=$("${SPARKLE_BIN}/sign_update" "${ZIP_OUTPUT}" 2>&1)
 
 echo "==> Generating appcast.xml..."
-DOWNLOAD_URL="${REPO_URL}/releases/download/v${VERSION}/${DMG_NAME}-${VERSION}.dmg"
+DOWNLOAD_URL="${REPO_URL}/releases/download/v${VERSION}/${DMG_NAME}-${VERSION}.zip"
 PUB_DATE=$(date -R)
 
 cat > appcast.xml <<APPCAST_EOF
@@ -102,14 +110,15 @@ cat > appcast.xml <<APPCAST_EOF
 APPCAST_EOF
 
 echo ""
-echo "==> Done! DMG created:"
-echo "    ${DMG_OUTPUT} (${DMG_SIZE})"
+echo "==> Done!"
+echo "    DMG: ${DMG_OUTPUT} (${DMG_SIZE})"
+echo "    ZIP: ${ZIP_OUTPUT} (${ZIP_SIZE}) — for Sparkle auto-update"
 echo ""
 echo "==> appcast.xml updated with v${VERSION}"
 echo ""
 echo "Next steps:"
 echo "  1. git add appcast.xml && git commit && git push"
-echo "  2. gh release create v${VERSION} ${DMG_OUTPUT} --title 'v${VERSION}'"
+echo "  2. gh release create v${VERSION} ${DMG_OUTPUT} ${ZIP_OUTPUT} --title 'v${VERSION}'"
 echo ""
 echo "Note: This DMG is not signed/notarized by Apple."
 echo "Users need to run: xattr -cr /Applications/${APP_NAME}.app"
