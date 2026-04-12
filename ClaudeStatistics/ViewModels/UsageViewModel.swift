@@ -25,7 +25,14 @@ final class UsageViewModel: ObservableObject {
         if enabled {
             autoRefreshInterval = interval > 0 ? interval : 300
             Task { @MainActor in
-                await self.refresh()
+                // Skip API call on launch if cache is fresh enough
+                if let cached = UsageAPIService.shared.loadFromCache(),
+                   Date().timeIntervalSince(cached.fetchedAt) < autoRefreshInterval {
+                    usageData = cached.data
+                    lastFetchedAt = cached.fetchedAt
+                } else {
+                    await self.refresh()
+                }
             }
             startAutoRefresh()
         }
@@ -38,7 +45,7 @@ final class UsageViewModel: ObservableObject {
         }
     }
 
-    /// Auto-refresh: always attempt API call (timer already controls the interval)
+    /// Auto-refresh: timer controls the interval, always call API
     func refresh() async {
         await callAPI()
     }

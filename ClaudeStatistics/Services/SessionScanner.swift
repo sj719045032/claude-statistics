@@ -35,6 +35,21 @@ final class SessionScanner {
                 // Skip tiny files (likely empty sessions)
                 guard fileSize > 100 else { continue }
 
+                // Include subagent file sizes for cache invalidation
+                var combinedSize = fileSize
+                let subagentDir = (projectPath as NSString)
+                    .appendingPathComponent(sessionId)
+                    .appending("/subagents")
+                if let subFiles = try? fm.contentsOfDirectory(atPath: subagentDir) {
+                    for subFile in subFiles where subFile.hasSuffix(".jsonl") {
+                        let subPath = (subagentDir as NSString).appendingPathComponent(subFile)
+                        if let subAttrs = try? fm.attributesOfItem(atPath: subPath),
+                           let subSize = subAttrs[.size] as? Int64 {
+                            combinedSize += subSize
+                        }
+                    }
+                }
+
                 let cwd = readCwd(from: filePath)
 
                 sessions.append(Session(
@@ -43,7 +58,7 @@ final class SessionScanner {
                     filePath: filePath,
                     startTime: nil,
                     lastModified: modDate,
-                    fileSize: fileSize,
+                    fileSize: combinedSize,
                     cwd: cwd
                 ))
             }

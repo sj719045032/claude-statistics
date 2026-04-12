@@ -694,6 +694,7 @@ struct PricingManageView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
         .contentShape(Rectangle())
+        .textSelection(.enabled)
     }
 
     // MARK: - Edit row

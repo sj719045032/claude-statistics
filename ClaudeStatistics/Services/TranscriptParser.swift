@@ -150,7 +150,54 @@ final class TranscriptParser {
             }
         }
 
-        // Aggregate per-message usage into fiveMinSlices (single source of truth)
+        // Merge subagent tokens into messageData BEFORE aggregation
+        // This ensures global dedup: main session + all subagents share one dictionary
+        let sessionId = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
+        let subagentDir = ((path as NSString).deletingLastPathComponent as NSString)
+            .appendingPathComponent(sessionId)
+            .appending("/subagents")
+
+        // Record main session message IDs before subagent merge
+        let mainMessageIds = Set(messageData.keys)
+
+        if FileManager.default.fileExists(atPath: subagentDir),
+           let subFiles = try? FileManager.default.contentsOfDirectory(atPath: subagentDir) {
+            for subFile in subFiles where subFile.hasSuffix(".jsonl") {
+                let subPath = (subagentDir as NSString).appendingPathComponent(subFile)
+                guard let subData = FileManager.default.contents(atPath: subPath) else { continue }
+                let subContent = String(decoding: subData, as: UTF8.self)
+
+                for subLine in subContent.components(separatedBy: "\n") {
+                    let trimmed = subLine.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty, let lineData = trimmed.data(using: .utf8) else { continue }
+                    guard let entry = try? decoder.decode(TranscriptEntry.self, from: lineData) else { continue }
+                    guard entry.type == "assistant",
+                          let message = entry.message,
+                          let usage = message.usage else { continue }
+
+                    let msgId = message.id ?? UUID().uuidString
+                    // Skip if main session already has this message (context copy)
+                    // But allow overwrite for streaming dedup within/across subagent files
+                    if mainMessageIds.contains(msgId) { continue }
+
+                    let isSynthetic = message.model == "<synthetic>"
+                    let subModel = isSynthetic ? stats.model : (message.model ?? stats.model)
+
+                    messageData[msgId] = MessageAccum(
+                        model: subModel,
+                        timestamp: entry.timestampDate,
+                        inputTokens: usage.inputTokens ?? 0,
+                        outputTokens: usage.outputTokens ?? 0,
+                        cacheCreationTotalTokens: usage.cacheCreationInputTokens ?? 0,
+                        cacheReadTokens: usage.cacheReadInputTokens ?? 0,
+                        cacheCreation5mTokens: usage.cacheCreation?.ephemeral5mInputTokens ?? 0,
+                        cacheCreation1hTokens: usage.cacheCreation?.ephemeral1hInputTokens ?? 0
+                    )
+                }
+            }
+        }
+
+        // Aggregate all messages (main + subagent) into fiveMinSlices (single source of truth)
         for (_, accum) in messageData {
             if let ts = accum.timestamp {
                 let sliceKey = fiveMinKey(for: ts)

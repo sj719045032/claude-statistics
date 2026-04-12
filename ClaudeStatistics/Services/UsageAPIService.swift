@@ -7,8 +7,22 @@ final class UsageAPIService {
     private let profileURL = "https://api.anthropic.com/api/oauth/profile"
     private let cacheFileName = "usage-cache.json"
 
-    /// Tracks when we can next call the API (set on 429)
-    private(set) var retryAfter: Date?
+    /// Tracks when we can next call the API (set on 429), persisted across restarts
+    private(set) var retryAfter: Date? {
+        get {
+            if let stored = UserDefaults.standard.object(forKey: "usageAPIRetryAfter") as? Date {
+                return stored > Date() ? stored : nil
+            }
+            return nil
+        }
+        set {
+            if let date = newValue {
+                UserDefaults.standard.set(date, forKey: "usageAPIRetryAfter")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "usageAPIRetryAfter")
+            }
+        }
+    }
 
     private init() {}
 
@@ -48,9 +62,9 @@ final class UsageAPIService {
         }
 
         if httpResponse.statusCode == 429 {
-            // Parse Retry-After header, default to 60s
+            // Parse Retry-After header, default to 15 minutes (API rarely returns this header)
             let retrySeconds = httpResponse.value(forHTTPHeaderField: "Retry-After")
-                .flatMap { Int($0) } ?? 60
+                .flatMap { Int($0) }.flatMap { $0 > 0 ? $0 : nil } ?? 900
             retryAfter = Date().addingTimeInterval(TimeInterval(retrySeconds))
             throw UsageError.rateLimited(retryInSeconds: retrySeconds)
         }

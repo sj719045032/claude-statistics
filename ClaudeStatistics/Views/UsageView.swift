@@ -100,7 +100,7 @@ struct UsageView: View {
                 case "5h":
                     windowChart(for: usage.fiveHour, durationValue: -5, durationComponent: .hour, granularity: .fiveMinute, modelFilter: isClaude)
                 case "7d":
-                    windowChart(for: usage.sevenDay, durationValue: -7, durationComponent: .day, granularity: .hour, modelFilter: isClaudeNonSonnet)
+                    windowChart(for: usage.sevenDay, durationValue: -7, durationComponent: .day, granularity: .hour, modelFilter: isClaude)
                 case "7d_sonnet":
                     windowChart(for: usage.sevenDaySonnet, durationValue: -7, durationComponent: .day, granularity: .hour, modelFilter: isSonnet)
                 default:
@@ -206,97 +206,11 @@ extension UsageView {
             windowTimeRange(info)
             UsageTrendChartView(dataPoints: info.dataPoints, granularity: info.granularity, windowStart: info.windowStart, windowEnd: info.windowEnd)
             if !info.modelBreakdown.isEmpty {
-                windowModelBreakdownView(info.modelBreakdown)
+                WindowModelBreakdownView(models: info.modelBreakdown)
             }
         }
     }
 
-    @ViewBuilder
-    private func windowModelBreakdownView(_ models: [ModelUsage]) -> some View {
-        let totalTokens = models.reduce(0) { $0 + $1.totalTokens }
-        let totalCost = models.reduce(0.0) { $0 + $1.cost }
-
-        VStack(alignment: .leading, spacing: 5) {
-            // Summary line
-            HStack {
-                HStack(spacing: 3) {
-                    Text("Tokens")
-                        .foregroundStyle(.tertiary)
-                    Text(abbreviateNumber(totalTokens))
-                        .foregroundStyle(.blue)
-                }
-                Spacer()
-                HStack(spacing: 3) {
-                    Text("Cost")
-                        .foregroundStyle(.tertiary)
-                    Text(abbreviateCost(totalCost))
-                        .foregroundStyle(.orange)
-                }
-            }
-            .font(.caption)
-
-            // Stacked bar
-            if totalTokens > 0 {
-                Canvas { ctx, size in
-                    var x: CGFloat = 0
-                    for model in models {
-                        let fraction = CGFloat(model.totalTokens) / CGFloat(totalTokens)
-                        let w = size.width * fraction
-                        ctx.fill(Path(CGRect(x: x, y: 0, width: w, height: size.height)),
-                                 with: .color(modelColor(model.model)))
-                        x += w
-                    }
-                }
-                .frame(height: 6)
-                .clipShape(Capsule())
-            }
-
-            // Inline legend
-            HStack(spacing: 10) {
-                ForEach(models) { model in
-                    let pct = totalTokens > 0 ? Double(model.totalTokens) / Double(totalTokens) * 100 : 0
-                    HStack(spacing: 3) {
-                        Circle().fill(modelColor(model.model)).frame(width: 6, height: 6)
-                        Text(shortModelName(model.model))
-                            .font(.caption2)
-                        Text("\(abbreviateNumber(model.totalTokens)) (\(String(format: "%.0f", pct))%)")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                Spacer()
-            }
-        }
-        .padding(.top, 4)
-    }
-
-    private func modelColor(_ model: String) -> Color {
-        let lower = model.lowercased()
-        if lower.contains("opus") { return .purple }
-        if lower.contains("sonnet") { return .blue }
-        if lower.contains("haiku") { return .green }
-        return .gray
-    }
-
-    private func shortModelName(_ model: String) -> String {
-        let lower = model.lowercased()
-        if lower.contains("opus") { return "Opus" }
-        if lower.contains("sonnet") { return "Sonnet" }
-        if lower.contains("haiku") { return "Haiku" }
-        return model
-    }
-
-    private func abbreviateNumber(_ n: Int) -> String {
-        if n >= 1_000_000 { return String(format: "%.1fM", Double(n) / 1_000_000) }
-        if n >= 1_000 { return String(format: "%.1fK", Double(n) / 1_000) }
-        return "\(n)"
-    }
-
-    private func abbreviateCost(_ cost: Double) -> String {
-        if cost >= 1.0 { return String(format: "$%.2f", cost) }
-        if cost >= 0.01 { return String(format: "$%.3f", cost) }
-        return String(format: "$%.4f", cost)
-    }
 
     private func windowTimeRange(_ info: WindowTrendInfo) -> some View {
         let fmt = DateFormatter()
@@ -340,6 +254,171 @@ extension UsageView {
         }
     }
 }
+
+// MARK: - Model Breakdown View
+
+struct WindowModelBreakdownView: View {
+    let models: [ModelUsage]
+    @State private var showDetail = false
+
+    private var totalTokens: Int { models.reduce(0) { $0 + $1.totalTokens } }
+    private var totalCost: Double { models.reduce(0.0) { $0 + $1.cost } }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            // Summary line
+            HStack {
+                HStack(spacing: 3) {
+                    Text("Tokens").foregroundStyle(.tertiary)
+                    Text(abbreviateNumber(totalTokens)).foregroundStyle(.blue)
+                }
+                Spacer()
+                HStack(spacing: 3) {
+                    Text("Cost").foregroundStyle(.tertiary)
+                    Text(abbreviateCost(totalCost)).foregroundStyle(.orange)
+                }
+            }
+            .font(.caption)
+
+            // Stacked bar
+            if totalTokens > 0 {
+                Canvas { ctx, size in
+                    var x: CGFloat = 0
+                    for model in models {
+                        let w = size.width * CGFloat(model.totalTokens) / CGFloat(totalTokens)
+                        ctx.fill(Path(CGRect(x: x, y: 0, width: w, height: size.height)),
+                                 with: .color(modelColor(model.model)))
+                        x += w
+                    }
+                }
+                .frame(height: 6)
+                .clipShape(Capsule())
+            }
+
+            // Inline legend + detail toggle
+            HStack(spacing: 0) {
+                HStack(spacing: 10) {
+                    ForEach(models) { model in
+                        let pct = totalTokens > 0 ? Double(model.totalTokens) / Double(totalTokens) * 100 : 0
+                        HStack(spacing: 3) {
+                            Circle().fill(modelColor(model.model)).frame(width: 6, height: 6)
+                            Text(shortModelName(model.model)).font(.caption2)
+                            Text("\(abbreviateNumber(model.totalTokens)) (\(String(format: "%.0f", pct))%)")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                Spacer()
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) { showDetail.toggle() }
+                } label: {
+                    HStack(spacing: 2) {
+                        Text("detail").font(.caption2)
+                        Image(systemName: showDetail ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 8, weight: .medium))
+                    }
+                    .foregroundStyle(.blue)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if showDetail {
+                tokenDetailTable
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    @ViewBuilder
+    private var tokenDetailTable: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack(spacing: 0) {
+                Text("Model").frame(width: 55, alignment: .leading)
+                Text("Input").frame(width: 45, alignment: .trailing)
+                Text("Output").frame(width: 45, alignment: .trailing)
+                Text("Cache+").frame(width: 47, alignment: .trailing)
+                Text("Cache-").frame(width: 47, alignment: .trailing)
+                Text("Cost").frame(width: 50, alignment: .trailing)
+            }
+            .font(.system(size: 9, weight: .medium))
+            .foregroundStyle(.tertiary)
+            .padding(.top, 6)
+            .padding(.bottom, 3)
+
+            Divider()
+
+            ForEach(models) { model in
+                HStack(spacing: 0) {
+                    HStack(spacing: 4) {
+                        Circle().fill(modelColor(model.model)).frame(width: 5, height: 5)
+                        Text(shortModelName(model.model))
+                    }
+                    .frame(width: 55, alignment: .leading)
+                    Text(abbreviateNumber(model.inputTokens)).frame(width: 45, alignment: .trailing)
+                    Text(abbreviateNumber(model.outputTokens)).frame(width: 45, alignment: .trailing)
+                    Text(abbreviateNumber(model.cacheCreationTotalTokens)).frame(width: 47, alignment: .trailing)
+                    Text(abbreviateNumber(model.cacheReadTokens)).frame(width: 47, alignment: .trailing)
+                    Text(abbreviateCost(model.cost)).frame(width: 50, alignment: .trailing)
+                }
+                .font(.caption2)
+                .padding(.vertical, 2)
+            }
+
+            if models.count > 1 {
+                let totalIn = models.reduce(0) { $0 + $1.inputTokens }
+                let totalOut = models.reduce(0) { $0 + $1.outputTokens }
+                let totalCC = models.reduce(0) { $0 + $1.cacheCreationTotalTokens }
+                let totalCR = models.reduce(0) { $0 + $1.cacheReadTokens }
+
+                Divider().padding(.top, 1)
+                HStack(spacing: 0) {
+                    Text("Total").frame(width: 55, alignment: .leading)
+                    Text(abbreviateNumber(totalIn)).frame(width: 45, alignment: .trailing)
+                    Text(abbreviateNumber(totalOut)).frame(width: 45, alignment: .trailing)
+                    Text(abbreviateNumber(totalCC)).frame(width: 47, alignment: .trailing)
+                    Text(abbreviateNumber(totalCR)).frame(width: 47, alignment: .trailing)
+                    Text(abbreviateCost(totalCost)).frame(width: 50, alignment: .trailing)
+                }
+                .font(.caption2)
+                .fontWeight(.medium)
+                .padding(.top, 2)
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func modelColor(_ model: String) -> Color {
+        let lower = model.lowercased()
+        if lower.contains("opus") { return .purple }
+        if lower.contains("sonnet") { return .blue }
+        if lower.contains("haiku") { return .green }
+        return .gray
+    }
+
+    private func shortModelName(_ model: String) -> String {
+        let lower = model.lowercased()
+        if lower.contains("opus") { return "Opus" }
+        if lower.contains("sonnet") { return "Sonnet" }
+        if lower.contains("haiku") { return "Haiku" }
+        return model
+    }
+
+    private func abbreviateNumber(_ n: Int) -> String {
+        if n >= 1_000_000 { return String(format: "%.1fM", Double(n) / 1_000_000) }
+        if n >= 1_000 { return String(format: "%.1fK", Double(n) / 1_000) }
+        return "\(n)"
+    }
+
+    private func abbreviateCost(_ cost: Double) -> String {
+        if cost >= 1.0 { return String(format: "$%.2f", cost) }
+        if cost >= 0.01 { return String(format: "$%.3f", cost) }
+        return String(format: "$%.4f", cost)
+    }
+}
+
+// MARK: - Usage Window Row
 
 struct UsageWindowRow: View {
     let title: LocalizedStringKey

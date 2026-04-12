@@ -117,7 +117,7 @@ final class SessionViewModel: ObservableObject {
     }
 
     var projectGroups: [ProjectGroup] {
-        let grouped = Dictionary(grouping: filteredSessions) { $0.projectPath }
+        let grouped = Dictionary(grouping: filteredSessions) { $0.cwd ?? $0.projectPath }
         return grouped.map { key, sessions in
             ProjectGroup(
                 projectPath: key,

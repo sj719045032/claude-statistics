@@ -4,7 +4,8 @@ import Foundation
 struct StatusLineInstaller {
     static let scriptPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusline-command.sh")
     static let backupPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusline-command.sh.bak")
-    static let marker = "# Claude Statistics Integration v1"
+    static let marker = "# Claude Statistics Integration v2"
+    private static let markerPrefix = "# Claude Statistics Integration"
     static let settingsPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/settings.json")
     static let settingsBackupPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusline-settings.bak.json")
     private static let expectedCommand = "bash ~/.claude/statusline-command.sh"
@@ -35,10 +36,10 @@ struct StatusLineInstaller {
     static func install() throws {
         let fm = FileManager.default
 
-        // Backup current script if it exists and isn't ours
+        // Backup current script only if it isn't ours (any version)
         if fm.fileExists(atPath: scriptPath) {
             let current = try String(contentsOfFile: scriptPath, encoding: .utf8)
-            if !current.contains(marker) {
+            if !current.contains(markerPrefix) {
                 if fm.fileExists(atPath: backupPath) {
                     try fm.removeItem(atPath: backupPath)
                 }
@@ -426,7 +427,7 @@ struct StatusLineInstaller {
           fi
         }
 
-        clean_pct() { echo "$1" | sed 's/\\.0$//'; }
+        clean_pct() { printf "%.0f" "$1" 2>/dev/null || echo "$1"; }
 
         color_pct() {
           local val=$(clean_pct "$1")
@@ -468,9 +469,52 @@ struct StatusLineInstaller {
         }
 
         # ---------------------------------------------------------------------------
-        # Subscription usage — read from Claude Statistics app cache
+        # Rate limits from stdin — write to usage cache (no API call needed)
+        # Requires Claude Code v2.1.80+; silently skipped on older versions
         # ---------------------------------------------------------------------------
         APP_USAGE_CACHE="$HOME/.claude-statistics/usage-cache.json"
+
+        rl_5h_pct=$(echo "$input" | jq -r '.rate_limits.five_hour.used_percentage // empty' 2>/dev/null)
+        rl_5h_reset=$(echo "$input" | jq -r '.rate_limits.five_hour.resets_at // empty' 2>/dev/null)
+        rl_7d_pct=$(echo "$input" | jq -r '.rate_limits.seven_day.used_percentage // empty' 2>/dev/null)
+        rl_7d_reset=$(echo "$input" | jq -r '.rate_limits.seven_day.resets_at // empty' 2>/dev/null)
+
+        if [ -n "$rl_5h_pct" ] && [ -n "$rl_7d_pct" ]; then
+          python3 -c "
+        import json
+        from datetime import datetime, timezone
+
+        def ts_to_iso(ts):
+            return datetime.fromtimestamp(int(ts), tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+        stdin_5h = float('$rl_5h_pct')
+        stdin_7d = float('$rl_7d_pct')
+
+        try:
+            with open('$APP_USAGE_CACHE') as f:
+                out = json.load(f)
+        except:
+            out = {'fetched_at': '0', 'data': {}}
+
+        data = out.get('data', {})
+
+        existing_5h = data.get('five_hour', {}).get('utilization', -1)
+        if stdin_5h > existing_5h:
+            data['five_hour'] = {'utilization': stdin_5h, 'resets_at': ts_to_iso('$rl_5h_reset')}
+
+        existing_7d = data.get('seven_day', {}).get('utilization', -1)
+        if stdin_7d > existing_7d:
+            data['seven_day'] = {'utilization': stdin_7d, 'resets_at': ts_to_iso('$rl_7d_reset')}
+
+        out['data'] = data
+        with open('$APP_USAGE_CACHE', 'w') as f:
+            json.dump(out, f)
+        " 2>/dev/null
+        fi
+
+        # ---------------------------------------------------------------------------
+        # Subscription usage — read from Claude Statistics app cache
+        # ---------------------------------------------------------------------------
         quota_section=""
 
         if [ -f "$APP_USAGE_CACHE" ]; then
