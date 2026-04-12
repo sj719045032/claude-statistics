@@ -51,14 +51,16 @@ struct UsageView: View {
                 UsageWindowRow(
                     title: "usage.7day",
                     utilization: usage.sevenDay?.utilization ?? 0,
-                    countdown: viewModel.sevenDayResetCountdown
+                    countdown: viewModel.sevenDayResetCountdown,
+                    exhaustEstimate: viewModel.sevenDayExhaustEstimate
                 )
 
                 if let opus = usage.sevenDayOpus {
                     UsageWindowRow(
                         title: "usage.7dayOpus",
                         utilization: opus.utilization,
-                        countdown: opus.timeUntilReset.map { TimeFormatter.countdown(from: $0) }
+                        countdown: opus.timeUntilReset.map { TimeFormatter.countdown(from: $0) },
+                        exhaustEstimate: viewModel.sevenDayOpusExhaustEstimate
                     )
                 }
 
@@ -66,7 +68,8 @@ struct UsageView: View {
                     UsageWindowRow(
                         title: "usage.7daySonnet",
                         utilization: sonnet.utilization,
-                        countdown: sonnet.timeUntilReset.map { TimeFormatter.countdown(from: $0) }
+                        countdown: sonnet.timeUntilReset.map { TimeFormatter.countdown(from: $0) },
+                        exhaustEstimate: viewModel.sevenDaySonnetExhaustEstimate
                     )
                 }
 

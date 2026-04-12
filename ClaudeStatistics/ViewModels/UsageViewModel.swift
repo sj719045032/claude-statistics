@@ -143,14 +143,13 @@ final class UsageViewModel: ObservableObject {
         return TimeFormatter.countdown(from: interval)
     }
 
-    /// Predicts when the 5-hour window will be exhausted at the current consumption rate.
+    /// Predicts when a usage window will be exhausted at the current consumption rate.
     /// Returns (estimate string, will exhaust before reset), or nil if utilization < 10%.
-    var fiveHourExhaustEstimate: (text: String, willExhaust: Bool)? {
-        guard let window = usageData?.fiveHour,
+    private func exhaustEstimate(for window: UsageWindow?, windowDuration: TimeInterval) -> (text: String, willExhaust: Bool)? {
+        guard let window,
               window.utilization >= 10,
               let timeUntilReset = window.timeUntilReset else { return nil }
 
-        let windowDuration: TimeInterval = 5 * 3600
         let elapsed = windowDuration - timeUntilReset
         guard elapsed > 0 else { return nil }
 
@@ -163,6 +162,22 @@ final class UsageViewModel: ObservableObject {
         let secondsToExhaust = remaining / rate
         let willExhaust = secondsToExhaust < timeUntilReset
         return (text: TimeFormatter.countdown(from: secondsToExhaust), willExhaust: willExhaust)
+    }
+
+    var fiveHourExhaustEstimate: (text: String, willExhaust: Bool)? {
+        exhaustEstimate(for: usageData?.fiveHour, windowDuration: 5 * 3600)
+    }
+
+    var sevenDayExhaustEstimate: (text: String, willExhaust: Bool)? {
+        exhaustEstimate(for: usageData?.sevenDay, windowDuration: 7 * 86400)
+    }
+
+    var sevenDayOpusExhaustEstimate: (text: String, willExhaust: Bool)? {
+        exhaustEstimate(for: usageData?.sevenDayOpus, windowDuration: 7 * 86400)
+    }
+
+    var sevenDaySonnetExhaustEstimate: (text: String, willExhaust: Bool)? {
+        exhaustEstimate(for: usageData?.sevenDaySonnet, windowDuration: 7 * 86400)
     }
 
     var statusColor: Color {
