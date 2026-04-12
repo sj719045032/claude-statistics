@@ -161,7 +161,6 @@ struct SessionListView: View {
                     ForEach(viewModel.projectGroups) { group in
                         ProjectGroupHeader(
                             group: group,
-                            store: store,
                             isExpanded: viewModel.isProjectExpanded(group.projectPath),
                             onToggle: {
                                 withAnimation(Theme.quickSpring) {
@@ -261,15 +260,10 @@ struct SessionListView: View {
 
 struct ProjectGroupHeader: View {
     let group: ProjectGroup
-    @ObservedObject var store: SessionDataStore
     let isExpanded: Bool
     let onToggle: () -> Void
     let onNewSession: () -> Void
     @State private var isHovered = false
-
-    private var groupCost: Double {
-        group.sessions.compactMap { store.parsedStats[$0.id]?.estimatedCost }.reduce(0, +)
-    }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -303,10 +297,10 @@ struct ProjectGroupHeader: View {
                 .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(.secondary)
 
-            if groupCost > 0 {
-                Text(formatCost(groupCost))
+            if group.totalCost > 0 {
+                Text(formatCost(group.totalCost))
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundStyle(costColor(groupCost))
+                    .foregroundStyle(costColor(group.totalCost))
             }
         }
         .padding(.horizontal, 12)

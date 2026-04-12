@@ -13,6 +13,7 @@ final class SessionDataStore: ObservableObject {
     @Published var periodStats: [PeriodStats] = []
     @Published var isFullParseComplete = false
     @Published var parseProgress: String?
+    @Published var parsePercent: Double?
 
     // MARK: - Internal state
 
@@ -125,21 +126,55 @@ final class SessionDataStore: ObservableObject {
                 }
             }
 
-            // Full parse + index dirty sessions
+            // Full parse + index dirty sessions (parse in parallel, DB write serial)
             let total = dirtyIds.count
-            for (i, session) in dirtyIds.enumerated() {
-                let stats = TranscriptParser.shared.parseSession(at: session.filePath)
-                db.saveSessionStats(sessionId: session.id, stats: stats)
-                db.indexSession(sessionId: session.id, filePath: session.filePath)
+            let parseStart = CFAbsoluteTimeGetCurrent()
+            let batchSize = 8
+            var processed = 0
+
+            for batchStart in stride(from: 0, to: total, by: batchSize) {
+                let batchEnd = min(batchStart + batchSize, total)
+                let batch = Array(dirtyIds[batchStart..<batchEnd])
+
+                // Parse batch in parallel
+                let results = await withTaskGroup(of: (Session, SessionStats).self) { group in
+                    for session in batch {
+                        group.addTask {
+                            let stats = TranscriptParser.shared.parseSession(at: session.filePath)
+                            return (session, stats)
+                        }
+                    }
+                    var batchResults: [(Session, SessionStats)] = []
+                    for await result in group {
+                        batchResults.append(result)
+                    }
+                    return batchResults
+                }
+
+                // DB write + UI update (serial)
+                for (session, stats) in results {
+                    db.saveSessionStats(sessionId: session.id, stats: stats)
+                    db.indexSession(sessionId: session.id, filePath: session.filePath)
+                }
+                processed += results.count
 
                 await MainActor.run {
-                    self.parsedStats[session.id] = stats
-                    if (i + 1) % 20 == 0 || i == total - 1 {
-                        self.parseProgress = "Parsing \(i + 1)/\(total)..."
+                    for (session, stats) in results {
+                        self.parsedStats[session.id] = stats
+                    }
+                    self.parseProgress = "Parsing \(processed)/\(total)"
+                    self.parsePercent = Double(processed) / Double(total)
+                    if processed % 20 < batchSize || processed == total {
                         self.rebucket()
                     }
                 }
             }
+
+            let parseTotal = CFAbsoluteTimeGetCurrent() - parseStart
+            DiagnosticLogger.shared.parsePerf(
+                sessions: total, subagentSessions: 0,
+                parseTime: parseTotal, dbTime: 0, indexTime: 0
+            )
 
             // Clean up DB entries for deleted sessions
             let currentIds = Set(scannedSessions.map(\.id))
@@ -150,6 +185,7 @@ final class SessionDataStore: ObservableObject {
                 self.rebucket()
                 self.isFullParseComplete = true
                 self.parseProgress = nil
+                self.parsePercent = nil
 
                 let totalMsgs = self.parsedStats.values.reduce(0) { $0 + $1.messageCount }
                 let totalToks = self.parsedStats.values.reduce(0) { $0 + $1.totalTokens }
@@ -224,13 +260,17 @@ final class SessionDataStore: ObservableObject {
                 await MainActor.run {
                     self.parsedStats[session.id] = stats
                     if showProgress {
-                        self.parseProgress = "Updating \(i + 1)/\(total)..."
+                        self.parseProgress = "Updating \(i + 1)/\(total)"
+                        self.parsePercent = Double(i + 1) / Double(total)
                     }
                 }
             }
 
             if showProgress {
-                await MainActor.run { self.parseProgress = nil }
+                await MainActor.run {
+                    self.parseProgress = nil
+                    self.parsePercent = nil
+                }
             }
 
             await MainActor.run { self.rebucket() }
@@ -287,6 +327,14 @@ final class SessionDataStore: ObservableObject {
         }
 
         periodStats = buckets.values.sorted { $0.period > $1.period }
+
+        // Update cached aggregates
+        allTimeCost = parsedStats.values.reduce(0) { $0 + $1.estimatedCost }
+        allTimeSessions = parsedStats.count
+        allTimeTokens = parsedStats.values.reduce(0) { $0 + $1.totalTokens }
+        allTimeMessages = parsedStats.values.reduce(0) { $0 + $1.messageCount }
+        visibleStats = Array(periodStats.prefix(selectedPeriod.displayCount))
+        visibleModelBreakdown = modelBreakdown(for: visibleStats)
     }
 
     // MARK: - Delete
@@ -339,31 +387,14 @@ final class SessionDataStore: ObservableObject {
         db.search(query: query)
     }
 
-    // MARK: - Computed (convenience for views)
+    // MARK: - Cached aggregates (updated in rebucket)
 
-    var allTimeCost: Double {
-        parsedStats.values.reduce(0) { $0 + $1.estimatedCost }
-    }
-
-    var allTimeSessions: Int {
-        parsedStats.count
-    }
-
-    var allTimeTokens: Int {
-        parsedStats.values.reduce(0) { $0 + $1.totalTokens }
-    }
-
-    var allTimeMessages: Int {
-        parsedStats.values.reduce(0) { $0 + $1.messageCount }
-    }
-
-    var visibleStats: [PeriodStats] {
-        Array(periodStats.prefix(selectedPeriod.displayCount))
-    }
-
-    var visibleModelBreakdown: [ModelUsage] {
-        modelBreakdown(for: visibleStats)
-    }
+    @Published private(set) var allTimeCost: Double = 0
+    @Published private(set) var allTimeSessions: Int = 0
+    @Published private(set) var allTimeTokens: Int = 0
+    @Published private(set) var allTimeMessages: Int = 0
+    @Published private(set) var visibleStats: [PeriodStats] = []
+    @Published private(set) var visibleModelBreakdown: [ModelUsage] = []
 
     /// Aggregate trend data for a given period from parsed session stats
     func aggregateTrendData(for period: PeriodStats, periodType: StatsPeriod) -> [TrendDataPoint] {

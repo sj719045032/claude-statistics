@@ -144,9 +144,10 @@ final class DatabaseService {
         return result
     }
 
-    /// Check if a session needs reparsing (fingerprint mismatch or not cached)
+    /// Check if a session needs reparsing (fingerprint mismatch, not cached, or missing full stats)
     func needsReparse(sessionId: String, fileSize: Int64, mtime: Date, cache: [String: CachedSession]) -> Bool {
         guard let cached = cache[sessionId] else { return true }
+        if cached.sessionStats == nil { return true }
         return cached.fileSize != fileSize ||
                abs(cached.mtime.timeIntervalSince(mtime)) > 1.0
     }

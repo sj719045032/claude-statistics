@@ -59,6 +59,10 @@ final class DiagnosticLogger {
         log(level: "INFO", message: "Full parse complete — \(totalSessions) sessions, \(totalMessages) messages, \(totalTokens) tokens")
     }
 
+    func parsePerf(sessions: Int, subagentSessions: Int, parseTime: Double, dbTime: Double, indexTime: Double) {
+        log(level: "PERF", message: "Full parse \(sessions) sessions (\(subagentSessions) with subagents) — parse=\(String(format: "%.1f", parseTime))s db=\(String(format: "%.1f", dbTime))s index=\(String(format: "%.1f", indexTime))s total=\(String(format: "%.1f", parseTime + dbTime + indexTime))s")
+    }
+
     /// Read the full log content
     func readLog() -> String {
         (try? String(contentsOf: logFileURL, encoding: .utf8)) ?? "(No diagnostic log yet)"

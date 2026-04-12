@@ -6,6 +6,7 @@ struct ProjectGroup: Identifiable {
     var id: String { projectPath }
     let projectPath: String
     let sessions: [Session]
+    var totalCost: Double = 0
 
     var displayName: String {
         let path = sessions.first?.displayName ?? projectPath
@@ -54,13 +55,18 @@ final class SessionViewModel: ObservableObject {
     /// Snippets from FTS content search, keyed by session ID
     @Published var searchSnippets: [String: String] = [:]
 
-    private var searchCancellable: AnyCancellable?
+    /// Cached computed results — only recalculated when inputs change
+    @Published private(set) var recentSessions: [Session] = []
+    @Published private(set) var filteredSessions: [Session] = []
+    @Published private(set) var projectGroups: [ProjectGroup] = []
+
+    private var cancellables = Set<AnyCancellable>()
 
     init(store: SessionDataStore) {
         self.store = store
 
         // Debounced FTS content search — updates searchSnippets reactively
-        searchCancellable = $searchText
+        $searchText
             .removeDuplicates()
             .debounce(for: .milliseconds(150), scheduler: RunLoop.main)
             .sink { [weak self] text in
@@ -77,52 +83,58 @@ final class SessionViewModel: ObservableObject {
                     }
                 }
             }
+            .store(in: &cancellables)
+
+        // Recompute groups when sessions, search, or snippets change
+        store.$sessions
+            .combineLatest($searchText, $searchSnippets)
+            .debounce(for: .milliseconds(50), scheduler: RunLoop.main)
+            .sink { [weak self] _ in self?.recomputeGroups() }
+            .store(in: &cancellables)
+
+        // Initial computation
+        recomputeGroups()
     }
 
-    var recentSessions: [Session] {
-        guard searchText.isEmpty else { return [] }
-        return Array(store.sessions.prefix(3))
-    }
-
-    var filteredSessions: [Session] {
-        if searchText.isEmpty { return store.sessions }
-
-        // 1. Metadata matches (name, topic, id)
-        var matchedIds = Set<String>()
-        var result: [Session] = []
-
-        for session in store.sessions {
-            if SearchUtils.textMatches(query: searchText, in: session.displayName) ||
-                SearchUtils.textMatches(query: searchText, in: session.id) ||
-                SearchUtils.textMatches(query: searchText, in: store.quickStats[session.id]?.topic ?? "") ||
-                SearchUtils.textMatches(query: searchText, in: store.quickStats[session.id]?.sessionName ?? "")
-            {
-                result.append(session)
-                matchedIds.insert(session.id)
-            }
-        }
-
-        // 2. Include FTS content matches (snippets populated by Combine pipeline)
-        if !searchSnippets.isEmpty {
-            let sessionLookup = Dictionary(uniqueKeysWithValues: store.sessions.map { ($0.id, $0) })
-            for sessionId in searchSnippets.keys {
-                if !matchedIds.contains(sessionId), let session = sessionLookup[sessionId] {
+    private func recomputeGroups() {
+        // filteredSessions
+        let filtered: [Session]
+        if searchText.isEmpty {
+            filtered = store.sessions
+        } else {
+            var matchedIds = Set<String>()
+            var result: [Session] = []
+            for session in store.sessions {
+                if SearchUtils.textMatches(query: searchText, in: session.displayName) ||
+                    SearchUtils.textMatches(query: searchText, in: session.id) ||
+                    SearchUtils.textMatches(query: searchText, in: store.quickStats[session.id]?.topic ?? "") ||
+                    SearchUtils.textMatches(query: searchText, in: store.quickStats[session.id]?.sessionName ?? "")
+                {
                     result.append(session)
-                    matchedIds.insert(sessionId)
+                    matchedIds.insert(session.id)
                 }
             }
+            if !searchSnippets.isEmpty {
+                let sessionLookup = Dictionary(uniqueKeysWithValues: store.sessions.map { ($0.id, $0) })
+                for sessionId in searchSnippets.keys {
+                    if !matchedIds.contains(sessionId), let session = sessionLookup[sessionId] {
+                        result.append(session)
+                        matchedIds.insert(sessionId)
+                    }
+                }
+            }
+            filtered = result
         }
+        filteredSessions = filtered
+        recentSessions = searchText.isEmpty ? Array(store.sessions.prefix(3)) : []
 
-        return result
-    }
-
-    var projectGroups: [ProjectGroup] {
-        let grouped = Dictionary(grouping: filteredSessions) { $0.cwd ?? $0.projectPath }
-        return grouped.map { key, sessions in
-            ProjectGroup(
-                projectPath: key,
-                sessions: sessions.sorted { $0.lastModified > $1.lastModified }
-            )
+        // projectGroups (with pre-computed cost)
+        let statsMap = store.parsedStats
+        let grouped = Dictionary(grouping: filtered) { $0.cwd ?? $0.projectPath }
+        projectGroups = grouped.map { key, sessions in
+            let sorted = sessions.sorted { $0.lastModified > $1.lastModified }
+            let cost = sorted.reduce(0.0) { $0 + (statsMap[$1.id]?.estimatedCost ?? 0) }
+            return ProjectGroup(projectPath: key, sessions: sorted, totalCost: cost)
         }
         .sorted { ($0.sessions.first?.lastModified ?? .distantPast) > ($1.sessions.first?.lastModified ?? .distantPast) }
     }
