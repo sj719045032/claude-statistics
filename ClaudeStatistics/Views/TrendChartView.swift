@@ -131,7 +131,6 @@ struct TrendChartView: View {
             }
         }
         .chartYAxis {
-            // Left axis: tokens
             AxisMarks(position: .leading) { value in
                 AxisGridLine()
                 AxisValueLabel {
@@ -142,7 +141,6 @@ struct TrendChartView: View {
                     }
                 }
             }
-            // Right axis: cost (reverse-mapped from normalized values)
             if !useSingleAxis {
                 AxisMarks(position: .trailing) { value in
                     AxisValueLabel {
@@ -158,12 +156,8 @@ struct TrendChartView: View {
         }
         .chartLegend(position: .top) {
             HStack(spacing: 12) {
-                if maxTokens > 0 {
-                    legendItem(color: .blue, label: "Tokens")
-                }
-                if maxCost > 0 {
-                    legendItem(color: .orange, label: "Cost")
-                }
+                if maxTokens > 0 { legendItem(color: .blue, label: "Tokens") }
+                if maxCost > 0 { legendItem(color: .orange, label: "Cost") }
             }
             .font(.system(size: 10))
         }
@@ -236,6 +230,7 @@ struct TrendChartView: View {
         .shadow(color: .black.opacity(0.08), radius: 4, y: 1)
         .padding(4)
     }
+
 
     private func legendItem(color: Color, label: String) -> some View {
         HStack(spacing: 3) {

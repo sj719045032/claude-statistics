@@ -45,6 +45,7 @@
 "detail.collapse" = "收起";
 "detail.more" = "展开";
 "detail.tokens" = "Token";
+"detail.tokensAndModels" = "Token & 模型";
 "detail.messages" = "消息";
 "detail.user" = "用户";
 "detail.assistant" = "助手";
@@ -60,12 +61,12 @@
 "detail.sessions %lld" = "%lld 个会话";
 
 /* Token Labels */
-"token.input" = "输入";
-"token.output" = "输出";
-"token.cache5m" = "缓存 5m";
-"token.cache1h" = "缓存 1h";
-"token.cacheWrite" = "缓存写入";
-"token.cacheRead" = "缓存读取";
+"token.input" = "In";
+"token.output" = "Out";
+"token.cache5m" = "C.5m";
+"token.cache1h" = "C.1h";
+"token.cacheWrite" = "C.W";
+"token.cacheRead" = "C.R";
 "token.cacheWriteFull" = "缓存写入";
 "token.cacheReadFull" = "缓存读取";
 

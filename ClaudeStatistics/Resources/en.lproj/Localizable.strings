@@ -45,6 +45,7 @@
 "detail.collapse" = "Collapse";
 "detail.more" = "More";
 "detail.tokens" = "Tokens";
+"detail.tokensAndModels" = "Tokens & Models";
 "detail.messages" = "Messages";
 "detail.user" = "User";
 "detail.assistant" = "Assistant";
@@ -60,12 +61,12 @@
 "detail.sessions %lld" = "%lld sessions";
 
 /* Token Labels */
-"token.input" = "Input";
-"token.output" = "Output";
-"token.cache5m" = "Cache 5m";
-"token.cache1h" = "Cache 1h";
-"token.cacheWrite" = "Cache W";
-"token.cacheRead" = "Cache R";
+"token.input" = "In";
+"token.output" = "Out";
+"token.cache5m" = "C.5m";
+"token.cache1h" = "C.1h";
+"token.cacheWrite" = "C.W";
+"token.cacheRead" = "C.R";
 "token.cacheWriteFull" = "Cache Write";
 "token.cacheReadFull" = "Cache Read";
 

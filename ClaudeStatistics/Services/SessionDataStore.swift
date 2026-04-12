@@ -553,6 +553,8 @@ final class SessionDataStore: ObservableObject {
                     var existing = combined[model] ?? ModelUsage(model: model)
                     existing.inputTokens += modelStats.inputTokens
                     existing.outputTokens += modelStats.outputTokens
+                    existing.cacheCreation5mTokens += modelStats.cacheCreation5mTokens
+                    existing.cacheCreation1hTokens += modelStats.cacheCreation1hTokens
                     existing.cacheCreationTotalTokens += modelStats.cacheCreationTotalTokens
                     existing.cacheReadTokens += modelStats.cacheReadTokens
                     existing.cost += ModelPricing.estimateCost(

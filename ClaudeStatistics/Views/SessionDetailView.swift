@@ -273,48 +273,8 @@ struct SessionDetailView: View {
             Task { await loadTrendData() }
         }
 
-        // 4. Token Distribution — breakdown of token types + context window
-        SectionCard {
-            VStack(spacing: 6) {
-                HStack {
-                    Label("detail.tokens", systemImage: "number")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text(TimeFormatter.tokenCount(stats.totalTokens))
-                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                }
-
-                Divider()
-
-                TokenBar(
-                    segments: tokenSegments(stats),
-                    total: stats.totalTokens
-                )
-
-                HStack(spacing: 12) {
-                    TokenLegend(color: .blue, label: "token.input", value: TimeFormatter.tokenCount(stats.totalInputTokens))
-                    TokenLegend(color: .green, label: "token.output", value: TimeFormatter.tokenCount(stats.totalOutputTokens))
-                    if stats.cacheCreation5mTokens > 0 {
-                        TokenLegend(color: .yellow, label: "token.cache5m", value: TimeFormatter.tokenCount(stats.cacheCreation5mTokens))
-                    }
-                    if stats.cacheCreation1hTokens > 0 {
-                        TokenLegend(color: .orange, label: "token.cache1h", value: TimeFormatter.tokenCount(stats.cacheCreation1hTokens))
-                    }
-                    if stats.cacheCreation5mTokens == 0 && stats.cacheCreation1hTokens == 0 && stats.cacheCreationTotalTokens > 0 {
-                        TokenLegend(color: .orange, label: "token.cacheWrite", value: TimeFormatter.tokenCount(stats.cacheCreationTotalTokens))
-                    }
-                    if stats.cacheReadTokens > 0 {
-                        TokenLegend(color: .purple, label: "token.cacheRead", value: TimeFormatter.tokenCount(stats.cacheReadTokens))
-                    }
-                }
-                .font(.system(size: 10))
-
-            }
-        }
-
-        // 5. Models — per-model cost breakdown
-        CostModelsCard(stats: stats, showCostHeader: false)
+        // 4. Tokens + Models — unified breakdown
+        CostModelsCard(stats: stats)
 
         // 6. Tools
         if !stats.toolUseCounts.isEmpty {
@@ -557,71 +517,84 @@ struct CostModelsCard: View {
     let models: [ModelUsage]
     let totalCost: Double
     let isEstimated: Bool
-    var showCostHeader: Bool = true
     @State private var expandedModels: Set<String> = []
 
-    /// Convenience init from SessionStats
-    init(stats: SessionStats, showCostHeader: Bool = true) {
+    init(stats: SessionStats) {
         self.models = stats.asModelUsages
         self.totalCost = stats.estimatedCost
         self.isEstimated = stats.isCostEstimated
-        self.showCostHeader = showCostHeader
     }
 
-    /// Convenience init from PeriodStats
-    init(period: PeriodStats, showCostHeader: Bool = true) {
+    init(period: PeriodStats) {
         self.models = period.modelBreakdown.values.sorted { $0.totalTokens > $1.totalTokens }
         self.totalCost = period.totalCost
         self.isEstimated = period.hasEstimatedCost
-        self.showCostHeader = showCostHeader
     }
+
+    init(models: [ModelUsage]) {
+        self.models = models.sorted { $0.totalTokens > $1.totalTokens }
+        self.totalCost = models.reduce(0) { $0 + $1.cost }
+        self.isEstimated = models.contains { $0.isEstimated }
+    }
+
+    private var totalIn: Int { models.reduce(0) { $0 + $1.inputTokens } }
+    private var totalOut: Int { models.reduce(0) { $0 + $1.outputTokens } }
+    private var totalC5m: Int { models.reduce(0) { $0 + $1.cacheCreation5mTokens } }
+    private var totalC1h: Int { models.reduce(0) { $0 + $1.cacheCreation1hTokens } }
+    private var totalCW: Int { models.reduce(0) { $0 + $1.cacheCreationTotalTokens } }
+    private var totalCR: Int { models.reduce(0) { $0 + $1.cacheReadTokens } }
+    private var grandTotal: Int { totalIn + totalOut + totalCW + totalCR }
 
     var body: some View {
         SectionCard {
             VStack(spacing: 8) {
-                if showCostHeader {
-                    // Header: total cost
-                    HStack {
-                        Label("detail.estimatedCost", systemImage: "dollarsign.circle")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        if models.count > 1 {
-                            Text("detail.models \(models.count)")
-                                .font(.system(size: 10))
-                                .foregroundStyle(.tertiary)
-                        }
-                        HStack(spacing: 2) {
-                            if isEstimated {
-                                Text("~")
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(.orange)
-                            }
-                            Text(detailFormatCost(totalCost))
-                                .font(.system(size: 16, weight: .bold, design: .monospaced))
-                                .foregroundStyle(detailCostColor(totalCost))
-                        }
-                    }
+                // Section title
+                Label("detail.tokensAndModels", systemImage: "number")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Divider()
-                } else {
-                    // Lightweight header for models-only mode
-                    HStack {
-                        Label("detail.modelBreakdown", systemImage: "cpu")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
-                        Spacer()
+                // Summary: Tokens + Cost
+                HStack {
+                    Text(TimeFormatter.tokenCount(grandTotal))
+                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.blue)
+                    Spacer()
+                    if models.count > 1 {
                         Text("detail.models \(models.count)")
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                     }
-
-                    Divider()
+                    HStack(spacing: 2) {
+                        if isEstimated {
+                            Text("~").font(.system(size: 10)).foregroundStyle(.orange)
+                        }
+                        Text(detailFormatCost(totalCost))
+                            .font(.system(size: 14, weight: .bold, design: .monospaced))
+                            .foregroundStyle(detailCostColor(totalCost))
+                    }
                 }
 
-                let maxTokens = max(1, models.first?.totalTokens ?? 1)
+                // Token type bar + legend
+                if grandTotal > 0 {
+                    TokenBar(
+                        segments: {
+                            var s: [(color: Color, value: Int)] = [(.blue, totalIn), (.green, totalOut)]
+                            if totalCW > 0 { s.append((.orange, totalCW)) }
+                            if totalCR > 0 { s.append((.purple, totalCR)) }
+                            return s
+                        }(),
+                        total: grandTotal
+                    )
+                    tokenLegendRow(input: totalIn, output: totalOut, cache5m: totalC5m, cache1h: totalC1h, cacheTotal: totalCW, cacheRead: totalCR)
+                }
+
+                Divider()
+
+                // Model breakdown
+                let visibleModels = models.filter { $0.totalTokens > 0 }
                 VStack(spacing: 0) {
-                    ForEach(Array(models.enumerated()), id: \.element.id) { idx, item in
+                    ForEach(Array(visibleModels.enumerated()), id: \.element.id) { idx, item in
                         let isExpanded = expandedModels.contains(item.model)
 
                         VStack(alignment: .leading, spacing: 0) {
@@ -650,7 +623,8 @@ struct CostModelsCard: View {
                                             .font(.system(size: 10))
                                             .foregroundStyle(.tertiary)
                                     }
-                                    Text(TimeFormatter.tokenCount(item.totalTokens))
+                                    let pct = grandTotal > 0 ? Double(item.totalTokens) / Double(grandTotal) * 100 : 0
+                                    Text("\(TimeFormatter.tokenCount(item.totalTokens)) (\(String(format: "%.2f", pct))%)")
                                         .font(.system(size: 10, design: .monospaced))
                                         .foregroundStyle(.secondary)
                                     HStack(spacing: 1) {
@@ -666,11 +640,6 @@ struct CostModelsCard: View {
                             }
                             .buttonStyle(.plain)
                             .padding(.vertical, 4)
-
-                            // Token bar
-                            ProgressView(value: Double(item.totalTokens), total: Double(maxTokens))
-                                .tint(item.isEstimated ? Color.orange.opacity(0.7) : Color.blue.opacity(0.7))
-                                .padding(.leading, 16)
 
                             // Expandable cost detail
                             if isExpanded {
@@ -769,6 +738,79 @@ struct ToolBarRow: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 35, alignment: .trailing)
         }
+    }
+}
+
+@ViewBuilder
+func tokenLegendRow(input: Int, output: Int, cache5m: Int, cache1h: Int, cacheTotal: Int, cacheRead: Int) -> some View {
+    let total = input + output + cacheTotal + cacheRead
+    let items: [(Color, LocalizedStringKey, Int)] = [
+        (.blue, "token.input", input),
+        (.green, "token.output", output),
+        cache5m > 0 ? (.yellow, "token.cache5m", cache5m) : nil,
+        cache1h > 0 ? (.orange, "token.cache1h", cache1h) : nil,
+        cache5m == 0 && cache1h == 0 && cacheTotal > 0 ? (.orange, "token.cacheWrite", cacheTotal) : nil,
+        cacheRead > 0 ? (.purple, "token.cacheRead", cacheRead) : nil,
+    ].compactMap { $0 }
+
+    FlowLayout(spacing: 6) {
+        ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+            let ratio = total > 0 ? Double(item.2) / Double(total) * 100 : 0
+            let pct = String(format: "%.2f%%", ratio)
+            TokenLegend(color: item.0, label: item.1, value: "\(pct)")
+        }
+    }
+    .font(.system(size: 10))
+}
+
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = computeRows(proposal: proposal, subviews: subviews)
+        let height = rows.reduce(CGFloat(0)) { total, row in
+            total + row.height + (total > 0 ? 4 : 0)
+        }
+        return CGSize(width: proposal.width ?? 0, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let rows = computeRows(proposal: proposal, subviews: subviews)
+        var y = bounds.minY
+        var idx = 0
+        for row in rows {
+            var x = bounds.minX
+            for _ in 0..<row.count {
+                let size = subviews[idx].sizeThatFits(.unspecified)
+                subviews[idx].place(at: CGPoint(x: x, y: y), proposal: .unspecified)
+                x += size.width + spacing
+                idx += 1
+            }
+            y += row.height + 4
+        }
+    }
+
+    private func computeRows(proposal: ProposedViewSize, subviews: Subviews) -> [(count: Int, height: CGFloat)] {
+        let maxWidth = proposal.width ?? .infinity
+        var rows: [(count: Int, height: CGFloat)] = []
+        var currentWidth: CGFloat = 0
+        var currentHeight: CGFloat = 0
+        var currentCount = 0
+        for sub in subviews {
+            let size = sub.sizeThatFits(.unspecified)
+            if currentCount > 0 && currentWidth + spacing + size.width > maxWidth {
+                rows.append((count: currentCount, height: currentHeight))
+                currentWidth = size.width
+                currentHeight = size.height
+                currentCount = 1
+            } else {
+                currentWidth += (currentCount > 0 ? spacing : 0) + size.width
+                currentHeight = max(currentHeight, size.height)
+                currentCount += 1
+            }
+        }
+        if currentCount > 0 { rows.append((count: currentCount, height: currentHeight)) }
+        return rows
     }
 }
 

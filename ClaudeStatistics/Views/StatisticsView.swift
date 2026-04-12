@@ -652,41 +652,8 @@ struct PeriodDetailView: View {
                         trendData = store.aggregateTrendData(for: stat, periodType: periodType)
                     }
 
-                    // 3. Token bar
-                    SectionCard {
-                        VStack(spacing: 6) {
-                            HStack {
-                                Label("detail.tokens", systemImage: "number")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Text(TimeFormatter.tokenCount(stat.totalTokens))
-                                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                            }
-
-                            Divider()
-
-                            TokenBar(
-                                segments: tokenSegments,
-                                total: stat.totalTokens
-                            )
-
-                            HStack(spacing: 12) {
-                                TokenLegend(color: .blue, label: "token.input", value: TimeFormatter.tokenCount(stat.totalInputTokens))
-                                TokenLegend(color: .green, label: "token.output", value: TimeFormatter.tokenCount(stat.totalOutputTokens))
-                                if stat.cacheCreationTotalTokens > 0 {
-                                    TokenLegend(color: .orange, label: "token.cacheWrite", value: TimeFormatter.tokenCount(stat.cacheCreationTotalTokens))
-                                }
-                                if stat.cacheReadTokens > 0 {
-                                    TokenLegend(color: .purple, label: "token.cacheRead", value: TimeFormatter.tokenCount(stat.cacheReadTokens))
-                                }
-                            }
-                            .font(.system(size: 10))
-                        }
-                    }
-
-                    // 4. Models detail
-                    CostModelsCard(period: stat, showCostHeader: false)
+                    // 3. Tokens + Models — unified breakdown
+                    CostModelsCard(period: stat)
 
                 }
                 .padding(12)
