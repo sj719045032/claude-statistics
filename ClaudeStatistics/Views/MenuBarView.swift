@@ -113,8 +113,8 @@ struct MenuBarView: View {
                 .font(.system(size: 11 * fontScale))
                 .foregroundStyle(.secondary)
 
+                Spacer()
                 if let progress = store.parseProgress {
-                    Spacer()
                     HStack(spacing: 4) {
                         ProgressView()
                             .scaleEffect(0.5)
@@ -122,11 +122,9 @@ struct MenuBarView: View {
                         Text(progress)
                             .font(.system(size: 10 * fontScale))
                             .foregroundStyle(.secondary)
+                            .fixedSize()
                     }
                     .transition(.opacity)
-                    Spacer()
-                } else {
-                    Spacer()
                 }
 
                 Text("app.name")
