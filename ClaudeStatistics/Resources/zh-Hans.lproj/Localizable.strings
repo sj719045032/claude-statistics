@@ -144,6 +144,8 @@
 "settings.about" = "关于";
 "settings.version" = "版本";
 "settings.checkForUpdates" = "检查更新";
+"settings.github" = "GitHub";
+"settings.reportIssue" = "提交反馈";
 
 /* Pricing Management */
 "pricing.back" = "设置";

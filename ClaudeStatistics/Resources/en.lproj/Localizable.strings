@@ -144,6 +144,8 @@
 "settings.about" = "About";
 "settings.version" = "Version";
 "settings.checkForUpdates" = "Check for Updates";
+"settings.github" = "GitHub";
+"settings.reportIssue" = "Report an Issue";
 
 /* Pricing Management */
 "pricing.back" = "Settings";

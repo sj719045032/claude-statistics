@@ -250,6 +250,38 @@ struct SettingsView: View {
                 .disabled(!updaterService.canCheckForUpdates)
 
                 Button(action: {
+                    if let url = URL(string: "https://github.com/sj719045032/claude-statistics") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }) {
+                    HStack {
+                        Label("settings.github", systemImage: "safari")
+                        Spacer()
+                        Image(systemName: "arrow.up.forward.square")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .font(.system(size: 12))
+                }
+                .buttonStyle(.plain)
+
+                Button(action: {
+                    if let url = URL(string: "https://github.com/sj719045032/claude-statistics/issues/new") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }) {
+                    HStack {
+                        Label("settings.reportIssue", systemImage: "exclamationmark.bubble")
+                        Spacer()
+                        Image(systemName: "arrow.up.forward.square")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .font(.system(size: 12))
+                }
+                .buttonStyle(.plain)
+
+                Button(action: {
                     let logPath = DiagnosticLogger.shared.logFilePath
                     if FileManager.default.fileExists(atPath: logPath) {
                         NSWorkspace.shared.selectFile(logPath, inFileViewerRootedAtPath: "")
