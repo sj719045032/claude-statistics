@@ -293,6 +293,16 @@ Model pricing is stored in `~/.claude-statistics/pricing.json` and can be edited
 | Font Scale | Adjust panel content scale |
 | Diagnostics | Open/export app logs |
 
+## Star History
+
+<a href="https://www.star-history.com/?repos=sj719045032%2Fclaude-statistics&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=sj719045032/claude-statistics&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=sj719045032/claude-statistics&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=sj719045032/claude-statistics&type=date&legend=top-left" />
+ </picture>
+</a>
+
 ## License
 
 MIT
