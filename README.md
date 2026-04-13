@@ -2,17 +2,15 @@
 
 **[中文文档](docs/README_zh.md)**
 
-A native macOS menu bar app for monitoring your [Claude Code](https://docs.anthropic.com/en/docs/claude-code) sessions, subscription usage, and token/cost analytics in real time.
+A native macOS menu bar app for monitoring your [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [Codex CLI](https://github.com/openai/codex) sessions, subscription usage, and token/cost analytics in real time.
 
-## v2.0 Highlights
+## v2.3.0 Highlights
 
-Claude Statistics 2.0 is a major UI and interaction overhaul:
-
-- Unified design system with material cards, softer shadows, and polished spacing
-- Sliding capsule tab indicators and custom period pickers
-- Interactive charts with hover crosshair, interpolated tooltip, and animated entry
-- Refined session and statistics lists with richer hover states and smoother transitions
-- Better usage monitoring with animated progress bars and trend visualization
+- **Multi-provider support** — switch between Claude Code and Codex CLI from the footer provider switcher
+- Provider-aware UI: tabs, account card, and status-line integration all adapt to the active provider
+- Installation detection: uninstalled providers are shown as disabled in the switcher
+- Codex profile decoded locally from JWT — no extra API calls needed
+- Account card shows a full-card loading spinner instead of a stale "?" avatar during provider switches
 
 ![Claude Statistics overview](docs/screenshots/hero-overview.png)
 
@@ -47,7 +45,7 @@ Claude Statistics lives in your macOS menu bar and opens as a floating panel.
 
 ### Session Management
 
-Claude Statistics automatically discovers and parses your Claude Code sessions from `~/.claude/projects/`.
+Claude Statistics automatically discovers and parses sessions from `~/.claude/projects/` (Claude Code) and `~/.codex/projects/` (Codex CLI). Switch providers from the footer switcher.
 
 **Session List**
 
@@ -114,6 +112,15 @@ Fetches live usage data from Anthropic's OAuth-backed usage API.
 - Error banner with retry action and direct link to [claude.ai/settings/usage](https://claude.ai/settings/usage)
 - Configurable auto-refresh interval
 
+### Provider Switcher
+
+A compact switcher in the footer lets you toggle between providers at any time:
+
+- **Claude Code** — reads `~/.claude/projects/`, fetches usage from Anthropic's OAuth API
+- **Codex CLI** — reads `~/.codex/projects/`, decodes profile from local JWT
+
+Providers that are not installed are shown as disabled automatically.
+
 ### Settings & Integrations
 
 - Launch at login
@@ -129,14 +136,12 @@ Fetches live usage data from Anthropic's OAuth-backed usage API.
 - Font scale control
 - Custom tab ordering
 - Model pricing management (view, edit, fetch latest pricing)
-- Claude Code status line integration using the app's pricing and usage cache
+- Status line integration for Claude Code and Codex CLI
 - OAuth token detection from macOS Keychain or `~/.claude/.credentials.json`
 - Diagnostics log export
 - Sparkle-based in-app update checks
 
 ### UI & Interaction Details
-
-v2.0 adds many small but meaningful interaction improvements:
 
 - Material-based cards with consistent design tokens (`Theme.swift`)
 - Hover scale animation for clickable icon buttons
@@ -190,17 +195,18 @@ This script builds using the dedicated debug DerivedData path and relaunches the
 
 ## How It Works
 
-Claude Statistics uses two local-first data sources:
+Claude Statistics supports two providers, each with its own local-first data sources:
 
-1. **Local transcript data**
-   - Parses JSONL transcript files under `~/.claude/projects/`
-   - Extracts session metadata, timestamps, token counts, model usage, tool calls, and cost estimates
-   - Uses built-in model pricing tables (customizable via settings / pricing file)
-   - Supports multi-model sessions and per-day slices for more accurate period attribution
+**Claude Code**
+- Parses JSONL transcript files under `~/.claude/projects/`
+- Extracts session metadata, timestamps, token counts, model usage, tool calls, and cost estimates
+- Uses built-in model pricing tables (customizable via settings / pricing file)
+- Fetches subscription usage windows from Anthropic's OAuth-backed API (5h / 7d / per-model)
 
-2. **Anthropic usage API**
-   - Uses the OAuth token stored by Claude Code in macOS Keychain or `~/.claude/.credentials.json`
-   - Fetches subscription usage windows (5h / 7d / per-model when available)
+**Codex CLI**
+- Parses conversation files under `~/.codex/projects/`
+- Decodes user profile (name, email, plan) from a local JWT — no extra API calls
+- Session scanning and transcript parsing adapted for Codex's file format
 
 All parsing and analytics happen locally on your machine.
 
@@ -210,6 +216,10 @@ All parsing and analytics happen locally on your machine.
 ClaudeStatistics/
 ├── App/                    # App entry, status bar controller, floating panel
 ├── Models/                 # Session, SessionStats, AggregateStats, UsageData, etc.
+├── Providers/              # SessionProvider protocol + Claude and Codex implementations
+│   ├── SessionProvider.swift
+│   ├── Claude/             # ClaudeProvider, ClaudeSessionScanner, ClaudeTranscriptParser
+│   └── Codex/              # CodexProvider, CodexSessionScanner, CodexTranscriptParser
 ├── Services/               # Parsing, scanning, storage, pricing fetch, usage API, logs
 ├── Utilities/              # Terminal launching, time formatting, language handling
 ├── ViewModels/             # SessionViewModel, UsageViewModel, ProfileViewModel
