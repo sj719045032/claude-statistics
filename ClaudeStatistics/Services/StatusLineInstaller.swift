@@ -171,6 +171,8 @@ struct StatusLineInstaller {
         # ---------------------------------------------------------------------------
         # Parse transcript JSONL for cumulative token usage & cost
         # Uses pricing from Claude Statistics app for accurate per-model costs
+        # Includes subagent transcripts; incremental parse via per-file size cache
+        # Debug: export CLAUDE_STATUSLINE_DEBUG=1 to see parse stats on stderr
         # ---------------------------------------------------------------------------
         TRANSCRIPT_CACHE_DIR="$HOME/.claude/statusline-cache"
         mkdir -p "$TRANSCRIPT_CACHE_DIR" 2>/dev/null
@@ -183,124 +185,200 @@ struct StatusLineInstaller {
 
         PRICING_FILE="$HOME/.claude-statistics/pricing.json"
 
+        # Portable file size: macOS -f%z / Linux -c%s
+        _stat_size() {
+          stat -f%z "$1" 2>/dev/null || stat -c%s "$1" 2>/dev/null || echo 0
+        }
+
         if [ -n "$transcript_path" ] && [ -f "$transcript_path" ]; then
           cache_key=$(echo "$transcript_path" | md5 -q 2>/dev/null || echo "$transcript_path" | md5sum 2>/dev/null | cut -d' ' -f1)
-          tcache="$TRANSCRIPT_CACHE_DIR/${cache_key}.json"
-          file_size=$(stat -f%z "$transcript_path" 2>/dev/null || stat -c%s "$transcript_path" 2>/dev/null || echo 0)
+          # _v2 cache: per-file sizes + totals; supports incremental parse + subagents
+          tcache="$TRANSCRIPT_CACHE_DIR/${cache_key}_v2.json"
 
-          cached_size=0
-          if [ -f "$tcache" ]; then
-            cached_size=$(jq -r '.file_size // 0' "$tcache" 2>/dev/null)
+          # Subagent transcripts live at <transcript_dir>/<session_id>/subagents/*.jsonl
+          _tp_dir=$(dirname "$transcript_path")
+          _tp_base=$(basename "$transcript_path" .jsonl)
+          subagent_dir="$_tp_dir/$_tp_base/subagents"
+
+          all_files=("$transcript_path")
+          if [ -d "$subagent_dir" ]; then
+            for _f in "$subagent_dir"/*.jsonl; do
+              [ -f "$_f" ] && all_files+=("$_f")
+            done
           fi
 
-          if [ "$file_size" != "$cached_size" ]; then
-            transcript_stats=$(python3 -c "
-        import json, sys, os
+          # L1 fast path: fingerprint = concatenated file sizes. If unchanged, skip Python.
+          fp=""
+          for _f in "${all_files[@]}"; do
+            fp="${fp}$(_stat_size "$_f"):"
+          done
 
-        # Load pricing from Claude Statistics app
-        pricing_file = os.path.expanduser('$PRICING_FILE')
+          cached_fp=""
+          if [ -f "$tcache" ]; then
+            cached_fp=$(jq -r '.fp // ""' "$tcache" 2>/dev/null)
+          fi
+
+          if [ "$fp" != "$cached_fp" ] || [ -z "$cached_fp" ]; then
+            # L2: incremental parse - seek past previously-parsed bytes per file
+            _files_newline=$(printf '%s\\n' "${all_files[@]}")
+            _py_stderr=/dev/null
+            [ "$CLAUDE_STATUSLINE_DEBUG" = "1" ] && _py_stderr=/dev/stderr
+            CS_FILES="$_files_newline" CS_FP="$fp" CS_TCACHE="$tcache" \\
+            CS_PRICING="$PRICING_FILE" CS_MODEL_ID="$model_id" \\
+            python3 -c '
+        import json, os, sys, time
+
+        files = [p for p in os.environ.get("CS_FILES", "").split("\\n") if p]
+        fp = os.environ.get("CS_FP", "")
+        tcache_path = os.environ.get("CS_TCACHE", "")
+        pricing_file = os.environ.get("CS_PRICING", "")
+        default_model_id = os.environ.get("CS_MODEL_ID", "")
+        debug = os.environ.get("CLAUDE_STATUSLINE_DEBUG") == "1"
+        t0 = time.time()
         app_pricing = {}
         try:
             with open(pricing_file) as f:
-                data = json.load(f)
-                app_pricing = data.get('models', {})
-        except:
+                app_pricing = json.load(f).get("models", {})
+        except Exception:
             pass
 
         # Fallback pricing per million tokens: (input, output, cache_write_1h, cache_read)
         FALLBACK = {
-            'opus-4-6':   (5.0,  25.0, 10.0,  0.50),
-            'opus-4-5':   (5.0,  25.0, 10.0,  0.50),
-            'opus-4-1':   (15.0, 75.0, 30.0,  1.50),
-            'opus-4':     (15.0, 75.0, 30.0,  1.50),
-            'sonnet':     (3.0,  15.0, 6.0,   0.30),
-            'haiku':      (0.80, 4.0,  1.60,  0.08),
+            "opus-4-6":   (5.0,  25.0, 10.0,  0.50),
+            "opus-4-5":   (5.0,  25.0, 10.0,  0.50),
+            "opus-4-1":   (15.0, 75.0, 30.0,  1.50),
+            "opus-4":     (15.0, 75.0, 30.0,  1.50),
+            "sonnet":     (3.0,  15.0, 6.0,   0.30),
+            "haiku":      (0.80, 4.0,  1.60,  0.08),
         }
 
-        def get_pricing(model_id):
-            m = (model_id or '').lower()
-            # Try app pricing first (exact match)
-            if model_id in app_pricing:
-                p = app_pricing[model_id]
-                return (p.get('input', 3.0), p.get('output', 15.0),
-                        p.get('cache_write_1h', 6.0), p.get('cache_read', 0.30))
-            # Fuzzy match app pricing
-            for key, p in app_pricing.items():
-                if key.lower() in m or m in key.lower():
-                    return (p.get('input', 3.0), p.get('output', 15.0),
-                            p.get('cache_write_1h', 6.0), p.get('cache_read', 0.30))
-            # Fallback
-            for key, rates in FALLBACK.items():
-                if key in m:
-                    return rates
-            return FALLBACK.get('sonnet', (3.0, 15.0, 6.0, 0.30))
+        def get_pricing(mid):
+            m = (mid or "").lower()
+            if mid in app_pricing:
+                p = app_pricing[mid]
+                return (p.get("input", 3.0), p.get("output", 15.0),
+                        p.get("cache_write_1h", 6.0), p.get("cache_read", 0.30))
+            for k, p in app_pricing.items():
+                if k.lower() in m or m in k.lower():
+                    return (p.get("input", 3.0), p.get("output", 15.0),
+                            p.get("cache_write_1h", 6.0), p.get("cache_read", 0.30))
+            for k, r in FALLBACK.items():
+                if k in m:
+                    return r
+            return FALLBACK["sonnet"]
 
-        # Per-model token accumulators (deduplicated by message ID)
-        model_tokens = {}  # model_id -> [inp, out, cc, cr]
-        seen_ids = set()
-
+        # Load existing v2 cache; start fresh if missing or older schema
+        cache = {"version": 2, "files": {}}
         try:
-            with open('$transcript_path', 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if not line: continue
-                    try:
-                        entry = json.loads(line)
-                    except: continue
-                    if entry.get('type') != 'assistant': continue
-                    msg = entry.get('message', {})
-                    msg_id = msg.get('id', '')
-                    if msg_id in seen_ids:
-                        continue
-                    if msg_id:
-                        seen_ids.add(msg_id)
-                    mid = msg.get('model') or '${model_id}'
-                    if mid == '<synthetic>':
-                        mid = '${model_id}'
-                    u = msg.get('usage', {})
-                    inp = u.get('input_tokens', 0)
-                    out = u.get('output_tokens', 0)
-                    cc  = u.get('cache_creation_input_tokens', 0)
-                    cr  = u.get('cache_read_input_tokens', 0)
-                    if mid not in model_tokens:
-                        model_tokens[mid] = [0, 0, 0, 0]
-                    model_tokens[mid][0] += inp
-                    model_tokens[mid][1] += out
-                    model_tokens[mid][2] += cc
-                    model_tokens[mid][3] += cr
-        except: pass
+            with open(tcache_path) as f:
+                loaded = json.load(f)
+                if loaded.get("version") == 2:
+                    cache = loaded
+                    cache.setdefault("files", {})
+        except Exception:
+            pass
 
-        # Calculate per-model cost
+        # Drop entries for files that no longer exist (e.g. deleted subagents)
+        current = set(files)
+        for k in list(cache["files"].keys()):
+            if k not in current:
+                del cache["files"][k]
+
+        # Parse JSONL from byte offset. JSONL is append-only so offset lands on a line boundary.
+        def parse_from(path, offset, tokens, seen):
+            try:
+                with open(path, "r") as f:
+                    f.seek(offset)
+                    for line in f:
+                        line = line.strip()
+                        if not line: continue
+                        try:
+                            e = json.loads(line)
+                        except Exception:
+                            continue
+                        if e.get("type") != "assistant": continue
+                        msg = e.get("message", {})
+                        mid_ = msg.get("id", "")
+                        if mid_:
+                            if mid_ in seen:
+                                continue
+                            seen.add(mid_)
+                        model = msg.get("model") or default_model_id
+                        if model == "<synthetic>":
+                            model = default_model_id
+                        u = msg.get("usage", {})
+                        if model not in tokens:
+                            tokens[model] = [0, 0, 0, 0]
+                        tokens[model][0] += u.get("input_tokens", 0)
+                        tokens[model][1] += u.get("output_tokens", 0)
+                        tokens[model][2] += u.get("cache_creation_input_tokens", 0)
+                        tokens[model][3] += u.get("cache_read_input_tokens", 0)
+            except Exception:
+                pass
+
+        bytes_parsed = 0
+        for path in files:
+            try:
+                cur_size = os.path.getsize(path)
+            except Exception:
+                continue
+            entry = cache["files"].get(path)
+            if entry and entry.get("size", 0) <= cur_size:
+                # Incremental: seek past previously-parsed bytes
+                tokens = {k: list(v) for k, v in entry.get("tokens", {}).items()}
+                seen = set(entry.get("seen", []))
+                prev = entry.get("size", 0)
+                if cur_size > prev:
+                    parse_from(path, prev, tokens, seen)
+                    bytes_parsed += cur_size - prev
+            else:
+                # New file (or shrunk - rare; full re-parse)
+                tokens = {}
+                seen = set()
+                parse_from(path, 0, tokens, seen)
+                bytes_parsed += cur_size
+            cache["files"][path] = {"size": cur_size, "tokens": tokens, "seen": list(seen)}
+
+        # Aggregate per-model tokens -> cost
         M = 1_000_000
-        total_cost = 0
-        total_inp = total_out = total_cc = total_cr = 0
-        for mid, (inp, out, cc, cr) in model_tokens.items():
-            p = get_pricing(mid)
-            total_cost += inp/M*p[0] + out/M*p[1] + cc/M*p[2] + cr/M*p[3]
-            total_inp += inp
-            total_out += out
-            total_cc += cc
-            total_cr += cr
+        tc = 0.0
+        ti = to = tcc = tcr = 0
+        for e in cache["files"].values():
+            for mid_, vals in e.get("tokens", {}).items():
+                i_ = vals[0] if len(vals) > 0 else 0
+                o_ = vals[1] if len(vals) > 1 else 0
+                cc_ = vals[2] if len(vals) > 2 else 0
+                cr_ = vals[3] if len(vals) > 3 else 0
+                p = get_pricing(mid_)
+                tc += i_/M*p[0] + o_/M*p[1] + cc_/M*p[2] + cr_/M*p[3]
+                ti += i_; to += o_; tcc += cc_; tcr += cr_
 
-        print(json.dumps({
-            'input': total_inp, 'output': total_out,
-            'cache_create': total_cc, 'cache_read': total_cr,
-            'cost': round(total_cost, 4),
-            'file_size': $file_size
-        }))
-        " 2>/dev/null)
+        cache["fp"] = fp
+        cache["totals"] = {"input": ti, "output": to, "cc": tcc, "cr": tcr, "cost": round(tc, 4)}
 
-            if [ -n "$transcript_stats" ]; then
-              echo "$transcript_stats" > "$tcache"
-            fi
+        # Atomic write
+        try:
+            tmp = tcache_path + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump(cache, f)
+            os.replace(tmp, tcache_path)
+        except Exception:
+            pass
+
+        if debug:
+            sys.stderr.write(
+                "[statusline] files=%d parsed=%dB elapsed=%.1fms\\n"
+                % (len(files), bytes_parsed, (time.time() - t0) * 1000)
+            )
+        ' 2>"$_py_stderr"
           fi
 
           if [ -f "$tcache" ]; then
-            total_input_tokens=$(jq -r '.input // 0' "$tcache" 2>/dev/null)
-            total_output_tokens=$(jq -r '.output // 0' "$tcache" 2>/dev/null)
-            cache_creation_tokens=$(jq -r '.cache_create // 0' "$tcache" 2>/dev/null)
-            cache_read_tokens=$(jq -r '.cache_read // 0' "$tcache" 2>/dev/null)
-            total_cost=$(jq -r '.cost // 0' "$tcache" 2>/dev/null)
+            total_input_tokens=$(jq -r '.totals.input // 0' "$tcache" 2>/dev/null)
+            total_output_tokens=$(jq -r '.totals.output // 0' "$tcache" 2>/dev/null)
+            cache_creation_tokens=$(jq -r '.totals.cc // 0' "$tcache" 2>/dev/null)
+            cache_read_tokens=$(jq -r '.totals.cr // 0' "$tcache" 2>/dev/null)
+            total_cost=$(jq -r '.totals.cost // 0' "$tcache" 2>/dev/null)
           fi
         fi
 
