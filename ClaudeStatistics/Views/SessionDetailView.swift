@@ -3,10 +3,15 @@ import AppKit
 
 struct SessionDetailView: View {
     let session: Session
+    let providerDisplayName: String
+    let supportsCost: Bool
     var topic: String? = nil
     var sessionName: String? = nil
     let stats: SessionStats?
     let isLoading: Bool
+    let onNewSession: () -> Void
+    let onResume: () -> Void
+    let loadTrendData: (TrendGranularity) async -> [TrendDataPoint]
     let onBack: () -> Void
     var onDelete: (() -> Void)? = nil
     var onViewTranscript: (() -> Void)? = nil
@@ -50,14 +55,14 @@ struct SessionDetailView: View {
                     .controlSize(.small)
                 }
 
-                Button(action: { TerminalLauncher.openNewSession(session) }) {
+                Button(action: onNewSession) {
                     Label("detail.new", systemImage: "plus")
                         .font(.system(size: 11))
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
 
-                Button(action: { TerminalLauncher.openSession(session) }) {
+                Button(action: onResume) {
                     Label("detail.resume", systemImage: "terminal")
                         .font(.system(size: 11))
                 }
@@ -238,11 +243,7 @@ struct SessionDetailView: View {
         // 3. Trend — how usage changed over time
         TrendSection(
             initialGranularity: TrendGranularity.autoSelect(for: stats.duration),
-            loadData: { gran in
-                await Task.detached {
-                    TranscriptParser.shared.parseTrendData(from: session.filePath, granularity: gran)
-                }.value
-            }
+            loadData: loadTrendData
         )
 
         // 4. Tokens + Models — unified breakdown

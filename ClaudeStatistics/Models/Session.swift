@@ -2,6 +2,7 @@ import Foundation
 
 struct Session: Identifiable, Hashable {
     let id: String
+    let provider: ProviderKind
     let projectPath: String
     let filePath: String
     let startTime: Date?
@@ -20,11 +21,12 @@ struct Session: Identifiable, Hashable {
     }
 
     func hash(into hasher: inout Hasher) {
+        hasher.combine(provider)
         hasher.combine(id)
     }
 
     static func == (lhs: Session, rhs: Session) -> Bool {
-        lhs.id == rhs.id
+        lhs.provider == rhs.provider && lhs.id == rhs.id
     }
 }
 
@@ -325,9 +327,9 @@ struct SessionStats: Codable {
     }
 }
 
-/// Claude model pricing (per million tokens, USD)
+/// Model pricing (per million tokens, USD)
 /// Pricing is loaded from a local JSON config file (~/.claude-statistics/pricing.json).
-/// If the file doesn't exist, built-in defaults are used and written to the file for easy editing.
+/// Built-in defaults cover Claude and known OpenAI/Codex models, then user config overrides them.
 final class ModelPricing {
     static let shared = ModelPricing()
 
@@ -350,8 +352,10 @@ final class ModelPricing {
     private(set) var models: [String: Pricing] = [:]
     private(set) var defaultPricing = Pricing(input: 3.0, output: 15.0, cacheWrite5m: 3.75, cacheWrite1h: 6.0, cacheRead: 0.30)
 
-    // Source: https://docs.anthropic.com/en/docs/about-claude/pricing (2026-03-20)
-    // cache_write_5m = 1.25x base input,  cache_write_1h = 2x base input,  cache_read = 0.1x base input
+    // Sources:
+    // - Anthropic Claude pricing (2026-03-20)
+    // - OpenAI API Pricing / model pages verified on 2026-04-13
+    // Cache write/read multipliers follow each provider's published cached-input rates.
     private static let builtinModels: [String: Pricing] = [
         // Opus 4.6 / 4.5 — $5 in, $25 out
         "claude-opus-4-6":              Pricing(input: 5.0,  output: 25.0, cacheWrite5m: 6.25,  cacheWrite1h: 10.0,  cacheRead: 0.50),
@@ -369,6 +373,18 @@ final class ModelPricing {
         "claude-3-5-haiku-20241022":    Pricing(input: 0.80, output: 4.0,  cacheWrite5m: 1.0,   cacheWrite1h: 1.60,  cacheRead: 0.08),
         // Haiku 3 — $0.25 in, $1.25 out
         "claude-3-haiku-20240307":      Pricing(input: 0.25, output: 1.25, cacheWrite5m: 0.3125, cacheWrite1h: 0.50, cacheRead: 0.025),
+
+        // GPT-5 / Codex family
+        "gpt-5":                        Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25,  cacheWrite1h: 1.25,  cacheRead: 0.125),
+        "gpt-5.1":                      Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25,  cacheWrite1h: 1.25,  cacheRead: 0.125),
+        "gpt-5.4":                      Pricing(input: 2.50, output: 15.0, cacheWrite5m: 2.50,  cacheWrite1h: 2.50,  cacheRead: 0.25),
+        "gpt-5.4-mini":                 Pricing(input: 0.75, output: 4.50, cacheWrite5m: 0.75,  cacheWrite1h: 0.75,  cacheRead: 0.075),
+        "gpt-5-codex":                  Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25,  cacheWrite1h: 1.25,  cacheRead: 0.125),
+        "gpt-5.1-codex":                Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25,  cacheWrite1h: 1.25,  cacheRead: 0.125),
+        "gpt-5.1-codex-max":            Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25,  cacheWrite1h: 1.25,  cacheRead: 0.125),
+        "gpt-5.1-codex-mini":           Pricing(input: 0.25, output: 2.0,  cacheWrite5m: 0.25,  cacheWrite1h: 0.25,  cacheRead: 0.025),
+        "gpt-5.2-codex":                Pricing(input: 1.75, output: 14.0, cacheWrite5m: 1.75,  cacheWrite1h: 1.75,  cacheRead: 0.175),
+        "gpt-5.3-codex":                Pricing(input: 1.75, output: 14.0, cacheWrite5m: 1.75,  cacheWrite1h: 1.75,  cacheRead: 0.175),
     ]
 
     private var configDir: String {
@@ -389,7 +405,9 @@ final class ModelPricing {
         // Try loading from config file
         if let data = fm.contents(atPath: pricingFilePath),
            let loaded = try? JSONDecoder().decode(PricingFile.self, from: data) {
-            models = loaded.models
+            var merged = Self.builtinModels
+            merged.merge(loaded.models) { _, user in user }
+            models = merged
             if let d = loaded.default_pricing { defaultPricing = d }
             return
         }
@@ -449,6 +467,16 @@ final class ModelPricing {
     func pricing(for model: String) -> Pricing {
         if let p = models[model] { return p }
         let lower = model.lowercased()
+        if lower.contains("gpt-5.4-mini") { return models["gpt-5.4-mini"] ?? defaultPricing }
+        if lower.contains("gpt-5.4") { return models["gpt-5.4"] ?? defaultPricing }
+        if lower.contains("gpt-5.3-codex") { return models["gpt-5.3-codex"] ?? defaultPricing }
+        if lower.contains("gpt-5.2-codex") { return models["gpt-5.2-codex"] ?? defaultPricing }
+        if lower.contains("gpt-5.1-codex-mini") { return models["gpt-5.1-codex-mini"] ?? defaultPricing }
+        if lower.contains("gpt-5.1-codex-max") { return models["gpt-5.1-codex-max"] ?? defaultPricing }
+        if lower.contains("gpt-5.1-codex") { return models["gpt-5.1-codex"] ?? defaultPricing }
+        if lower.contains("gpt-5-codex") { return models["gpt-5-codex"] ?? defaultPricing }
+        if lower.contains("gpt-5.1") { return models["gpt-5.1"] ?? defaultPricing }
+        if lower.contains("gpt-5") { return models["gpt-5"] ?? defaultPricing }
         if lower.contains("opus") { return models.first { $0.key.contains("opus") }?.value ?? defaultPricing }
         if lower.contains("haiku") { return models.first { $0.key.contains("haiku") }?.value ?? defaultPricing }
         if lower.contains("sonnet") { return models.first { $0.key.contains("sonnet") }?.value ?? defaultPricing }

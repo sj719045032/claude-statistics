@@ -6,7 +6,7 @@ final class SessionDataStore: ObservableObject {
     // MARK: - Published state (UI binds to these)
 
     @Published var sessions: [Session] = []
-    @Published var quickStats: [String: TranscriptParser.QuickStats] = [:]
+    @Published var quickStats: [String: SessionQuickStats] = [:]
     @Published var parsedStats: [String: SessionStats] = [:]
     @Published var selectedPeriod: StatsPeriod = .daily { didSet { rebucket() } }
     @Published var weeklyResetDate: Date? { didSet { if selectedPeriod == .weekly { rebucket() } } }
@@ -19,7 +19,8 @@ final class SessionDataStore: ObservableObject {
 
     private var dirtySessionIds: Set<String> = []
     private var isPopoverVisible = false
-    private var watcher: FSEventsWatcher?
+    private var watcher: (any SessionWatcher)?
+    let provider: any SessionProvider
     private let db = DatabaseService.shared
     private let parseQueue: OperationQueue = {
         let q = OperationQueue()
@@ -29,13 +30,16 @@ final class SessionDataStore: ObservableObject {
         return q
     }()
 
+    init(provider: any SessionProvider) {
+        self.provider = provider
+    }
+
     // MARK: - Lifecycle
 
     func start() {
         db.open()
 
-        let projectsDir = (CredentialService.shared.claudeConfigDir() as NSString).appendingPathComponent("projects")
-        watcher = FSEventsWatcher(path: projectsDir, debounceSeconds: 2.0) { [weak self] changedPaths in
+        watcher = provider.makeWatcher { [weak self] changedPaths in
             Task { @MainActor [weak self] in
                 self?.handleFileChanges(changedPaths)
             }
@@ -71,13 +75,13 @@ final class SessionDataStore: ObservableObject {
         Task.detached { [weak self] in
             guard let self else { return }
             let db = self.db
-            let scannedSessions = SessionScanner.shared.scanSessions()
+            let scannedSessions = self.provider.scanSessions()
             DiagnosticLogger.shared.appLaunched(sessionCount: scannedSessions.count)
 
             // Load DB cache and determine which sessions need reparsing
-            let cache = db.loadAllCached()
+            let cache = db.loadAllCached(provider: self.provider.kind)
             var dirtyIds: [Session] = []
-            var quickMap: [String: TranscriptParser.QuickStats] = [:]
+            var quickMap: [String: SessionQuickStats] = [:]
             var statsMap: [String: SessionStats] = [:]
 
             for session in scannedSessions {
@@ -101,7 +105,7 @@ final class SessionDataStore: ObservableObject {
                 // Clean up DB entries for deleted sessions
                 let currentIds = Set(scannedSessions.map(\.id))
                 let staleIds = Set(cache.keys).subtracting(currentIds)
-                if !staleIds.isEmpty { db.removeSessions(staleIds) }
+                if !staleIds.isEmpty { db.removeSessions(provider: self.provider.kind, staleIds) }
 
                 await MainActor.run {
                     self.isFullParseComplete = true
@@ -119,8 +123,8 @@ final class SessionDataStore: ObservableObject {
 
             // Quick parse dirty sessions
             for session in dirtyIds {
-                let quick = TranscriptParser.shared.parseSessionQuick(at: session.filePath)
-                db.saveQuickStats(sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, stats: quick)
+                let quick = self.provider.parseQuickStats(at: session.filePath)
+                db.saveQuickStats(provider: self.provider.kind, sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, stats: quick)
                 await MainActor.run {
                     self.quickStats[session.id] = quick
                 }
@@ -140,7 +144,7 @@ final class SessionDataStore: ObservableObject {
                 let results = await withTaskGroup(of: (Session, SessionStats).self) { group in
                     for session in batch {
                         group.addTask {
-                            let stats = TranscriptParser.shared.parseSession(at: session.filePath)
+                            let stats = self.provider.parseSession(at: session.filePath)
                             return (session, stats)
                         }
                     }
@@ -153,8 +157,8 @@ final class SessionDataStore: ObservableObject {
 
                 // DB write + UI update (serial)
                 for (session, stats) in results {
-                    db.saveSessionStats(sessionId: session.id, stats: stats)
-                    db.indexSession(sessionId: session.id, filePath: session.filePath)
+                    db.saveSessionStats(provider: self.provider.kind, sessionId: session.id, stats: stats)
+                    db.indexSession(provider: self.provider.kind, sessionId: session.id, filePath: session.filePath)
                 }
                 processed += results.count
 
@@ -179,7 +183,7 @@ final class SessionDataStore: ObservableObject {
             // Clean up DB entries for deleted sessions
             let currentIds = Set(scannedSessions.map(\.id))
             let staleIds = Set(cache.keys).subtracting(currentIds)
-            if !staleIds.isEmpty { db.removeSessions(staleIds) }
+            if !staleIds.isEmpty { db.removeSessions(provider: self.provider.kind, staleIds) }
 
             await MainActor.run {
                 self.rebucket()
@@ -232,7 +236,7 @@ final class SessionDataStore: ObservableObject {
             let db = self.db
 
             // Rescan to pick up new/deleted files
-            let scannedSessions = SessionScanner.shared.scanSessions()
+            let scannedSessions = self.provider.scanSessions()
 
             await MainActor.run {
                 self.sessions = scannedSessions
@@ -250,13 +254,13 @@ final class SessionDataStore: ObservableObject {
             }
 
             for (i, session) in dirtySessions.enumerated() {
-                let quick = TranscriptParser.shared.parseSessionQuick(at: session.filePath)
-                db.saveQuickStats(sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, stats: quick)
+                let quick = self.provider.parseQuickStats(at: session.filePath)
+                db.saveQuickStats(provider: self.provider.kind, sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, stats: quick)
                 await MainActor.run { self.quickStats[session.id] = quick }
 
-                let stats = TranscriptParser.shared.parseSession(at: session.filePath)
-                db.saveSessionStats(sessionId: session.id, stats: stats)
-                db.indexSession(sessionId: session.id, filePath: session.filePath)
+                let stats = self.provider.parseSession(at: session.filePath)
+                db.saveSessionStats(provider: self.provider.kind, sessionId: session.id, stats: stats)
+                db.indexSession(provider: self.provider.kind, sessionId: session.id, filePath: session.filePath)
                 await MainActor.run {
                     self.parsedStats[session.id] = stats
                     if showProgress {
@@ -349,7 +353,7 @@ final class SessionDataStore: ObservableObject {
             quickStats.removeValue(forKey: id)
             parsedStats.removeValue(forKey: id)
         }
-        db.removeSessions(ids)
+        db.removeSessions(provider: provider.kind, ids)
         rebucket()
     }
 
@@ -379,12 +383,12 @@ final class SessionDataStore: ObservableObject {
             parsedStats.removeValue(forKey: id)
             quickStats.removeValue(forKey: id)
         }
-        db.removeSessions(staleIds)
+        db.removeSessions(provider: provider.kind, staleIds)
     }
 
     /// Search messages via FTS index
     func searchMessages(query: String) -> [DatabaseService.SearchResult] {
-        db.search(query: query)
+        db.search(query: query, provider: provider.kind)
     }
 
     /// Returns the period-over-period comparison for `stat` vs the preceding period.

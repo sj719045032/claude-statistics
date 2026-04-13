@@ -83,6 +83,8 @@ final class FSEventsWatcher {
     }
 }
 
+extension FSEventsWatcher: SessionWatcher {}
+
 // C callback — extracts file paths and forwards to instance
 private func fsEventsCallback(
     _ streamRef: ConstFSEventStreamRef,

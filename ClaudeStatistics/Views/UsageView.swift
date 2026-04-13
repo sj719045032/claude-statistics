@@ -3,7 +3,7 @@ import SwiftUI
 struct UsageView: View {
     @ObservedObject var viewModel: UsageViewModel
     @ObservedObject var store: SessionDataStore
-    @State private var selectedWindowTab = "5h"
+    @State private var selectedWindowTab: UsageWindowTab = .fiveHour
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -11,17 +11,17 @@ struct UsageView: View {
                 Text("usage.title")
                     .font(.headline)
                 Spacer()
-                Button(action: {
-                    if let url = URL(string: "https://claude.ai/settings/usage") {
-                        NSWorkspace.shared.open(url)
+                if let dashboardURL = viewModel.dashboardURL {
+                    Button(action: {
+                        NSWorkspace.shared.open(dashboardURL)
+                    }) {
+                        Image(systemName: "safari")
+                            .font(.system(size: 11))
                     }
-                }) {
-                    Image(systemName: "safari")
-                        .font(.system(size: 11))
+                    .buttonStyle(.hoverScale)
+                    .foregroundStyle(.secondary)
+                    .help("usage.viewOnline")
                 }
-                .buttonStyle(.hoverScale)
-                .foregroundStyle(.secondary)
-                .help("usage.viewOnline")
 
                 if viewModel.isLoading {
                     ProgressView()
@@ -37,23 +37,29 @@ struct UsageView: View {
             }
 
             if let usage = viewModel.usageData {
+                let tabs = availableWindowTabs(for: usage)
+
                 if let error = viewModel.errorMessage {
                     errorBanner(error)
                 }
 
-                UsageWindowRow(
-                    title: "usage.5hour",
-                    utilization: usage.fiveHour?.utilization ?? 0,
-                    countdown: viewModel.fiveHourResetCountdown,
-                    exhaustEstimate: viewModel.fiveHourExhaustEstimate
-                )
+                if let fiveHour = usage.fiveHour {
+                    UsageWindowRow(
+                        title: "usage.5hour",
+                        utilization: fiveHour.utilization,
+                        countdown: viewModel.fiveHourResetCountdown,
+                        exhaustEstimate: viewModel.fiveHourExhaustEstimate
+                    )
+                }
 
-                UsageWindowRow(
-                    title: "usage.7day",
-                    utilization: usage.sevenDay?.utilization ?? 0,
-                    countdown: viewModel.sevenDayResetCountdown,
-                    exhaustEstimate: viewModel.sevenDayExhaustEstimate
-                )
+                if let sevenDay = usage.sevenDay {
+                    UsageWindowRow(
+                        title: "usage.7day",
+                        utilization: sevenDay.utilization,
+                        countdown: viewModel.sevenDayResetCountdown,
+                        exhaustEstimate: viewModel.sevenDayExhaustEstimate
+                    )
+                }
 
                 if let opus = usage.sevenDayOpus {
                     UsageWindowRow(
@@ -76,25 +82,25 @@ struct UsageView: View {
 
                 Divider()
 
-                Picker("", selection: $selectedWindowTab) {
-                    Text("5h").tag("5h")
-                    Text("7d").tag("7d")
-                    if usage.sevenDaySonnet != nil {
-                        Text("7d Sonnet").tag("7d_sonnet")
+                if !tabs.isEmpty {
+                    Picker("", selection: $selectedWindowTab) {
+                        ForEach(tabs, id: \.self) { tab in
+                            Text(tab.label).tag(tab)
+                        }
                     }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
 
-                switch selectedWindowTab {
-                case "5h":
-                    windowChart(for: usage.fiveHour, durationValue: -5, durationComponent: .hour, granularity: .fiveMinute, modelFilter: isClaude)
-                case "7d":
-                    windowChart(for: usage.sevenDay, durationValue: -7, durationComponent: .day, granularity: .hour, modelFilter: isClaude)
-                case "7d_sonnet":
-                    windowChart(for: usage.sevenDaySonnet, durationValue: -7, durationComponent: .day, granularity: .hour, modelFilter: isSonnet)
-                default:
-                    EmptyView()
+                    switch selectedWindowTab {
+                    case .fiveHour:
+                        windowChart(for: usage.fiveHour, durationValue: -5, durationComponent: .hour, granularity: .fiveMinute, modelFilter: defaultUsageModelFilter)
+                    case .sevenDay:
+                        windowChart(for: usage.sevenDay, durationValue: -7, durationComponent: .day, granularity: .hour, modelFilter: defaultUsageModelFilter)
+                    case .sevenDayOpus:
+                        windowChart(for: usage.sevenDayOpus, durationValue: -7, durationComponent: .day, granularity: .hour, modelFilter: isOpus)
+                    case .sevenDaySonnet:
+                        windowChart(for: usage.sevenDaySonnet, durationValue: -7, durationComponent: .day, granularity: .hour, modelFilter: isSonnet)
+                    }
                 }
             } else if !viewModel.isLoading {
                 // No data — show error or empty state with retry action
@@ -129,10 +135,30 @@ struct UsageView: View {
             }
         }
         .textSelection(.enabled)
+        .onAppear { ensureValidSelectedWindow() }
+        .onChange(of: viewModel.usageData) { _, _ in
+            ensureValidSelectedWindow()
+        }
     }
 }
 
 extension UsageView {
+    enum UsageWindowTab: Hashable {
+        case fiveHour
+        case sevenDay
+        case sevenDayOpus
+        case sevenDaySonnet
+
+        var label: String {
+            switch self {
+            case .fiveHour: return "5h"
+            case .sevenDay: return "7d"
+            case .sevenDayOpus: return "7d Opus"
+            case .sevenDaySonnet: return "7d Sonnet"
+            }
+        }
+    }
+
     struct WindowTrendInfo {
         let dataPoints: [TrendDataPoint]
         let granularity: TrendGranularity
@@ -175,13 +201,42 @@ extension UsageView {
         model.lowercased().contains("claude")
     }
 
+    private func isOpus(_ model: String) -> Bool {
+        model.lowercased().contains("opus")
+    }
+
     private func isSonnet(_ model: String) -> Bool {
         model.lowercased().contains("sonnet")
     }
 
-    private func isClaudeNonSonnet(_ model: String) -> Bool {
-        let lower = model.lowercased()
-        return lower.contains("claude") && !lower.contains("sonnet")
+    private var defaultUsageModelFilter: ((String) -> Bool)? {
+        store.provider.kind == .claude ? isClaude : nil
+    }
+
+    private func availableWindowTabs(for usage: UsageData) -> [UsageWindowTab] {
+        var tabs: [UsageWindowTab] = []
+        if usage.fiveHour != nil {
+            tabs.append(.fiveHour)
+        }
+        if usage.sevenDay != nil {
+            tabs.append(.sevenDay)
+        }
+        if usage.sevenDayOpus != nil {
+            tabs.append(.sevenDayOpus)
+        }
+        if usage.sevenDaySonnet != nil {
+            tabs.append(.sevenDaySonnet)
+        }
+        return tabs
+    }
+
+    private func ensureValidSelectedWindow() {
+        guard let usage = viewModel.usageData else { return }
+        let tabs = availableWindowTabs(for: usage)
+        guard !tabs.isEmpty else { return }
+        if !tabs.contains(selectedWindowTab) {
+            selectedWindowTab = tabs[0]
+        }
     }
 
     @ViewBuilder

@@ -36,58 +36,46 @@ enum TerminalApp: String, CaseIterable, Identifiable {
 }
 
 enum TerminalLauncher {
-    /// Open a new Claude session in the same directory
-    static func openNewSession(_ session: Session) {
-        let cwd = session.cwd ?? decodeProjectPath(session.projectPath) ?? NSHomeDirectory()
-        launchInTerminal(cwd: cwd, claudeArgs: "")
+    static func launch(executable: String, arguments: [String], cwd: String) {
+        launchInTerminal(cwd: cwd, executable: executable, arguments: arguments)
     }
 
-    /// Open a Claude session in the user's terminal
-    static func openSession(_ session: Session) {
-        let cwd = session.cwd ?? decodeProjectPath(session.projectPath) ?? NSHomeDirectory()
-        launchInTerminal(cwd: cwd, claudeArgs: "--resume \(session.id)")
-    }
-
-    /// Open a new Claude session in a specific directory
-    static func openNewSessionInDirectory(_ path: String) {
-        launchInTerminal(cwd: path, claudeArgs: "")
-    }
-
-    private static func launchInTerminal(cwd: String, claudeArgs: String) {
-        let command = "cd \(shellEscape(cwd)) && claude" + (claudeArgs.isEmpty ? "" : " \(claudeArgs)")
+    private static func launchInTerminal(cwd: String, executable: String, arguments: [String]) {
+        let commandOnly = shellCommand(executable: executable, arguments: arguments)
+        let command = "cd \(shellEscape(cwd)) && \(commandOnly)"
         let preferred = TerminalApp.preferred
         switch preferred {
         case .auto:
             if TerminalApp.ghostty.isInstalled {
-                openInGhostty(cwd: cwd, claudeArgs: claudeArgs)
+                openInGhostty(cwd: cwd, executable: executable, arguments: arguments)
             } else if TerminalApp.iterm.isInstalled {
                 openInITerm(command: command)
             } else if TerminalApp.warp.isInstalled {
-                openInWarp(cwd: cwd, claudeArgs: claudeArgs)
+                openInWarp(cwd: cwd, executable: executable, arguments: arguments)
             } else {
                 openInTerminalApp(command: command)
             }
         case .ghostty:
-            openInGhostty(cwd: cwd, claudeArgs: claudeArgs)
+            openInGhostty(cwd: cwd, executable: executable, arguments: arguments)
         case .iterm:
             openInITerm(command: command)
         case .terminal:
             openInTerminalApp(command: command)
         case .warp:
-            openInWarp(cwd: cwd, claudeArgs: claudeArgs)
+            openInWarp(cwd: cwd, executable: executable, arguments: arguments)
         case .kitty:
-            openInKitty(command: command, cwd: cwd)
+            openInKitty(command: commandOnly, cwd: cwd)
         case .alacritty:
-            openInAlacritty(command: command, cwd: cwd)
+            openInAlacritty(command: commandOnly, cwd: cwd)
         }
     }
 
     // MARK: - Ghostty
 
-    private static func openInGhostty(cwd: String, claudeArgs: String) {
-        let claudeCommand = "claude" + (claudeArgs.isEmpty ? "" : " \(claudeArgs)")
+    private static func openInGhostty(cwd: String, executable: String, arguments: [String]) {
+        let launchCommand = shellCommand(executable: executable, arguments: arguments)
         let scriptPath = (cwd as NSString).appendingPathComponent(".cs-launch")
-        let content = "#!/bin/zsh -l\nrm -f \(shellEscape(scriptPath))\nexec \(claudeCommand)\n"
+        let content = "#!/bin/zsh -l\nrm -f \(shellEscape(scriptPath))\nexec \(launchCommand)\n"
         guard (try? content.write(toFile: scriptPath, atomically: true, encoding: .utf8)) != nil,
               (try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptPath)) != nil
         else { return }
@@ -130,10 +118,10 @@ enum TerminalLauncher {
 
     // MARK: - Warp
 
-    private static func openInWarp(cwd: String, claudeArgs: String) {
-        let claudeCommand = "claude" + (claudeArgs.isEmpty ? "" : " \(claudeArgs)")
+    private static func openInWarp(cwd: String, executable: String, arguments: [String]) {
+        let launchCommand = shellCommand(executable: executable, arguments: arguments)
         let scriptPath = (cwd as NSString).appendingPathComponent(".cs-launch")
-        let content = "#!/bin/bash\nrm -f \(shellEscape(scriptPath))\nexec \(claudeCommand)\n"
+        let content = "#!/bin/bash\nrm -f \(shellEscape(scriptPath))\nexec \(launchCommand)\n"
         guard (try? content.write(toFile: scriptPath, atomically: true, encoding: .utf8)) != nil,
               (try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptPath)) != nil
         else { return }
@@ -152,7 +140,7 @@ enum TerminalLauncher {
     private static func openInKitty(command: String, cwd: String) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/Applications/kitty.app/Contents/MacOS/kitty")
-        process.arguments = ["--single-instance", "--directory", cwd, "bash", "-c", command.replacingOccurrences(of: "cd \(shellEscape(cwd)) && ", with: "") + "; exec bash"]
+        process.arguments = ["--single-instance", "--directory", cwd, "bash", "-c", command + "; exec bash"]
         process.standardOutput = Pipe()
         process.standardError = Pipe()
         try? process.run()
@@ -163,7 +151,7 @@ enum TerminalLauncher {
     private static func openInAlacritty(command: String, cwd: String) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/Applications/Alacritty.app/Contents/MacOS/alacritty")
-        process.arguments = ["--working-directory", cwd, "-e", "bash", "-c", command.replacingOccurrences(of: "cd \(shellEscape(cwd)) && ", with: "") + "; exec bash"]
+        process.arguments = ["--working-directory", cwd, "-e", "bash", "-c", command + "; exec bash"]
         process.standardOutput = Pipe()
         process.standardError = Pipe()
         try? process.run()
@@ -190,51 +178,12 @@ enum TerminalLauncher {
         }
     }
 
-    /// Decode the encoded project path back to a real filesystem path.
-    static func decodeProjectPath(_ encoded: String) -> String? {
-        let stripped = encoded.hasPrefix("-") ? String(encoded.dropFirst()) : encoded
-        let parts = stripped.split(separator: "-", omittingEmptySubsequences: false).map(String.init)
-        guard !parts.isEmpty else { return nil }
-
-        let fm = FileManager.default
-        var currentPath = "/" + parts[0]
-        var i = 1
-
-        while i < parts.count {
-            let asSubdir = currentPath + "/" + parts[i]
-            let asHyphen = currentPath + "-" + parts[i]
-
-            if i == parts.count - 1 {
-                if fm.fileExists(atPath: asSubdir) {
-                    currentPath = asSubdir
-                } else if fm.fileExists(atPath: asHyphen) {
-                    currentPath = asHyphen
-                } else {
-                    currentPath = asSubdir
-                }
-            } else {
-                var isDirSub: ObjCBool = false
-                var isDirHyp: ObjCBool = false
-                let subExists = fm.fileExists(atPath: asSubdir, isDirectory: &isDirSub) && isDirSub.boolValue
-                let hypExists = fm.fileExists(atPath: asHyphen, isDirectory: &isDirHyp) && isDirHyp.boolValue
-
-                if hypExists && !subExists {
-                    currentPath = asHyphen
-                } else {
-                    currentPath = asSubdir
-                }
-            }
-            i += 1
-        }
-
-        if fm.fileExists(atPath: currentPath) {
-            return currentPath
-        }
-        return nil
-    }
-
     private static func shellEscape(_ str: String) -> String {
         "'" + str.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    private static func shellCommand(executable: String, arguments: [String]) -> String {
+        ([shellEscape(executable)] + arguments.map(shellEscape)).joined(separator: " ")
     }
 
     private static func escapeAppleScript(_ str: String) -> String {

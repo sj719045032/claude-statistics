@@ -48,6 +48,7 @@ final class DatabaseService {
         // FTS5 for message content search
         execute("""
             CREATE VIRTUAL TABLE IF NOT EXISTS messages USING fts5(
+                provider UNINDEXED,
                 session_id UNINDEXED,
                 role UNINDEXED,
                 content,
@@ -58,17 +59,19 @@ final class DatabaseService {
         // Session stats cache (fingerprint + serialized stats)
         execute("""
             CREATE TABLE IF NOT EXISTS session_cache(
-                session_id TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                session_id TEXT NOT NULL,
                 file_size INTEGER NOT NULL,
                 mtime REAL NOT NULL,
                 quick_json TEXT,
-                stats_json TEXT
+                stats_json TEXT,
+                PRIMARY KEY (provider, session_id)
             )
         """)
     }
 
     /// Current schema version — bump to force full reparse of session cache
-    private static let currentSchemaVersion: Int32 = 4
+    private static let currentSchemaVersion: Int32 = 5
 
     private func migrateIfNeeded() {
         var version: Int32 = 0
@@ -80,8 +83,7 @@ final class DatabaseService {
         sqlite3_finalize(stmt)
 
         if version < Self.currentSchemaVersion {
-            // Clear session cache to force reparse with new hourSlices field
-            execute("DELETE FROM session_cache")
+            resetDatabase()
             execute("PRAGMA user_version = \(Self.currentSchemaVersion)")
         }
     }
@@ -96,21 +98,27 @@ final class DatabaseService {
     // MARK: - Stats Cache
 
     struct CachedSession {
+        let provider: ProviderKind
         let sessionId: String
         let fileSize: Int64
         let mtime: Date
-        let quickStats: TranscriptParser.QuickStats?
+        let quickStats: SessionQuickStats?
         let sessionStats: SessionStats?
     }
 
     /// Load all cached sessions from the database
-    func loadAllCached() -> [String: CachedSession] {
+    func loadAllCached(provider: ProviderKind) -> [String: CachedSession] {
         guard let db else { return [:] }
 
-        let sql = "SELECT session_id, file_size, mtime, quick_json, stats_json FROM session_cache"
+        let sql = """
+            SELECT session_id, file_size, mtime, quick_json, stats_json
+            FROM session_cache
+            WHERE provider = ?
+        """
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [:] }
         defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, provider.rawValue, -1, sqliteTransient)
 
         let decoder = JSONDecoder()
         var result: [String: CachedSession] = [:]
@@ -120,10 +128,10 @@ final class DatabaseService {
             let fileSize = sqlite3_column_int64(stmt, 1)
             let mtime = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 2))
 
-            var quick: TranscriptParser.QuickStats?
+            var quick: SessionQuickStats?
             if let ptr = sqlite3_column_text(stmt, 3) {
                 let json = Data(String(cString: ptr).utf8)
-                quick = try? decoder.decode(TranscriptParser.QuickStats.self, from: json)
+                quick = try? decoder.decode(SessionQuickStats.self, from: json)
             }
 
             var stats: SessionStats?
@@ -133,6 +141,7 @@ final class DatabaseService {
             }
 
             result[sessionId] = CachedSession(
+                provider: provider,
                 sessionId: sessionId,
                 fileSize: fileSize,
                 mtime: mtime,
@@ -153,7 +162,7 @@ final class DatabaseService {
     }
 
     /// Save quick stats for a session (upsert)
-    func saveQuickStats(sessionId: String, fileSize: Int64, mtime: Date, stats: TranscriptParser.QuickStats) {
+    func saveQuickStats(provider: ProviderKind, sessionId: String, fileSize: Int64, mtime: Date, stats: SessionQuickStats) {
         guard let db else { return }
 
         let encoder = JSONEncoder()
@@ -161,9 +170,9 @@ final class DatabaseService {
               let jsonStr = String(data: json, encoding: .utf8) else { return }
 
         let sql = """
-            INSERT INTO session_cache(session_id, file_size, mtime, quick_json)
-            VALUES(?, ?, ?, ?)
-            ON CONFLICT(session_id) DO UPDATE SET
+            INSERT INTO session_cache(provider, session_id, file_size, mtime, quick_json)
+            VALUES(?, ?, ?, ?, ?)
+            ON CONFLICT(provider, session_id) DO UPDATE SET
                 file_size = excluded.file_size,
                 mtime = excluded.mtime,
                 quick_json = excluded.quick_json
@@ -172,49 +181,53 @@ final class DatabaseService {
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
         defer { sqlite3_finalize(stmt) }
 
-        sqlite3_bind_text(stmt, 1, sessionId, -1, sqliteTransient)
-        sqlite3_bind_int64(stmt, 2, fileSize)
-        sqlite3_bind_double(stmt, 3, mtime.timeIntervalSince1970)
-        sqlite3_bind_text(stmt, 4, jsonStr, -1, sqliteTransient)
+        sqlite3_bind_text(stmt, 1, provider.rawValue, -1, sqliteTransient)
+        sqlite3_bind_text(stmt, 2, sessionId, -1, sqliteTransient)
+        sqlite3_bind_int64(stmt, 3, fileSize)
+        sqlite3_bind_double(stmt, 4, mtime.timeIntervalSince1970)
+        sqlite3_bind_text(stmt, 5, jsonStr, -1, sqliteTransient)
         sqlite3_step(stmt)
     }
 
     /// Save full session stats (update existing row)
-    func saveSessionStats(sessionId: String, stats: SessionStats) {
+    func saveSessionStats(provider: ProviderKind, sessionId: String, stats: SessionStats) {
         guard let db else { return }
 
         let encoder = JSONEncoder()
         guard let json = try? encoder.encode(stats),
               let jsonStr = String(data: json, encoding: .utf8) else { return }
 
-        let sql = "UPDATE session_cache SET stats_json = ? WHERE session_id = ?"
+        let sql = "UPDATE session_cache SET stats_json = ? WHERE provider = ? AND session_id = ?"
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
         defer { sqlite3_finalize(stmt) }
 
         sqlite3_bind_text(stmt, 1, jsonStr, -1, sqliteTransient)
-        sqlite3_bind_text(stmt, 2, sessionId, -1, sqliteTransient)
+        sqlite3_bind_text(stmt, 2, provider.rawValue, -1, sqliteTransient)
+        sqlite3_bind_text(stmt, 3, sessionId, -1, sqliteTransient)
         sqlite3_step(stmt)
     }
 
     /// Remove cached data for deleted sessions
-    func removeSessions(_ sessionIds: Set<String>) {
+    func removeSessions(provider: ProviderKind, _ sessionIds: Set<String>) {
         guard let db, !sessionIds.isEmpty else { return }
 
         execute("BEGIN TRANSACTION")
         for id in sessionIds {
-            let sql1 = "DELETE FROM session_cache WHERE session_id = ?"
+            let sql1 = "DELETE FROM session_cache WHERE provider = ? AND session_id = ?"
             var stmt1: OpaquePointer?
             if sqlite3_prepare_v2(db, sql1, -1, &stmt1, nil) == SQLITE_OK {
-                sqlite3_bind_text(stmt1, 1, id, -1, sqliteTransient)
+                sqlite3_bind_text(stmt1, 1, provider.rawValue, -1, sqliteTransient)
+                sqlite3_bind_text(stmt1, 2, id, -1, sqliteTransient)
                 sqlite3_step(stmt1)
                 sqlite3_finalize(stmt1)
             }
 
-            let sql2 = "DELETE FROM messages WHERE session_id = ?"
+            let sql2 = "DELETE FROM messages WHERE provider = ? AND session_id = ?"
             var stmt2: OpaquePointer?
             if sqlite3_prepare_v2(db, sql2, -1, &stmt2, nil) == SQLITE_OK {
-                sqlite3_bind_text(stmt2, 1, id, -1, sqliteTransient)
+                sqlite3_bind_text(stmt2, 1, provider.rawValue, -1, sqliteTransient)
+                sqlite3_bind_text(stmt2, 2, id, -1, sqliteTransient)
                 sqlite3_step(stmt2)
                 sqlite3_finalize(stmt2)
             }
@@ -225,7 +238,16 @@ final class DatabaseService {
     // MARK: - Search Index
 
     /// Index all messages from a session's JSONL file into FTS
-    func indexSession(sessionId: String, filePath: String) {
+    func indexSession(provider: ProviderKind, sessionId: String, filePath: String) {
+        switch provider {
+        case .claude:
+            indexClaudeSession(provider: provider, sessionId: sessionId, filePath: filePath)
+        case .codex:
+            indexCodexSession(provider: provider, sessionId: sessionId, filePath: filePath)
+        }
+    }
+
+    private func indexClaudeSession(provider: ProviderKind, sessionId: String, filePath: String) {
         guard let db else { return }
         guard let data = FileManager.default.contents(atPath: filePath) else { return }
 
@@ -233,10 +255,11 @@ final class DatabaseService {
         let decoder = JSONDecoder()
 
         // Remove old entries first
-        let delSQL = "DELETE FROM messages WHERE session_id = ?"
+        let delSQL = "DELETE FROM messages WHERE provider = ? AND session_id = ?"
         var delStmt: OpaquePointer?
         if sqlite3_prepare_v2(db, delSQL, -1, &delStmt, nil) == SQLITE_OK {
-            sqlite3_bind_text(delStmt, 1, sessionId, -1, sqliteTransient)
+            sqlite3_bind_text(delStmt, 1, provider.rawValue, -1, sqliteTransient)
+            sqlite3_bind_text(delStmt, 2, sessionId, -1, sqliteTransient)
             sqlite3_step(delStmt)
             sqlite3_finalize(delStmt)
         }
@@ -244,7 +267,7 @@ final class DatabaseService {
         // Insert in transaction
         execute("BEGIN TRANSACTION")
 
-        let insertSQL = "INSERT INTO messages(session_id, role, content, timestamp) VALUES(?, ?, ?, ?)"
+        let insertSQL = "INSERT INTO messages(provider, session_id, role, content, timestamp) VALUES(?, ?, ?, ?, ?)"
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, insertSQL, -1, &stmt, nil) == SQLITE_OK else {
             execute("ROLLBACK")
@@ -253,10 +276,11 @@ final class DatabaseService {
 
         func insertRow(_ role: String, _ text: String, _ timestamp: String) {
             sqlite3_reset(stmt)
-            sqlite3_bind_text(stmt, 1, sessionId, -1, sqliteTransient)
-            sqlite3_bind_text(stmt, 2, role, -1, sqliteTransient)
-            sqlite3_bind_text(stmt, 3, text, -1, sqliteTransient)
-            sqlite3_bind_text(stmt, 4, timestamp, -1, sqliteTransient)
+            sqlite3_bind_text(stmt, 1, provider.rawValue, -1, sqliteTransient)
+            sqlite3_bind_text(stmt, 2, sessionId, -1, sqliteTransient)
+            sqlite3_bind_text(stmt, 3, role, -1, sqliteTransient)
+            sqlite3_bind_text(stmt, 4, text, -1, sqliteTransient)
+            sqlite3_bind_text(stmt, 5, timestamp, -1, sqliteTransient)
             sqlite3_step(stmt)
         }
 
@@ -327,6 +351,58 @@ final class DatabaseService {
         execute("COMMIT")
     }
 
+    private func indexCodexSession(provider: ProviderKind, sessionId: String, filePath: String) {
+        guard let db else { return }
+
+        let delSQL = "DELETE FROM messages WHERE provider = ? AND session_id = ?"
+        var delStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, delSQL, -1, &delStmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(delStmt, 1, provider.rawValue, -1, sqliteTransient)
+            sqlite3_bind_text(delStmt, 2, sessionId, -1, sqliteTransient)
+            sqlite3_step(delStmt)
+            sqlite3_finalize(delStmt)
+        }
+
+        let messages = CodexTranscriptParser.shared.parseMessages(at: filePath)
+
+        execute("BEGIN TRANSACTION")
+
+        let insertSQL = "INSERT INTO messages(provider, session_id, role, content, timestamp) VALUES(?, ?, ?, ?, ?)"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, insertSQL, -1, &stmt, nil) == SQLITE_OK else {
+            execute("ROLLBACK")
+            return
+        }
+
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        for message in messages {
+            var parts: [String] = []
+            if !message.text.isEmpty { parts.append(message.text) }
+            if let toolName = message.toolName, !toolName.isEmpty { parts.append(toolName) }
+            if let toolDetail = message.toolDetail, !toolDetail.isEmpty { parts.append(toolDetail) }
+            if let oldString = message.editOldString, !oldString.isEmpty { parts.append(oldString) }
+            if let newString = message.editNewString, !newString.isEmpty { parts.append(newString) }
+
+            let combined = SearchUtils.stripMarkdown(parts.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines))
+            guard combined.count > 2 else { continue }
+
+            sqlite3_reset(stmt)
+            sqlite3_bind_text(stmt, 1, provider.rawValue, -1, sqliteTransient)
+            sqlite3_bind_text(stmt, 2, sessionId, -1, sqliteTransient)
+            sqlite3_bind_text(stmt, 3, message.role, -1, sqliteTransient)
+            sqlite3_bind_text(stmt, 4, combined, -1, sqliteTransient)
+
+            let timestamp = message.timestamp.map { isoFormatter.string(from: $0) } ?? ""
+            sqlite3_bind_text(stmt, 5, timestamp, -1, sqliteTransient)
+            sqlite3_step(stmt)
+        }
+
+        sqlite3_finalize(stmt)
+        execute("COMMIT")
+    }
+
     /// Search results grouped by session
     struct SearchResult {
         let sessionId: String
@@ -335,7 +411,7 @@ final class DatabaseService {
     }
 
     /// Full-text search across all indexed messages. Returns best match per session.
-    func search(query: String) -> [SearchResult] {
+    func search(query: String, provider: ProviderKind) -> [SearchResult] {
         guard let db, !query.isEmpty else { return [] }
 
         // Sanitize query for FTS5: escape double quotes, wrap terms
@@ -343,9 +419,9 @@ final class DatabaseService {
         guard !sanitized.isEmpty else { return [] }
 
         let sql = """
-            SELECT session_id, snippet(messages, 2, '«', '»', '…', 20), role
+            SELECT session_id, snippet(messages, 3, '«', '»', '…', 20), role
             FROM messages
-            WHERE content MATCH ?
+            WHERE provider = ? AND content MATCH ?
             ORDER BY rank
             LIMIT 200
         """
@@ -353,7 +429,8 @@ final class DatabaseService {
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
         defer { sqlite3_finalize(stmt) }
 
-        sqlite3_bind_text(stmt, 1, sanitized, -1, sqliteTransient)
+        sqlite3_bind_text(stmt, 1, provider.rawValue, -1, sqliteTransient)
+        sqlite3_bind_text(stmt, 2, sanitized, -1, sqliteTransient)
 
         // Collect all matches, keep best (first) per session, preserving SQLite rank order
         var seenIds = Set<String>()

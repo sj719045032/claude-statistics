@@ -6,6 +6,7 @@ struct SettingsView: View {
     @ObservedObject var profileViewModel: ProfileViewModel
     @Binding var tabOrder: [AppTab]
     @ObservedObject var updaterService: UpdaterService
+    let provider: any SessionProvider
     @AppStorage("autoRefreshEnabled") private var autoRefreshEnabled = false
     @AppStorage("refreshInterval") private var refreshInterval = 300.0
     @AppStorage("preferredTerminal") private var preferredTerminal = "Auto"
@@ -29,18 +30,23 @@ struct SettingsView: View {
 
     private var settingsContent: some View {
         VStack(spacing: 0) {
-            // Account card (outside Form)
-            accountCard
-                .padding(.horizontal, 12)
-                .padding(.top, 8)
-                .padding(.bottom, 4)
-                .task {
-                    let tokenFound = CredentialService.shared.getAccessToken() != nil
-                    hasToken = tokenFound
-                    if tokenFound && profileViewModel.userProfile == nil {
-                        await profileViewModel.loadProfile()
-                    }
+            Group {
+                if provider.capabilities.supportsProfile {
+                    accountCard
+                        .task(id: provider.kind) {
+                            hasToken = provider.credentialStatus
+                            if hasToken != false {
+                                await profileViewModel.loadProfile()
+                            }
+                        }
+                } else {
+                    providerCard
                 }
+            }
+            .animation(.easeInOut(duration: 0.2), value: provider.kind)
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 6)
 
             Divider()
 
@@ -76,6 +82,7 @@ struct SettingsView: View {
             }
 
             // Auto Refresh
+            if provider.capabilities.supportsUsageWindows {
             Section("settings.autoRefresh") {
                 Toggle("settings.enableAutoRefresh", isOn: $autoRefreshEnabled)
                     .onChange(of: autoRefreshEnabled) { _, newValue in
@@ -137,6 +144,7 @@ struct SettingsView: View {
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
+            }
 
             // Language + Font Size
             Section("settings.appearance") {
@@ -177,6 +185,7 @@ struct SettingsView: View {
             }
 
             // Pricing
+            if provider.capabilities.supportsCost {
             Section("settings.pricing") {
                 Button(action: { showPricing = true }) {
                     HStack {
@@ -192,10 +201,14 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.plain)
             }
+            }
 
             // Status Line + Tab Order
             Section("settings.customize") {
-                StatusLineSection()
+                if let installer = provider.statusLineInstaller {
+                    StatusLineSection(installer: installer)
+                        .id(provider.kind)
+                }
 
                 TabOrderEditor(tabOrder: $tabOrder)
                 Button("settings.resetDefault") {
@@ -209,7 +222,8 @@ struct SettingsView: View {
             // About + Diagnostics
             Section("settings.about") {
                 HStack {
-                    Text("settings.version")
+                    Text("app.name")
+                        .font(.system(size: 12, weight: .medium))
                     Spacer()
                     Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "–")
                         .foregroundStyle(.secondary)
@@ -309,17 +323,34 @@ struct SettingsView: View {
     // MARK: - Account Card
 
     private var accountCard: some View {
+        Group {
+            if profileViewModel.profileLoading || (profileViewModel.userProfile == nil && hasToken == nil) {
+                // Loading state — no avatar, just a centered spinner
+                HStack {
+                    Spacer()
+                    ProgressView().scaleEffect(0.6)
+                    Spacer()
+                }
+            } else {
+                accountCardContent
+            }
+        }
+        .frame(minHeight: 56)
+        .padding(10)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .shadow(color: Theme.cardShadowColor, radius: Theme.cardShadowRadius, y: Theme.cardShadowY)
+    }
+
+    @ViewBuilder
+    private var accountCardContent: some View {
         HStack(spacing: 10) {
             // Avatar
             ZStack {
                 Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.blue.opacity(0.2), Color.purple.opacity(0.15)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(LinearGradient(
+                        colors: [Color.blue.opacity(0.2), Color.purple.opacity(0.15)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing))
                     .frame(width: 36, height: 36)
                     .shadow(color: .blue.opacity(0.15), radius: 4, y: 1)
                 Text(avatarInitial)
@@ -327,9 +358,7 @@ struct SettingsView: View {
                     .foregroundStyle(.blue)
             }
 
-            if profileViewModel.profileLoading {
-                ProgressView().scaleEffect(0.5)
-            } else if let profile = profileViewModel.userProfile {
+            if let profile = profileViewModel.userProfile {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(profile.account?.displayName ?? "–")
                         .font(.system(size: 13, weight: .medium))
@@ -337,19 +366,19 @@ struct SettingsView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
-
                 Spacer()
-
                 VStack(alignment: .trailing, spacing: 3) {
                     if let org = profile.organization {
                         HStack(spacing: 4) {
-                            Text(org.orgTypeDisplayName)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.gray.opacity(0.1))
-                                .clipShape(Capsule())
+                            if org.organizationType != nil {
+                                Text(org.orgTypeDisplayName)
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.gray.opacity(0.1))
+                                    .clipShape(Capsule())
+                            }
                             Text(org.tierDisplayName)
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundStyle(.blue)
@@ -395,10 +424,36 @@ struct SettingsView: View {
                         .foregroundStyle(.tertiary)
                 }
                 Spacer()
-            } else {
-                ProgressView().scaleEffect(0.5)
-                Spacer()
             }
+        }
+    }
+
+    private var providerCard: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.green.opacity(0.2), Color.blue.opacity(0.15)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 36, height: 36)
+                Text(String(provider.kind.displayName.prefix(1)))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.blue)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(provider.kind.displayName)
+                    .font(.system(size: 13, weight: .medium))
+                Text(provider.capabilities.supportsUsageWindows ? "Local session parsing and usage snapshots" : "Local session parsing only")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
         }
         .padding(10)
         .background(.ultraThinMaterial)
@@ -843,15 +898,23 @@ struct PricingManageView: View {
 // MARK: - Status Line Integration
 
 struct StatusLineSection: View {
-    @State private var isInstalled = StatusLineInstaller.isInstalled
-    @State private var hasBackup = StatusLineInstaller.hasBackup
+    let installer: any StatusLineInstalling
+
+    @State private var isInstalled: Bool
+    @State private var hasRestore: Bool
     @State private var message: LocalizedStringKey?
     @State private var isError = false
+
+    init(installer: any StatusLineInstalling) {
+        self.installer = installer
+        _isInstalled = State(initialValue: installer.isInstalled)
+        _hasRestore = State(initialValue: installer.hasRestoreOption)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Label("statusLine.title", systemImage: "terminal")
+                Label(LocalizedStringKey(installer.titleLocalizationKey), systemImage: "terminal")
                     .font(.system(size: 12))
                 Spacer()
                 if isInstalled {
@@ -865,7 +928,7 @@ struct StatusLineSection: View {
                 }
             }
 
-            Text("statusLine.description")
+            Text(LocalizedStringKey(installer.descriptionLocalizationKey))
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
 
@@ -880,7 +943,7 @@ struct StatusLineSection: View {
                         .controlSize(.small)
                 }
 
-                if hasBackup {
+                if hasRestore {
                     Button("statusLine.restore") { restore() }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
@@ -897,9 +960,9 @@ struct StatusLineSection: View {
 
     private func install() {
         do {
-            try StatusLineInstaller.install()
-            isInstalled = true
-            hasBackup = StatusLineInstaller.hasBackup
+            try installer.install()
+            isInstalled = installer.isInstalled
+            hasRestore = installer.hasRestoreOption
             message = "statusLine.installSuccess"
             isError = false
         } catch {
@@ -910,9 +973,9 @@ struct StatusLineSection: View {
 
     private func restore() {
         do {
-            try StatusLineInstaller.restore()
-            isInstalled = false
-            hasBackup = false
+            try installer.restore()
+            isInstalled = installer.isInstalled
+            hasRestore = installer.hasRestoreOption
             message = "statusLine.restoreSuccess"
             isError = false
         } catch {

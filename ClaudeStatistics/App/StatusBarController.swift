@@ -28,7 +28,7 @@ final class StatusBarController: NSObject, ObservableObject {
             button.image = NSImage(named: "MenuBarIcon")
             button.image?.isTemplate = true
             button.imagePosition = .imageLeading
-            button.title = appState.usageViewModel.menuBarText
+            button.title = appState.menuBarText
             button.font = .monospacedSystemFont(ofSize: 11, weight: .medium)
             button.target = self
             button.action = #selector(togglePanel)
@@ -40,7 +40,15 @@ final class StatusBarController: NSObject, ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 guard let self else { return }
-                self.statusItem.button?.title = self.appState.usageViewModel.menuBarText
+                self.statusItem.button?.title = self.appState.menuBarText
+            }
+            .store(in: &cancellables)
+
+        appState.$providerKind
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.statusItem.button?.title = self.appState.menuBarText
             }
             .store(in: &cancellables)
     }
@@ -52,13 +60,7 @@ final class StatusBarController: NSObject, ObservableObject {
         panel = StatusBarPanel(contentRect: defaultRect)
 
         let hostingView = NSHostingView(rootView:
-            PanelContentView(
-                usageViewModel: appState.usageViewModel,
-                profileViewModel: appState.profileViewModel,
-                sessionViewModel: appState.sessionViewModel,
-                store: appState.store,
-                updaterService: appState.updaterService
-            )
+            PanelContentView(appState: appState)
         )
         hostingView.translatesAutoresizingMaskIntoConstraints = false
 

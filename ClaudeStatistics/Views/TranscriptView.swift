@@ -26,7 +26,7 @@ struct TranscriptView: View {
     let onBack: () -> Void
     @ObservedObject var viewModel: SessionViewModel
 
-    @State private var messages: [TranscriptParser.DisplayMessage] = []
+    @State private var messages: [TranscriptDisplayMessage] = []
     @State private var isLoading = true
     @State private var searchText = ""
     @State private var matchedIds: [String] = []
@@ -35,17 +35,19 @@ struct TranscriptView: View {
     @State private var roleFilters: Set<String> = []  // empty = show all
     @State private var toolFilters: Set<String> = []  // empty = show all tools
 
-    private static let roleOptions: [(key: String, label: String, icon: String)] = [
-        ("user", "User", "person.circle.fill"),
-        ("assistant", "Claude", "brain"),
-        ("tool", "Tools", "wrench.and.screwdriver"),
-    ]
+    private var roleOptions: [(key: String, label: String, icon: String)] {
+        [
+            ("user", "User", "person.circle.fill"),
+            ("assistant", viewModel.providerDisplayName, "brain"),
+            ("tool", "Tools", "wrench.and.screwdriver"),
+        ]
+    }
 
     private var availableTools: [String] {
         Array(Set(messages.compactMap(\.toolName))).sorted()
     }
 
-    private var filteredMessages: [TranscriptParser.DisplayMessage] {
+    private var filteredMessages: [TranscriptDisplayMessage] {
         messages.filter { msg in
             if !roleFilters.isEmpty && !roleFilters.contains(msg.role) { return false }
             if !toolFilters.isEmpty && msg.role == "tool" && !toolFilters.contains(msg.toolName ?? "") { return false }
@@ -128,7 +130,7 @@ struct TranscriptView: View {
 
             // Filter bar
             HStack(spacing: 4) {
-                ForEach(Self.roleOptions, id: \.key) { option in
+                ForEach(roleOptions, id: \.key) { option in
                     let isActive = roleFilters.contains(option.key)
                     Button {
                         if isActive {
@@ -205,10 +207,13 @@ struct TranscriptView: View {
                             if msg.role == "tool" {
                                 ToolCallRow(message: msg, searchText: searchText,
                                             isCurrentMatch: isCurrentMatch(msg.id),
-                                            sessionFilePath: session.filePath)
+                                            providerDisplayName: viewModel.providerDisplayName,
+                                            sessionFilePath: session.filePath,
+                                            loadMessagesAtPath: viewModel.loadMessages(at:))
                             } else {
                                 MessageRow(message: msg, searchText: searchText,
-                                           isCurrentMatch: isCurrentMatch(msg.id))
+                                           isCurrentMatch: isCurrentMatch(msg.id),
+                                           assistantName: viewModel.providerDisplayName)
                             }
                         }
                         .id(msg.id)
@@ -295,11 +300,7 @@ struct TranscriptView: View {
     }
 
     private func loadMessages() async {
-        let path = session.filePath
-        let parsed = await Task.detached {
-            TranscriptParser.shared.parseMessages(at: path)
-        }.value
-        messages = parsed
+        messages = await viewModel.loadMessages(for: session)
         // NOTE: isLoading is set in .task AFTER scroll target is determined
     }
 
@@ -422,9 +423,10 @@ struct TranscriptView: View {
 // MARK: - MessageRow (user / assistant)
 
 private struct MessageRow: View {
-    let message: TranscriptParser.DisplayMessage
+    let message: TranscriptDisplayMessage
     let searchText: String
     let isCurrentMatch: Bool
+    let assistantName: String
 
     private static let truncateThreshold = 500
     @State private var isFullExpanded = false
@@ -443,8 +445,8 @@ private struct MessageRow: View {
                 .padding(.top, 2)
 
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(message.role == "user" ? "You" : "Claude")
+                    HStack(spacing: 6) {
+                    Text(message.role == "user" ? "You" : assistantName)
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(message.role == "user" ? .blue : .purple)
                     if let ts = message.timestamp {
@@ -519,12 +521,14 @@ private struct MessageRow: View {
 // MARK: - ToolCallRow
 
 private struct ToolCallRow: View {
-    let message: TranscriptParser.DisplayMessage
+    let message: TranscriptDisplayMessage
     let searchText: String
     let isCurrentMatch: Bool
+    let providerDisplayName: String
     var sessionFilePath: String = ""
+    let loadMessagesAtPath: (String) async -> [TranscriptDisplayMessage]
     @State private var isExpanded = false
-    @State private var subagentMessages: [TranscriptParser.DisplayMessage]?
+    @State private var subagentMessages: [TranscriptDisplayMessage]?
     @State private var isLoadingSubagent = false
 
     private var toolDisplayName: String {
@@ -651,9 +655,12 @@ private struct ToolCallRow: View {
                             VStack(alignment: .leading, spacing: 0) {
                                 ForEach(subMsgs) { sub in
                                     if sub.role == "tool" {
-                                        ToolCallRow(message: sub, searchText: "", isCurrentMatch: false)
+                                        ToolCallRow(message: sub, searchText: "", isCurrentMatch: false,
+                                                    providerDisplayName: providerDisplayName,
+                                                    loadMessagesAtPath: loadMessagesAtPath)
                                     } else {
-                                        MessageRow(message: sub, searchText: "", isCurrentMatch: false)
+                                        MessageRow(message: sub, searchText: "", isCurrentMatch: false,
+                                                   assistantName: providerDisplayName)
                                     }
                                 }
                             }
@@ -740,7 +747,7 @@ private struct ToolCallRow: View {
                 return
             }
 
-            let messages = TranscriptParser.shared.parseMessages(at: matchedFile)
+            let messages = await loadMessagesAtPath(matchedFile)
             await MainActor.run {
                 subagentMessages = messages
                 isLoadingSubagent = false
@@ -976,4 +983,3 @@ private final class ImageWindowController {
         NSApp.activate(ignoringOtherApps: true)
     }
 }
-

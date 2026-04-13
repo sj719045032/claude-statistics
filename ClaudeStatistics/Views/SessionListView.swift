@@ -165,8 +165,8 @@ struct SessionListView: View {
                                 cachedStats: store.parsedStats[session.id],
                                 isSelected: viewModel.selectedSession?.id == session.id,
                                 onTap: { viewModel.selectSession(session) },
-                                onNewSession: { TerminalLauncher.openNewSession(session) },
-                                onResume: { TerminalLauncher.openSession(session) },
+                                onNewSession: { viewModel.openNewSession(session) },
+                                onResume: { viewModel.resumeSession(session) },
                                 onViewTranscript: { viewModel.openTranscript(for: session) }
                             )
                             .id("recent-\(session.id)")
@@ -186,7 +186,7 @@ struct SessionListView: View {
                                 }
                             },
                             onNewSession: {
-                                TerminalLauncher.openNewSessionInDirectory(group.cwdPath)
+                                viewModel.openNewSession(inDirectory: group.cwdPath)
                             },
                             onAnalytics: {
                                 withAnimation(Theme.springAnimation) {
@@ -224,8 +224,8 @@ struct SessionListView: View {
                                             viewModel.selectSession(session)
                                         }
                                     },
-                                    onNewSession: { TerminalLauncher.openNewSession(session) },
-                                    onResume: { TerminalLauncher.openSession(session) },
+                                    onNewSession: { viewModel.openNewSession(session) },
+                                    onResume: { viewModel.resumeSession(session) },
                                     onDelete: {
                                         deleteTarget = [session.id]
                                         showDeleteConfirm = true
@@ -352,7 +352,7 @@ struct ProjectGroupHeader: View {
 
 struct SessionRow: View {
     let session: Session
-    let quickStats: TranscriptParser.QuickStats?
+    let quickStats: SessionQuickStats?
     let cachedStats: SessionStats?
     let isSelected: Bool
     let isSelecting: Bool
@@ -554,7 +554,7 @@ struct SessionRow: View {
 
 struct RecentSessionRow: View {
     let session: Session
-    let quickStats: TranscriptParser.QuickStats?
+    let quickStats: SessionQuickStats?
     let cachedStats: SessionStats?
     let isSelected: Bool
     let onTap: () -> Void

@@ -6,21 +6,20 @@ struct ProjectGroup: Identifiable {
     var id: String { projectPath }
     let projectPath: String
     let sessions: [Session]
+    let resolvedPath: String
     var totalCost: Double = 0
     var totalTokens: Int = 0
     var totalMessages: Int = 0
     var toolUseCount: Int = 0
 
     var displayName: String {
-        let path = sessions.first?.displayName ?? projectPath
+        let path = resolvedPath
         return (path as NSString).lastPathComponent
     }
 
     var shortPath: String {
         let home = NSHomeDirectory()
-        let path = sessions.first?.cwd
-            ?? TerminalLauncher.decodeProjectPath(projectPath)
-            ?? projectPath
+        let path = resolvedPath
         if path.hasPrefix(home) {
             return "~" + path.dropFirst(home.count)
         }
@@ -28,9 +27,7 @@ struct ProjectGroup: Identifiable {
     }
 
     var cwdPath: String {
-        sessions.first?.cwd
-            ?? TerminalLauncher.decodeProjectPath(projectPath)
-            ?? NSHomeDirectory()
+        resolvedPath
     }
 }
 
@@ -64,6 +61,10 @@ final class SessionViewModel: ObservableObject {
     @Published private(set) var projectGroups: [ProjectGroup] = []
 
     private var cancellables = Set<AnyCancellable>()
+
+    var providerKind: ProviderKind { store.provider.kind }
+    var providerDisplayName: String { store.provider.displayName }
+    var providerCapabilities: ProviderCapabilities { store.provider.capabilities }
 
     init(store: SessionDataStore) {
         self.store = store
@@ -133,9 +134,11 @@ final class SessionViewModel: ObservableObject {
 
         // projectGroups (with pre-computed cost)
         let statsMap = store.parsedStats
+        let provider = store.provider
         let grouped = Dictionary(grouping: filtered) { $0.cwd ?? $0.projectPath }
         projectGroups = grouped.map { key, sessions in
             let sorted = sessions.sorted { $0.lastModified > $1.lastModified }
+            let resolvedPath = sorted.first.map(provider.resolvedProjectPath(for:)) ?? key
             var cost = 0.0
             var tokens = 0
             var messages = 0
@@ -148,7 +151,7 @@ final class SessionViewModel: ObservableObject {
                     toolUseCount += stats.toolUseTotal
                 }
             }
-            return ProjectGroup(projectPath: key, sessions: sorted, totalCost: cost,
+            return ProjectGroup(projectPath: key, sessions: sorted, resolvedPath: resolvedPath, totalCost: cost,
                                 totalTokens: tokens, totalMessages: messages, toolUseCount: toolUseCount)
         }
         .sorted { ($0.sessions.first?.lastModified ?? .distantPast) > ($1.sessions.first?.lastModified ?? .distantPast) }
@@ -207,9 +210,10 @@ final class SessionViewModel: ObservableObject {
         isLoadingStats = true
         selectedSessionStats = nil
 
+        let provider = store.provider
         let path = session.filePath
         Task.detached {
-            let stats = TranscriptParser.shared.parseSession(at: path)
+            let stats = provider.parseSession(at: path)
             await MainActor.run { [weak self] in
                 self?.selectedSessionStats = stats
                 self?.isLoadingStats = false
@@ -217,8 +221,39 @@ final class SessionViewModel: ObservableObject {
         }
     }
 
-    func quickStat(for session: Session) -> TranscriptParser.QuickStats? {
+    func quickStat(for session: Session) -> SessionQuickStats? {
         store.quickStats[session.id]
+    }
+
+    func loadMessages(for session: Session) async -> [TranscriptDisplayMessage] {
+        await loadMessages(at: session.filePath)
+    }
+
+    func loadMessages(at path: String) async -> [TranscriptDisplayMessage] {
+        let provider = store.provider
+        return await Task.detached {
+            provider.parseMessages(at: path)
+        }.value
+    }
+
+    func loadTrendData(for session: Session, granularity: TrendGranularity) async -> [TrendDataPoint] {
+        let provider = store.provider
+        let path = session.filePath
+        return await Task.detached {
+            provider.parseTrendData(from: path, granularity: granularity)
+        }.value
+    }
+
+    func openNewSession(_ session: Session) {
+        store.provider.openNewSession(session)
+    }
+
+    func resumeSession(_ session: Session) {
+        store.provider.resumeSession(session)
+    }
+
+    func openNewSession(inDirectory path: String) {
+        store.provider.openNewSession(inDirectory: path)
     }
 
     // MARK: - Selection & Delete

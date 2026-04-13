@@ -5,25 +5,20 @@ final class ProfileViewModel: ObservableObject {
     @Published var userProfile: UserProfile?
     @Published var profileLoading = false
 
-    init() {
-        Task { @MainActor in
-            await self.loadProfile()
-        }
+    private var loader: (() async -> UserProfile?)?
+
+    init() {}
+
+    func configure(loader: @escaping () async -> UserProfile?) {
+        self.loader = loader
+        userProfile = nil
+        profileLoading = false
     }
 
     func loadProfile() async {
-        guard userProfile == nil, !profileLoading else { return }
-        guard CredentialService.shared.getAccessToken() != nil else { return }
+        guard userProfile == nil, !profileLoading, let loader else { return }
         profileLoading = true
-        do {
-            userProfile = try await UsageAPIService.shared.fetchProfile()
-        } catch {
-            // Token might be expired — try refreshing via CLI and retry
-            let refreshed = await UsageAPIService.shared.refreshToken()
-            if refreshed {
-                userProfile = try? await UsageAPIService.shared.fetchProfile()
-            }
-        }
+        userProfile = await loader()
         profileLoading = false
     }
 }

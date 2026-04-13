@@ -28,6 +28,15 @@ enum AppTab: String, CaseIterable, Identifiable, Codable {
 
     static let defaultOrder: [AppTab] = [.sessions, .stats, .usage, .settings]
 
+    func isAvailable(for capabilities: ProviderCapabilities) -> Bool {
+        switch self {
+        case .usage:
+            capabilities.supportsUsageWindows
+        default:
+            true
+        }
+    }
+
     static func loadOrder() -> [AppTab] {
         guard let data = UserDefaults.standard.data(forKey: "tabOrder"),
               let order = try? JSONDecoder().decode([AppTab].self, from: data),
@@ -45,6 +54,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable {
 }
 
 struct MenuBarView: View {
+    @ObservedObject var appState: AppState
     @ObservedObject var usageViewModel: UsageViewModel
     @ObservedObject var profileViewModel: ProfileViewModel
     @ObservedObject var sessionViewModel: SessionViewModel
@@ -55,11 +65,15 @@ struct MenuBarView: View {
     @AppStorage("fontScale") private var fontScale = 1.0
     @Namespace private var tabNamespace
 
+    private var visibleTabs: [AppTab] {
+        tabOrder.filter { $0.isAvailable(for: appState.providerCapabilities) }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Tab bar
             HStack(spacing: 0) {
-                ForEach(tabOrder) { tab in
+                ForEach(visibleTabs) { tab in
                     TabButton(
                         title: tab.localizedName,
                         icon: tab.icon,
@@ -90,12 +104,20 @@ struct MenuBarView: View {
                     case .stats:
                         StatisticsView(store: store)
                     case .usage:
-                        ScrollView {
-                            UsageView(viewModel: usageViewModel, store: store)
-                                .padding(12)
+                        if appState.providerCapabilities.supportsUsageWindows {
+                            ScrollView {
+                                UsageView(viewModel: usageViewModel, store: store)
+                                    .padding(12)
+                            }
                         }
                     case .settings:
-                        SettingsView(usageViewModel: usageViewModel, profileViewModel: profileViewModel, tabOrder: $tabOrder, updaterService: updaterService)
+                        SettingsView(
+                            usageViewModel: usageViewModel,
+                            profileViewModel: profileViewModel,
+                            tabOrder: $tabOrder,
+                            updaterService: updaterService,
+                            provider: appState.provider
+                        )
                     }
                 }
                 .frame(width: geo.size.width / fontScale, height: geo.size.height / fontScale, alignment: .topLeading)
@@ -133,9 +155,7 @@ struct MenuBarView: View {
                     }
                 }
                 Spacer()
-                Text("app.name")
-                    .font(.system(size: 10 * fontScale))
-                    .foregroundStyle(.tertiary)
+                providerSwitcher
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
@@ -143,6 +163,27 @@ struct MenuBarView: View {
             .animation(.easeInOut(duration: 0.3), value: store.parseProgress)
         }
         .frame(minWidth: 480, maxWidth: 800, minHeight: 520, maxHeight: 900)
+        .onAppear { ensureSelectedTabIsAvailable() }
+        .onChange(of: appState.providerKind) { _, _ in
+            ensureSelectedTabIsAvailable()
+        }
+    }
+
+    private var providerSwitcher: some View {
+        HStack(spacing: 0) {
+            ForEach(ProviderRegistry.supportedProviders, id: \.self) { kind in
+                ProviderSwitcherButton(
+                    kind: kind,
+                    isCurrent: kind == appState.providerKind,
+                    isInstalled: ProviderRegistry.provider(for: kind).isInstalled,
+                    fontScale: fontScale,
+                    onTap: { appState.switchProvider(to: kind) }
+                )
+            }
+        }
+        .padding(1.5)
+        .background(Color.gray.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 5.5))
     }
 
     @ViewBuilder
@@ -158,10 +199,17 @@ struct MenuBarView: View {
         } else if let session = sessionViewModel.selectedSession {
             SessionDetailView(
                 session: session,
+                providerDisplayName: sessionViewModel.providerDisplayName,
+                supportsCost: sessionViewModel.providerCapabilities.supportsCost,
                 topic: store.quickStats[session.id]?.topic,
                 sessionName: store.quickStats[session.id]?.sessionName,
                 stats: sessionViewModel.selectedSessionStats,
                 isLoading: sessionViewModel.isLoadingStats,
+                onNewSession: { sessionViewModel.openNewSession(session) },
+                onResume: { sessionViewModel.resumeSession(session) },
+                loadTrendData: { granularity in
+                    await sessionViewModel.loadTrendData(for: session, granularity: granularity)
+                },
                 onBack: { sessionViewModel.selectedSession = nil; sessionViewModel.selectedSessionStats = nil },
                 onDelete: {
                     sessionViewModel.deleteSession(session)
@@ -173,6 +221,35 @@ struct MenuBarView: View {
         } else {
             SessionListView(viewModel: sessionViewModel, store: store)
         }
+    }
+
+    private func ensureSelectedTabIsAvailable() {
+        if !selectedTab.isAvailable(for: appState.providerCapabilities) {
+            selectedTab = visibleTabs.first ?? .sessions
+        }
+    }
+}
+
+private struct ProviderSwitcherButton: View {
+    let kind: ProviderKind
+    let isCurrent: Bool
+    let isInstalled: Bool
+    let fontScale: Double
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            Text(kind.displayName)
+                .font(.system(size: 10 * fontScale, weight: isCurrent ? .semibold : .regular))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 2.5)
+                .background(isCurrent ? Color.accentColor : Color.clear)
+                .foregroundStyle(isCurrent ? AnyShapeStyle(.white) : AnyShapeStyle(isInstalled ? Color.secondary : Color.secondary.opacity(0.4)))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+        }
+        .buttonStyle(.plain)
+        .disabled(!isInstalled)
+        .help(isInstalled ? kind.displayName : "\(kind.displayName) not installed")
     }
 }
 
@@ -228,11 +305,7 @@ struct TabButton: View {
 /// Wrapper that reactively applies locale from @AppStorage.
 struct PanelContentView: View {
     @AppStorage("appLanguage") private var appLanguage = "auto"
-    @ObservedObject var usageViewModel: UsageViewModel
-    @ObservedObject var profileViewModel: ProfileViewModel
-    @ObservedObject var sessionViewModel: SessionViewModel
-    @ObservedObject var store: SessionDataStore
-    @ObservedObject var updaterService: UpdaterService
+    @ObservedObject var appState: AppState
 
     private var currentLocale: Locale {
         switch appLanguage {
@@ -244,11 +317,12 @@ struct PanelContentView: View {
 
     var body: some View {
         MenuBarView(
-            usageViewModel: usageViewModel,
-            profileViewModel: profileViewModel,
-            sessionViewModel: sessionViewModel,
-            store: store,
-            updaterService: updaterService
+            appState: appState,
+            usageViewModel: appState.usageViewModel,
+            profileViewModel: appState.profileViewModel,
+            sessionViewModel: appState.sessionViewModel,
+            store: appState.store,
+            updaterService: appState.updaterService
         )
         .environment(\.locale, currentLocale)
     }

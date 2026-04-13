@@ -78,33 +78,6 @@ struct UsageCacheFile: Codable {
     }
 }
 
-/// Claude HUD plugin cache format (~/.claude/plugins/claude-hud/.usage-cache.json)
-struct HudUsageCache: Codable {
-    let data: HudUsageData?
-    let timestamp: Double?
-    let lastGoodData: HudUsageData?
-}
-
-struct HudUsageData: Codable {
-    let planName: String?
-    let fiveHour: Double?
-    let sevenDay: Double?
-    let fiveHourResetAt: String?
-    let sevenDayResetAt: String?
-
-    func toUsageData() -> UsageData {
-        UsageData(
-            fiveHour: fiveHour.map { UsageWindow(utilization: $0, resetsAt: fiveHourResetAt ?? "") },
-            sevenDay: sevenDay.map { UsageWindow(utilization: $0, resetsAt: sevenDayResetAt ?? "") },
-            sevenDayOauthApps: nil,
-            sevenDayOpus: nil,
-            sevenDaySonnet: nil,
-            sevenDayCowork: nil,
-            extraUsage: nil
-        )
-    }
-}
-
 // MARK: - User Profile
 
 struct UserProfile: Codable {

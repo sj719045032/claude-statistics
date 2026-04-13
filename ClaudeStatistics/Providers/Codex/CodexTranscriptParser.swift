@@ -1,0 +1,491 @@
+import Foundation
+
+final class CodexTranscriptParser {
+    static let shared = CodexTranscriptParser()
+
+    private let isoFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private let isoFallback: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    private init() {}
+
+    func parseSessionQuick(at path: String) -> SessionQuickStats {
+        var quick = SessionQuickStats()
+        var userCount = 0
+        var assistantCount = 0
+        var latestUsage: UsageSnapshot?
+
+        for event in readEvents(at: path) {
+            if quick.startTime == nil, let timestamp = event.timestamp {
+                quick.startTime = timestamp
+            }
+
+            switch event.type {
+            case "turn_context":
+                if let model = event.payload["model"] as? String, !model.isEmpty {
+                    quick.model = model
+                }
+
+            case "response_item":
+                guard let payloadType = event.payload["type"] as? String else { continue }
+                if payloadType == "message" {
+                    let role = event.payload["role"] as? String
+                    if role == "user", let text = extractMessageText(from: event.payload), let cleaned = cleanUserText(text) {
+                        userCount += 1
+                        if quick.topic == nil { quick.topic = cleaned }
+                        quick.lastPrompt = truncate(cleaned, limit: 200)
+                    } else if role == "assistant" {
+                        assistantCount += 1
+                    }
+                }
+
+            case "event_msg":
+                if let usage = tokenUsage(from: event.payload) {
+                    latestUsage = usage.total
+                    let lastContext = usage.last.inputTokens + usage.last.cachedInputTokens
+                    if lastContext > 0 {
+                        quick.totalTokens = usage.total.totalTokens
+                    }
+                }
+
+            default:
+                continue
+            }
+        }
+
+        quick.userMessageCount = userCount
+        quick.messageCount = userCount + assistantCount
+        quick.totalTokens = latestUsage?.totalTokens ?? quick.totalTokens
+        if let latestUsage, let model = quick.model {
+            quick.estimatedCost = ModelPricing.estimateCost(
+                model: model,
+                inputTokens: latestUsage.inputTokens,
+                outputTokens: latestUsage.outputTokens + latestUsage.reasoningOutputTokens,
+                cacheCreation5mTokens: 0,
+                cacheCreation1hTokens: 0,
+                cacheCreationTotalTokens: 0,
+                cacheReadTokens: latestUsage.cachedInputTokens
+            )
+        }
+        return quick
+    }
+
+    func parseSession(at path: String) -> SessionStats {
+        var stats = SessionStats()
+        var activeModel = "Unknown"
+        var previousTotalUsage: UsageSnapshot?
+        var userMessageTimes: [Date] = []
+        var toolUseTimes: [(Date, String)] = []
+
+        for event in readEvents(at: path) {
+            if let timestamp = event.timestamp {
+                if stats.startTime == nil || timestamp < stats.startTime! { stats.startTime = timestamp }
+                if stats.endTime == nil || timestamp > stats.endTime! { stats.endTime = timestamp }
+            }
+
+            switch event.type {
+            case "turn_context":
+                if let model = event.payload["model"] as? String, !model.isEmpty {
+                    activeModel = model
+                    stats.model = model
+                }
+
+            case "response_item":
+                guard let payloadType = event.payload["type"] as? String else { continue }
+
+                if payloadType == "message" {
+                    let role = event.payload["role"] as? String
+                    if role == "user", let text = extractMessageText(from: event.payload), let cleaned = cleanUserText(text) {
+                        stats.userMessageCount += 1
+                        stats.lastPrompt = truncate(cleaned, limit: 200)
+                        if let timestamp = event.timestamp {
+                            userMessageTimes.append(fiveMinuteKey(for: timestamp))
+                        }
+                    } else if role == "assistant" {
+                        stats.assistantMessageCount += 1
+                    }
+                } else if payloadType == "function_call",
+                          let rawName = event.payload["name"] as? String,
+                          let timestamp = event.timestamp {
+                    toolUseTimes.append((fiveMinuteKey(for: timestamp), normalizedToolName(rawName)))
+                }
+
+            case "event_msg":
+                guard let usage = tokenUsage(from: event.payload) else { continue }
+
+                let contextTokens = usage.last.inputTokens + usage.last.cachedInputTokens
+                if contextTokens > 0 {
+                    stats.contextTokens = contextTokens
+                }
+
+                let delta = usage.total.delta(from: previousTotalUsage)
+                previousTotalUsage = usage.total
+
+                guard delta.totalTokens > 0, let timestamp = event.timestamp else { continue }
+
+                let sliceKey = fiveMinuteKey(for: timestamp)
+                var slice = stats.fiveMinSlices[sliceKey] ?? SessionStats.DaySlice()
+                slice.totalInputTokens += delta.inputTokens
+                slice.totalOutputTokens += delta.outputTokens + delta.reasoningOutputTokens
+                slice.cacheReadTokens += delta.cachedInputTokens
+                slice.messageCount += 1
+
+                var modelStats = slice.modelBreakdown[activeModel, default: ModelTokenStats()]
+                modelStats.inputTokens += delta.inputTokens
+                modelStats.outputTokens += delta.outputTokens + delta.reasoningOutputTokens
+                modelStats.cacheReadTokens += delta.cachedInputTokens
+                modelStats.messageCount += 1
+                slice.modelBreakdown[activeModel] = modelStats
+                stats.fiveMinSlices[sliceKey] = slice
+
+            default:
+                continue
+            }
+        }
+
+        for time in userMessageTimes {
+            stats.fiveMinSlices[time, default: SessionStats.DaySlice()].messageCount += 1
+        }
+
+        for (time, toolName) in toolUseTimes {
+            stats.fiveMinSlices[time, default: SessionStats.DaySlice()].toolUseCounts[toolName, default: 0] += 1
+        }
+
+        return stats
+    }
+
+    func parseMessages(at path: String) -> [TranscriptDisplayMessage] {
+        var messages: [TranscriptDisplayMessage] = []
+        var toolMessageIndices: [String: Int] = [:]
+        var toolResults: [String: String] = [:]
+
+        for event in readEvents(at: path) {
+            switch event.type {
+            case "response_item":
+                guard let payloadType = event.payload["type"] as? String else { continue }
+
+                if payloadType == "message" {
+                    let role = event.payload["role"] as? String
+                    if role == "user", let text = extractMessageText(from: event.payload), let cleaned = cleanUserText(text) {
+                        messages.append(TranscriptDisplayMessage(
+                            id: "msg-\(messages.count)",
+                            role: "user",
+                            text: cleaned,
+                            timestamp: event.timestamp
+                        ))
+                    } else if role == "assistant", let text = extractMessageText(from: event.payload) {
+                        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmed.isEmpty else { continue }
+                        messages.append(TranscriptDisplayMessage(
+                            id: "msg-\(messages.count)",
+                            role: "assistant",
+                            text: trimmed,
+                            timestamp: event.timestamp
+                        ))
+                    }
+                } else if payloadType == "function_call" {
+                    let callId = (event.payload["call_id"] as? String) ?? UUID().uuidString
+                    let rawName = (event.payload["name"] as? String) ?? "tool"
+                    let arguments = (event.payload["arguments"] as? String) ?? ""
+                    let descriptor = toolDescriptor(name: rawName, arguments: arguments)
+
+                    var message = TranscriptDisplayMessage(
+                        id: "tool-\(callId)",
+                        role: "tool",
+                        text: descriptor.summary,
+                        timestamp: event.timestamp,
+                        toolName: descriptor.toolName,
+                        toolDetail: descriptor.detail
+                    )
+                    message.editOldString = descriptor.oldString
+                    message.editNewString = descriptor.newString
+                    toolMessageIndices[callId] = messages.count
+                    messages.append(message)
+                } else if payloadType == "function_call_output",
+                          let callId = event.payload["call_id"] as? String,
+                          let output = event.payload["output"] as? String,
+                          !output.isEmpty {
+                    toolResults[callId] = output
+                }
+
+            case "event_msg":
+                guard let callId = event.payload["call_id"] as? String else { continue }
+
+                if let aggregated = event.payload["aggregated_output"] as? String, !aggregated.isEmpty {
+                    toolResults[callId] = aggregated
+                } else if let output = event.payload["output"] as? String, !output.isEmpty {
+                    toolResults[callId] = output
+                }
+
+            default:
+                continue
+            }
+        }
+
+        for (callId, result) in toolResults {
+            guard let index = toolMessageIndices[callId], messages.indices.contains(index) else { continue }
+            if let detail = messages[index].toolDetail, !detail.isEmpty {
+                messages[index].toolDetail = "\(detail)\n\n\(result)"
+            } else {
+                messages[index].toolDetail = result
+            }
+        }
+
+        return messages
+    }
+
+    func parseTrendData(from filePath: String, granularity: TrendGranularity) -> [TrendDataPoint] {
+        var buckets: [Date: (tokens: Int, cost: Double)] = [:]
+        var activeModel = "Unknown"
+        var previousTotalUsage: UsageSnapshot?
+
+        for event in readEvents(at: filePath) {
+            switch event.type {
+            case "turn_context":
+                if let model = event.payload["model"] as? String, !model.isEmpty {
+                    activeModel = model
+                }
+
+            case "event_msg":
+                guard let usage = tokenUsage(from: event.payload),
+                      let timestamp = event.timestamp else {
+                    continue
+                }
+
+                let delta = usage.total.delta(from: previousTotalUsage)
+                previousTotalUsage = usage.total
+                guard delta.totalTokens > 0 else { continue }
+
+                let bucket = granularity.bucketStart(for: timestamp)
+                var existing = buckets[bucket, default: (tokens: 0, cost: 0)]
+                existing.tokens += delta.totalTokens
+                existing.cost += ModelPricing.estimateCost(
+                    model: activeModel,
+                    inputTokens: delta.inputTokens,
+                    outputTokens: delta.outputTokens + delta.reasoningOutputTokens,
+                    cacheCreation5mTokens: 0,
+                    cacheCreation1hTokens: 0,
+                    cacheCreationTotalTokens: 0,
+                    cacheReadTokens: delta.cachedInputTokens
+                )
+                buckets[bucket] = existing
+
+            default:
+                continue
+            }
+        }
+
+        var cumulativeTokens = 0
+        var cumulativeCost = 0.0
+        return buckets.sorted { $0.key < $1.key }.map { time, bucket in
+            cumulativeTokens += bucket.tokens
+            cumulativeCost += bucket.cost
+            return TrendDataPoint(time: time, tokens: cumulativeTokens, cost: cumulativeCost)
+        }
+    }
+
+    private func readEvents(at path: String) -> [Event] {
+        guard let data = FileManager.default.contents(atPath: path) else { return [] }
+        let content = String(decoding: data, as: UTF8.self)
+
+        return content
+            .components(separatedBy: "\n")
+            .compactMap { line in
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty,
+                      let lineData = trimmed.data(using: .utf8),
+                      let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+                      let type = json["type"] as? String else {
+                    return nil
+                }
+
+                let payload = json["payload"] as? [String: Any] ?? [:]
+                let timestamp = parseDate(json["timestamp"] as? String)
+                return Event(type: type, timestamp: timestamp, payload: payload)
+            }
+    }
+
+    private func parseDate(_ raw: String?) -> Date? {
+        guard let raw, !raw.isEmpty else { return nil }
+        return isoFormatter.date(from: raw) ?? isoFallback.date(from: raw)
+    }
+
+    private func extractMessageText(from payload: [String: Any]) -> String? {
+        if let content = payload["content"] as? [[String: Any]] {
+            let texts = content.compactMap { item -> String? in
+                if let text = item["text"] as? String, !text.isEmpty {
+                    return text
+                }
+                return nil
+            }
+            if !texts.isEmpty { return texts.joined(separator: "\n") }
+        }
+        return payload["text"] as? String
+    }
+
+    private func cleanUserText(_ text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if trimmed.hasPrefix("<environment_context>") || trimmed.hasPrefix("<permissions instructions>") {
+            return nil
+        }
+
+        let firstLine = trimmed
+            .components(separatedBy: .newlines)
+            .first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? trimmed
+
+        return firstLine.isEmpty ? nil : firstLine
+    }
+
+    private func truncate(_ text: String, limit: Int) -> String {
+        text.count > limit ? String(text.prefix(limit)) + "…" : text
+    }
+
+    private func fiveMinuteKey(for date: Date) -> Date {
+        var comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        comps.minute = ((comps.minute ?? 0) / 5) * 5
+        return Calendar.current.date(from: comps) ?? date
+    }
+
+    private func tokenUsage(from payload: [String: Any]) -> (total: UsageSnapshot, last: UsageSnapshot)? {
+        guard (payload["type"] as? String) == "token_count",
+              let info = payload["info"] as? [String: Any],
+              let totalUsage = info["total_token_usage"] as? [String: Any],
+              let total = UsageSnapshot(json: totalUsage) else {
+            return nil
+        }
+
+        let lastUsage = (info["last_token_usage"] as? [String: Any]).flatMap(UsageSnapshot.init(json:)) ?? total
+        return (total, lastUsage)
+    }
+
+    private func normalizedToolName(_ rawName: String) -> String {
+        switch rawName {
+        case "exec_command", "write_stdin":
+            return "Bash"
+        case "apply_patch":
+            return "Edit"
+        case "read_mcp_resource":
+            return "Read"
+        default:
+            return rawName
+        }
+    }
+
+    private func toolDescriptor(name rawName: String, arguments: String) -> ToolDescriptor {
+        let toolName = normalizedToolName(rawName)
+        let payload = parseObjectString(arguments)
+
+        switch rawName {
+        case "exec_command":
+            let command = (payload?["cmd"] as? String) ?? arguments
+            let firstLine = command.components(separatedBy: .newlines).first ?? command
+            return ToolDescriptor(toolName: toolName, summary: truncate(firstLine, limit: 140), detail: command)
+
+        case "apply_patch":
+            let patch = (payload?["patch"] as? String) ?? arguments
+            let summary = firstPatchTarget(in: patch) ?? "Patch"
+            return ToolDescriptor(toolName: toolName, summary: summary, detail: patch)
+
+        default:
+            if let payload {
+                if let cmd = payload["cmd"] as? String {
+                    let firstLine = cmd.components(separatedBy: .newlines).first ?? cmd
+                    return ToolDescriptor(toolName: toolName, summary: truncate(firstLine, limit: 140), detail: cmd)
+                }
+                for key in ["path", "filePath", "file_path", "uri", "url", "q", "question", "location"] {
+                    if let value = payload[key] as? String, !value.isEmpty {
+                        return ToolDescriptor(toolName: toolName, summary: truncate(value, limit: 140), detail: arguments)
+                    }
+                }
+            }
+
+            let fallback = arguments.trimmingCharacters(in: .whitespacesAndNewlines)
+            let summary = fallback.isEmpty ? toolName : truncate(fallback.components(separatedBy: .newlines).first ?? fallback, limit: 140)
+            return ToolDescriptor(toolName: toolName, summary: summary, detail: fallback.isEmpty ? nil : fallback)
+        }
+    }
+
+    private func parseObjectString(_ raw: String) -> [String: Any]? {
+        guard let data = raw.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        return json
+    }
+
+    private func firstPatchTarget(in patch: String) -> String? {
+        for line in patch.components(separatedBy: .newlines) {
+            if let path = line.stripPrefix("*** Update File: ") { return path }
+            if let path = line.stripPrefix("*** Add File: ") { return path }
+            if let path = line.stripPrefix("*** Delete File: ") { return path }
+        }
+        return nil
+    }
+}
+
+private struct Event {
+    let type: String
+    let timestamp: Date?
+    let payload: [String: Any]
+}
+
+private struct ToolDescriptor {
+    let toolName: String
+    let summary: String
+    let detail: String?
+    var oldString: String? = nil
+    var newString: String? = nil
+}
+
+private struct UsageSnapshot {
+    let inputTokens: Int
+    let cachedInputTokens: Int
+    let outputTokens: Int
+    let reasoningOutputTokens: Int
+
+    var totalTokens: Int {
+        inputTokens + cachedInputTokens + outputTokens + reasoningOutputTokens
+    }
+
+    init?(json: [String: Any]) {
+        inputTokens = json["input_tokens"] as? Int ?? 0
+        cachedInputTokens = json["cached_input_tokens"] as? Int ?? 0
+        outputTokens = json["output_tokens"] as? Int ?? 0
+        reasoningOutputTokens = json["reasoning_output_tokens"] as? Int ?? 0
+    }
+
+    func delta(from previous: UsageSnapshot?) -> UsageSnapshot {
+        guard let previous else { return self }
+        return UsageSnapshot(
+            inputTokens: max(0, inputTokens - previous.inputTokens),
+            cachedInputTokens: max(0, cachedInputTokens - previous.cachedInputTokens),
+            outputTokens: max(0, outputTokens - previous.outputTokens),
+            reasoningOutputTokens: max(0, reasoningOutputTokens - previous.reasoningOutputTokens)
+        )
+    }
+
+    init(inputTokens: Int, cachedInputTokens: Int, outputTokens: Int, reasoningOutputTokens: Int) {
+        self.inputTokens = inputTokens
+        self.cachedInputTokens = cachedInputTokens
+        self.outputTokens = outputTokens
+        self.reasoningOutputTokens = reasoningOutputTokens
+    }
+}
+
+private extension String {
+    func stripPrefix(_ prefix: String) -> String? {
+        guard hasPrefix(prefix) else { return nil }
+        return String(dropFirst(prefix.count))
+    }
+}

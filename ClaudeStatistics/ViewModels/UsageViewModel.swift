@@ -8,93 +8,83 @@ final class UsageViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var lastFetchedAt: Date?
     @Published var autoRefreshInterval: TimeInterval = 300
+    @Published private(set) var dashboardURL: URL?
 
     private var autoRefresh: AutoRefreshCoordinator?
+    private var usageSource: (any ProviderUsageSource)?
     weak var store: SessionDataStore?
 
     init() {
-        loadCache()
-
         // Create coordinator after all stored properties are initialized
         self.autoRefresh = AutoRefreshCoordinator { [weak self] in
             guard let self else { return }
             await self.refresh()
         }
 
-        let enabled = UserDefaults.standard.bool(forKey: "autoRefreshEnabled")
         let interval = UserDefaults.standard.double(forKey: "refreshInterval")
-        if enabled {
-            autoRefreshInterval = interval > 0 ? interval : 300
-            Task { @MainActor in
-                // Skip API call on launch if cache is fresh enough
-                if let cached = UsageAPIService.shared.loadFromCache(),
-                   Date().timeIntervalSince(cached.fetchedAt) < autoRefreshInterval {
-                    usageData = cached.data
-                    lastFetchedAt = cached.fetchedAt
-                } else {
-                    await self.refresh()
-                }
-            }
-            startAutoRefresh()
-        }
+        autoRefreshInterval = interval > 0 ? interval : 300
+    }
+
+    func configure(source: (any ProviderUsageSource)?) {
+        stopAutoRefresh()
+        usageSource = source
+        dashboardURL = source?.dashboardURL
+        usageData = nil
+        errorMessage = nil
+        lastFetchedAt = nil
+        isLoading = false
     }
 
     func loadCache() {
-        if let cached = UsageAPIService.shared.loadFromCache() {
+        if let cached = usageSource?.loadCachedSnapshot() {
             usageData = cached.data
             lastFetchedAt = cached.fetchedAt
+        } else {
+            usageData = nil
+            lastFetchedAt = nil
         }
     }
 
     /// Auto-refresh: timer controls the interval, always call API
     func refresh() async {
-        await callAPI()
+        await refreshUsage(showRateLimitError: false)
     }
 
     /// Manual refresh: try API, but show meaningful feedback on 429
     func forceRefresh() async {
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            let data = try await UsageAPIService.shared.fetchUsage()
-            usageData = data
-            lastFetchedAt = Date()
-        } catch {
-            errorMessage = error.localizedDescription
-            if usageData == nil { loadCache() }
-        }
-
-        isLoading = false
+        await refreshUsage(showRateLimitError: true)
     }
 
-    private func callAPI() async {
-        // Respect rate limit — but still reload cache so UI timestamp updates
-        if let retryAfter = UsageAPIService.shared.retryAfter, Date() < retryAfter {
-            loadCache()
-            return
-        }
-
+    private func refreshUsage(showRateLimitError: Bool) async {
         isLoading = true
         errorMessage = nil
 
         do {
-            let data = try await UsageAPIService.shared.fetchUsage()
-            usageData = data
-            lastFetchedAt = Date()
+            guard let usageSource else {
+                throw UsageError.invalidResponse
+            }
+            let snapshot = try await usageSource.refreshSnapshot()
+            usageData = snapshot.data
+            lastFetchedAt = snapshot.fetchedAt
             errorMessage = nil
         } catch let error as UsageError {
             switch error {
             case .rateLimited:
-                loadCache()
+                if showRateLimitError {
+                    errorMessage = error.localizedDescription
+                } else {
+                    loadCache()
+                }
             case .unauthorized:
-                // Ask Claude Code CLI to refresh the token, then retry
-                let refreshed = await UsageAPIService.shared.refreshToken()
+                let refreshed = await usageSource?.refreshCredentials() ?? false
                 if refreshed {
                     do {
-                        let data = try await UsageAPIService.shared.fetchUsage()
-                        usageData = data
-                        lastFetchedAt = Date()
+                        guard let usageSource else {
+                            throw UsageError.invalidResponse
+                        }
+                        let snapshot = try await usageSource.refreshSnapshot()
+                        usageData = snapshot.data
+                        lastFetchedAt = snapshot.fetchedAt
                         errorMessage = nil
                     } catch {
                         errorMessage = error.localizedDescription
@@ -122,6 +112,10 @@ final class UsageViewModel: ObservableObject {
 
     func stopAutoRefresh() {
         autoRefresh?.stop()
+    }
+
+    func clearForUnsupportedProvider() {
+        configure(source: nil)
     }
 
     // MARK: - Computed display properties
@@ -226,6 +220,12 @@ final class UsageViewModel: ObservableObject {
     }
 
     var menuBarText: String {
-        "\(Int(fiveHourPercent))%"
+        if usageData?.fiveHour != nil {
+            return "\(Int(fiveHourPercent))%"
+        }
+        if usageData?.sevenDay != nil {
+            return "\(Int(sevenDayPercent))%"
+        }
+        return ""
     }
 }

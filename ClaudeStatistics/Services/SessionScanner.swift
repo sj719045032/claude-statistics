@@ -54,6 +54,7 @@ final class SessionScanner {
 
                 sessions.append(Session(
                     id: sessionId,
+                    provider: .claude,
                     projectPath: projectDir,
                     filePath: filePath,
                     startTime: nil,

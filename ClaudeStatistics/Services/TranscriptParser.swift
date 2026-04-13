@@ -331,25 +331,13 @@ final class TranscriptParser {
     }
 
     /// Parse only basic info (fast, reads first few lines)
-    struct QuickStats: Codable {
-        var startTime: Date?
-        var model: String?
-        var topic: String?
-        var lastPrompt: String?
-        var sessionName: String?
-        var messageCount: Int = 0
-        var userMessageCount: Int = 0
-        var totalTokens: Int = 0
-        var estimatedCost: Double = 0
-    }
-
-    func parseSessionQuick(at path: String) -> QuickStats {
+    func parseSessionQuick(at path: String) -> SessionQuickStats {
         guard let handle = FileHandle(forReadingAtPath: path) else {
-            return QuickStats()
+            return SessionQuickStats()
         }
         defer { handle.closeFile() }
 
-        var quick = QuickStats()
+        var quick = SessionQuickStats()
         var totalInput = 0
         var totalOutput = 0
         var cacheCreate = 0
@@ -479,18 +467,6 @@ final class TranscriptParser {
 
     // MARK: - Parse messages for transcript display
 
-    struct DisplayMessage: Identifiable {
-        let id: String
-        let role: String      // "user", "assistant", or "tool"
-        let text: String      // summary line (file path, command, etc.)
-        let timestamp: Date?
-        var toolName: String?  // non-nil for tool call entries
-        var toolDetail: String? // expandable content (code, output, etc.)
-        var editOldString: String? // Edit tool: original text (for diff view)
-        var editNewString: String? // Edit tool: replacement text (for diff view)
-        var imagePaths: [String] = [] // image file paths for inline display
-    }
-
     /// Regex to extract image path from [Image: source: /path/to/file.png]
     private static let imagePathPattern = try! NSRegularExpression(
         pattern: "\\[Image: source: ([^\\]]+)\\]",
@@ -503,12 +479,12 @@ final class TranscriptParser {
     )
 
     /// Parse all messages from a JSONL file for transcript display
-    func parseMessages(at path: String) -> [DisplayMessage] {
+    func parseMessages(at path: String) -> [TranscriptDisplayMessage] {
         guard let data = FileManager.default.contents(atPath: path) else { return [] }
         let content = String(decoding: data, as: UTF8.self)
         let decoder = JSONDecoder()
 
-        var messages: [DisplayMessage] = []
+        var messages: [TranscriptDisplayMessage] = []
         var seenMsgIds: Set<String> = []
         var seenToolIds: Set<String> = []
         var toolResults: [String: String] = [:]      // tool_use_id → result text
@@ -527,7 +503,7 @@ final class TranscriptParser {
                 guard entry.operation == "enqueue" else { continue }
                 guard let text = entry.content, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
                 let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                messages.append(DisplayMessage(
+                messages.append(TranscriptDisplayMessage(
                     id: "msg-\(index)", role: "user", text: cleaned, timestamp: entry.timestampDate
                 ))
                 index += 1
@@ -571,7 +547,7 @@ final class TranscriptParser {
                     }
                 }
 
-                var msg = DisplayMessage(
+                var msg = TranscriptDisplayMessage(
                     id: "msg-\(index)", role: "user", text: cleaned, timestamp: entry.timestampDate
                 )
                 msg.imagePaths = imagePaths
@@ -588,13 +564,13 @@ final class TranscriptParser {
                 if let text = textContent, !text.isEmpty {
                     if seenMsgIds.contains(msgId) {
                         if let i = messages.indices.last(where: { messages[$0].id == "text-\(msgId)" }) {
-                            messages[i] = DisplayMessage(
+                            messages[i] = TranscriptDisplayMessage(
                                 id: "text-\(msgId)", role: "assistant", text: text, timestamp: entry.timestampDate
                             )
                         }
                     } else {
                         seenMsgIds.insert(msgId)
-                        messages.append(DisplayMessage(
+                        messages.append(TranscriptDisplayMessage(
                             id: "text-\(msgId)", role: "assistant", text: text, timestamp: entry.timestampDate
                         ))
                     }
@@ -611,7 +587,7 @@ final class TranscriptParser {
                             let name = tc.name ?? "unknown"
                             let (summary, detail) = Self.toolSummaryAndDetail(name: name, input: tc.input)
                             let msgIdx = messages.count
-                            var msg = DisplayMessage(
+                            var msg = TranscriptDisplayMessage(
                                 id: "tool-\(toolId)", role: "tool", text: summary,
                                 timestamp: entry.timestampDate, toolName: name, toolDetail: detail
                             )
@@ -643,7 +619,7 @@ final class TranscriptParser {
             guard let msgIdx = toolMsgIndices[toolId], msgIdx < messages.count else { continue }
             let msg = messages[msgIdx]
             if msg.toolDetail == nil || msg.toolDetail!.isEmpty {
-                messages[msgIdx] = DisplayMessage(
+                messages[msgIdx] = TranscriptDisplayMessage(
                     id: msg.id, role: msg.role, text: msg.text,
                     timestamp: msg.timestamp, toolName: msg.toolName, toolDetail: result
                 )

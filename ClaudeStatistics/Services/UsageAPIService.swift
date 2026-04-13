@@ -1,6 +1,6 @@
 import Foundation
 
-final class UsageAPIService {
+final class UsageAPIService: ProviderUsageSource {
     static let shared = UsageAPIService()
 
     private let apiURL = "https://api.anthropic.com/api/oauth/usage"
@@ -159,29 +159,6 @@ final class UsageAPIService {
         return readCacheFile(at: appCacheFilePath())
     }
 
-    /// Read claude-hud plugin's cache (updated by claude-hud on each statusline render)
-    func loadFromHudCache() -> (data: UsageData, fetchedAt: Date)? {
-        let hudCachePath = (CredentialService.shared.claudeConfigDir() as NSString)
-            .appendingPathComponent("plugins/claude-hud/.usage-cache.json")
-
-        guard let rawData = FileManager.default.contents(atPath: hudCachePath),
-              let cache = try? JSONDecoder().decode(HudUsageCache.self, from: rawData) else {
-            return nil
-        }
-
-        let hudData = cache.data ?? cache.lastGoodData
-        guard let hudData else { return nil }
-
-        let fetchedAt: Date
-        if let ts = cache.timestamp {
-            fetchedAt = Date(timeIntervalSince1970: ts / 1000.0) // ms -> s
-        } else {
-            fetchedAt = Date()
-        }
-
-        return (data: hudData.toUsageData(), fetchedAt: fetchedAt)
-    }
-
     private func readCacheFile(at path: String) -> (data: UsageData, fetchedAt: Date)? {
         guard let data = FileManager.default.contents(atPath: path) else { return nil }
 
@@ -217,6 +194,26 @@ final class UsageAPIService {
             try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
         }
         return (dir as NSString).appendingPathComponent(cacheFileName)
+    }
+}
+
+extension UsageAPIService {
+    var dashboardURL: URL? {
+        URL(string: "https://claude.ai/settings/usage")
+    }
+
+    func loadCachedSnapshot() -> ProviderUsageSnapshot? {
+        guard let cached = loadFromCache() else { return nil }
+        return ProviderUsageSnapshot(data: cached.data, fetchedAt: cached.fetchedAt)
+    }
+
+    func refreshSnapshot() async throws -> ProviderUsageSnapshot {
+        let data = try await fetchUsage()
+        return ProviderUsageSnapshot(data: data, fetchedAt: Date())
+    }
+
+    func refreshCredentials() async -> Bool {
+        await refreshToken()
     }
 }
 
