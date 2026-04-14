@@ -11,7 +11,7 @@ final class GeminiUsageService: ProviderUsageSource {
 
     private init() {}
 
-    var dashboardURL: URL? { URL(string: "https://aistudio.google.com/app/quotas") }
+    var dashboardURL: URL? { nil }
 
     var hasUsableCredentials: Bool {
         guard let settings = try? readSettings() else { return false }
