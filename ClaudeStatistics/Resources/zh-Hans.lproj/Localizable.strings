@@ -161,8 +161,14 @@
 "pricing.read" = "CRead";
 "pricing.save" = "保存";
 "pricing.add" = "添加";
+"pricing.scope.provider" = "当前 Provider";
+"pricing.scope.all" = "全部模型";
 "pricing.modelId" = "模型 ID（如 gpt-4o）";
 "pricing.updated %lld" = "已从 Anthropic 文档更新 %lld 个模型";
+"pricing.updated.claude %lld" = "已从 Anthropic 文档更新 %lld 个模型";
+"pricing.updated.codex %lld" = "已从 OpenAI 定价文档更新 %lld 个模型";
+"pricing.source.claude" = "来源：docs.anthropic.com/en/docs/about-claude/pricing";
+"pricing.source.codex" = "来源：developers.openai.com/api/docs/pricing";
 
 /* Status Line */
 "statusLine.title" = "Claude Code 状态行";

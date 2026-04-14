@@ -352,40 +352,12 @@ final class ModelPricing {
     private(set) var models: [String: Pricing] = [:]
     private(set) var defaultPricing = Pricing(input: 3.0, output: 15.0, cacheWrite5m: 3.75, cacheWrite1h: 6.0, cacheRead: 0.30)
 
-    // Sources:
-    // - Anthropic Claude pricing (2026-03-20)
-    // - OpenAI API Pricing / model pages verified on 2026-04-13
-    // Cache write/read multipliers follow each provider's published cached-input rates.
-    private static let builtinModels: [String: Pricing] = [
-        // Opus 4.6 / 4.5 — $5 in, $25 out
-        "claude-opus-4-6":              Pricing(input: 5.0,  output: 25.0, cacheWrite5m: 6.25,  cacheWrite1h: 10.0,  cacheRead: 0.50),
-        "claude-opus-4-5-20251101":     Pricing(input: 5.0,  output: 25.0, cacheWrite5m: 6.25,  cacheWrite1h: 10.0,  cacheRead: 0.50),
-        // Opus 4.1 / 4 — $15 in, $75 out
-        "claude-opus-4-1-20250805":     Pricing(input: 15.0, output: 75.0, cacheWrite5m: 18.75, cacheWrite1h: 30.0,  cacheRead: 1.50),
-        "claude-opus-4-20250514":       Pricing(input: 15.0, output: 75.0, cacheWrite5m: 18.75, cacheWrite1h: 30.0,  cacheRead: 1.50),
-        // Sonnet 4.6 / 4.5 / 4 — $3 in, $15 out
-        "claude-sonnet-4-6":            Pricing(input: 3.0,  output: 15.0, cacheWrite5m: 3.75,  cacheWrite1h: 6.0,   cacheRead: 0.30),
-        "claude-sonnet-4-5-20250929":   Pricing(input: 3.0,  output: 15.0, cacheWrite5m: 3.75,  cacheWrite1h: 6.0,   cacheRead: 0.30),
-        "claude-sonnet-4-20250514":     Pricing(input: 3.0,  output: 15.0, cacheWrite5m: 3.75,  cacheWrite1h: 6.0,   cacheRead: 0.30),
-        // Haiku 4.5 — $1 in, $5 out
-        "claude-haiku-4-5-20251001":    Pricing(input: 1.0,  output: 5.0,  cacheWrite5m: 1.25,  cacheWrite1h: 2.0,   cacheRead: 0.10),
-        // Haiku 3.5 — $0.80 in, $4 out
-        "claude-3-5-haiku-20241022":    Pricing(input: 0.80, output: 4.0,  cacheWrite5m: 1.0,   cacheWrite1h: 1.60,  cacheRead: 0.08),
-        // Haiku 3 — $0.25 in, $1.25 out
-        "claude-3-haiku-20240307":      Pricing(input: 0.25, output: 1.25, cacheWrite5m: 0.3125, cacheWrite1h: 0.50, cacheRead: 0.025),
-
-        // GPT-5 / Codex family
-        "gpt-5":                        Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25,  cacheWrite1h: 1.25,  cacheRead: 0.125),
-        "gpt-5.1":                      Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25,  cacheWrite1h: 1.25,  cacheRead: 0.125),
-        "gpt-5.4":                      Pricing(input: 2.50, output: 15.0, cacheWrite5m: 2.50,  cacheWrite1h: 2.50,  cacheRead: 0.25),
-        "gpt-5.4-mini":                 Pricing(input: 0.75, output: 4.50, cacheWrite5m: 0.75,  cacheWrite1h: 0.75,  cacheRead: 0.075),
-        "gpt-5-codex":                  Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25,  cacheWrite1h: 1.25,  cacheRead: 0.125),
-        "gpt-5.1-codex":                Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25,  cacheWrite1h: 1.25,  cacheRead: 0.125),
-        "gpt-5.1-codex-max":            Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25,  cacheWrite1h: 1.25,  cacheRead: 0.125),
-        "gpt-5.1-codex-mini":           Pricing(input: 0.25, output: 2.0,  cacheWrite5m: 0.25,  cacheWrite1h: 0.25,  cacheRead: 0.025),
-        "gpt-5.2-codex":                Pricing(input: 1.75, output: 14.0, cacheWrite5m: 1.75,  cacheWrite1h: 1.75,  cacheRead: 0.175),
-        "gpt-5.3-codex":                Pricing(input: 1.75, output: 14.0, cacheWrite5m: 1.75,  cacheWrite1h: 1.75,  cacheRead: 0.175),
-    ]
+    private static var builtinModels: [String: Pricing] {
+        ProviderRegistry.supportedProviders.reduce(into: [:]) { merged, kind in
+            let provider = ProviderRegistry.provider(for: kind)
+            merged.merge(provider.builtinPricingModels) { current, _ in current }
+        }
+    }
 
     private var configDir: String {
         (NSHomeDirectory() as NSString).appendingPathComponent(".claude-statistics")
@@ -417,9 +389,9 @@ final class ModelPricing {
         savePricing()
     }
 
-    /// Replace all pricing with remotely fetched data and persist
+    /// Merge remotely fetched pricing into the current model set and persist
     func updateModels(_ newModels: [String: Pricing]) {
-        models = newModels
+        models.merge(newModels) { _, fetched in fetched }
         savePricing()
     }
 

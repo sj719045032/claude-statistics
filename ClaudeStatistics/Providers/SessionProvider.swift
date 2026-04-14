@@ -26,6 +26,10 @@ extension ProviderUsageSource {
     }
 }
 
+protocol ProviderPricingFetching {
+    func fetchPricing() async throws -> [String: ModelPricing.Pricing]
+}
+
 /// Encapsulates statusline install/restore operations for a specific provider.
 /// Title and description localization keys are plain strings to avoid SwiftUI import.
 protocol StatusLineInstalling {
@@ -56,6 +60,16 @@ protocol SessionProvider: Sendable {
     var credentialStatus: Bool? { get }
     /// Returns the statusline installer for this provider, or `nil` if not supported.
     var statusLineInstaller: (any StatusLineInstalling)? { get }
+    /// Provider-owned built-in model pricing seeds.
+    var builtinPricingModels: [String: ModelPricing.Pricing] { get }
+    /// Optional provider-specific remote pricing fetcher.
+    var pricingFetcher: (any ProviderPricingFetching)? { get }
+    /// Localization key describing the pricing source for this provider.
+    var pricingSourceLocalizationKey: String? { get }
+    /// Clickable source URL for this provider's pricing page.
+    var pricingSourceURL: URL? { get }
+    /// Localization key used after a successful remote pricing refresh.
+    var pricingUpdatedLocalizationKey: String? { get }
 
     func resolvedProjectPath(for session: Session) -> String
     func scanSessions() -> [Session]
@@ -76,6 +90,11 @@ protocol SessionProvider: Sendable {
 extension SessionProvider {
     var credentialStatus: Bool? { nil }
     var statusLineInstaller: (any StatusLineInstalling)? { nil }
+    var builtinPricingModels: [String: ModelPricing.Pricing] { [:] }
+    var pricingFetcher: (any ProviderPricingFetching)? { nil }
+    var pricingSourceLocalizationKey: String? { nil }
+    var pricingSourceURL: URL? { nil }
+    var pricingUpdatedLocalizationKey: String? { nil }
     func fetchProfile() async -> UserProfile? { nil }
 
     /// Returns `true` when the provider's config directory exists.

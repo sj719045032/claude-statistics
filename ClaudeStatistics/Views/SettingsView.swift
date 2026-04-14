@@ -21,7 +21,7 @@ struct SettingsView: View {
     var body: some View {
         VStack(spacing: 0) {
             if showPricing {
-                PricingManageView(onBack: { showPricing = false })
+                PricingManageView(provider: provider, onBack: { showPricing = false })
             } else {
                 settingsContent
             }
@@ -563,11 +563,19 @@ struct TabOrderEditor: View {
 // MARK: - Pricing Management View
 
 struct PricingManageView: View {
+    enum ModelScope: String, CaseIterable, Identifiable {
+        case provider
+        case all
+
+        var id: String { rawValue }
+    }
+
+    let provider: any SessionProvider
     let onBack: () -> Void
 
     @State private var models: [(id: String, pricing: ModelPricing.Pricing)] = []
     @State private var isFetching = false
-    @State private var fetchMessage: LocalizedStringKey?
+    @State private var fetchMessage: String?
     @State private var fetchIsError = false
     @State private var editingModel: String?
     @State private var editInput = ""
@@ -577,6 +585,9 @@ struct PricingManageView: View {
     @State private var editCacheRead = ""
     @State private var showAddModel = false
     @State private var newModelId = ""
+    @State private var modelScope: ModelScope = .provider
+    @State private var listOpacity = 1.0
+    @State private var listOffset: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -612,16 +623,37 @@ struct PricingManageView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
 
-                Button(action: fetchRemote) {
-                    Label("pricing.fetchLatest", systemImage: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 11))
+                if provider.pricingFetcher != nil {
+                    Button(action: fetchRemote) {
+                        Label("pricing.fetchLatest", systemImage: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 11))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(isFetching)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(isFetching)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
+
+            if let pricingSourceKey = provider.pricingSourceLocalizationKey {
+                Group {
+                    if let pricingSourceURL = provider.pricingSourceURL {
+                        Link(destination: pricingSourceURL) {
+                            Text(LocalizedStringKey(pricingSourceKey))
+                                .underline(false)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Text(LocalizedStringKey(pricingSourceKey))
+                    }
+                }
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 4)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
 
             if let msg = fetchMessage {
                 HStack {
@@ -633,9 +665,18 @@ struct PricingManageView: View {
                 .foregroundStyle(fetchIsError ? .red : .green)
                 .padding(.horizontal, 12)
                 .padding(.bottom, 4)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
             Divider()
+
+            Picker("", selection: $modelScope) {
+                Text("pricing.scope.provider").tag(ModelScope.provider)
+                Text("pricing.scope.all").tag(ModelScope.all)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
 
             // Add model form
             if showAddModel {
@@ -697,18 +738,39 @@ struct PricingManageView: View {
                     .padding(.vertical, 6)
                     .background(Color.gray.opacity(0.08))
 
-                    ForEach(models, id: \.id) { item in
-                        if editingModel == item.id {
-                            editRow(item)
-                        } else {
-                            displayRow(item)
+                    ForEach(Array(models.enumerated()), id: \.element.id) { index, item in
+                        Group {
+                            if editingModel == item.id {
+                                editRow(item)
+                            } else {
+                                displayRow(item)
+                            }
                         }
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .trailing).combined(with: .opacity),
+                            removal: .move(edge: .leading).combined(with: .opacity)
+                        ))
+                        .animation(Theme.quickSpring.delay(Double(index) * 0.015), value: models.map(\.id))
                         Divider()
                     }
                 }
             }
+            .opacity(listOpacity)
+            .offset(y: listOffset)
         }
-        .onAppear { loadModels() }
+        .onAppear { refreshModels(animated: false) }
+        .onChange(of: modelScope) { _, _ in refreshModels(animated: true) }
+        .onChange(of: provider.kind) { _, _ in
+            fetchMessage = nil
+            fetchIsError = false
+            editingModel = nil
+            showAddModel = false
+            modelScope = .provider
+            refreshModels(animated: true)
+        }
+        .animation(Theme.quickSpring, value: provider.kind)
+        .animation(Theme.quickSpring, value: modelScope)
+        .animation(Theme.quickSpring, value: fetchMessage != nil)
     }
 
     // MARK: - Display row
@@ -798,8 +860,24 @@ struct PricingManageView: View {
     // MARK: - Actions
 
     private func loadModels() {
+        let preferred = Set(provider.builtinPricingModels.keys)
         models = ModelPricing.shared.models
-            .sorted { $0.key < $1.key }
+            .sorted {
+                let lhsPreferred = preferred.contains($0.key)
+                let rhsPreferred = preferred.contains($1.key)
+                if lhsPreferred != rhsPreferred {
+                    return lhsPreferred && !rhsPreferred
+                }
+                return $0.key < $1.key
+            }
+            .filter { item in
+                switch modelScope {
+                case .provider:
+                    return preferred.contains(item.key)
+                case .all:
+                    return true
+                }
+            }
             .map { (id: $0.key, pricing: $0.value) }
     }
 
@@ -859,17 +937,31 @@ struct PricingManageView: View {
 
         Task {
             do {
-                let fetched = try await PricingFetchService.shared.fetchPricing()
+                guard let fetcher = provider.pricingFetcher else {
+                    await MainActor.run {
+                        fetchMessage = "Failed to fetch pricing page"
+                        fetchIsError = true
+                        isFetching = false
+                    }
+                    return
+                }
+
+                let fetched = try await fetcher.fetchPricing()
                 await MainActor.run {
                     ModelPricing.shared.updateModels(fetched)
                     loadModels()
-                    fetchMessage = "pricing.updated \(fetched.count)"
+                    if let key = provider.pricingUpdatedLocalizationKey {
+                        let format = NSLocalizedString("\(key) %lld", comment: "")
+                        fetchMessage = String(format: format, locale: Locale.current, fetched.count)
+                    } else {
+                        fetchMessage = nil
+                    }
                     fetchIsError = false
                     isFetching = false
                 }
             } catch {
                 await MainActor.run {
-                    fetchMessage = LocalizedStringKey(error.localizedDescription)
+                    fetchMessage = error.localizedDescription
                     fetchIsError = true
                     isFetching = false
                 }
@@ -892,6 +984,29 @@ struct PricingManageView: View {
 
     private func shortModelName(_ id: String) -> String {
         id.replacingOccurrences(of: "claude-", with: "")
+    }
+
+    private func refreshModels(animated: Bool) {
+        if !animated {
+            loadModels()
+            listOpacity = 1
+            listOffset = 0
+            return
+        }
+
+        withAnimation(.easeOut(duration: 0.12)) {
+            listOpacity = 0
+            listOffset = 10
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 90_000_000)
+            loadModels()
+            withAnimation(Theme.springAnimation) {
+                listOpacity = 1
+                listOffset = 0
+            }
+        }
     }
 }
 

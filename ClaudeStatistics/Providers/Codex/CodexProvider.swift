@@ -8,9 +8,14 @@ final class CodexProvider: SessionProvider, @unchecked Sendable {
     let capabilities = ProviderCapabilities.codex
     let usageSource: (any ProviderUsageSource)? = CodexUsageService.shared
     let configDirectory = (NSHomeDirectory() as NSString).appendingPathComponent(".codex")
+    let builtinPricingModels = CodexPricingCatalog.builtinModels
 
     // credentialStatus: nil — Codex profile is decoded locally, no explicit credential check needed
     var statusLineInstaller: (any StatusLineInstalling)? { CodexStatusLineAdapter() }
+    var pricingFetcher: (any ProviderPricingFetching)? { CodexPricingFetchService.shared }
+    var pricingSourceLocalizationKey: String? { "pricing.source.codex" }
+    var pricingSourceURL: URL? { URL(string: "https://developers.openai.com/api/docs/pricing") }
+    var pricingUpdatedLocalizationKey: String? { "pricing.updated.codex" }
 
     private init() {}
 
@@ -66,4 +71,20 @@ struct CodexStatusLineAdapter: StatusLineInstalling {
     var titleLocalizationKey: String { "statusLine.codex.title" }
     var descriptionLocalizationKey: String { "statusLine.codex.description" }
     func install() throws { try CodexStatusLineInstaller.install() }
+}
+
+enum CodexPricingCatalog {
+    // Source: OpenAI pricing pages verified on 2026-04-14
+    static let builtinModels: [String: ModelPricing.Pricing] = [
+        "gpt-5":              ModelPricing.Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25, cacheWrite1h: 1.25, cacheRead: 0.125),
+        "gpt-5.1":            ModelPricing.Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25, cacheWrite1h: 1.25, cacheRead: 0.125),
+        "gpt-5.4":            ModelPricing.Pricing(input: 2.50, output: 15.0, cacheWrite5m: 2.50, cacheWrite1h: 2.50, cacheRead: 0.25),
+        "gpt-5.4-mini":       ModelPricing.Pricing(input: 0.75, output: 4.50, cacheWrite5m: 0.75, cacheWrite1h: 0.75, cacheRead: 0.075),
+        "gpt-5-codex":        ModelPricing.Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25, cacheWrite1h: 1.25, cacheRead: 0.125),
+        "gpt-5.1-codex":      ModelPricing.Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25, cacheWrite1h: 1.25, cacheRead: 0.125),
+        "gpt-5.1-codex-max":  ModelPricing.Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25, cacheWrite1h: 1.25, cacheRead: 0.125),
+        "gpt-5.1-codex-mini": ModelPricing.Pricing(input: 0.25, output: 2.0, cacheWrite5m: 0.25, cacheWrite1h: 0.25, cacheRead: 0.025),
+        "gpt-5.2-codex":      ModelPricing.Pricing(input: 1.75, output: 14.0, cacheWrite5m: 1.75, cacheWrite1h: 1.75, cacheRead: 0.175),
+        "gpt-5.3-codex":      ModelPricing.Pricing(input: 1.75, output: 14.0, cacheWrite5m: 1.75, cacheWrite1h: 1.75, cacheRead: 0.175),
+    ]
 }

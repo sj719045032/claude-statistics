@@ -161,8 +161,14 @@
 "pricing.read" = "CRead";
 "pricing.save" = "Save";
 "pricing.add" = "Add";
+"pricing.scope.provider" = "Current Provider";
+"pricing.scope.all" = "All Models";
 "pricing.modelId" = "Model ID (e.g. gpt-4o)";
 "pricing.updated %lld" = "Updated %lld models from Anthropic docs";
+"pricing.updated.claude %lld" = "Updated %lld models from Anthropic docs";
+"pricing.updated.codex %lld" = "Updated %lld models from OpenAI pricing docs";
+"pricing.source.claude" = "Source: docs.anthropic.com/en/docs/about-claude/pricing";
+"pricing.source.codex" = "Source: developers.openai.com/api/docs/pricing";
 
 /* Status Line */
 "statusLine.title" = "Claude Code Status Line";
