@@ -195,8 +195,8 @@ final class CodexUsageService: ProviderUsageSource {
                 fullName: name,
                 displayName: name,
                 email: email,
-                hasClaudeMax: nil,
-                hasClaudePro: planType.map { $0 == "plus" || $0 == "pro" }),
+                hasMaxPlan: nil,
+                hasProPlan: planType.map { $0 == "plus" || $0 == "pro" }),
             organization: ProfileOrganization(
                 name: nil,
                 organizationType: nil,
@@ -211,7 +211,7 @@ final class CodexUsageService: ProviderUsageSource {
             fetchedAt: String(Int(Date().timeIntervalSince1970)),
             data: usageData)
         guard let data = try? JSONEncoder().encode(cache) else { return }
-        try? data.write(to: URL(fileURLWithPath: cacheFilePath()))
+        try? data.write(to: URL(fileURLWithPath: cacheFilePath()), options: .atomic)
     }
 
     private func cacheFilePath() -> String {
@@ -280,6 +280,7 @@ private struct CodexUsageAPIResponse: Decodable {
             sevenDayOpus: nil,
             sevenDaySonnet: nil,
             sevenDayCowork: nil,
+            providerBuckets: nil,
             extraUsage: nil)
     }
 

@@ -57,6 +57,7 @@ final class CodexSessionScanner {
 
             sessions.append(Session(
                 id: id,
+                externalID: id,
                 provider: .codex,
                 projectPath: projectPath,
                 filePath: filePath,

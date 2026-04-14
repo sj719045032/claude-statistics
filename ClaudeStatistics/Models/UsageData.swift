@@ -7,6 +7,7 @@ struct UsageData: Codable, Equatable {
     let sevenDayOpus: UsageWindow?
     let sevenDaySonnet: UsageWindow?
     let sevenDayCowork: UsageWindow?
+    let providerBuckets: [ProviderUsageBucket]?
     let extraUsage: ExtraUsage?
 
     enum CodingKeys: String, CodingKey {
@@ -16,7 +17,47 @@ struct UsageData: Codable, Equatable {
         case sevenDayOpus = "seven_day_opus"
         case sevenDaySonnet = "seven_day_sonnet"
         case sevenDayCowork = "seven_day_cowork"
+        case providerBuckets = "provider_buckets"
         case extraUsage = "extra_usage"
+    }
+}
+
+struct ProviderUsageBucket: Codable, Equatable, Identifiable {
+    let id: String
+    let title: String
+    let subtitle: String?
+    let remainingPercentage: Double
+    let resetsAt: String?
+    let remainingAmount: Double?
+    let limitAmount: Double?
+    let unit: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case subtitle
+        case remainingPercentage = "remaining_percentage"
+        case resetsAt = "resets_at"
+        case remainingAmount = "remaining_amount"
+        case limitAmount = "limit_amount"
+        case unit
+    }
+
+    var resetsAtDate: Date? {
+        guard let resetsAt else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: resetsAt) {
+            return date
+        }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: resetsAt)
+    }
+
+    var timeUntilReset: TimeInterval? {
+        guard let resetsAtDate else { return nil }
+        let interval = resetsAtDate.timeIntervalSinceNow
+        return interval > 0 ? interval : nil
     }
 }
 
@@ -89,15 +130,15 @@ struct ProfileAccount: Codable {
     let fullName: String?
     let displayName: String?
     let email: String?
-    let hasClaudeMax: Bool?
-    let hasClaudePro: Bool?
+    let hasMaxPlan: Bool?
+    let hasProPlan: Bool?
 
     enum CodingKeys: String, CodingKey {
         case fullName = "full_name"
         case displayName = "display_name"
         case email
-        case hasClaudeMax = "has_claude_max"
-        case hasClaudePro = "has_claude_pro"
+        case hasMaxPlan = "has_claude_max"
+        case hasProPlan = "has_claude_pro"
     }
 }
 
@@ -115,6 +156,9 @@ struct ProfileOrganization: Codable {
     }
 
     var orgTypeDisplayName: String {
+        if let organizationType, organizationType.contains(" "), organizationType != organizationType.lowercased() {
+            return organizationType
+        }
         switch organizationType {
         case "claude_team": return "Team"
         case "claude_enterprise": return "Enterprise"
@@ -125,6 +169,9 @@ struct ProfileOrganization: Codable {
 
     var tierDisplayName: String {
         guard let tier = rateLimitTier else { return "–" }
+        if tier.contains(" "), tier != tier.lowercased() {
+            return tier
+        }
         if tier.contains("claude_max_5x") { return "Max 5x" }
         if tier.contains("claude_max") { return "Max" }
         if tier.contains("claude_pro") { return "Pro" }
@@ -164,6 +211,7 @@ struct UsageAPIResponse: Codable {
             sevenDayOpus: sevenDayOpus,
             sevenDaySonnet: sevenDaySonnet,
             sevenDayCowork: sevenDayCowork,
+            providerBuckets: nil,
             extraUsage: extraUsage
         )
     }

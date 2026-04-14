@@ -2,15 +2,16 @@
 
 **[中文文档](docs/README_zh.md)**
 
-A native macOS menu bar app for monitoring your [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [Codex CLI](https://github.com/openai/codex) sessions, subscription usage, and token/cost analytics in real time.
+A native macOS menu bar app for monitoring your [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), and Gemini CLI sessions, subscription usage, and token/cost analytics in real time.
 
-## v2.3.0 Highlights
+## v2.4.0 Highlights
 
-- **Multi-provider support** — switch between Claude Code and Codex CLI from the footer provider switcher
-- Provider-aware UI: tabs, account card, and status-line integration all adapt to the active provider
-- Installation detection: uninstalled providers are shown as disabled in the switcher
-- Codex profile decoded locally from JWT — no extra API calls needed
-- Account card shows a full-card loading spinner instead of a stale "?" avatar during provider switches
+- **Provider-native experience** — Claude Code, Codex CLI, and Gemini CLI each use provider-specific session scanning, transcript parsing, usage presentation, and resume behavior
+- **Background parsing per provider** — switching providers no longer interrupts parsing or search-index rebuilds for the others
+- **Gemini Usage alignment** — Gemini now exposes grouped subscription usage, local token trends, and menu bar quota text instead of a generic percentage-only view
+- **Faster, safer indexing** — Claude, Codex, and Gemini all use lightweight search indexing paths instead of full transcript UI parsing during startup
+- **Cache/index self-healing** — atomic stats + FTS writes, startup repair of missing indexes, and retry protection for suspicious parse results
+- Installation detection: unavailable providers are hidden or disabled automatically based on the current UI context
 
 ![Claude Statistics overview](docs/screenshots/hero-overview.png)
 
@@ -45,7 +46,7 @@ Claude Statistics lives in your macOS menu bar and opens as a floating panel.
 
 ### Session Management
 
-Claude Statistics automatically discovers and parses sessions from `~/.claude/projects/` (Claude Code) and `~/.codex/projects/` (Codex CLI). Switch providers from the footer switcher.
+Claude Statistics automatically discovers and parses sessions from `~/.claude/projects/` (Claude Code), `~/.codex/projects/` (Codex CLI), and `~/.gemini/tmp/` (Gemini CLI). Each provider keeps its own parsing pipeline and local cache, so switching providers does not stop background indexing for the others.
 
 **Session List**
 
@@ -55,7 +56,7 @@ Claude Statistics automatically discovers and parses sessions from `~/.claude/pr
 - Each session shows topic/title, model badge, message count, token count, cost, context usage, and timestamp
 - Model-aware color badges (Opus / Sonnet / Haiku)
 - Batch selection mode for bulk deletion
-- Real-time updates via macOS file watching — new or modified sessions appear automatically
+- Real-time updates via macOS file watching where available, with provider-specific rescans for formats that need it
 - Quick actions on hover: new session, resume session, open transcript, delete, copy path
 
 **Session Detail**
@@ -101,15 +102,16 @@ Analyze usage from the local transcript data you already have.
 
 ### Subscription Usage Monitoring
 
-Fetches live usage data from Anthropic's OAuth-backed usage API.
+Fetches provider-specific live usage data and combines it with local session analytics.
 
-- 5-hour and 7-day usage windows with utilization percentage and reset countdown
-- Per-model windows (such as Opus / Sonnet) when available from the API
+- Claude: 5-hour and 7-day windows with utilization, reset countdown, and per-model windows when available
+- Gemini: grouped quota buckets (Pro / Flash / Flash Lite) with reset countdown and local token trend charts
+- Menu bar usage text adapts to the active provider's best metric
 - Extra Usage credit tracking when available
 - Usage trend chart with cumulative token and cost view
 - Interpolated tooltip + crosshair for chart inspection
 - Animated progress bars for rate-limit usage
-- Error banner with retry action and direct link to [claude.ai/settings/usage](https://claude.ai/settings/usage)
+- Error banner with retry action and direct dashboard link when supported
 - Configurable auto-refresh interval
 
 ### Provider Switcher
@@ -118,8 +120,9 @@ A compact switcher in the footer lets you toggle between providers at any time:
 
 - **Claude Code** — reads `~/.claude/projects/`, fetches usage from Anthropic's OAuth API
 - **Codex CLI** — reads `~/.codex/projects/`, decodes profile from local JWT
+- **Gemini CLI** — reads `~/.gemini/tmp/`, fetches usage from Gemini API, and exposes provider-specific grouped usage/trend views
 
-Providers that are not installed are shown as disabled automatically.
+Providers that are not installed are hidden or disabled automatically depending on the current control.
 
 ### Settings & Integrations
 
@@ -136,7 +139,7 @@ Providers that are not installed are shown as disabled automatically.
 - Font scale control
 - Custom tab ordering
 - Model pricing management (view, edit, fetch latest pricing)
-- Status line integration for Claude Code and Codex CLI
+- Status line integration for Claude Code, Codex CLI, and Gemini CLI
 - OAuth token detection from macOS Keychain or `~/.claude/.credentials.json`
 - Diagnostics log export
 - Sparkle-based in-app update checks
@@ -195,7 +198,7 @@ This script builds using the dedicated debug DerivedData path and relaunches the
 
 ## How It Works
 
-Claude Statistics supports two providers, each with its own local-first data sources:
+Claude Statistics supports three providers, each with its own local-first data sources:
 
 **Claude Code**
 - Parses JSONL transcript files under `~/.claude/projects/`
@@ -206,7 +209,13 @@ Claude Statistics supports two providers, each with its own local-first data sou
 **Codex CLI**
 - Parses conversation files under `~/.codex/projects/`
 - Decodes user profile (name, email, plan) from a local JWT — no extra API calls
-- Session scanning and transcript parsing adapted for Codex's file format
+- Session scanning, transcript parsing, and lightweight search indexing adapted for Codex's file format
+
+**Gemini CLI**
+- Parses JSON transcript files under `~/.gemini/tmp/` and project roots from `~/.gemini/history/`
+- Extracts session history, token counts, model usage, and provider-specific grouped usage windows
+- Keeps the latest snapshot when Gemini writes multiple files for the same logical session
+- Uses lightweight search indexing and provider-specific usage/menu bar presentation
 
 All parsing and analytics happen locally on your machine.
 
@@ -216,10 +225,11 @@ All parsing and analytics happen locally on your machine.
 ClaudeStatistics/
 ├── App/                    # App entry, status bar controller, floating panel
 ├── Models/                 # Session, SessionStats, AggregateStats, UsageData, etc.
-├── Providers/              # SessionProvider protocol + Claude and Codex implementations
+├── Providers/              # SessionProvider protocol + Claude, Codex, and Gemini implementations
 │   ├── SessionProvider.swift
 │   ├── Claude/             # ClaudeProvider, ClaudeSessionScanner, ClaudeTranscriptParser
-│   └── Codex/              # CodexProvider, CodexSessionScanner, CodexTranscriptParser
+│   ├── Codex/              # CodexProvider, CodexSessionScanner, CodexTranscriptParser
+│   └── Gemini/             # GeminiProvider, GeminiSessionScanner, GeminiTranscriptParser
 ├── Services/               # Parsing, scanning, storage, pricing fetch, usage API, logs
 ├── Utilities/              # Terminal launching, time formatting, language handling
 ├── ViewModels/             # SessionViewModel, UsageViewModel, ProfileViewModel

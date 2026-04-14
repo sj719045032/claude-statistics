@@ -110,7 +110,7 @@ final class SessionViewModel: ObservableObject {
             var result: [Session] = []
             for session in store.sessions {
                 if SearchUtils.textMatches(query: searchText, in: session.displayName) ||
-                    SearchUtils.textMatches(query: searchText, in: session.id) ||
+                    SearchUtils.textMatches(query: searchText, in: session.externalID) ||
                     SearchUtils.textMatches(query: searchText, in: store.quickStats[session.id]?.topic ?? "") ||
                     SearchUtils.textMatches(query: searchText, in: store.quickStats[session.id]?.sessionName ?? "")
                 {

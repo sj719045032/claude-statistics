@@ -86,11 +86,11 @@ struct SessionDetailView: View {
                             CopyButton(text: session.displayName, help: "detail.copyPath")
                         }
                         HStack(spacing: 4) {
-                            Text(session.id)
+                            Text(session.externalID)
                                 .font(.system(size: 10, design: .monospaced))
                                 .foregroundStyle(.tertiary)
                                 .lineLimit(1)
-                            CopyButton(text: session.id, help: "detail.copyId")
+                            CopyButton(text: session.externalID, help: "detail.copyId")
                         }
                         if let sessionName, !sessionName.isEmpty {
                             Text(sessionName)

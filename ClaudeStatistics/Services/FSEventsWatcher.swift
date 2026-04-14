@@ -4,6 +4,7 @@ import CoreServices
 final class FSEventsWatcher {
     private let path: String
     private let debounceSeconds: TimeInterval
+    private let fileFilter: (String) -> Bool
     private let onChange: (Set<String>) -> Void
 
     private var stream: FSEventStreamRef?
@@ -11,9 +12,15 @@ final class FSEventsWatcher {
     private var pendingPaths: Set<String> = []
     private var debounceWork: DispatchWorkItem?
 
-    init(path: String, debounceSeconds: TimeInterval = 2.0, onChange: @escaping (Set<String>) -> Void) {
+    init(
+        path: String,
+        debounceSeconds: TimeInterval = 2.0,
+        fileFilter: @escaping (String) -> Bool = { $0.hasSuffix(".jsonl") },
+        onChange: @escaping (Set<String>) -> Void
+    ) {
         self.path = path
         self.debounceSeconds = debounceSeconds
+        self.fileFilter = fileFilter
         self.onChange = onChange
     }
 
@@ -63,10 +70,10 @@ final class FSEventsWatcher {
     // MARK: - Internal
 
     fileprivate func handleEvents(_ paths: [String]) {
-        let jsonlPaths = paths.filter { $0.hasSuffix(".jsonl") }
-        guard !jsonlPaths.isEmpty else { return }
+        let matchingPaths = paths.filter(fileFilter)
+        guard !matchingPaths.isEmpty else { return }
 
-        pendingPaths.formUnion(jsonlPaths)
+        pendingPaths.formUnion(matchingPaths)
 
         debounceWork?.cancel()
         let work = DispatchWorkItem { [weak self] in

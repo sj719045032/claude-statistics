@@ -27,6 +27,7 @@ final class SessionScanner {
             for file in files where file.hasSuffix(".jsonl") {
                 let filePath = (projectPath as NSString).appendingPathComponent(file)
                 let sessionId = (file as NSString).deletingPathExtension
+                let uniqueSessionId = Self.uniqueSessionId(projectDirectory: projectDir, transcriptFileName: file)
 
                 guard let attrs = try? fm.attributesOfItem(atPath: filePath) else { continue }
                 let modDate = attrs[.modificationDate] as? Date ?? Date.distantPast
@@ -53,7 +54,8 @@ final class SessionScanner {
                 let cwd = readCwd(from: filePath)
 
                 sessions.append(Session(
-                    id: sessionId,
+                    id: uniqueSessionId,
+                    externalID: sessionId,
                     provider: .claude,
                     projectPath: projectDir,
                     filePath: filePath,
@@ -66,6 +68,18 @@ final class SessionScanner {
         }
 
         return sessions.sorted { $0.lastModified > $1.lastModified }
+    }
+
+    static func uniqueSessionId(projectDirectory: String, transcriptFileName: String) -> String {
+        let basename = (transcriptFileName as NSString).deletingPathExtension
+        return "\(projectDirectory)::\(basename)"
+    }
+
+    static func uniqueSessionId(forTranscriptPath path: String) -> String? {
+        let fileName = (path as NSString).lastPathComponent
+        let projectDir = (((path as NSString).deletingLastPathComponent as NSString).lastPathComponent)
+        guard fileName.hasSuffix(".jsonl"), !projectDir.isEmpty else { return nil }
+        return uniqueSessionId(projectDirectory: projectDir, transcriptFileName: fileName)
     }
 
     /// Read cwd from JSONL file by reading in 64KB chunks until found

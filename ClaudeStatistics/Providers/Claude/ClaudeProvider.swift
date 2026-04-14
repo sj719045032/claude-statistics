@@ -16,6 +16,7 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
     var pricingSourceLocalizationKey: String? { "pricing.source.claude" }
     var pricingSourceURL: URL? { URL(string: "https://docs.anthropic.com/en/docs/about-claude/pricing") }
     var pricingUpdatedLocalizationKey: String? { "pricing.updated.claude" }
+    var credentialHintLocalizationKey: String? { "settings.credentialHint.claude" }
 
     private init() {}
 
@@ -43,6 +44,10 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
         return FSEventsWatcher(path: projectsDir, debounceSeconds: 2.0, onChange: onChange)
     }
 
+    func changedSessionIds(for changedPaths: Set<String>) -> Set<String> {
+        Set(changedPaths.compactMap { SessionScanner.uniqueSessionId(forTranscriptPath: $0) })
+    }
+
     func parseQuickStats(at path: String) -> SessionQuickStats {
         TranscriptParser.shared.parseSessionQuick(at: path)
     }
@@ -55,6 +60,10 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
         TranscriptParser.shared.parseMessages(at: path)
     }
 
+    func parseSearchIndexMessages(at path: String) -> [SearchIndexMessage] {
+        TranscriptParser.shared.parseSearchIndexMessages(at: path)
+    }
+
     func parseTrendData(from filePath: String, granularity: TrendGranularity) -> [TrendDataPoint] {
         TranscriptParser.shared.parseTrendData(from: filePath, granularity: granularity)
     }
@@ -64,7 +73,7 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
     }
 
     func resumeSession(_ session: Session) {
-        TerminalLauncher.launch(executable: "claude", arguments: ["--resume", session.id], cwd: resolvedProjectPath(for: session))
+        TerminalLauncher.launch(executable: "claude", arguments: ["--resume", session.externalID], cwd: resolvedProjectPath(for: session))
     }
 
     func openNewSession(inDirectory path: String) {

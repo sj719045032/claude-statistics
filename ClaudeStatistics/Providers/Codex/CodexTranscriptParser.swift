@@ -242,6 +242,54 @@ final class CodexTranscriptParser {
         return messages
     }
 
+    /// Lightweight transcript extraction for FTS indexing. This intentionally
+    /// avoids UI transcript assembly and full tool result stitching.
+    func parseSearchIndexMessages(at path: String) -> [SearchIndexMessage] {
+        var messages: [SearchIndexMessage] = []
+        var toolResults: [String: (content: String, timestamp: Date?)] = [:]
+
+        for event in readEvents(at: path) {
+            switch event.type {
+            case "response_item":
+                guard let payloadType = event.payload["type"] as? String else { continue }
+
+                if payloadType == "message" {
+                    guard let role = event.payload["role"] as? String,
+                          role == "user" || role == "assistant",
+                          let text = extractMessageText(from: event.payload),
+                          let content = cleanSearchText(text) else { continue }
+                    messages.append(SearchIndexMessage(role: role, content: content, timestamp: event.timestamp))
+                } else if payloadType == "function_call" {
+                    let rawName = (event.payload["name"] as? String) ?? "tool"
+                    let arguments = (event.payload["arguments"] as? String) ?? ""
+                    guard let content = searchTextForTool(name: rawName, arguments: arguments) else { continue }
+                    messages.append(SearchIndexMessage(role: "tool", content: content, timestamp: event.timestamp))
+                } else if payloadType == "function_call_output",
+                          let callId = event.payload["call_id"] as? String,
+                          let output = event.payload["output"] as? String,
+                          let content = cleanSearchText(String(output.prefix(500))) {
+                    toolResults[callId] = (content, event.timestamp)
+                }
+
+            case "event_msg":
+                guard let callId = event.payload["call_id"] as? String else { continue }
+                let output = (event.payload["aggregated_output"] as? String) ?? (event.payload["output"] as? String)
+                guard let output,
+                      let content = cleanSearchText(String(output.prefix(500))) else { continue }
+                toolResults[callId] = (content, event.timestamp)
+
+            default:
+                continue
+            }
+        }
+
+        for result in toolResults.values {
+            messages.append(SearchIndexMessage(role: "tool", content: result.content, timestamp: result.timestamp))
+        }
+
+        return messages
+    }
+
     func parseTrendData(from filePath: String, granularity: TrendGranularity) -> [TrendDataPoint] {
         var buckets: [Date: (tokens: Int, cost: Double)] = [:]
         var activeModel = "Unknown"
@@ -345,6 +393,35 @@ final class CodexTranscriptParser {
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? trimmed
 
         return firstLine.isEmpty ? nil : firstLine
+    }
+
+    private func cleanSearchText(_ text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count > 2 else { return nil }
+
+        if trimmed.hasPrefix("<environment_context>") || trimmed.hasPrefix("<permissions instructions>") {
+            return nil
+        }
+
+        let stripped = SearchUtils.stripMarkdown(trimmed)
+        return stripped.count > 2 ? stripped : nil
+    }
+
+    private func searchTextForTool(name rawName: String, arguments: String) -> String? {
+        let descriptor = toolDescriptor(name: rawName, arguments: arguments)
+        var parts = [descriptor.toolName, descriptor.summary]
+
+        if let detail = descriptor.detail {
+            parts.append(String(detail.prefix(2_000)))
+        }
+        if let oldString = descriptor.oldString {
+            parts.append(String(oldString.prefix(1_000)))
+        }
+        if let newString = descriptor.newString {
+            parts.append(String(newString.prefix(1_000)))
+        }
+
+        return cleanSearchText(parts.joined(separator: "\n"))
     }
 
     private func truncate(_ text: String, limit: Int) -> String {

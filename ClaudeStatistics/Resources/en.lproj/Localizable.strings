@@ -99,8 +99,14 @@
 "usage.7day" = "7 Day";
 "usage.7dayOpus" = "7 Day Opus";
 "usage.7daySonnet" = "7 Day Sonnet";
+"usage.localTrend" = "Local Token Trend";
+"usage.currentWindowTrend" = "Current Window Token Trend";
+"usage.last24hTrend" = "Last 24 Hours Token Trend";
+"usage.last7dTrend" = "Last 7 Days Token Trend";
 "usage.extraUsage" = "Extra Usage";
+"usage.left %lld" = "%lld%% left";
 "usage.resetsIn %@" = "resets in %@";
+"usage.resetsNow" = "resets now";
 "usage.exhaustEstimate %@" = "At current rate, exhausts in %@";
 "usage.safeEstimate %@" = "At current rate, resets before exhaustion (%@ remaining)";
 "usage.exhaustShort %@" = "· exhausts in %@";
@@ -132,6 +138,9 @@
 "settings.found" = "Found";
 "settings.notFoundStatus" = "Not found";
 "settings.credentialHint" = "Reads from macOS Keychain or ~/.claude/.credentials.json";
+"settings.credentialHint.claude" = "Reads from macOS Keychain or ~/.claude/.credentials.json";
+"settings.credentialHint.codex" = "Reads from ~/.codex/auth.json";
+"settings.credentialHint.gemini" = "Reads from ~/.gemini/settings.json and ~/.gemini/oauth_creds.json";
 "settings.email" = "Email";
 "settings.displayName" = "Name";
 "settings.plan" = "Plan";
@@ -167,8 +176,10 @@
 "pricing.updated %lld" = "Updated %lld models from Anthropic docs";
 "pricing.updated.claude %lld" = "Updated %lld models from Anthropic docs";
 "pricing.updated.codex %lld" = "Updated %lld models from OpenAI pricing docs";
+"pricing.updated.gemini %lld" = "Updated %lld models from Gemini API pricing docs";
 "pricing.source.claude" = "Source: docs.anthropic.com/en/docs/about-claude/pricing";
 "pricing.source.codex" = "Source: developers.openai.com/api/docs/pricing";
+"pricing.source.gemini" = "Source: ai.google.dev/gemini-api/docs/pricing";
 
 /* Status Line */
 "statusLine.title" = "Claude Code Status Line";
@@ -182,6 +193,8 @@
 "statusLine.restoreSuccess" = "Original script restored";
 "statusLine.codex.title" = "Codex Status Line";
 "statusLine.codex.description" = "Show five-hour and weekly usage limits in the Codex terminal status line. Writes the recommended layout to ~/.codex/config.toml.";
+"statusLine.gemini.title" = "Gemini CLI Footer";
+"statusLine.gemini.description" = "Configure Gemini CLI's built-in footer to show workspace, model, quota, auth, and sandbox state in ~/.gemini/settings.json.";
 
 /* Language */
 "settings.language" = "Language";

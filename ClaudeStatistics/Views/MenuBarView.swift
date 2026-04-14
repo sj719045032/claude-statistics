@@ -31,7 +31,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable {
     func isAvailable(for capabilities: ProviderCapabilities) -> Bool {
         switch self {
         case .usage:
-            capabilities.supportsUsageWindows
+            capabilities.supportsUsage
         default:
             true
         }
@@ -69,6 +69,10 @@ struct MenuBarView: View {
         tabOrder.filter { $0.isAvailable(for: appState.providerCapabilities) }
     }
 
+    private var visibleProviders: [ProviderKind] {
+        ProviderRegistry.availableProviders()
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Tab bar
@@ -104,7 +108,7 @@ struct MenuBarView: View {
                     case .stats:
                         StatisticsView(store: store)
                     case .usage:
-                        if appState.providerCapabilities.supportsUsageWindows {
+                        if appState.providerCapabilities.supportsUsage {
                             ScrollView {
                                 UsageView(viewModel: usageViewModel, store: store)
                                     .padding(12)
@@ -155,7 +159,9 @@ struct MenuBarView: View {
                     }
                 }
                 Spacer()
-                providerSwitcher
+                if !visibleProviders.isEmpty {
+                    providerSwitcher
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
@@ -171,11 +177,11 @@ struct MenuBarView: View {
 
     private var providerSwitcher: some View {
         HStack(spacing: 0) {
-            ForEach(ProviderRegistry.supportedProviders, id: \.self) { kind in
+            ForEach(visibleProviders, id: \.self) { kind in
                 ProviderSwitcherButton(
                     kind: kind,
                     isCurrent: kind == appState.providerKind,
-                    isInstalled: ProviderRegistry.provider(for: kind).isInstalled,
+                    isInstalled: true,
                     fontScale: fontScale,
                     onTap: { appState.switchProvider(to: kind) }
                 )

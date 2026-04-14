@@ -7,21 +7,41 @@ final class AppState: ObservableObject {
     @Published private(set) var providerKind: ProviderKind
     @Published private(set) var store: SessionDataStore
     @Published private(set) var sessionViewModel: SessionViewModel
+    @Published private(set) var isPopoverVisible = false
     let usageViewModel = UsageViewModel()
     let profileViewModel = ProfileViewModel()
     let updaterService = UpdaterService()
     private var cancellables: Set<AnyCancellable> = []
+    private var storesByProvider: [ProviderKind: SessionDataStore] = [:]
+    private var sessionViewModelsByProvider: [ProviderKind: SessionViewModel] = [:]
 
     init() {
         let selectedKind = ProviderRegistry.selectedProviderKind()
         providerKind = selectedKind
-        let provider = ProviderRegistry.provider(for: selectedKind)
-        let store = SessionDataStore(provider: provider)
+        let availableKinds = Set(ProviderRegistry.availableProviders())
+        let startupKinds = ProviderRegistry.supportedProviders.filter { kind in
+            availableKinds.contains(kind) || kind == selectedKind
+        }
+
+        var storesByProvider: [ProviderKind: SessionDataStore] = [:]
+        var sessionViewModelsByProvider: [ProviderKind: SessionViewModel] = [:]
+        for kind in startupKinds {
+            let provider = ProviderRegistry.provider(for: kind)
+            let store = SessionDataStore(provider: provider)
+            let viewModel = SessionViewModel(store: store)
+            storesByProvider[kind] = store
+            sessionViewModelsByProvider[kind] = viewModel
+            store.start()
+        }
+
+        self.storesByProvider = storesByProvider
+        self.sessionViewModelsByProvider = sessionViewModelsByProvider
+
+        let store = storesByProvider[selectedKind]!
         self.store = store
-        self.sessionViewModel = SessionViewModel(store: store)
-        store.start()
+        self.sessionViewModel = sessionViewModelsByProvider[selectedKind]!
         usageViewModel.store = store
-        configureUsageState(for: provider)
+        configureUsageState(for: store.provider)
 
         // Sync subscription weekly reset date to SessionDataStore
         usageViewModel.$usageData
@@ -35,30 +55,50 @@ final class AppState: ObservableObject {
 
     var provider: any SessionProvider { store.provider }
     var providerCapabilities: ProviderCapabilities { provider.capabilities }
-    var menuBarText: String { providerCapabilities.supportsUsageWindows ? usageViewModel.menuBarText : "" }
+    var menuBarText: String { providerCapabilities.supportsUsage ? usageViewModel.menuBarText : "" }
 
     func switchProvider(to kind: ProviderKind) {
         guard kind != providerKind else { return }
+        let available = ProviderRegistry.availableProviders()
+        guard available.isEmpty || available.contains(kind) else { return }
 
-        store.stop()
         ProviderRegistry.persistSelectedProvider(kind)
         providerKind = kind
 
-        let provider = ProviderRegistry.provider(for: kind)
-        let nextStore = SessionDataStore(provider: provider)
+        let context = ensureProviderContext(for: kind)
+        let nextStore = context.store
         nextStore.weeklyResetDate = usageViewModel.usageData?.sevenDay?.resetsAtDate
-        nextStore.start()
 
         store = nextStore
-        sessionViewModel = SessionViewModel(store: nextStore)
+        sessionViewModel = context.viewModel
         usageViewModel.store = nextStore
-        configureUsageState(for: provider)
+        configureUsageState(for: nextStore.provider)
+
+        if isPopoverVisible {
+            nextStore.popoverDidOpen()
+        }
+    }
+
+    func popoverDidOpen() {
+        isPopoverVisible = true
+        store.popoverDidOpen()
+    }
+
+    func popoverDidClose() {
+        isPopoverVisible = false
+        store.popoverDidClose()
+    }
+
+    func stopAllStores() {
+        for store in storesByProvider.values {
+            store.stop()
+        }
     }
 
     private func configureUsageState(for provider: any SessionProvider) {
-        usageViewModel.configure(source: provider.usageSource)
+        usageViewModel.configure(source: provider.usageSource, usagePresentation: provider.usagePresentation)
         configureProfileLoader(for: provider)
-        if provider.capabilities.supportsUsageWindows {
+        if provider.capabilities.supportsUsage {
             usageViewModel.loadCache()
             if UserDefaults.standard.bool(forKey: "autoRefreshEnabled") {
                 usageViewModel.startAutoRefresh()
@@ -70,6 +110,21 @@ final class AppState: ObservableObject {
 
     private func configureProfileLoader(for provider: any SessionProvider) {
         profileViewModel.configure(loader: { await provider.fetchProfile() })
+    }
+
+    @discardableResult
+    private func ensureProviderContext(for kind: ProviderKind) -> (store: SessionDataStore, viewModel: SessionViewModel) {
+        if let store = storesByProvider[kind], let viewModel = sessionViewModelsByProvider[kind] {
+            return (store, viewModel)
+        }
+
+        let provider = ProviderRegistry.provider(for: kind)
+        let store = SessionDataStore(provider: provider)
+        let viewModel = SessionViewModel(store: store)
+        storesByProvider[kind] = store
+        sessionViewModelsByProvider[kind] = viewModel
+        store.start()
+        return (store, viewModel)
     }
 }
 
@@ -84,6 +139,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         LanguageManager.setup()
         statusBarController = StatusBarController(appState: appState)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        appState.stopAllStores()
     }
 }
 

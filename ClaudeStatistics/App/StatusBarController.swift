@@ -89,7 +89,7 @@ final class StatusBarController: NSObject, ObservableObject {
         panel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: false)
         appState.usageViewModel.loadCache()
-        appState.store.popoverDidOpen()
+        appState.popoverDidOpen()
 
         // Install event monitor after a tiny delay to avoid catching the triggering click
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
@@ -99,7 +99,7 @@ final class StatusBarController: NSObject, ObservableObject {
 
     private func hidePanel() {
         panel.orderOut(nil)
-        appState.store.popoverDidClose()
+        appState.popoverDidClose()
         removeEventMonitor()
     }
 

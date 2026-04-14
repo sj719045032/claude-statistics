@@ -7,6 +7,7 @@ final class DatabaseService {
     static let shared = DatabaseService()
 
     private var db: OpaquePointer?
+    private let lock = NSRecursiveLock()
     private let sqliteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
     private init() {}
@@ -14,6 +15,8 @@ final class DatabaseService {
     // MARK: - Open / Close
 
     func open() {
+        lock.lock()
+        defer { lock.unlock() }
         guard db == nil else { return }
 
         let fm = FileManager.default
@@ -37,6 +40,8 @@ final class DatabaseService {
     }
 
     func close() {
+        lock.lock()
+        defer { lock.unlock() }
         guard let db else { return }
         sqlite3_close(db)
         self.db = nil
@@ -90,6 +95,8 @@ final class DatabaseService {
 
     /// Drop all data and recreate tables (for schema migration or corruption recovery)
     func resetDatabase() {
+        lock.lock()
+        defer { lock.unlock() }
         execute("DROP TABLE IF EXISTS messages")
         execute("DROP TABLE IF EXISTS session_cache")
         createTables()
@@ -108,6 +115,8 @@ final class DatabaseService {
 
     /// Load all cached sessions from the database
     func loadAllCached(provider: ProviderKind) -> [String: CachedSession] {
+        lock.lock()
+        defer { lock.unlock() }
         guard let db else { return [:] }
 
         let sql = """
@@ -153,6 +162,29 @@ final class DatabaseService {
         return result
     }
 
+    func indexedSessionIds(provider: ProviderKind) -> Set<String> {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db else { return [] }
+
+        let sql = """
+            SELECT DISTINCT session_id
+            FROM messages
+            WHERE provider = ?
+        """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, provider.rawValue, -1, sqliteTransient)
+
+        var sessionIds = Set<String>()
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let text = sqlite3_column_text(stmt, 0) else { continue }
+            sessionIds.insert(String(cString: text))
+        }
+        return sessionIds
+    }
+
     /// Check if a session needs reparsing (fingerprint mismatch, not cached, or missing full stats)
     func needsReparse(sessionId: String, fileSize: Int64, mtime: Date, cache: [String: CachedSession]) -> Bool {
         guard let cached = cache[sessionId] else { return true }
@@ -161,8 +193,12 @@ final class DatabaseService {
                abs(cached.mtime.timeIntervalSince(mtime)) > 1.0
     }
 
-    /// Save quick stats for a session (upsert)
+    /// Save quick stats for a session.
+    /// For existing fully parsed rows, keep the last committed fingerprint intact until
+    /// full stats + search index are atomically replaced.
     func saveQuickStats(provider: ProviderKind, sessionId: String, fileSize: Int64, mtime: Date, stats: SessionQuickStats) {
+        lock.lock()
+        defer { lock.unlock() }
         guard let db else { return }
 
         let encoder = JSONEncoder()
@@ -173,8 +209,6 @@ final class DatabaseService {
             INSERT INTO session_cache(provider, session_id, file_size, mtime, quick_json)
             VALUES(?, ?, ?, ?, ?)
             ON CONFLICT(provider, session_id) DO UPDATE SET
-                file_size = excluded.file_size,
-                mtime = excluded.mtime,
                 quick_json = excluded.quick_json
         """
         var stmt: OpaquePointer?
@@ -189,27 +223,95 @@ final class DatabaseService {
         sqlite3_step(stmt)
     }
 
-    /// Save full session stats (update existing row)
-    func saveSessionStats(provider: ProviderKind, sessionId: String, stats: SessionStats) {
+    /// Atomically replace full session stats, committed fingerprint, and FTS rows.
+    func saveSessionStatsAndIndex(
+        provider: ProviderKind,
+        sessionId: String,
+        fileSize: Int64,
+        mtime: Date,
+        stats: SessionStats,
+        searchMessages: [SearchIndexMessage]
+    ) {
+        lock.lock()
+        defer { lock.unlock() }
         guard let db else { return }
 
         let encoder = JSONEncoder()
         guard let json = try? encoder.encode(stats),
               let jsonStr = String(data: json, encoding: .utf8) else { return }
 
-        let sql = "UPDATE session_cache SET stats_json = ? WHERE provider = ? AND session_id = ?"
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
-        defer { sqlite3_finalize(stmt) }
+        execute("BEGIN TRANSACTION")
+        defer {
+            if sqlite3_get_autocommit(db) == 0 {
+                execute("ROLLBACK")
+            }
+        }
 
-        sqlite3_bind_text(stmt, 1, jsonStr, -1, sqliteTransient)
-        sqlite3_bind_text(stmt, 2, provider.rawValue, -1, sqliteTransient)
-        sqlite3_bind_text(stmt, 3, sessionId, -1, sqliteTransient)
-        sqlite3_step(stmt)
+        let upsertSQL = """
+            INSERT INTO session_cache(provider, session_id, file_size, mtime, stats_json)
+            VALUES(?, ?, ?, ?, ?)
+            ON CONFLICT(provider, session_id) DO UPDATE SET
+                file_size = excluded.file_size,
+                mtime = excluded.mtime,
+                stats_json = excluded.stats_json
+        """
+        var upsertStmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, upsertSQL, -1, &upsertStmt, nil) == SQLITE_OK else { return }
+        sqlite3_bind_text(upsertStmt, 1, provider.rawValue, -1, sqliteTransient)
+        sqlite3_bind_text(upsertStmt, 2, sessionId, -1, sqliteTransient)
+        sqlite3_bind_int64(upsertStmt, 3, fileSize)
+        sqlite3_bind_double(upsertStmt, 4, mtime.timeIntervalSince1970)
+        sqlite3_bind_text(upsertStmt, 5, jsonStr, -1, sqliteTransient)
+        guard sqlite3_step(upsertStmt) == SQLITE_DONE else {
+            sqlite3_finalize(upsertStmt)
+            return
+        }
+        sqlite3_finalize(upsertStmt)
+
+        let deleteSQL = "DELETE FROM messages WHERE provider = ? AND session_id = ?"
+        var deleteStmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, deleteSQL, -1, &deleteStmt, nil) == SQLITE_OK else { return }
+        sqlite3_bind_text(deleteStmt, 1, provider.rawValue, -1, sqliteTransient)
+        sqlite3_bind_text(deleteStmt, 2, sessionId, -1, sqliteTransient)
+        guard sqlite3_step(deleteStmt) == SQLITE_DONE else {
+            sqlite3_finalize(deleteStmt)
+            return
+        }
+        sqlite3_finalize(deleteStmt)
+
+        if !searchMessages.isEmpty {
+            let insertSQL = "INSERT INTO messages(provider, session_id, role, content, timestamp) VALUES(?, ?, ?, ?, ?)"
+            var stmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, insertSQL, -1, &stmt, nil) == SQLITE_OK else { return }
+
+            let isoFormatter = ISO8601DateFormatter()
+            isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+            for message in searchMessages {
+                sqlite3_reset(stmt)
+                sqlite3_clear_bindings(stmt)
+                sqlite3_bind_text(stmt, 1, provider.rawValue, -1, sqliteTransient)
+                sqlite3_bind_text(stmt, 2, sessionId, -1, sqliteTransient)
+                sqlite3_bind_text(stmt, 3, message.role, -1, sqliteTransient)
+                sqlite3_bind_text(stmt, 4, message.content, -1, sqliteTransient)
+
+                let timestamp = message.timestamp.map { isoFormatter.string(from: $0) } ?? ""
+                sqlite3_bind_text(stmt, 5, timestamp, -1, sqliteTransient)
+                guard sqlite3_step(stmt) == SQLITE_DONE else {
+                    sqlite3_finalize(stmt)
+                    return
+                }
+            }
+            sqlite3_finalize(stmt)
+        }
+
+        execute("COMMIT")
     }
 
     /// Remove cached data for deleted sessions
     func removeSessions(provider: ProviderKind, _ sessionIds: Set<String>) {
+        lock.lock()
+        defer { lock.unlock() }
         guard let db, !sessionIds.isEmpty else { return }
 
         execute("BEGIN TRANSACTION")
@@ -237,172 +339,6 @@ final class DatabaseService {
 
     // MARK: - Search Index
 
-    /// Index all messages from a session's JSONL file into FTS
-    func indexSession(provider: ProviderKind, sessionId: String, filePath: String) {
-        switch provider {
-        case .claude:
-            indexClaudeSession(provider: provider, sessionId: sessionId, filePath: filePath)
-        case .codex:
-            indexCodexSession(provider: provider, sessionId: sessionId, filePath: filePath)
-        }
-    }
-
-    private func indexClaudeSession(provider: ProviderKind, sessionId: String, filePath: String) {
-        guard let db else { return }
-        guard let data = FileManager.default.contents(atPath: filePath) else { return }
-
-        let content = String(decoding: data, as: UTF8.self)
-        let decoder = JSONDecoder()
-
-        // Remove old entries first
-        let delSQL = "DELETE FROM messages WHERE provider = ? AND session_id = ?"
-        var delStmt: OpaquePointer?
-        if sqlite3_prepare_v2(db, delSQL, -1, &delStmt, nil) == SQLITE_OK {
-            sqlite3_bind_text(delStmt, 1, provider.rawValue, -1, sqliteTransient)
-            sqlite3_bind_text(delStmt, 2, sessionId, -1, sqliteTransient)
-            sqlite3_step(delStmt)
-            sqlite3_finalize(delStmt)
-        }
-
-        // Insert in transaction
-        execute("BEGIN TRANSACTION")
-
-        let insertSQL = "INSERT INTO messages(provider, session_id, role, content, timestamp) VALUES(?, ?, ?, ?, ?)"
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, insertSQL, -1, &stmt, nil) == SQLITE_OK else {
-            execute("ROLLBACK")
-            return
-        }
-
-        func insertRow(_ role: String, _ text: String, _ timestamp: String) {
-            sqlite3_reset(stmt)
-            sqlite3_bind_text(stmt, 1, provider.rawValue, -1, sqliteTransient)
-            sqlite3_bind_text(stmt, 2, sessionId, -1, sqliteTransient)
-            sqlite3_bind_text(stmt, 3, role, -1, sqliteTransient)
-            sqlite3_bind_text(stmt, 4, text, -1, sqliteTransient)
-            sqlite3_bind_text(stmt, 5, timestamp, -1, sqliteTransient)
-            sqlite3_step(stmt)
-        }
-
-        for line in content.components(separatedBy: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty,
-                  let lineData = trimmed.data(using: .utf8),
-                  let entry = try? decoder.decode(TranscriptEntry.self, from: lineData) else { continue }
-
-            let ts = entry.timestamp ?? ""
-
-            switch entry.type {
-            case "queue-operation":
-                if entry.operation == "enqueue", let text = entry.content,
-                   text.trimmingCharacters(in: .whitespacesAndNewlines).count > 2 {
-                    insertRow("user", text.trimmingCharacters(in: .whitespacesAndNewlines), ts)
-                }
-
-            case "user", "human":
-                guard let text = Self.extractMessageText(from: entry) else { continue }
-                let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard cleaned.count > 2 else { continue }
-                if cleaned.hasPrefix("<") && (
-                    cleaned.contains("<ide_opened_file>") ||
-                    cleaned.contains("<command-message>") ||
-                    cleaned.contains("<local-command-caveat>") ||
-                    cleaned.contains("<system-reminder>")
-                ) { continue }
-                insertRow("user", Self.stripMarkdownForIndex(cleaned), ts)
-
-            case "assistant":
-                // Index text content (strip markdown so FTS matches plain text)
-                if let text = Self.extractMessageText(from: entry) {
-                    let cleaned = Self.stripMarkdownForIndex(text.trimmingCharacters(in: .whitespacesAndNewlines))
-                    if cleaned.count > 2 { insertRow("assistant", cleaned, ts) }
-                }
-                // Index tool use names + tool result content
-                if let items = entry.message?.content {
-                    for item in items {
-                        if case .toolUse(let tc) = item, let name = tc.name {
-                            var indexText = name
-                            if let dict = tc.input?.value as? [String: Any] {
-                                if let p = dict["file_path"] as? String { indexText += " " + p }
-                                if let c = dict["command"] as? String { indexText += " " + String(c.prefix(500)) }
-                                if let p = dict["pattern"] as? String { indexText += " " + p }
-                                // Index Write content and Edit old/new strings
-                                if let c = dict["content"] as? String { indexText += " " + String(c.prefix(2000)) }
-                                if let s = dict["old_string"] as? String { indexText += " " + String(s.prefix(1000)) }
-                                if let s = dict["new_string"] as? String { indexText += " " + String(s.prefix(1000)) }
-                            }
-                            insertRow("tool", Self.stripMarkdownForIndex(indexText), ts)
-                        }
-                        if case .toolResult(let tr) = item {
-                            if let resultStr = tr.content?.stringValue, resultStr.count > 2 {
-                                // Truncate large results for FTS
-                                let truncated = resultStr.count > 500 ? String(resultStr.prefix(500)) : resultStr
-                                insertRow("tool", truncated, ts)
-                            }
-                        }
-                    }
-                }
-
-            default: break
-            }
-        }
-
-        sqlite3_finalize(stmt)
-        execute("COMMIT")
-    }
-
-    private func indexCodexSession(provider: ProviderKind, sessionId: String, filePath: String) {
-        guard let db else { return }
-
-        let delSQL = "DELETE FROM messages WHERE provider = ? AND session_id = ?"
-        var delStmt: OpaquePointer?
-        if sqlite3_prepare_v2(db, delSQL, -1, &delStmt, nil) == SQLITE_OK {
-            sqlite3_bind_text(delStmt, 1, provider.rawValue, -1, sqliteTransient)
-            sqlite3_bind_text(delStmt, 2, sessionId, -1, sqliteTransient)
-            sqlite3_step(delStmt)
-            sqlite3_finalize(delStmt)
-        }
-
-        let messages = CodexTranscriptParser.shared.parseMessages(at: filePath)
-
-        execute("BEGIN TRANSACTION")
-
-        let insertSQL = "INSERT INTO messages(provider, session_id, role, content, timestamp) VALUES(?, ?, ?, ?, ?)"
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, insertSQL, -1, &stmt, nil) == SQLITE_OK else {
-            execute("ROLLBACK")
-            return
-        }
-
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-        for message in messages {
-            var parts: [String] = []
-            if !message.text.isEmpty { parts.append(message.text) }
-            if let toolName = message.toolName, !toolName.isEmpty { parts.append(toolName) }
-            if let toolDetail = message.toolDetail, !toolDetail.isEmpty { parts.append(toolDetail) }
-            if let oldString = message.editOldString, !oldString.isEmpty { parts.append(oldString) }
-            if let newString = message.editNewString, !newString.isEmpty { parts.append(newString) }
-
-            let combined = SearchUtils.stripMarkdown(parts.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines))
-            guard combined.count > 2 else { continue }
-
-            sqlite3_reset(stmt)
-            sqlite3_bind_text(stmt, 1, provider.rawValue, -1, sqliteTransient)
-            sqlite3_bind_text(stmt, 2, sessionId, -1, sqliteTransient)
-            sqlite3_bind_text(stmt, 3, message.role, -1, sqliteTransient)
-            sqlite3_bind_text(stmt, 4, combined, -1, sqliteTransient)
-
-            let timestamp = message.timestamp.map { isoFormatter.string(from: $0) } ?? ""
-            sqlite3_bind_text(stmt, 5, timestamp, -1, sqliteTransient)
-            sqlite3_step(stmt)
-        }
-
-        sqlite3_finalize(stmt)
-        execute("COMMIT")
-    }
-
     /// Search results grouped by session
     struct SearchResult {
         let sessionId: String
@@ -412,6 +348,8 @@ final class DatabaseService {
 
     /// Full-text search across all indexed messages. Returns best match per session.
     func search(query: String, provider: ProviderKind) -> [SearchResult] {
+        lock.lock()
+        defer { lock.unlock() }
         guard let db, !query.isEmpty else { return [] }
 
         // Sanitize query for FTS5: escape double quotes, wrap terms
@@ -466,31 +404,6 @@ final class DatabaseService {
                 sqlite3_free(errMsg)
             }
         }
-    }
-
-    private static func stripMarkdownForIndex(_ text: String) -> String {
-        SearchUtils.stripMarkdown(text)
-    }
-
-    /// Extract all text content from a message entry (user or assistant)
-    private static func extractMessageText(from entry: TranscriptEntry) -> String? {
-        guard let message = entry.message else { return nil }
-
-        // Plain string content
-        if let str = message.contentString {
-            return str
-        }
-
-        // Array content — collect all text blocks
-        if let content = message.content {
-            let texts = content.compactMap { item -> String? in
-                if case .text(let tc) = item { return tc.text }
-                return nil
-            }
-            return texts.isEmpty ? nil : texts.joined(separator: "\n")
-        }
-
-        return nil
     }
 
     private func sanitizeFTSQuery(_ raw: String) -> String {

@@ -12,6 +12,7 @@ final class UsageViewModel: ObservableObject {
 
     private var autoRefresh: AutoRefreshCoordinator?
     private var usageSource: (any ProviderUsageSource)?
+    private var usagePresentation: ProviderUsagePresentation = .standard
     weak var store: SessionDataStore?
 
     init() {
@@ -25,9 +26,10 @@ final class UsageViewModel: ObservableObject {
         autoRefreshInterval = interval > 0 ? interval : 300
     }
 
-    func configure(source: (any ProviderUsageSource)?) {
+    func configure(source: (any ProviderUsageSource)?, usagePresentation: ProviderUsagePresentation) {
         stopAutoRefresh()
         usageSource = source
+        self.usagePresentation = usagePresentation
         dashboardURL = source?.dashboardURL
         usageData = nil
         errorMessage = nil
@@ -120,7 +122,7 @@ final class UsageViewModel: ObservableObject {
     }
 
     func clearForUnsupportedProvider() {
-        configure(source: nil)
+        configure(source: nil, usagePresentation: usagePresentation)
     }
 
     private func refreshIfStale() async {
@@ -229,20 +231,78 @@ final class UsageViewModel: ObservableObject {
         exhaustEstimate(for: usageData?.sevenDaySonnet, windowDuration: 7 * 86400)
     }
 
+    var primaryQuotaBucket: ProviderUsageBucket? {
+        usageData?.providerBuckets?.first
+    }
+
+    private var menuBarQuotaBucket: ProviderUsageBucket? {
+        guard let buckets = usageData?.providerBuckets else { return nil }
+        return buckets.first { $0.remainingPercentage > 0 } ?? buckets.first
+    }
+
     var statusColor: Color {
-        let maxUtil = max(fiveHourPercent, sevenDayPercent)
-        if maxUtil >= 80 { return .red }
-        if maxUtil >= 50 { return .orange }
+        switch usagePresentation.menuBarMetric {
+        case .preferredWindow:
+            let preferredUtilization: Double
+            switch usagePresentation.preferredWindow {
+            case .short:
+                preferredUtilization = usageData?.fiveHour?.utilization ?? max(fiveHourPercent, sevenDayPercent)
+            case .long:
+                preferredUtilization = usageData?.sevenDay?.utilization ?? max(fiveHourPercent, sevenDayPercent)
+            }
+            if preferredUtilization >= 80 { return .red }
+            if preferredUtilization >= 50 { return .orange }
+        case .primaryQuotaBucket:
+            let usedPercentage = 100 - (menuBarQuotaBucket?.remainingPercentage ?? 0)
+            if usedPercentage >= 80 { return .red }
+            if usedPercentage >= 50 { return .orange }
+        }
         return .green
     }
 
     var menuBarText: String {
-        if usageData?.fiveHour != nil {
-            return "\(Int(fiveHourPercent))%"
-        }
-        if usageData?.sevenDay != nil {
-            return "\(Int(sevenDayPercent))%"
+        switch usagePresentation.menuBarMetric {
+        case .preferredWindow:
+            switch usagePresentation.preferredWindow {
+            case .short:
+                if usageData?.fiveHour != nil {
+                    return "\(Int(fiveHourPercent))%"
+                }
+                if usageData?.sevenDay != nil {
+                    return "\(Int(sevenDayPercent))%"
+                }
+            case .long:
+                if usageData?.sevenDay != nil {
+                    return "\(Int(sevenDayPercent))%"
+                }
+                if usageData?.fiveHour != nil {
+                    return "\(Int(fiveHourPercent))%"
+                }
+            }
+        case .primaryQuotaBucket:
+            if let bucket = menuBarQuotaBucket {
+                return quotaMenuBarText(for: bucket)
+            }
         }
         return ""
+    }
+
+    private func quotaMenuBarText(for bucket: ProviderUsageBucket) -> String {
+        let title = bucket.title
+        if let remaining = bucket.remainingAmount, let limit = bucket.limitAmount {
+            return "\(title) \(formatQuotaAmount(remaining))/\(formatQuotaAmount(limit))"
+        }
+        if let remaining = bucket.remainingAmount {
+            return "\(title) \(formatQuotaAmount(remaining))"
+        }
+        return "\(title) \(Int(bucket.remainingPercentage.rounded()))%"
+    }
+
+    private func formatQuotaAmount(_ value: Double) -> String {
+        let rounded = value.rounded()
+        if abs(value - rounded) < 0.001 {
+            return Int(rounded).formatted()
+        }
+        return String(format: "%.1f", value)
     }
 }

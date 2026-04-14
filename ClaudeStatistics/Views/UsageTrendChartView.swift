@@ -237,7 +237,17 @@ struct UsageTrendChartView: View {
     private var xAxisValues: [Date] {
         let cal = Calendar.current
         let comp = granularity.axisMarkComponent
-        let step = granularity.axisMarkCount
+        
+        let windowDuration = windowEnd.timeIntervalSince(windowStart)
+        let hoursDuration = windowDuration / 3600.0
+        
+        // Adjust step dynamically to avoid overlapping labels on long windows with fine granularity
+        let step: Int
+        if granularity == .fiveMinute && hoursDuration > 12 {
+            step = 4 // e.g., for a 24h window, mark every 4 hours instead of every 1 hour
+        } else {
+            step = granularity.axisMarkCount
+        }
 
         let refDate = cal.date(byAdding: comp, value: step, to: windowStart) ?? windowStart
         let strideInterval = refDate.timeIntervalSince(windowStart)

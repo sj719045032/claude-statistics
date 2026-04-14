@@ -82,7 +82,7 @@ struct SettingsView: View {
             }
 
             // Auto Refresh
-            if provider.capabilities.supportsUsageWindows {
+            if provider.capabilities.supportsUsage {
             Section("settings.autoRefresh") {
                 Toggle("settings.enableAutoRefresh", isOn: $autoRefreshEnabled)
                     .onChange(of: autoRefreshEnabled) { _, newValue in
@@ -367,28 +367,29 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                VStack(alignment: .trailing, spacing: 3) {
+                VStack(alignment: .trailing, spacing: 4) {
                     if let org = profile.organization {
-                        HStack(spacing: 4) {
-                            if org.organizationType != nil {
-                                Text(org.orgTypeDisplayName)
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(.secondary)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.gray.opacity(0.1))
-                                    .clipShape(Capsule())
-                            }
-                            Text(org.tierDisplayName)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.blue)
+                        if org.organizationType != nil {
+                            Text(org.orgTypeDisplayName)
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(.secondary)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Color.blue.opacity(0.1))
+                                .background(Color.primary.opacity(0.06))
                                 .clipShape(Capsule())
                         }
+                        Text(org.tierDisplayName)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.blue)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.blue.opacity(0.1))
+                            .clipShape(Capsule())
                     }
-                    if let orgName = profile.organization?.name {
+                    if let orgName = profile.organization?.name,
+                       !orgName.isEmpty,
+                       orgName != "Gemini CLI",
+                       orgName != "Claude" {
                         Text(orgName)
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
@@ -404,7 +405,7 @@ struct SettingsView: View {
                             .font(.system(size: 12))
                             .foregroundStyle(.green)
                     }
-                    Text("settings.credentialHint")
+                    Text(credentialHintKey)
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
                 }
@@ -419,7 +420,7 @@ struct SettingsView: View {
                             .font(.system(size: 12))
                             .foregroundStyle(.red)
                     }
-                    Text("settings.credentialHint")
+                    Text(credentialHintKey)
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
                 }
@@ -448,7 +449,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(provider.kind.displayName)
                     .font(.system(size: 13, weight: .medium))
-                Text(provider.capabilities.supportsUsageWindows ? "Local session parsing and usage snapshots" : "Local session parsing only")
+                Text(provider.capabilities.supportsUsage ? "Local session parsing and usage snapshots" : "Local session parsing only")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -466,6 +467,10 @@ struct SettingsView: View {
             return String(first).uppercased()
         }
         return "?"
+    }
+
+    private var credentialHintKey: LocalizedStringKey {
+        LocalizedStringKey(provider.credentialHintLocalizationKey ?? "settings.credentialHint")
     }
 
     private func applyCustomInterval() {

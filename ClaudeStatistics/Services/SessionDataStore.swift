@@ -3,6 +3,14 @@ import SwiftUI
 
 @MainActor
 final class SessionDataStore: ObservableObject {
+    private struct ParseOutcome {
+        let sessionId: String
+        let committedStats: SessionStats?
+        let displayStats: SessionStats?
+        let searchMessages: [SearchIndexMessage]
+        let shouldRetry: Bool
+    }
+
     // MARK: - Published state (UI binds to these)
 
     @Published var sessions: [Session] = []
@@ -18,10 +26,15 @@ final class SessionDataStore: ObservableObject {
     // MARK: - Internal state
 
     private var dirtySessionIds: Set<String> = []
+    private var retrySessionIds: Set<String> = []
+    private var retryAttemptCounts: [String: Int] = [:]
+    private var retryTask: Task<Void, Never>?
+    private var pendingRescan = false
     private var isPopoverVisible = false
     private var watcher: (any SessionWatcher)?
     let provider: any SessionProvider
     private let db = DatabaseService.shared
+    private let maxQueuedRetryAttempts = 3
     private let parseQueue: OperationQueue = {
         let q = OperationQueue()
         q.maxConcurrentOperationCount = 1
@@ -50,6 +63,8 @@ final class SessionDataStore: ObservableObject {
 
     func stop() {
         watcher?.stop()
+        retryTask?.cancel()
+        retryTask = nil
         parseQueue.cancelAllOperations()
         db.close()
     }
@@ -58,13 +73,15 @@ final class SessionDataStore: ObservableObject {
 
     func popoverDidOpen() {
         isPopoverVisible = true
-        if !dirtySessionIds.isEmpty {
+        if !dirtySessionIds.isEmpty || !retrySessionIds.isEmpty {
             refreshDirtySessions()
         }
     }
 
     func popoverDidClose() {
         isPopoverVisible = false
+        retryTask?.cancel()
+        retryTask = nil
     }
 
     // MARK: - Initial load
@@ -75,12 +92,14 @@ final class SessionDataStore: ObservableObject {
         Task.detached { [weak self] in
             guard let self else { return }
             let db = self.db
-            let scannedSessions = self.provider.scanSessions()
+            let scannedSessions = Self.deduplicatedSessions(self.provider.scanSessions(), provider: self.provider.kind)
             DiagnosticLogger.shared.appLaunched(sessionCount: scannedSessions.count)
 
             // Load DB cache and determine which sessions need reparsing
             let cache = db.loadAllCached(provider: self.provider.kind)
+            let indexedSessionIds = db.indexedSessionIds(provider: self.provider.kind)
             var dirtyIds: [Session] = []
+            var indexRepairIds: [Session] = []
             var quickMap: [String: SessionQuickStats] = [:]
             var statsMap: [String: SessionStats] = [:]
 
@@ -90,6 +109,13 @@ final class SessionDataStore: ObservableObject {
                 } else if let cached = cache[session.id] {
                     if let q = cached.quickStats { quickMap[session.id] = q }
                     if let s = cached.sessionStats { statsMap[session.id] = s }
+                    if Self.needsSearchIndexRepair(
+                        session: session,
+                        cached: cached,
+                        indexedSessionIds: indexedSessionIds
+                    ) {
+                        indexRepairIds.append(session)
+                    }
                 }
             }
 
@@ -101,7 +127,7 @@ final class SessionDataStore: ObservableObject {
                 self.parseProgress = dirtyIds.isEmpty ? nil : "Loading..."
             }
 
-            if dirtyIds.isEmpty {
+            if dirtyIds.isEmpty && indexRepairIds.isEmpty {
                 // Clean up DB entries for deleted sessions
                 let currentIds = Set(scannedSessions.map(\.id))
                 let staleIds = Set(cache.keys).subtracting(currentIds)
@@ -122,9 +148,11 @@ final class SessionDataStore: ObservableObject {
             }
 
             // Quick parse dirty sessions
+            var quickBySessionId: [String: SessionQuickStats] = [:]
             for session in dirtyIds {
                 let quick = self.provider.parseQuickStats(at: session.filePath)
                 db.saveQuickStats(provider: self.provider.kind, sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, stats: quick)
+                quickBySessionId[session.id] = quick
                 await MainActor.run {
                     self.quickStats[session.id] = quick
                 }
@@ -141,14 +169,20 @@ final class SessionDataStore: ObservableObject {
                 let batch = Array(dirtyIds[batchStart..<batchEnd])
 
                 // Parse batch in parallel
-                let results = await withTaskGroup(of: (Session, SessionStats).self) { group in
+                let results = await withTaskGroup(of: ParseOutcome.self) { group in
                     for session in batch {
+                        let quick = quickBySessionId[session.id] ?? SessionQuickStats()
+                        let cachedSession = cache[session.id]
                         group.addTask {
-                            let stats = self.provider.parseSession(at: session.filePath)
-                            return (session, stats)
+                            await Self.parseValidatedSession(
+                                provider: self.provider,
+                                session: session,
+                                quick: quick,
+                                cached: cachedSession
+                            )
                         }
                     }
-                    var batchResults: [(Session, SessionStats)] = []
+                    var batchResults: [ParseOutcome] = []
                     for await result in group {
                         batchResults.append(result)
                     }
@@ -156,15 +190,27 @@ final class SessionDataStore: ObservableObject {
                 }
 
                 // DB write + UI update (serial)
-                for (session, stats) in results {
-                    db.saveSessionStats(provider: self.provider.kind, sessionId: session.id, stats: stats)
-                    db.indexSession(provider: self.provider.kind, sessionId: session.id, filePath: session.filePath)
+                let sessionsById = Dictionary(uniqueKeysWithValues: batch.map { ($0.id, $0) })
+                for result in results {
+                    guard let stats = result.committedStats else { continue }
+                    guard let session = sessionsById[result.sessionId] else { continue }
+                    db.saveSessionStatsAndIndex(
+                        provider: self.provider.kind,
+                        sessionId: session.id,
+                        fileSize: session.fileSize,
+                        mtime: session.lastModified,
+                        stats: stats,
+                        searchMessages: result.searchMessages
+                    )
                 }
                 processed += results.count
 
                 await MainActor.run {
-                    for (session, stats) in results {
-                        self.parsedStats[session.id] = stats
+                    for result in results {
+                        self.handleParseRetryState(for: result.sessionId, shouldRetry: result.shouldRetry)
+                        if let stats = result.displayStats {
+                            self.parsedStats[result.sessionId] = stats
+                        }
                     }
                     self.parseProgress = "Parsing \(processed)/\(total)"
                     self.parsePercent = Double(processed) / Double(total)
@@ -179,6 +225,15 @@ final class SessionDataStore: ObservableObject {
                 sessions: total, subagentSessions: 0,
                 parseTime: parseTotal, dbTime: 0, indexTime: 0
             )
+
+            if !indexRepairIds.isEmpty {
+                Self.repairSearchIndexes(
+                    provider: self.provider,
+                    db: db,
+                    for: indexRepairIds,
+                    cache: cache
+                )
+            }
 
             // Clean up DB entries for deleted sessions
             let currentIds = Set(scannedSessions.map(\.id))
@@ -205,19 +260,16 @@ final class SessionDataStore: ObservableObject {
     // MARK: - File change handling
 
     private func handleFileChanges(_ changedPaths: Set<String>) {
-        var changedIds: Set<String> = []
-
-        for path in changedPaths {
-            let fileName = (path as NSString).lastPathComponent
-            guard fileName.hasSuffix(".jsonl") else { continue }
-            changedIds.insert((fileName as NSString).deletingPathExtension)
-        }
-
-        guard !changedIds.isEmpty else { return }
+        let changedIds = provider.changedSessionIds(for: changedPaths)
+        let needsRescan = provider.alwaysRescanOnFileChanges
+        guard needsRescan || !changedIds.isEmpty else { return }
 
         if isPopoverVisible {
-            processDirtyIds(changedIds)
+            processDirtyIds(changedIds, forceRescan: needsRescan)
         } else {
+            if needsRescan {
+                pendingRescan = true
+            }
             dirtySessionIds.formUnion(changedIds)
         }
     }
@@ -225,25 +277,36 @@ final class SessionDataStore: ObservableObject {
     // MARK: - Dirty session processing
 
     private func refreshDirtySessions() {
-        let ids = dirtySessionIds
+        let ids = dirtySessionIds.union(retrySessionIds)
         dirtySessionIds.removeAll()
-        processDirtyIds(ids)
+        retrySessionIds.removeAll()
+        let needsRescan = pendingRescan
+        pendingRescan = false
+        processDirtyIds(ids, forceRescan: needsRescan)
     }
 
-    private func processDirtyIds(_ ids: Set<String>) {
+    private func processDirtyIds(_ ids: Set<String>, forceRescan: Bool = false) {
         Task.detached { [weak self] in
             guard let self else { return }
             let db = self.db
 
             // Rescan to pick up new/deleted files
-            let scannedSessions = self.provider.scanSessions()
+            let scannedSessions = Self.deduplicatedSessions(self.provider.scanSessions(), provider: self.provider.kind)
+            let cache = db.loadAllCached(provider: self.provider.kind)
 
             await MainActor.run {
                 self.sessions = scannedSessions
                 self.cleanupDeletedSessions(current: scannedSessions)
             }
 
-            let dirtySessions = scannedSessions.filter { ids.contains($0.id) }
+            let dirtySessions = scannedSessions.filter {
+                ids.contains($0.id) || (forceRescan && db.needsReparse(
+                    sessionId: $0.id,
+                    fileSize: $0.fileSize,
+                    mtime: $0.lastModified,
+                    cache: cache
+                ))
+            }
 
             // Quick-parse + full-parse + index changed sessions
             let total = dirtySessions.count
@@ -258,11 +321,27 @@ final class SessionDataStore: ObservableObject {
                 db.saveQuickStats(provider: self.provider.kind, sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, stats: quick)
                 await MainActor.run { self.quickStats[session.id] = quick }
 
-                let stats = self.provider.parseSession(at: session.filePath)
-                db.saveSessionStats(provider: self.provider.kind, sessionId: session.id, stats: stats)
-                db.indexSession(provider: self.provider.kind, sessionId: session.id, filePath: session.filePath)
+                let outcome = await Self.parseValidatedSession(
+                    provider: self.provider,
+                    session: session,
+                    quick: quick,
+                    cached: cache[session.id]
+                )
+                if let stats = outcome.committedStats {
+                    db.saveSessionStatsAndIndex(
+                        provider: self.provider.kind,
+                        sessionId: session.id,
+                        fileSize: session.fileSize,
+                        mtime: session.lastModified,
+                        stats: stats,
+                        searchMessages: outcome.searchMessages
+                    )
+                }
                 await MainActor.run {
-                    self.parsedStats[session.id] = stats
+                    self.handleParseRetryState(for: session.id, shouldRetry: outcome.shouldRetry)
+                    if let stats = outcome.displayStats {
+                        self.parsedStats[session.id] = stats
+                    }
                     if showProgress {
                         self.parseProgress = "Updating \(i + 1)/\(total)"
                         self.parsePercent = Double(i + 1) / Double(total)
@@ -279,6 +358,201 @@ final class SessionDataStore: ObservableObject {
 
             await MainActor.run { self.rebucket() }
         }
+    }
+
+    nonisolated private static func parseValidatedSession(
+        provider: any SessionProvider,
+        session: Session,
+        quick: SessionQuickStats,
+        cached: DatabaseService.CachedSession?
+    ) async -> ParseOutcome {
+        let firstStats = provider.parseSession(at: session.filePath)
+        if suspiciousParseReason(stats: firstStats, quick: quick, session: session) == nil {
+            let searchMessages = provider.parseSearchIndexMessages(at: session.filePath)
+            return ParseOutcome(
+                sessionId: session.id,
+                committedStats: firstStats,
+                displayStats: firstStats,
+                searchMessages: searchMessages,
+                shouldRetry: false
+            )
+        }
+
+        let firstReason = suspiciousParseReason(stats: firstStats, quick: quick, session: session) ?? "suspicious parse result"
+        DiagnosticLogger.shared.warning("Suspicious \(provider.kind.rawValue) parse for \(session.id); retrying once (\(firstReason))")
+        try? await Task.sleep(nanoseconds: 300_000_000)
+
+        let retryStats = provider.parseSession(at: session.filePath)
+        if suspiciousParseReason(stats: retryStats, quick: quick, session: session) == nil {
+            let searchMessages = provider.parseSearchIndexMessages(at: session.filePath)
+            DiagnosticLogger.shared.info("Recovered \(provider.kind.rawValue) parse for \(session.id) after retry")
+            return ParseOutcome(
+                sessionId: session.id,
+                committedStats: retryStats,
+                displayStats: retryStats,
+                searchMessages: searchMessages,
+                shouldRetry: false
+            )
+        }
+
+        let retryReason = suspiciousParseReason(stats: retryStats, quick: quick, session: session) ?? firstReason
+        DiagnosticLogger.shared.warning("Rejected \(provider.kind.rawValue) parse for \(session.id); keeping last committed cache (\(retryReason))")
+        return ParseOutcome(
+            sessionId: session.id,
+            committedStats: nil,
+            displayStats: cached?.sessionStats,
+            searchMessages: [],
+            shouldRetry: true
+        )
+    }
+
+    nonisolated private static func suspiciousParseReason(
+        stats: SessionStats,
+        quick: SessionQuickStats,
+        session: Session
+    ) -> String? {
+        if let start = stats.startTime, let end = stats.endTime, end < start {
+            return "endTime earlier than startTime"
+        }
+        if quick.messageCount > 0 && stats.messageCount == 0 {
+            return "quick messages=\(quick.messageCount), full messages=0"
+        }
+        if quick.userMessageCount > 0 && stats.userMessageCount == 0 {
+            return "quick user messages=\(quick.userMessageCount), full user messages=0"
+        }
+        if quick.totalTokens > 0 && stats.totalTokens == 0 {
+            return "quick tokens=\(quick.totalTokens), full tokens=0"
+        }
+        let sessionLooksNonEmpty = quick.startTime != nil || quick.messageCount > 0 || quick.totalTokens > 0
+        if session.fileSize >= 4_096 &&
+            sessionLooksNonEmpty &&
+            stats.startTime == nil &&
+            stats.endTime == nil &&
+            stats.messageCount == 0 &&
+            stats.totalTokens == 0 {
+            return "empty full stats for non-empty session"
+        }
+        if stats.messageCount == 0 && (stats.userMessageCount > 0 || stats.assistantMessageCount > 0) {
+            return "message counters exist without time slices"
+        }
+        return nil
+    }
+
+    private func handleParseRetryState(for sessionId: String, shouldRetry: Bool) {
+        if shouldRetry {
+            let attempts = retryAttemptCounts[sessionId, default: 0] + 1
+            retryAttemptCounts[sessionId] = attempts
+            guard attempts < maxQueuedRetryAttempts else {
+                retrySessionIds.remove(sessionId)
+                DiagnosticLogger.shared.warning("Giving up queued retries for \(provider.kind.rawValue) session \(sessionId) after \(attempts) failures")
+                return
+            }
+            retrySessionIds.insert(sessionId)
+            scheduleRetryIfNeeded()
+        } else {
+            retrySessionIds.remove(sessionId)
+            retryAttemptCounts.removeValue(forKey: sessionId)
+        }
+    }
+
+    private func scheduleRetryIfNeeded() {
+        guard isPopoverVisible, !retrySessionIds.isEmpty, retryTask == nil else { return }
+        retryTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard let self else { return }
+            self.retryTask = nil
+            guard self.isPopoverVisible, !self.retrySessionIds.isEmpty else { return }
+            self.refreshDirtySessions()
+        }
+    }
+
+    nonisolated private static func repairSearchIndexes(
+        provider: any SessionProvider,
+        db: DatabaseService,
+        for sessions: [Session],
+        cache: [String: DatabaseService.CachedSession]
+    ) {
+        guard !sessions.isEmpty else { return }
+        DiagnosticLogger.shared.info("Repairing missing \(provider.kind.rawValue) search index for \(sessions.count) sessions")
+
+        for session in sessions {
+            guard let cached = cache[session.id],
+                  let stats = cached.sessionStats else { continue }
+            let searchMessages = provider.parseSearchIndexMessages(at: session.filePath)
+            db.saveSessionStatsAndIndex(
+                provider: provider.kind,
+                sessionId: session.id,
+                fileSize: session.fileSize,
+                mtime: session.lastModified,
+                stats: stats,
+                searchMessages: searchMessages
+            )
+        }
+    }
+
+    nonisolated private static func needsSearchIndexRepair(
+        session: Session,
+        cached: DatabaseService.CachedSession,
+        indexedSessionIds: Set<String>
+    ) -> Bool {
+        guard cached.sessionStats != nil else { return false }
+        guard !indexedSessionIds.contains(session.id) else { return false }
+
+        let quick = cached.quickStats
+        let stats = cached.sessionStats
+        let likelySearchable = (quick?.messageCount ?? 0) > 0 ||
+            (quick?.totalTokens ?? 0) > 0 ||
+            (stats?.messageCount ?? 0) > 0 ||
+            (stats?.totalTokens ?? 0) > 0 ||
+            session.fileSize >= 4_096
+        return likelySearchable
+    }
+
+    nonisolated private static func deduplicatedSessions(
+        _ sessions: [Session],
+        provider: ProviderKind
+    ) -> [Session] {
+        guard !sessions.isEmpty else { return [] }
+
+        var bestById: [String: Session] = [:]
+        var duplicateCounts: [String: Int] = [:]
+
+        for session in sessions {
+            if let existing = bestById[session.id] {
+                duplicateCounts[session.id, default: 1] += 1
+                if shouldReplace(existing: existing, with: session) {
+                    bestById[session.id] = session
+                }
+            } else {
+                bestById[session.id] = session
+            }
+        }
+
+        if !duplicateCounts.isEmpty {
+            let sample = duplicateCounts
+                .sorted { lhs, rhs in
+                    if lhs.value == rhs.value { return lhs.key < rhs.key }
+                    return lhs.value > rhs.value
+                }
+                .prefix(5)
+                .map { "\($0.key)(x\($0.value))" }
+                .joined(separator: ", ")
+            DiagnosticLogger.shared.warning(
+                "Deduplicated \(provider.rawValue) sessions by id: dropped \(sessions.count - bestById.count) duplicates; sample: \(sample)"
+            )
+        }
+
+        return bestById.values.sorted { $0.lastModified > $1.lastModified }
+    }
+
+    nonisolated private static func shouldReplace(existing: Session, with candidate: Session) -> Bool {
+        if candidate.lastModified != existing.lastModified {
+            return candidate.lastModified > existing.lastModified
+        }
+        if candidate.fileSize != existing.fileSize {
+            return candidate.fileSize > existing.fileSize
+        }
+        return candidate.filePath > existing.filePath
     }
 
     // MARK: - Rebucket
@@ -494,7 +768,6 @@ final class SessionDataStore: ObservableObject {
 
         let cal = Calendar.current
         let useFineSlices = granularity == .fiveMinute || granularity == .minute || granularity == .hour
-        let sliceDuration: TimeInterval = useFineSlices ? 5 * 60 : 24 * 3600
         var buckets: [Date: (tokens: Int, cost: Double)] = [:]
 
         for stats in parsedStats.values {
@@ -545,8 +818,12 @@ final class SessionDataStore: ObservableObject {
                 bucketTime = nextBucket
             }
 
-            // Data from the first partial bucket was accumulated but not yet plotted.
-            // Show it at the next bucket boundary (already included in cumTokens/cumCost above).
+            // Data from the first or current partial bucket was accumulated but not yet plotted 
+            // if the loop ended before the next boundary. Append it at the exact end time.
+            if result.last?.time != end {
+                result.append(TrendDataPoint(time: end, tokens: cumTokens, cost: cumCost))
+            }
+
             return result
         }
 
@@ -636,13 +913,10 @@ final class SessionDataStore: ObservableObject {
     func windowModelBreakdown(from start: Date, to end: Date, modelFilter: ((String) -> Bool)? = nil) -> [ModelUsage] {
         guard start < end else { return [] }
 
-        let useFineSlices = true // always use fine slices for window queries
-        let sliceDuration: TimeInterval = 5 * 60
         var combined: [String: ModelUsage] = [:]
 
         for stats in parsedStats.values {
-            let slices: [Date: SessionStats.DaySlice] = useFineSlices ? stats.fiveMinSlices : stats.daySlices
-            for (sliceTime, slice) in slices {
+            for (sliceTime, slice) in stats.fiveMinSlices {
                 // Exclusive start: data at exact boundary belongs to previous period
                 guard sliceTime > start, sliceTime < end else { continue }
 

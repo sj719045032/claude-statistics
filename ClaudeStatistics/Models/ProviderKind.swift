@@ -3,6 +3,7 @@ import Foundation
 enum ProviderKind: String, CaseIterable, Identifiable, Codable {
     case claude
     case codex
+    case gemini
 
     var id: String { rawValue }
 
@@ -10,13 +11,14 @@ enum ProviderKind: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .claude: return "Claude"
         case .codex: return "Codex"
+        case .gemini: return "Gemini"
         }
     }
 }
 
 struct ProviderCapabilities: Codable, Equatable {
     let supportsCost: Bool
-    let supportsUsageWindows: Bool
+    let supportsUsage: Bool
     let supportsProfile: Bool
     let supportsStatusLine: Bool
     let supportsExactPricing: Bool
@@ -25,7 +27,7 @@ struct ProviderCapabilities: Codable, Equatable {
 
     static let claude = ProviderCapabilities(
         supportsCost: true,
-        supportsUsageWindows: true,
+        supportsUsage: true,
         supportsProfile: true,
         supportsStatusLine: true,
         supportsExactPricing: true,
@@ -35,7 +37,17 @@ struct ProviderCapabilities: Codable, Equatable {
 
     static let codex = ProviderCapabilities(
         supportsCost: true,
-        supportsUsageWindows: true,
+        supportsUsage: true,
+        supportsProfile: true,
+        supportsStatusLine: true,
+        supportsExactPricing: false,
+        supportsResume: true,
+        supportsNewSession: true
+    )
+
+    static let gemini = ProviderCapabilities(
+        supportsCost: true,
+        supportsUsage: true,
         supportsProfile: true,
         supportsStatusLine: true,
         supportsExactPricing: false,

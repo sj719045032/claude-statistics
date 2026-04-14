@@ -2,6 +2,7 @@ import Foundation
 
 struct Session: Identifiable, Hashable {
     let id: String
+    let externalID: String
     let provider: ProviderKind
     let projectPath: String
     let filePath: String
@@ -439,6 +440,10 @@ final class ModelPricing {
     func pricing(for model: String) -> Pricing {
         if let p = models[model] { return p }
         let lower = model.lowercased()
+        if lower.contains("gemini-3.1-pro") { return models["gemini-3.1-pro-preview"] ?? defaultPricing }
+        if lower.contains("gemini-3-pro") { return models["gemini-3-pro-preview"] ?? defaultPricing }
+        if lower.contains("gemini-3.1-flash-lite") { return models["gemini-3.1-flash-lite-preview"] ?? defaultPricing }
+        if lower.contains("gemini-3-flash") { return models["gemini-3-flash-preview"] ?? defaultPricing }
         if lower.contains("gpt-5.4-mini") { return models["gpt-5.4-mini"] ?? defaultPricing }
         if lower.contains("gpt-5.4") { return models["gpt-5.4"] ?? defaultPricing }
         if lower.contains("gpt-5.3-codex") { return models["gpt-5.3-codex"] ?? defaultPricing }
@@ -449,6 +454,11 @@ final class ModelPricing {
         if lower.contains("gpt-5-codex") { return models["gpt-5-codex"] ?? defaultPricing }
         if lower.contains("gpt-5.1") { return models["gpt-5.1"] ?? defaultPricing }
         if lower.contains("gpt-5") { return models["gpt-5"] ?? defaultPricing }
+        if lower.contains("gemini") {
+            if lower.contains("flash-lite") { return models["gemini-2.5-flash-lite"] ?? defaultPricing }
+            if lower.contains("flash") { return models["gemini-2.5-flash"] ?? defaultPricing }
+            if lower.contains("pro") { return models["gemini-2.5-pro"] ?? defaultPricing }
+        }
         if lower.contains("opus") { return models.first { $0.key.contains("opus") }?.value ?? defaultPricing }
         if lower.contains("haiku") { return models.first { $0.key.contains("haiku") }?.value ?? defaultPricing }
         if lower.contains("sonnet") { return models.first { $0.key.contains("sonnet") }?.value ?? defaultPricing }

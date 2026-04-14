@@ -99,8 +99,14 @@
 "usage.7day" = "7 天";
 "usage.7dayOpus" = "7 天 Opus";
 "usage.7daySonnet" = "7 天 Sonnet";
+"usage.localTrend" = "本地 Token 趋势";
+"usage.currentWindowTrend" = "当前窗口 Token 趋势";
+"usage.last24hTrend" = "最近 24 小时 Token 趋势";
+"usage.last7dTrend" = "最近 7 天 Token 趋势";
 "usage.extraUsage" = "额外用量";
+"usage.left %lld" = "剩余 %lld%%";
 "usage.resetsIn %@" = "%@ 后重置";
+"usage.resetsNow" = "现在重置";
 "usage.exhaustEstimate %@" = "按当前速率，约 %@ 后耗尽";
 "usage.safeEstimate %@" = "按当前速率，重置前不会耗尽（余量约 %@）";
 "usage.exhaustShort %@" = "· %@ 后耗尽";
@@ -132,6 +138,9 @@
 "settings.found" = "已找到";
 "settings.notFoundStatus" = "未找到";
 "settings.credentialHint" = "从 macOS 钥匙串或 ~/.claude/.credentials.json 读取";
+"settings.credentialHint.claude" = "从 macOS 钥匙串或 ~/.claude/.credentials.json 读取";
+"settings.credentialHint.codex" = "从 ~/.codex/auth.json 读取";
+"settings.credentialHint.gemini" = "从 ~/.gemini/settings.json 和 ~/.gemini/oauth_creds.json 读取";
 "settings.email" = "邮箱";
 "settings.displayName" = "名称";
 "settings.plan" = "套餐";
@@ -167,8 +176,10 @@
 "pricing.updated %lld" = "已从 Anthropic 文档更新 %lld 个模型";
 "pricing.updated.claude %lld" = "已从 Anthropic 文档更新 %lld 个模型";
 "pricing.updated.codex %lld" = "已从 OpenAI 定价文档更新 %lld 个模型";
+"pricing.updated.gemini %lld" = "已从 Gemini API 定价文档更新 %lld 个模型";
 "pricing.source.claude" = "来源：docs.anthropic.com/en/docs/about-claude/pricing";
 "pricing.source.codex" = "来源：developers.openai.com/api/docs/pricing";
+"pricing.source.gemini" = "来源：ai.google.dev/gemini-api/docs/pricing";
 
 /* Status Line */
 "statusLine.title" = "Claude Code 状态行";
@@ -182,6 +193,8 @@
 "statusLine.restoreSuccess" = "已恢复原始脚本";
 "statusLine.codex.title" = "Codex 状态行";
 "statusLine.codex.description" = "在 Codex terminal 状态行中显示 5 小时和每周用量限额，将推荐布局写入 ~/.codex/config.toml。";
+"statusLine.gemini.title" = "Gemini CLI 底栏";
+"statusLine.gemini.description" = "将 Gemini CLI 内置 footer 配置为显示 workspace、model、quota、auth 和 sandbox 状态，写入 ~/.gemini/settings.json。";
 
 /* Language */
 "settings.language" = "语言";
