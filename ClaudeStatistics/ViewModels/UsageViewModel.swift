@@ -108,6 +108,11 @@ final class UsageViewModel: ObservableObject {
 
     func startAutoRefresh() {
         autoRefresh?.start(interval: autoRefreshInterval)
+
+        Task { [weak self] in
+            guard let self else { return }
+            await self.refreshIfStale()
+        }
     }
 
     func stopAutoRefresh() {
@@ -116,6 +121,18 @@ final class UsageViewModel: ObservableObject {
 
     func clearForUnsupportedProvider() {
         configure(source: nil)
+    }
+
+    private func refreshIfStale() async {
+        guard !isLoading else { return }
+        guard let lastFetchedAt else {
+            await refresh()
+            return
+        }
+
+        let age = Date().timeIntervalSince(lastFetchedAt)
+        guard age >= autoRefreshInterval else { return }
+        await refresh()
     }
 
     // MARK: - Computed display properties

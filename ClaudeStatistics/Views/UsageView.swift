@@ -10,7 +10,17 @@ struct UsageView: View {
             HStack(spacing: 8) {
                 Text("usage.title")
                     .font(.headline)
+
                 Spacer()
+
+                if let fetchedAt = viewModel.lastFetchedAt {
+                    Text("usage.updated \(compactUpdatedText(fetchedAt))")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.tertiary)
+                        .help(TimeFormatter.absoluteDate(fetchedAt))
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
                 if let dashboardURL = viewModel.dashboardURL {
                     Button(action: {
                         NSWorkspace.shared.open(dashboardURL)
@@ -128,11 +138,6 @@ struct UsageView: View {
                 .padding(.vertical, 8)
             }
 
-            if let fetchedAt = viewModel.lastFetchedAt {
-                Text("usage.updated \(TimeFormatter.absoluteDate(fetchedAt))")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
         }
         .textSelection(.enabled)
         .onAppear { ensureValidSelectedWindow() }
@@ -228,6 +233,18 @@ extension UsageView {
             tabs.append(.sevenDaySonnet)
         }
         return tabs
+    }
+
+    private func compactUpdatedText(_ date: Date) -> String {
+        if Calendar.current.isDateInToday(date) {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm"
+            return formatter.string(from: date)
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM/dd HH:mm"
+        return formatter.string(from: date)
     }
 
     private func ensureValidSelectedWindow() {
