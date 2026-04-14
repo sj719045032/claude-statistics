@@ -7,7 +7,8 @@ struct CodexStatusLineInstaller {
     /// Recommended layout preset — mirrors the user's preferred config
     static let presetItems: [String] = [
         "model-with-reasoning", "current-dir", "git-branch", "context-usage",
-        "five-hour-limit", "weekly-limit", "codex-version", "context-window-size",
+        "five-hour-limit", "weekly-limit", "context-window-size",
+        "total-input-tokens", "total-output-tokens",
     ]
 
     private static let usageComponents: Set<String> = ["five-hour-limit", "weekly-limit"]
