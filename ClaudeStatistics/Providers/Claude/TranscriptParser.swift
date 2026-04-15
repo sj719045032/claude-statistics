@@ -236,6 +236,7 @@ final class TranscriptParser {
         }
         for (time, toolName) in toolUseTimes {
             stats.fiveMinSlices[time, default: SessionStats.DaySlice()].toolUseCounts[toolName, default: 0] += 1
+            stats.fiveMinSlices[time, default: SessionStats.DaySlice()].messageCount += 1
         }
 
         DiagnosticLogger.shared.parsingSummary(

@@ -142,7 +142,7 @@ enum ShareRoleEngine {
     }
 
     private static func vibeCodingKingScore(metrics: ShareMetrics, baseline: ShareMetrics?) -> Double {
-        if metrics.scope == .yearly {
+        if metrics.scope == .all {
             return longHorizonVibeCodingKingScore(metrics: metrics, baseline: baseline)
         }
 
@@ -175,9 +175,9 @@ enum ShareRoleEngine {
             score += 0.12
         }
         if hasModerateToolSignature(metrics) {
-            score += metrics.scope == .monthly || metrics.scope == .yearly ? 0.03 : 0.06
+            score += metrics.scope == .monthly || metrics.scope == .all ? 0.03 : 0.06
         }
-        if metrics.scope == .monthly || metrics.scope == .yearly {
+        if metrics.scope == .monthly || metrics.scope == .all {
             score -= 0.06
         }
         if hasModerateContextSignature(metrics) || hasModerateMultiModelSignature(metrics) {
@@ -257,7 +257,7 @@ enum ShareRoleEngine {
     }
 
     private static func fullStackPathfinderScore(metrics: ShareMetrics, baseline: ShareMetrics?) -> Double {
-        if metrics.scope == .yearly {
+        if metrics.scope == .all {
             return longHorizonFullStackPathfinderScore(metrics: metrics, baseline: baseline)
         }
 
@@ -949,7 +949,7 @@ enum ShareRoleEngine {
             return topRole == .steadyBuilder ? 0.42 : 0.46
         case .monthly:
             return topRole == .steadyBuilder ? 0.42 : 0.44
-        case .yearly:
+        case .all:
             return 0.40
         }
     }
@@ -962,7 +962,7 @@ enum ShareRoleEngine {
             return topRole == .steadyBuilder ? 0.16 : 0.12
         case .monthly:
             return topRole == .steadyBuilder ? 0.18 : 0.16
-        case .yearly:
+        case .all:
             return 0.20
         }
     }
@@ -1007,7 +1007,7 @@ enum ShareRoleEngine {
             return metrics.toolUseCount >= 5 && metrics.toolUsePerMessage >= 0.18 && metrics.toolCategoryCount >= 2
         case .weekly:
             return metrics.toolUseCount >= 10 && metrics.toolUsePerMessage >= 0.18 && metrics.toolCategoryCount >= 2
-        case .monthly, .yearly:
+        case .monthly, .all:
             return metrics.toolUseCount >= 36 && metrics.toolUsePerMessage >= 0.22 && metrics.toolCategoryCount >= 3
         }
     }
@@ -1018,7 +1018,7 @@ enum ShareRoleEngine {
             return metrics.toolUseCount >= 8 && metrics.toolUsePerMessage >= 0.28 && metrics.toolCategoryCount >= 2
         case .weekly:
             return metrics.toolUseCount >= 18 && metrics.toolUsePerMessage >= 0.26 && metrics.toolCategoryCount >= 3
-        case .monthly, .yearly:
+        case .monthly, .all:
             return metrics.toolUseCount >= 72 && metrics.toolUsePerMessage >= 0.32 && metrics.toolCategoryCount >= 4
         }
     }
@@ -1030,7 +1030,7 @@ enum ShareRoleEngine {
             return signalCount >= 2 || metrics.averageContextUsagePercent >= 18 || cacheReadRatio(metrics) >= 0.24
         case .weekly:
             return signalCount >= 2 || metrics.averageContextUsagePercent >= 20 || cacheReadRatio(metrics) >= 0.26
-        case .monthly, .yearly:
+        case .monthly, .all:
             return signalCount >= 2 || metrics.averageContextUsagePercent >= 22 || cacheReadRatio(metrics) >= 0.28
         }
     }
@@ -1042,7 +1042,7 @@ enum ShareRoleEngine {
             return signalCount >= 2 || metrics.averageContextUsagePercent >= 24 || cacheReadRatio(metrics) >= 0.32
         case .weekly:
             return signalCount >= 2 || metrics.averageContextUsagePercent >= 26 || cacheReadRatio(metrics) >= 0.34
-        case .monthly, .yearly:
+        case .monthly, .all:
             return signalCount >= 2 || metrics.averageContextUsagePercent >= 28 || cacheReadRatio(metrics) >= 0.36
         }
     }
@@ -1080,13 +1080,13 @@ enum ShareRoleEngine {
             cacheRatioThreshold = 0.16
             longSessionThreshold = 0.38
             averageTokensThreshold = 160_000
-        case (.monthly, false), (.yearly, false):
+        case (.monthly, false), (.all, false):
             averageContextThreshold = 10
             cacheTokenThreshold = 180_000
             cacheRatioThreshold = 0.07
             longSessionThreshold = 0.22
             averageTokensThreshold = 80_000
-        case (.monthly, true), (.yearly, true):
+        case (.monthly, true), (.all, true):
             averageContextThreshold = 16
             cacheTokenThreshold = 360_000
             cacheRatioThreshold = 0.14
@@ -1111,7 +1111,7 @@ enum ShareRoleEngine {
             return metrics.nightTokenRatio >= 0.32 && metrics.nightSessionCount >= 1
         case .weekly:
             return metrics.nightTokenRatio >= 0.24 && metrics.nightSessionCount >= 2
-        case .monthly, .yearly:
+        case .monthly, .all:
             return metrics.nightTokenRatio >= 0.22 && metrics.nightSessionCount >= 3
         }
     }
@@ -1122,7 +1122,7 @@ enum ShareRoleEngine {
             return metrics.nightTokenRatio >= 0.5 && metrics.nightSessionCount >= 1
         case .weekly:
             return metrics.nightTokenRatio >= 0.32 && metrics.nightSessionCount >= 2
-        case .monthly, .yearly:
+        case .monthly, .all:
             return metrics.nightTokenRatio >= 0.3 && metrics.nightSessionCount >= 4
         }
     }
@@ -1166,7 +1166,7 @@ enum ShareRoleEngine {
                 metrics.totalCost >= 1.2 &&
                 metrics.tokensPerDollar >= 220_000 &&
                 metrics.messagesPerDollar >= 10
-        case .weekly, .monthly, .yearly:
+        case .weekly, .monthly, .all:
             return metrics.totalTokens >= 500_000 &&
                 metrics.totalCost >= 1.0 &&
                 metrics.tokensPerDollar >= 220_000 &&

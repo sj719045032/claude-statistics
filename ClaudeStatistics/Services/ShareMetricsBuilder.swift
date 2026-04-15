@@ -155,14 +155,15 @@ struct ShareMetricsBuilder {
         let cal = Calendar.current
         let end: Date
         switch periodType {
+        case .all:
+            // All-time interval spans from earliest data to now
+            end = Date()
         case .daily:
             end = cal.date(byAdding: .day, value: 1, to: periodStart) ?? periodStart
         case .weekly:
             end = cal.date(byAdding: .day, value: 7, to: periodStart) ?? periodStart
         case .monthly:
             end = cal.date(byAdding: .month, value: 1, to: periodStart) ?? periodStart
-        case .yearly:
-            end = cal.date(byAdding: .year, value: 1, to: periodStart) ?? periodStart
         }
         return DateInterval(start: periodStart, end: end)
     }

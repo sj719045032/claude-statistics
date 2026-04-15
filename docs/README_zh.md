@@ -4,14 +4,54 @@
 
 一款原生 macOS 菜单栏应用，用于实时查看 [Claude Code](https://docs.anthropic.com/en/docs/claude-code)、[Codex CLI](https://github.com/openai/codex) 和 Gemini CLI 的会话、订阅用量以及 Token / 费用统计。
 
-## v2.5.0 亮点
+## v2.6.0 亮点
 
-- **可分享的统计卡片** — 基于会话数据生成精美的个性化分享图片，包含角色评分、成就徽章和证明指标
-- **多语言支持增强** — 扩展本地化覆盖范围，优化语言切换和多语言字符串管理
-- **菜单栏视图改进** — 更丰富的会话统计展示，内联信息更完善
-- **Statistics 视图优化** — 更清晰的周期摘要，Token 和费用展示更直观
+- **全新的 All-Time 视图** — Stats 面板改为 `全部 / 按天 / 按周 / 按月` 四个维度，默认打开 All 视图（删除了利用率较低的年视图）
+- **GitHub 风格活跃度热力图** — 53 周网格按日 token 量着色，支持年份切换、hover 查看当日详情，下方附 `少 → 多` 图例
+- **项目排行榜** — 按历史总花费排序的项目排行，带动画进度条
+- **消息计数对齐 Anthropic AI Footprint** — 工具调用现在也计入消息总数（与官方数据误差 ≤ 0.3%）
+- **Codex WAL 数据库恢复** — 修复 Codex CLI 留下 `-shm`/`-wal` 临时文件时无法扫描到会话的回归问题
+- **中断恢复可观测性** — 启动时在日志中标记 `Resuming parse — N sessions had incomplete cache`，前次被 kill 的会话自动重解析
+- **Heatmap 性能** — 缓存 `DateFormatter`、移除 per-cell 动画，371 个格子滑动流畅
+- **UX 细节打磨** — Tokens & Models 分项改为具体数字（不再是百分比），去掉估算金额的 "~" 符号，Overview 卡片 4 个指标一行更紧凑
 
 ![Claude Statistics 总览](screenshots/hero-overview.png)
+
+## 安装
+
+### 下载 DMG（推荐）
+
+从 [Releases](https://github.com/sj719045032/claude-statistics/releases) 下载最新 `.dmg`,打开后把 **Claude Statistics** 拖到 **Applications** 文件夹即可。
+
+由于应用未经过 Apple 公证，首次启动可能会被拦截。可执行：
+
+```bash
+xattr -cr /Applications/Claude\ Statistics.app
+```
+
+或者右键应用 → **打开** → 在弹窗中确认 **打开**。
+
+### 从源码构建
+
+```bash
+# 克隆仓库
+git clone https://github.com/sj719045032/claude-statistics.git
+cd claude-statistics
+
+# 生成 Xcode 项目
+xcodegen generate
+
+# 打开 Xcode
+open ClaudeStatistics.xcodeproj
+```
+
+如需本地调试，可运行：
+
+```bash
+bash scripts/run-debug.sh
+```
+
+该脚本会使用独立的调试 DerivedData 路径构建，并安全地重新启动菜单栏应用。
 
 ## 界面预览
 
@@ -167,42 +207,6 @@ Claude Statistics 会自动发现并解析会话数据：Claude Code 来自 `~/.
 - macOS 14.0+
 - Xcode 16.0+（本地开发）
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen)（基于 `project.yml` 生成工程）
-
-## 安装
-
-### 下载 DMG（推荐）
-
-从 [Releases](https://github.com/sj719045032/claude-statistics/releases) 下载最新 `.dmg`，打开后把 **Claude Statistics** 拖到 **Applications** 文件夹即可。
-
-由于应用未经过 Apple 公证，首次启动可能会被拦截。可执行：
-
-```bash
-xattr -cr /Applications/Claude\ Statistics.app
-```
-
-或者右键应用 → **打开** → 在弹窗中确认 **打开**。
-
-### 从源码构建
-
-```bash
-# 克隆仓库
-git clone https://github.com/sj719045032/claude-statistics.git
-cd claude-statistics
-
-# 生成 Xcode 项目
-xcodegen generate
-
-# 在 Xcode 中打开
-open ClaudeStatistics.xcodeproj
-```
-
-本地调试推荐使用：
-
-```bash
-bash scripts/run-debug.sh
-```
-
-该脚本会使用专门的 debug DerivedData 路径进行构建并安全重启菜单栏应用。
 
 ## 工作原理
 

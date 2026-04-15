@@ -39,7 +39,7 @@ struct ProjectAnalyticsView: View {
                     SectionCard {
                         VStack(spacing: 8) {
                             HStack(spacing: 16) {
-                                CostCell(cost: group.totalCost, isEstimated: false)
+                                CostCell(cost: group.totalCost)
                                 Divider().frame(height: 28)
                                 TokenCell(tokens: group.totalTokens)
                             }

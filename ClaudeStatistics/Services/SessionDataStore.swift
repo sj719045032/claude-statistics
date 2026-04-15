@@ -16,7 +16,7 @@ final class SessionDataStore: ObservableObject {
     @Published var sessions: [Session] = []
     @Published var quickStats: [String: SessionQuickStats] = [:]
     @Published var parsedStats: [String: SessionStats] = [:]
-    @Published var selectedPeriod: StatsPeriod = .daily { didSet { rebucket() } }
+    @Published var selectedPeriod: StatsPeriod = .all { didSet { rebucket() } }
     @Published var weeklyResetDate: Date? { didSet { if selectedPeriod == .weekly { rebucket() } } }
     @Published var periodStats: [PeriodStats] = []
     @Published var isFullParseComplete = false
@@ -103,9 +103,18 @@ final class SessionDataStore: ObservableObject {
             var quickMap: [String: SessionQuickStats] = [:]
             var statsMap: [String: SessionStats] = [:]
 
+            // Classify dirty sessions: interrupted-parse (has quick but no stats — previous
+            // run was killed mid-parse) vs new/changed. Interrupted ones are parsed first so
+            // the user sees complete data as soon as possible after a crash recovery.
+            var interruptedIds: [Session] = []
+            var freshOrChangedIds: [Session] = []
             for session in scannedSessions {
                 if db.needsReparse(sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, cache: cache) {
-                    dirtyIds.append(session)
+                    if let cached = cache[session.id], cached.sessionStats == nil, cached.quickStats != nil {
+                        interruptedIds.append(session)
+                    } else {
+                        freshOrChangedIds.append(session)
+                    }
                 } else if let cached = cache[session.id] {
                     if let q = cached.quickStats { quickMap[session.id] = q }
                     if let s = cached.sessionStats { statsMap[session.id] = s }
@@ -117,6 +126,13 @@ final class SessionDataStore: ObservableObject {
                         indexRepairIds.append(session)
                     }
                 }
+            }
+            dirtyIds = interruptedIds + freshOrChangedIds
+
+            if !interruptedIds.isEmpty {
+                DiagnosticLogger.shared.info(
+                    "[\(self.provider.kind.rawValue)] Resuming parse — \(interruptedIds.count) sessions had incomplete cache from previous run (will parse first)"
+                )
             }
 
             await MainActor.run {
@@ -560,6 +576,12 @@ final class SessionDataStore: ObservableObject {
     private func rebucket() {
         guard !parsedStats.isEmpty else { return }
 
+        // All-time scope: produce a single aggregated PeriodStats spanning all data
+        if selectedPeriod == .all {
+            rebucketAllTime()
+            return
+        }
+
         var buckets: [Date: PeriodStats] = [:]
         var periodSessionIds: [Date: Set<String>] = [:]
 
@@ -613,6 +635,105 @@ final class SessionDataStore: ObservableObject {
         allTimeMessages = parsedStats.values.reduce(0) { $0 + $1.messageCount }
         visibleStats = Array(periodStats.prefix(selectedPeriod.displayCount))
         visibleModelBreakdown = modelBreakdown(for: visibleStats)
+    }
+
+    /// Aggregate every session into a single "All Time" PeriodStats.
+    /// Matches the shape produced by `rebucket()` so downstream views (PeriodDetailView-like)
+    /// can consume it without branching on scope.
+    ///
+    /// `period.period` is intentionally set to `Date.distantPast` to line up with
+    /// `StatsPeriod.all.startOfPeriod(for:)` — `aggregateTrendData` compares the two
+    /// for equality when deciding which slices to include.
+    private func rebucketAllTime() {
+        let label = LanguageManager.localizedString("period.all")
+        var agg = PeriodStats(period: Date.distantPast, periodLabel: label, chartLabel: label)
+
+        // Accumulate every five-minute slice from every session; fall back to session-level
+        // aggregation when a session has no slices (older cached data).
+        for (_, stats) in parsedStats {
+            if stats.fiveMinSlices.isEmpty {
+                agg.accumulate(stats: stats)
+            } else {
+                for (_, slice) in stats.fiveMinSlices {
+                    agg.accumulate(daySlice: slice)
+                }
+            }
+        }
+        agg.sessionCount = parsedStats.count
+
+        periodStats = [agg]
+
+        // Cached aggregates — derivable from agg directly
+        allTimeCost = agg.totalCost
+        allTimeSessions = agg.sessionCount
+        allTimeTokens = agg.totalTokens
+        allTimeMessages = agg.messageCount
+        visibleStats = [agg]
+        visibleModelBreakdown = modelBreakdown(for: [agg])
+    }
+
+    // MARK: - Top projects (all-time aggregation by project path)
+
+    /// Aggregate all sessions by their `cwd` (or projectPath fallback), sorted by estimated cost desc.
+    /// Used by the All-Time view's "Top Projects" card.
+    var topProjects: [TopProject] {
+        struct Acc {
+            var cost: Double = 0
+            var tokens: Int = 0
+            var sessionCount: Int = 0
+            var messageCount: Int = 0
+        }
+        var acc: [String: Acc] = [:]
+        let sessionById = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
+
+        for (sessionId, stats) in parsedStats {
+            guard let session = sessionById[sessionId] else { continue }
+            let key = session.cwd ?? session.projectPath
+            var a = acc[key, default: Acc()]
+            a.cost += stats.estimatedCost
+            a.tokens += stats.totalTokens
+            a.sessionCount += 1
+            a.messageCount += stats.messageCount
+            acc[key] = a
+        }
+
+        return acc.map { key, v in
+            TopProject(
+                path: key,
+                displayName: Self.displayNameForProjectPath(key),
+                cost: v.cost,
+                tokens: v.tokens,
+                sessionCount: v.sessionCount,
+                messageCount: v.messageCount
+            )
+        }.sorted { $0.cost > $1.cost }
+    }
+
+    /// Trim/relabel a full path into something compact enough for a list row.
+    /// Prefers the last path component (like the basename of a repo).
+    private static func displayNameForProjectPath(_ path: String) -> String {
+        let expanded = (path as NSString).expandingTildeInPath
+        let last = (expanded as NSString).lastPathComponent
+        return last.isEmpty ? expanded : last
+    }
+
+    // MARK: - Daily activity heatmap data
+
+    /// Per-day aggregated cost + tokens for the heatmap in the All-Time view.
+    /// Key is `startOfDay` in the user's local timezone.
+    var dailyHeatmapData: [Date: DailyHeatmapBucket] {
+        let cal = Calendar.current
+        var buckets: [Date: DailyHeatmapBucket] = [:]
+        for stats in parsedStats.values {
+            for (sliceTime, slice) in stats.fiveMinSlices {
+                let day = cal.startOfDay(for: sliceTime)
+                var b = buckets[day, default: DailyHeatmapBucket(date: day, cost: 0, tokens: 0)]
+                b.cost += slice.estimatedCost
+                b.tokens += slice.totalTokens
+                buckets[day] = b
+            }
+        }
+        return buckets
     }
 
     // MARK: - Delete
@@ -742,9 +863,12 @@ final class SessionDataStore: ObservableObject {
         let cal = Calendar.current
         var result: [TrendDataPoint] = []
 
-        // Zero-origin at the period start
+        // Zero-origin baseline. For bounded periods (daily/weekly/monthly), `period.period`
+        // is the exact start-of-period. For `.all`, `period.period` is `distantPast` which
+        // would blow up the X-axis, so pin the baseline to the first bucket instead.
         if !sorted.isEmpty {
-            result.append(TrendDataPoint(time: period.period, tokens: 0, cost: 0))
+            let origin: Date = (periodType == .all) ? sorted.first!.key : period.period
+            result.append(TrendDataPoint(time: origin, tokens: 0, cost: 0))
         }
 
         // Data points at the END of each bucket (cumulative up to that point)
@@ -1010,7 +1134,7 @@ final class SessionDataStore: ObservableObject {
             sessions: sessions,
             parsedStats: parsedStats,
             providerKind: provider.kind,
-            scope: .yearly,
+            scope: .all,
             interval: DateInterval(start: start, end: end),
             scopeLabel: scopeLabel ?? LanguageManager.localizedString("share.scope.allTime")
         )
@@ -1023,7 +1147,7 @@ final class SessionDataStore: ObservableObject {
             sessions: sessions,
             parsedStats: parsedStats,
             providerKind: provider.kind,
-            scope: .yearly,
+            scope: .all,
             interval: DateInterval(start: baselineStart, end: end),
             scopeLabel: LanguageManager.localizedString("share.scope.lastYear")
         )
@@ -1031,14 +1155,14 @@ final class SessionDataStore: ObservableObject {
 
     private func shareBaselineLookbackDays(for periodType: StatsPeriod, fallback: Int) -> Int {
         switch periodType {
+        case .all:
+            return 730
         case .daily:
             return 14
         case .weekly:
             return 56
         case .monthly:
             return 365
-        case .yearly:
-            return 730
         }
     }
 
@@ -1057,4 +1181,23 @@ final class SessionDataStore: ObservableObject {
         }
         return combined.values.sorted { $0.cost > $1.cost }
     }
+}
+
+// MARK: - All-Time helper types
+
+struct TopProject: Identifiable, Hashable {
+    let path: String
+    let displayName: String
+    let cost: Double
+    let tokens: Int
+    let sessionCount: Int
+    let messageCount: Int
+
+    var id: String { path }
+}
+
+struct DailyHeatmapBucket: Hashable {
+    let date: Date
+    var cost: Double
+    var tokens: Int
 }

@@ -108,7 +108,7 @@ final class AppState: ObservableObject {
         let start = metrics.map(\.period.start).min() ?? end
         guard let mergedMetrics = ShareMetricsBuilder.merge(
             metrics,
-            scope: .yearly,
+            scope: .all,
             scopeLabel: scopeLabel,
             period: DateInterval(start: start, end: end)
         ) else {
@@ -121,7 +121,7 @@ final class AppState: ObservableObject {
         let baselineStart = Calendar.current.date(byAdding: .day, value: -365, to: end) ?? end
         let mergedBaseline = ShareMetricsBuilder.merge(
             baselineMetrics,
-            scope: .yearly,
+            scope: .all,
             scopeLabel: LanguageManager.localizedString("share.scope.lastYear"),
             period: DateInterval(start: baselineStart, end: end)
         )

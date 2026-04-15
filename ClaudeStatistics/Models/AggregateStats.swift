@@ -1,23 +1,25 @@
 import SwiftUI
 
 enum StatsPeriod: String, CaseIterable {
+    case all = "All"
     case daily = "Daily"
     case weekly = "Weekly"
     case monthly = "Monthly"
-    case yearly = "Yearly"
 
     var localizedName: LocalizedStringKey {
         switch self {
+        case .all: return "period.all"
         case .daily: return "period.daily"
         case .weekly: return "period.weekly"
         case .monthly: return "period.monthly"
-        case .yearly: return "period.yearly"
         }
     }
 
     func startOfPeriod(for date: Date, weeklyResetDate: Date? = nil) -> Date {
         let cal = Calendar.current
         switch self {
+        case .all:
+            return Date.distantPast
         case .daily:
             return cal.startOfDay(for: date)
         case .weekly:
@@ -36,9 +38,6 @@ enum StatsPeriod: String, CaseIterable {
         case .monthly:
             let comps = cal.dateComponents([.year, .month], from: date)
             return cal.date(from: comps) ?? cal.startOfDay(for: date)
-        case .yearly:
-            let comps = cal.dateComponents([.year], from: date)
-            return cal.date(from: comps) ?? cal.startOfDay(for: date)
         }
     }
 
@@ -46,6 +45,8 @@ enum StatsPeriod: String, CaseIterable {
     func label(for date: Date, weeklyResetDate: Date? = nil) -> String {
         let fmt = DateFormatter()
         switch self {
+        case .all:
+            return LanguageManager.localizedString("period.all")
         case .daily:
             fmt.dateFormat = "MM/dd"
         case .weekly:
@@ -58,8 +59,6 @@ enum StatsPeriod: String, CaseIterable {
             return "\(Self.smartDate(date))~\(Self.smartDate(end))"
         case .monthly:
             fmt.dateFormat = "yyyy/MM"
-        case .yearly:
-            fmt.dateFormat = "yyyy"
         }
         return fmt.string(from: date)
     }
@@ -100,10 +99,10 @@ enum StatsPeriod: String, CaseIterable {
 
     var displayCount: Int {
         switch self {
+        case .all: return 1
         case .daily: return 7
         case .weekly: return 8
         case .monthly: return 12
-        case .yearly: return 10
         }
     }
 }

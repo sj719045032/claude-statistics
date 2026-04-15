@@ -62,104 +62,39 @@ struct StatisticsView: View {
 
     private var statsContent: some View {
         VStack(spacing: 0) {
-            // All-time summary (fixed at top)
-            allTimeSummary
-                .padding(.horizontal, 12)
-                .padding(.top, 8)
-
-            // Period picker
+            // Period picker (first row, replaces the old provider/all-time summary header)
             PeriodPicker(selection: $store.selectedPeriod)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.top, 8)
+                .padding(.bottom, 8)
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    // Bar chart
-                    costChart
-
-                    // Period list
-                    periodList
-
-                    if store.isFullParseComplete {
-                        Text("stats.allParsed")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
+            if store.selectedPeriod == .all {
+                // All-time view takes over the entire area — renders its own header + share button
+                if let stat = store.visibleStats.first {
+                    AllTimeView(stat: stat, store: store)
+                } else {
+                    emptyView
                 }
-                .padding(12)
-            }
-        }
-    }
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Bar chart
+                        costChart
 
-    // MARK: - All-time Summary
+                        // Period list
+                        periodList
 
-    private var allTimeSummary: some View {
-        SectionCard {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 8) {
-                    Label {
-                        Text(verbatim: store.provider.displayName)
-                        Text(verbatim: " · ")
-                        Text("share.scope.allTime")
-                    } icon: {
-                        Image(systemName: "sparkles")
-                    }
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-
-                    Spacer()
-
-                    Button(action: openAllTimeSharePreview) {
-                        Label {
-                            Text("share.action.shareAll")
-                        } icon: {
-                            Image(systemName: "square.and.arrow.up")
+                        if store.isFullParseComplete {
+                            Text("stats.allParsed")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
                         }
-                        .font(.system(size: 11, weight: .medium))
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.blue)
-                    .disabled(store.allTimeSessions == 0)
-                }
-                .padding(.bottom, 2)
-
-                Divider()
-
-                HStack(spacing: 12) {
-                    summaryItem("stats.totalCost", value: formatCost(store.allTimeCost), icon: "dollarsign.circle", estimated: store.periodStats.contains { $0.hasEstimatedCost })
-                    Divider().frame(height: 28)
-                    summaryItem("stats.sessions", value: "\(store.allTimeSessions)", icon: "list.bullet")
-                    Divider().frame(height: 28)
-                    summaryItem("stats.tokens", value: TimeFormatter.tokenCount(store.allTimeTokens), icon: "number")
-                    Divider().frame(height: 28)
-                    summaryItem("stats.messages", value: "\(store.allTimeMessages)", icon: "message")
+                    .padding(12)
                 }
             }
         }
     }
-
-    private func summaryItem(_ title: LocalizedStringKey, value: String, icon: String, estimated: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Label(title, systemImage: icon)
-                .font(.system(size: 12))
-                .foregroundStyle(.tertiary)
-            HStack(spacing: 1) {
-                if estimated {
-                    Text("~")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.orange)
-                }
-                Text(value)
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .lineLimit(1)
-                    .contentTransition(.numericText())
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .animation(Theme.quickSpring, value: value)
-    }
-
-
 
     // MARK: - Cost Chart
 
@@ -222,18 +157,11 @@ struct StatisticsView: View {
                             .frame(width: 110, alignment: .leading)
 
                         ProgressView(value: usage.cost, total: maxCost)
-                            .tint(usage.isEstimated ? Color.orange.opacity(0.7) : Color.blue.opacity(0.7))
+                            .tint(Color.blue.opacity(0.7))
 
-                        HStack(spacing: 1) {
-                            if usage.isEstimated {
-                                Text("~")
-                                    .font(.system(size: 8, weight: .medium))
-                                    .foregroundStyle(.orange)
-                            }
-                            Text(formatCost(usage.cost))
-                                .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        }
-                        .frame(width: 65, alignment: .trailing)
+                        Text(formatCost(usage.cost))
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .frame(width: 65, alignment: .trailing)
                     }
                 }
             }
@@ -296,11 +224,6 @@ struct StatisticsView: View {
 
     private func shortModel(_ id: String) -> String {
         id.replacingOccurrences(of: "claude-", with: "")
-    }
-
-    private func openAllTimeSharePreview() {
-        guard let result = store.buildAllTimeShareRoleResult() else { return }
-        SharePreviewWindowController.show(result: result, source: .providerAllTime)
     }
 }
 
@@ -460,16 +383,9 @@ private struct PeriodRow: View {
                     Text(stat.periodLabel)
                         .font(.system(size: 11, weight: .semibold))
                     HStack(spacing: 8) {
-                        HStack(spacing: 1) {
-                            if stat.hasEstimatedCost {
-                                Text("~")
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(.orange)
-                            }
-                            Text(formatCost(stat.totalCost))
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                .foregroundStyle(costColor(stat.totalCost))
-                        }
+                        Text(formatCost(stat.totalCost))
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundStyle(costColor(stat.totalCost))
                         Text(TimeFormatter.tokenCount(stat.totalTokens))
                             .font(.system(size: 11, weight: .medium, design: .monospaced))
                             .foregroundStyle(.blue)
@@ -577,15 +493,8 @@ struct PeriodModelBreakdownCard: View {
                                     Text("detail.sessions \(usage.sessionCount)")
                                         .font(.system(size: 8))
                                         .foregroundStyle(.tertiary)
-                                    HStack(spacing: 1) {
-                                        if usage.isEstimated {
-                                            Text("~")
-                                                .font(.system(size: 8, weight: .medium))
-                                                .foregroundStyle(.orange)
-                                        }
-                                        Text(formatCost(usage.cost))
-                                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                                    }
+                                    Text(formatCost(usage.cost))
+                                        .font(.system(size: 10, weight: .medium, design: .monospaced))
                                 }
                                 .contentShape(Rectangle())
                             }
@@ -593,7 +502,7 @@ struct PeriodModelBreakdownCard: View {
                             .padding(.vertical, 3)
 
                             ProgressView(value: usage.cost, total: maxCost)
-                                .tint(usage.isEstimated ? Color.orange.opacity(0.7) : Color.blue.opacity(0.7))
+                                .tint(Color.blue.opacity(0.7))
                                 .padding(.leading, 16)
 
                             if isExpanded {
@@ -698,31 +607,19 @@ struct PeriodDetailView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    // 1. Overview
+                    // 1. Overview — single row of 4 metrics to match AllTimeView's layout.
+                    //    No period-over-period delta here; the deltas show up in the period
+                    //    list on the Stats main screen, which is the context where comparison
+                    //    actually helps.
                     SectionCard {
-                        let comparison = store.periodComparison(for: stat)
-                        VStack(spacing: 8) {
-                            HStack(spacing: 16) {
-                                metricWithDelta(delta: comparison?.costDelta, isInverse: true) {
-                                    CostCell(cost: stat.totalCost, isEstimated: stat.hasEstimatedCost)
-                                }
-                                Divider().frame(height: 28)
-                                metricWithDelta(delta: comparison?.tokenDelta, isInverse: false) {
-                                    TokenCell(tokens: stat.totalTokens)
-                                }
-                            }
-                            Divider()
-                            HStack(spacing: 16) {
-                                metricWithDelta(delta: comparison?.sessionDelta, isInverse: false) {
-                                    overviewItem("stats.sessions", value: "\(stat.sessionCount)", icon: "list.bullet")
-                                }
-                                Divider().frame(height: 28)
-                                metricWithDelta(delta: comparison?.messageDelta, isInverse: false) {
-                                    overviewItem("stats.messages", value: "\(stat.messageCount)", icon: "message")
-                                }
-                                Divider().frame(height: 28)
-                                overviewItem("stats.tools", value: "\(stat.toolUseCount)", icon: "wrench")
-                            }
+                        HStack(spacing: 12) {
+                            CostCell(cost: stat.totalCost)
+                            Divider().frame(height: 32)
+                            TokenCell(tokens: stat.totalTokens)
+                            Divider().frame(height: 32)
+                            overviewItem("stats.sessions", value: "\(stat.sessionCount)", icon: "list.bullet")
+                            Divider().frame(height: 32)
+                            overviewItem("stats.messages", value: "\(stat.messageCount)", icon: "message")
                         }
                     }
 

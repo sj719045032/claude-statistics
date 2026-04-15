@@ -4,14 +4,54 @@
 
 A native macOS menu bar app for monitoring your [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), and Gemini CLI sessions, subscription usage, and token/cost analytics in real time.
 
-## v2.5.0 Highlights
+## v2.6.0 Highlights
 
-- **Shareable stat cards** — generate beautiful, persona-driven share images with role scoring, badges, and proof metrics based on your session data
-- **Enhanced language support** — expanded localization coverage with refined language switching and multi-language string management
-- **Improved menu bar view** — better session statistics display with richer inline information
-- **Statistics view refinements** — cleaner period summaries with enhanced token and cost presentation
+- **Brand-new All-Time view** — Stats tab now opens on a full-panel overview with `All / Daily / Weekly / Monthly` tabs (the rarely-useful Yearly tab has been retired)
+- **GitHub-style activity heatmap** — 53-week grid coloured by daily token volume, with a year-picker, hover-to-reveal details, and `Less → More` legend
+- **Top Projects ranking** — at-a-glance ranking of projects by all-time cost, with animated progress bars
+- **Messages count aligned with Anthropic's AI Footprint** — tool uses now included in the message total (≤ 0.3% off the official number)
+- **Codex provider WAL DB recovery** — fixes a regression where Codex sessions silently failed to load when the CLI left `-shm`/`-wal` sidecar files behind
+- **Crash-recovery telemetry** — startup log now reports `Resuming parse — N sessions had incomplete cache` when prior runs were killed mid-parse
+- **Heatmap performance** — cached `DateFormatter` and removed per-cell animations for smooth scrolling across 371 cells
+- **UX polish** — absolute numbers instead of percentages in the Tokens & Models breakdown, removed "~" estimated-cost markers, cleaner overview card with 4 metrics in a single row
 
 ![Claude Statistics overview](docs/screenshots/hero-overview.png)
+
+## Installation
+
+### Download DMG (Recommended)
+
+Download the latest `.dmg` from [Releases](https://github.com/sj719045032/claude-statistics/releases), open it, and drag **Claude Statistics** into **Applications**.
+
+Because the app is not notarized by Apple, macOS may block the first launch. If that happens:
+
+```bash
+xattr -cr /Applications/Claude\ Statistics.app
+```
+
+Or right-click the app → **Open** → confirm **Open** in the dialog.
+
+### Build from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/sj719045032/claude-statistics.git
+cd claude-statistics
+
+# Generate Xcode project
+xcodegen generate
+
+# Open in Xcode
+open ClaudeStatistics.xcodeproj
+```
+
+For local debug runs, use the provided script:
+
+```bash
+bash scripts/run-debug.sh
+```
+
+This script builds using the dedicated debug DerivedData path and relaunches the menu bar app safely.
 
 ## Screenshots
 
@@ -167,42 +207,6 @@ Generate beautiful, shareable stat cards from your session analytics.
 - macOS 14.0+
 - Xcode 16.0+ (for local development)
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) (to generate the project from `project.yml`)
-
-## Installation
-
-### Download DMG (Recommended)
-
-Download the latest `.dmg` from [Releases](https://github.com/sj719045032/claude-statistics/releases), open it, and drag **Claude Statistics** into **Applications**.
-
-Because the app is not notarized by Apple, macOS may block the first launch. If that happens:
-
-```bash
-xattr -cr /Applications/Claude\ Statistics.app
-```
-
-Or right-click the app → **Open** → confirm **Open** in the dialog.
-
-### Build from Source
-
-```bash
-# Clone the repository
-git clone https://github.com/sj719045032/claude-statistics.git
-cd claude-statistics
-
-# Generate Xcode project
-xcodegen generate
-
-# Open in Xcode
-open ClaudeStatistics.xcodeproj
-```
-
-For local debug runs, use the provided script:
-
-```bash
-bash scripts/run-debug.sh
-```
-
-This script builds using the dedicated debug DerivedData path and relaunches the menu bar app safely.
 
 ## How It Works
 

@@ -208,7 +208,7 @@ struct SessionDetailView: View {
         SectionCard {
             VStack(spacing: 8) {
                 HStack(spacing: 16) {
-                    CostCell(cost: stats.estimatedCost, isEstimated: stats.isCostEstimated)
+                    CostCell(cost: stats.estimatedCost)
                     Divider().frame(height: 28)
                     TokenCell(tokens: stats.totalTokens)
                     if stats.contextTokens > 0 {
@@ -445,22 +445,16 @@ struct StatRow: View {
 
 struct CostCell: View {
     let cost: Double
-    let isEstimated: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Label("detail.cost", systemImage: "dollarsign.circle")
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
-            HStack(spacing: 1) {
-                if isEstimated {
-                    Text("~").font(.system(size: 10)).foregroundStyle(.orange)
-                }
-                Text(detailFormatCost(cost))
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundStyle(detailCostColor(cost))
-                    .contentTransition(.numericText())
-            }
+            Text(detailFormatCost(cost))
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundStyle(detailCostColor(cost))
+                .contentTransition(.numericText())
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .animation(Theme.quickSpring, value: cost)
@@ -580,14 +574,9 @@ struct CostModelsCard: View {
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                     }
-                    HStack(spacing: 2) {
-                        if isEstimated {
-                            Text("~").font(.system(size: 10)).foregroundStyle(.orange)
-                        }
-                        Text(detailFormatCost(totalCost))
-                            .font(.system(size: 14, weight: .bold, design: .monospaced))
-                            .foregroundStyle(detailCostColor(totalCost))
-                    }
+                    Text(detailFormatCost(totalCost))
+                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .foregroundStyle(detailCostColor(totalCost))
                 }
 
                 // Token type bar + legend
@@ -642,14 +631,9 @@ struct CostModelsCard: View {
                                     Text("\(TimeFormatter.tokenCount(item.totalTokens)) (\(String(format: "%.2f", pct))%)")
                                         .font(.system(size: 10, design: .monospaced))
                                         .foregroundStyle(.secondary)
-                                    HStack(spacing: 1) {
-                                        if item.isEstimated {
-                                            Text("~").font(.system(size: 8)).foregroundStyle(.orange)
-                                        }
-                                        Text(detailFormatCost(item.cost))
-                                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                                            .foregroundStyle(detailCostColor(item.cost))
-                                    }
+                                    Text(detailFormatCost(item.cost))
+                                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                        .foregroundStyle(detailCostColor(item.cost))
                                 }
                                 .contentShape(Rectangle())
                             }
@@ -759,7 +743,6 @@ struct ToolBarRow: View {
 
 @ViewBuilder
 func tokenLegendRow(input: Int, output: Int, cache5m: Int, cache1h: Int, cacheTotal: Int, cacheRead: Int) -> some View {
-    let total = input + output + cacheTotal + cacheRead
     let items: [(Color, LocalizedStringKey, Int)] = [
         (.blue, "token.input", input),
         (.green, "token.output", output),
@@ -771,9 +754,7 @@ func tokenLegendRow(input: Int, output: Int, cache5m: Int, cache1h: Int, cacheTo
 
     FlowLayout(spacing: 6) {
         ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-            let ratio = total > 0 ? Double(item.2) / Double(total) * 100 : 0
-            let pct = String(format: "%.2f%%", ratio)
-            TokenLegend(color: item.0, label: item.1, value: "\(pct)")
+            TokenLegend(color: item.0, label: item.1, value: TimeFormatter.tokenCount(item.2))
         }
     }
     .font(.system(size: 10))

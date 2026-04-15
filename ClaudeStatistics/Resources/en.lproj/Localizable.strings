@@ -211,10 +211,19 @@
 "transcript.noMatch" = "No match";
 
 /* Period Names */
+"period.all" = "All";
 "period.daily" = "Daily";
 "period.weekly" = "Weekly";
 "period.monthly" = "Monthly";
-"period.yearly" = "Yearly";
+
+/* All-Time View */
+"allTime.title" = "All Time";
+"allTime.activity" = "Activity";
+"allTime.topProjects" = "Top Projects";
+"allTime.heatmap.empty" = "No activity yet";
+"allTime.heatmap.less" = "Less";
+"allTime.heatmap.more" = "More";
+"allTime.heatmap.last12Months" = "Last 12 months";
 
 /* Share */
 "share.provider.unknown" = "Unknown";
@@ -311,7 +320,7 @@
 "share.action.copyCaption" = "Copy Caption";
 "share.action.savePNG" = "Save";
 "share.action.shareX" = "To X";
-"share.action.share" = "More";
+"share.action.share" = "Share";
 "share.x.prompt.title" = "Image Copied";
 "share.x.prompt.message" = "The share image has been copied to your clipboard. Next, we'll open the X composer so you can paste the image and post it.";
 "share.x.prompt.cancel" = "Later";

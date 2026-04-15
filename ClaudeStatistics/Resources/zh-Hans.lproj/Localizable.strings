@@ -211,10 +211,19 @@
 "transcript.noMatch" = "无匹配";
 
 /* Period Names */
+"period.all" = "全部";
 "period.daily" = "按天";
 "period.weekly" = "按周";
 "period.monthly" = "按月";
-"period.yearly" = "按年";
+
+/* All-Time View */
+"allTime.title" = "全部";
+"allTime.activity" = "活跃度";
+"allTime.topProjects" = "项目排行";
+"allTime.heatmap.empty" = "暂无活动";
+"allTime.heatmap.less" = "少";
+"allTime.heatmap.more" = "多";
+"allTime.heatmap.last12Months" = "过去一年";
 
 /* Share */
 "share.provider.unknown" = "未知";

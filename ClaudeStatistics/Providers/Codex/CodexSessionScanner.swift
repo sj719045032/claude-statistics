@@ -9,13 +9,13 @@ final class CodexSessionScanner {
     private init() {}
 
     func scanSessions() -> [Session] {
-        guard FileManager.default.fileExists(atPath: dbPath) else { return [] }
-
-        var db: OpaquePointer?
-        guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK, let db else {
-            if let db { sqlite3_close(db) }
+        guard FileManager.default.fileExists(atPath: dbPath) else {
+            DiagnosticLogger.shared.warning("Codex state DB not found at \(dbPath)")
             return []
         }
+
+        var db: OpaquePointer? = Self.openCodexDB(path: dbPath)
+        guard let db else { return [] }
         defer { sqlite3_close(db) }
 
         let sql = """
@@ -26,7 +26,12 @@ final class CodexSessionScanner {
         """
 
         var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        let prepResult = sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+        guard prepResult == SQLITE_OK else {
+            let msg = String(cString: sqlite3_errmsg(db))
+            DiagnosticLogger.shared.error("Codex state DB prepare failed (code=\(prepResult)): \(msg)")
+            return []
+        }
         defer { sqlite3_finalize(stmt) }
 
         var sessions: [Session] = []
@@ -74,6 +79,50 @@ final class CodexSessionScanner {
     private func columnText(_ stmt: OpaquePointer?, at index: Int32) -> String? {
         guard let ptr = sqlite3_column_text(stmt, index) else { return nil }
         return String(cString: ptr)
+    }
+
+    /// Open Codex's state DB read-only, with fallback for WAL mode.
+    ///
+    /// Codex CLI writes the DB in WAL mode, leaving `-shm` / `-wal` sidecar files.
+    /// A plain SQLITE_OPEN_READONLY can fail with SQLITE_CANTOPEN during prepare()
+    /// when the reader can't initialise the shared-memory region (e.g. the sidecar
+    /// was touched by another process or is in an odd state). Falling back to
+    /// `immutable=1` tells SQLite to ignore the WAL/shm files and read straight
+    /// from the main DB file — safe since we only read and don't mind slightly
+    /// stale data for session listing.
+    private static func openCodexDB(path: String) -> OpaquePointer? {
+        // Attempt 1: standard read-only (respects WAL)
+        var db: OpaquePointer?
+        var result = sqlite3_open_v2(path, &db, SQLITE_OPEN_READONLY, nil)
+        if result == SQLITE_OK, let db, Self.canQueryThreads(db: db) {
+            return db
+        }
+
+        let firstErr = db.map { String(cString: sqlite3_errmsg($0)) } ?? "nil handle"
+        if let db { sqlite3_close(db) }
+        db = nil
+
+        // Attempt 2: URI + immutable=1 (bypass WAL entirely)
+        let uri = "file:\(path)?mode=ro&immutable=1"
+        result = sqlite3_open_v2(uri, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nil)
+        if result == SQLITE_OK, let db, Self.canQueryThreads(db: db) {
+            DiagnosticLogger.shared.info("Codex state DB opened via immutable fallback (first attempt: \(firstErr))")
+            return db
+        }
+
+        let secondErr = db.map { String(cString: sqlite3_errmsg($0)) } ?? "code \(result)"
+        DiagnosticLogger.shared.error("Codex state DB open failed — standard: \(firstErr); immutable: \(secondErr)")
+        if let db { sqlite3_close(db) }
+        return nil
+    }
+
+    /// Verify the DB handle can actually read the threads table — catches the
+    /// case where open() succeeds but prepare() later fails with SQLITE_CANTOPEN.
+    private static func canQueryThreads(db: OpaquePointer) -> Bool {
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        let sql = "SELECT 1 FROM threads LIMIT 1"
+        return sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK
     }
 
     private func fallbackProjectPath(title: String, filePath: String, sessionId: String) -> String {
