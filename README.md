@@ -4,14 +4,12 @@
 
 A native macOS menu bar app for monitoring your [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), and Gemini CLI sessions, subscription usage, and token/cost analytics in real time.
 
-## v2.4.0 Highlights
+## v2.5.0 Highlights
 
-- **Provider-native experience** — Claude Code, Codex CLI, and Gemini CLI each use provider-specific session scanning, transcript parsing, usage presentation, and resume behavior
-- **Background parsing per provider** — switching providers no longer interrupts parsing or search-index rebuilds for the others
-- **Gemini Usage alignment** — Gemini now exposes grouped subscription usage, local token trends, and menu bar quota text instead of a generic percentage-only view
-- **Faster, safer indexing** — Claude, Codex, and Gemini all use lightweight search indexing paths instead of full transcript UI parsing during startup
-- **Cache/index self-healing** — atomic stats + FTS writes, startup repair of missing indexes, and retry protection for suspicious parse results
-- Installation detection: unavailable providers are hidden or disabled automatically based on the current UI context
+- **Shareable stat cards** — generate beautiful, persona-driven share images with role scoring, badges, and proof metrics based on your session data
+- **Enhanced language support** — expanded localization coverage with refined language switching and multi-language string management
+- **Improved menu bar view** — better session statistics display with richer inline information
+- **Statistics view refinements** — cleaner period summaries with enhanced token and cost presentation
 
 ![Claude Statistics overview](docs/screenshots/hero-overview.png)
 
@@ -144,6 +142,16 @@ Providers that are not installed are hidden or disabled automatically depending 
 - Diagnostics log export
 - Sparkle-based in-app update checks
 
+### Share Cards
+
+Generate beautiful, shareable stat cards from your session analytics.
+
+- **Persona-driven roles** — 10 unique share roles (Vibe Coding King, Tool Summoner, Night Shift Engineer, etc.) with themed gradients, SF Symbols artwork, and mascot scenes
+- **Achievement badges** — 11 unlockable badges across categories like schedule, context, model preference, tooling, cost efficiency, and burst usage
+- **Proof metrics** — data-backed evidence showing your top stats (token counts, session counts, tool usage, cost efficiency)
+- **QR code integration** — each card includes a QR code for sharing or quick access
+- **Export as PNG** — render and save share cards at native resolution for social media or messaging
+
 ### UI & Interaction Details
 
 - Material-based cards with consistent design tokens (`Theme.swift`)
@@ -224,16 +232,16 @@ All parsing and analytics happen locally on your machine.
 ```text
 ClaudeStatistics/
 ├── App/                    # App entry, status bar controller, floating panel
-├── Models/                 # Session, SessionStats, AggregateStats, UsageData, etc.
+├── Models/                 # Session, SessionStats, AggregateStats, UsageData, ShareRole, ShareMetrics, etc.
 ├── Providers/              # SessionProvider protocol + Claude, Codex, and Gemini implementations
 │   ├── SessionProvider.swift
 │   ├── Claude/             # ClaudeProvider, ClaudeSessionScanner, ClaudeTranscriptParser
 │   ├── Codex/              # CodexProvider, CodexSessionScanner, CodexTranscriptParser
 │   └── Gemini/             # GeminiProvider, GeminiSessionScanner, GeminiTranscriptParser
-├── Services/               # Parsing, scanning, storage, pricing fetch, usage API, logs
-├── Utilities/              # Terminal launching, time formatting, language handling
+├── Services/               # Parsing, scanning, storage, pricing fetch, usage API, share metrics builder, logs
+├── Utilities/              # Terminal launching, time formatting, language handling, share image exporter
 ├── ViewModels/             # SessionViewModel, UsageViewModel, ProfileViewModel
-├── Views/                  # Sessions, statistics, usage, transcript, settings, theme
+├── Views/                  # Sessions, statistics, usage, transcript, settings, theme, share cards
 ├── Resources/              # Localizable strings and assets
 └── scripts/                # Debug build/run and DMG release helpers
 ```

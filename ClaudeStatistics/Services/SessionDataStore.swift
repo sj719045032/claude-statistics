@@ -950,6 +950,98 @@ final class SessionDataStore: ObservableObject {
         modelBreakdown(for: periodStats)
     }
 
+    func buildShareMetrics(for period: PeriodStats, periodType: StatsPeriod) -> ShareMetrics? {
+        return ShareMetricsBuilder.build(
+            sessions: sessions,
+            parsedStats: parsedStats,
+            providerKind: provider.kind,
+            period: period,
+            periodType: periodType,
+            weeklyResetDate: weeklyResetDate
+        )
+    }
+
+    func buildShareBaselineMetrics(for period: PeriodStats, periodType: StatsPeriod, lookbackDays: Int = 30) -> ShareMetrics? {
+        let cal = Calendar.current
+        let end = period.period
+        let resolvedLookback = shareBaselineLookbackDays(for: periodType, fallback: lookbackDays)
+        let start = cal.date(byAdding: .day, value: -resolvedLookback, to: end) ?? end
+        return ShareMetricsBuilder.build(
+            sessions: sessions,
+            parsedStats: parsedStats,
+            providerKind: provider.kind,
+            scope: periodType,
+            interval: DateInterval(start: start, end: end),
+            scopeLabel: "Previous \(resolvedLookback)d"
+        )
+    }
+
+    func buildShareRoleResult(for period: PeriodStats, periodType: StatsPeriod) -> ShareRoleResult? {
+        guard let metrics = buildShareMetrics(for: period, periodType: periodType) else { return nil }
+        let baseline = buildShareBaselineMetrics(for: period, periodType: periodType)
+        return ShareRoleEngine.makeRoleResult(metrics: metrics, baseline: baseline)
+    }
+
+    func buildAllTimeShareRoleResult() -> ShareRoleResult? {
+        guard let metrics = buildAllTimeShareMetrics(
+            scopeLabel: LanguageManager.localizedString("share.scope.allTime")
+        ) else {
+            return nil
+        }
+        let baseline = buildAllTimeShareBaselineMetrics()
+        return ShareRoleEngine.makeAllTimeRoleResult(metrics: metrics, baseline: baseline)
+    }
+
+    func buildAllTimeShareMetrics(scopeLabel: String? = nil) -> ShareMetrics? {
+        let cal = Calendar.current
+        let allDates = sessions.compactMap { session -> Date? in
+            if let stats = parsedStats[session.id] {
+                return stats.startTime ?? session.startTime ?? session.lastModified
+            }
+            return session.startTime ?? session.lastModified
+        }
+        guard let firstDate = allDates.min() else { return nil }
+
+        let start = cal.startOfDay(for: firstDate)
+        let end = Date()
+        guard end > start else { return nil }
+
+        return ShareMetricsBuilder.build(
+            sessions: sessions,
+            parsedStats: parsedStats,
+            providerKind: provider.kind,
+            scope: .yearly,
+            interval: DateInterval(start: start, end: end),
+            scopeLabel: scopeLabel ?? LanguageManager.localizedString("share.scope.allTime")
+        )
+    }
+
+    func buildAllTimeShareBaselineMetrics(end: Date = Date()) -> ShareMetrics? {
+        let cal = Calendar.current
+        let baselineStart = cal.date(byAdding: .day, value: -365, to: end) ?? end
+        return ShareMetricsBuilder.build(
+            sessions: sessions,
+            parsedStats: parsedStats,
+            providerKind: provider.kind,
+            scope: .yearly,
+            interval: DateInterval(start: baselineStart, end: end),
+            scopeLabel: LanguageManager.localizedString("share.scope.lastYear")
+        )
+    }
+
+    private func shareBaselineLookbackDays(for periodType: StatsPeriod, fallback: Int) -> Int {
+        switch periodType {
+        case .daily:
+            return 14
+        case .weekly:
+            return 56
+        case .monthly:
+            return 365
+        case .yearly:
+            return 730
+        }
+    }
+
     private func modelBreakdown(for periods: [PeriodStats]) -> [ModelUsage] {
         var combined: [String: ModelUsage] = [:]
         for period in periods {

@@ -4,14 +4,12 @@
 
 一款原生 macOS 菜单栏应用，用于实时查看 [Claude Code](https://docs.anthropic.com/en/docs/claude-code)、[Codex CLI](https://github.com/openai/codex) 和 Gemini CLI 的会话、订阅用量以及 Token / 费用统计。
 
-## v2.4.0 亮点
+## v2.5.0 亮点
 
-- **Provider 原生体验** — Claude Code、Codex CLI、Gemini CLI 都使用各自独立的会话扫描、transcript 解析、Usage 展示和恢复逻辑
-- **按 Provider 常驻后台解析** — 切换 Provider 不会中断其他 Provider 的解析或搜索索引重建
-- **Gemini Usage 对齐** — Gemini 现在支持按 Pro / Flash / Flash Lite 分组展示订阅用量、本地 Token 趋势，以及更合理的菜单栏额度文案
-- **更快更稳的索引链路** — Claude、Codex、Gemini 启动时统一走轻量搜索索引，不再为建索引执行完整 transcript UI 解析
-- **缓存与索引自愈** — 统计和 FTS 原子写入、启动时自动修复缺失索引、可疑解析结果自动重试和保护旧缓存
-- 安装检测：未安装 Provider 会根据当前 UI 场景自动隐藏或置灰
+- **可分享的统计卡片** — 基于会话数据生成精美的个性化分享图片，包含角色评分、成就徽章和证明指标
+- **多语言支持增强** — 扩展本地化覆盖范围，优化语言切换和多语言字符串管理
+- **菜单栏视图改进** — 更丰富的会话统计展示，内联信息更完善
+- **Statistics 视图优化** — 更清晰的周期摘要，Token 和费用展示更直观
 
 ![Claude Statistics 总览](screenshots/hero-overview.png)
 
@@ -143,6 +141,16 @@ Claude Statistics 会自动发现并解析会话数据：Claude Code 来自 `~/.
 - 从 macOS 钥匙串或 `~/.claude/.credentials.json` 检测 OAuth token
 - 诊断日志导出
 - 基于 Sparkle 的应用内更新检查
+
+### 分享卡片
+
+从你的会话分析中生成精美、可分享的统计卡片。
+
+- **个性化角色** — 10 种独特的分享角色（Vibe Coding King、Tool Summoner、Night Shift Engineer 等），各有专属渐变色、SF Symbols 图标和 mascot 场景
+- **成就徽章** — 11 种可解锁徽章，涵盖时间段、上下文、模型偏好、工具使用、成本效率、爆发使用等类别
+- **证明指标** — 基于数据的硬核证据展示你的顶级数据（Token 数、会话数、工具使用、成本效率等）
+- **QR 码集成** — 每张卡片包含 QR 码，方便分享或快速访问
+- **PNG 导出** — 以原生分辨率渲染并保存分享卡片，适合社交媒体或聊天分享
 
 ### UI 与交互细节
 

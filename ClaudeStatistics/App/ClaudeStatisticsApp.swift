@@ -95,6 +95,39 @@ final class AppState: ObservableObject {
         }
     }
 
+    func buildAllProvidersShareRoleResult() -> ShareRoleResult? {
+        let availableKinds = ProviderRegistry.availableProviders()
+        let stores = availableKinds.map { ensureProviderContext(for: $0).store }
+        let scopeLabel = LanguageManager.localizedString("share.scope.allProviders")
+        let metrics = stores.compactMap { store in
+            store.buildAllTimeShareMetrics(scopeLabel: scopeLabel)
+        }
+        guard !metrics.isEmpty else { return nil }
+
+        let end = Date()
+        let start = metrics.map(\.period.start).min() ?? end
+        guard let mergedMetrics = ShareMetricsBuilder.merge(
+            metrics,
+            scope: .yearly,
+            scopeLabel: scopeLabel,
+            period: DateInterval(start: start, end: end)
+        ) else {
+            return nil
+        }
+
+        let baselineMetrics = stores.compactMap { store in
+            store.buildAllTimeShareBaselineMetrics(end: end)
+        }
+        let baselineStart = Calendar.current.date(byAdding: .day, value: -365, to: end) ?? end
+        let mergedBaseline = ShareMetricsBuilder.merge(
+            baselineMetrics,
+            scope: .yearly,
+            scopeLabel: LanguageManager.localizedString("share.scope.lastYear"),
+            period: DateInterval(start: baselineStart, end: end)
+        )
+        return ShareRoleEngine.makeAllTimeRoleResult(metrics: mergedMetrics, baseline: mergedBaseline)
+    }
+
     private func configureUsageState(for provider: any SessionProvider) {
         usageViewModel.configure(source: provider.usageSource, usagePresentation: provider.usagePresentation)
         configureProfileLoader(for: provider)

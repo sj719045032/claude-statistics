@@ -159,8 +159,23 @@ struct MenuBarView: View {
                     }
                 }
                 Spacer()
-                if !visibleProviders.isEmpty {
-                    providerSwitcher
+                HStack(spacing: 8) {
+                    if visibleProviders.count > 1 {
+                        Button(action: openAllProvidersShare) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 10 * fontScale, weight: .semibold))
+                                Text("share.action.shareAllProviders")
+                                    .font(.system(size: 10 * fontScale, weight: .medium))
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                    }
+
+                    if !visibleProviders.isEmpty {
+                        providerSwitcher
+                    }
                 }
             }
             .padding(.horizontal, 12)
@@ -233,6 +248,11 @@ struct MenuBarView: View {
         if !selectedTab.isAvailable(for: appState.providerCapabilities) {
             selectedTab = visibleTabs.first ?? .sessions
         }
+    }
+
+    private func openAllProvidersShare() {
+        guard let result = appState.buildAllProvidersShareRoleResult() else { return }
+        SharePreviewWindowController.show(result: result, source: .allProviders)
     }
 }
 

@@ -95,14 +95,45 @@ struct StatisticsView: View {
 
     private var allTimeSummary: some View {
         SectionCard {
-            HStack(spacing: 12) {
-                summaryItem("stats.totalCost", value: formatCost(store.allTimeCost), icon: "dollarsign.circle", estimated: store.periodStats.contains { $0.hasEstimatedCost })
-                Divider().frame(height: 28)
-                summaryItem("stats.sessions", value: "\(store.allTimeSessions)", icon: "list.bullet")
-                Divider().frame(height: 28)
-                summaryItem("stats.tokens", value: TimeFormatter.tokenCount(store.allTimeTokens), icon: "number")
-                Divider().frame(height: 28)
-                summaryItem("stats.messages", value: "\(store.allTimeMessages)", icon: "message")
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Label {
+                        Text(verbatim: store.provider.displayName)
+                        Text(verbatim: " · ")
+                        Text("share.scope.allTime")
+                    } icon: {
+                        Image(systemName: "sparkles")
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    Button(action: openAllTimeSharePreview) {
+                        Label {
+                            Text("share.action.shareAll")
+                        } icon: {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                        .font(.system(size: 11, weight: .medium))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.blue)
+                    .disabled(store.allTimeSessions == 0)
+                }
+                .padding(.bottom, 2)
+
+                Divider()
+
+                HStack(spacing: 12) {
+                    summaryItem("stats.totalCost", value: formatCost(store.allTimeCost), icon: "dollarsign.circle", estimated: store.periodStats.contains { $0.hasEstimatedCost })
+                    Divider().frame(height: 28)
+                    summaryItem("stats.sessions", value: "\(store.allTimeSessions)", icon: "list.bullet")
+                    Divider().frame(height: 28)
+                    summaryItem("stats.tokens", value: TimeFormatter.tokenCount(store.allTimeTokens), icon: "number")
+                    Divider().frame(height: 28)
+                    summaryItem("stats.messages", value: "\(store.allTimeMessages)", icon: "message")
+                }
             }
         }
     }
@@ -265,6 +296,11 @@ struct StatisticsView: View {
 
     private func shortModel(_ id: String) -> String {
         id.replacingOccurrences(of: "claude-", with: "")
+    }
+
+    private func openAllTimeSharePreview() {
+        guard let result = store.buildAllTimeShareRoleResult() else { return }
+        SharePreviewWindowController.show(result: result, source: .providerAllTime)
     }
 }
 
@@ -639,6 +675,19 @@ struct PeriodDetailView: View {
 
                 Spacer()
 
+                if supportsShare {
+                    Button(action: openSharePreview) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 11, weight: .semibold))
+                            Text("share.action.share")
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.blue)
+                }
+
                 Text(stat.periodLabel)
                     .font(.system(size: 13, weight: .semibold))
             }
@@ -794,5 +843,14 @@ struct PeriodDetailView: View {
 
     private func shortModel(_ id: String) -> String {
         id.replacingOccurrences(of: "claude-", with: "")
+    }
+
+    private var supportsShare: Bool {
+        true
+    }
+
+    private func openSharePreview() {
+        guard let result = store.buildShareRoleResult(for: stat, periodType: periodType) else { return }
+        SharePreviewWindowController.show(result: result, source: .periodDetail)
     }
 }
