@@ -560,15 +560,20 @@ struct StatusLineInstaller {
 
         if [ -n "$rl_5h_pct" ] && [ -n "$rl_7d_pct" ]; then
           python3 -c "
-        import json
+        import json, os, time
         from datetime import datetime, timezone
 
         def ts_to_iso(ts):
             return datetime.fromtimestamp(int(ts), tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
+        now_ts = int(time.time())
         stdin_5h = float('$rl_5h_pct')
         stdin_7d = float('$rl_7d_pct')
+        stdin_5h_r = int('$rl_5h_reset')
+        stdin_7d_r = int('$rl_7d_reset')
 
+        # --- Update usage-cache.json ---
+        # Fix: update on value increase OR window reset (resets_at change)
         try:
             with open('$APP_USAGE_CACHE') as f:
                 out = json.load(f)
@@ -577,17 +582,42 @@ struct StatusLineInstaller {
 
         data = out.get('data', {})
 
-        existing_5h = data.get('five_hour', {}).get('utilization', -1)
-        if stdin_5h > existing_5h:
-            data['five_hour'] = {'utilization': stdin_5h, 'resets_at': ts_to_iso('$rl_5h_reset')}
+        new_5h_r = ts_to_iso(stdin_5h_r)
+        if stdin_5h > data.get('five_hour', {}).get('utilization', -1) or new_5h_r != data.get('five_hour', {}).get('resets_at', ''):
+            data['five_hour'] = {'utilization': stdin_5h, 'resets_at': new_5h_r}
 
-        existing_7d = data.get('seven_day', {}).get('utilization', -1)
-        if stdin_7d > existing_7d:
-            data['seven_day'] = {'utilization': stdin_7d, 'resets_at': ts_to_iso('$rl_7d_reset')}
+        new_7d_r = ts_to_iso(stdin_7d_r)
+        if stdin_7d > data.get('seven_day', {}).get('utilization', -1) or new_7d_r != data.get('seven_day', {}).get('resets_at', ''):
+            data['seven_day'] = {'utilization': stdin_7d, 'resets_at': new_7d_r}
 
         out['data'] = data
         with open('$APP_USAGE_CACHE', 'w') as f:
             json.dump(out, f)
+
+        # --- Append to usage-history.jsonl ---
+        # Dedup: skip if same values within 5 minutes
+        history_path = os.path.expanduser('~/.claude-statistics/usage-history.jsonl')
+        entry = {'ts': now_ts, 'fh': stdin_5h, 'fh_r': stdin_5h_r, 'sd': stdin_7d, 'sd_r': stdin_7d_r}
+
+        should_append = True
+        try:
+            with open(history_path, 'rb') as f:
+                f.seek(0, 2)
+                size = f.tell()
+                if size > 0:
+                    f.seek(max(0, size - 256))
+                    last_line = f.read().decode('utf-8', errors='ignore').strip().split('\\n')[-1]
+                    last = json.loads(last_line)
+                    if (now_ts - last.get('ts', 0) < 300 and
+                            last.get('fh') == stdin_5h and last.get('sd') == stdin_7d and
+                            last.get('fh_r') == stdin_5h_r and last.get('sd_r') == stdin_7d_r):
+                        should_append = False
+        except:
+            pass
+
+        if should_append:
+            with open(history_path, 'a') as f:
+                f.write(json.dumps(entry) + '\\n')
         " 2>/dev/null
         fi
 

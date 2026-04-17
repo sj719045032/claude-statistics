@@ -141,6 +141,7 @@ protocol ProviderUsageSource {
 
 extension ProviderUsageSource {
     var dashboardURL: URL? { nil }
+    var historyStore: UsageHistoryStore? { nil }
 
     func refreshCredentials() async -> Bool {
         false

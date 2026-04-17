@@ -153,6 +153,8 @@ final class UsageAPIService: ProviderUsageSource {
         return try JSONDecoder().decode(UserProfile.self, from: data)
     }
 
+    var historyStore: UsageHistoryStore? { UsageHistoryStore.shared }
+
     // MARK: - Cache
 
     func loadFromCache() -> (data: UsageData, fetchedAt: Date)? {
