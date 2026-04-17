@@ -11,6 +11,7 @@ struct SessionDetailView: View {
     let isLoading: Bool
     let onNewSession: () -> Void
     let onResume: () -> Void
+    let resumeCommand: String
     let loadTrendData: (TrendGranularity) async -> [TrendDataPoint]
     let onBack: () -> Void
     var onDelete: (() -> Void)? = nil
@@ -90,7 +91,7 @@ struct SessionDetailView: View {
                                 .font(.system(size: 10, design: .monospaced))
                                 .foregroundStyle(.tertiary)
                                 .lineLimit(1)
-                            CopyButton(text: session.externalID, help: "detail.copyId")
+                            CopyButton(text: resumeCommand, help: "detail.copyResumeCommand")
                         }
                         if let sessionName, !sessionName.isEmpty {
                             Text(sessionName)

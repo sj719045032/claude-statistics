@@ -127,7 +127,7 @@ struct SessionStats: Codable {
 
     var contextWindowSize: Int {
         let m = model.lowercased()
-        if m.contains("opus-4-6") || m.contains("sonnet-4-6") || m.contains("opus-4-5") || m.contains("sonnet-4-5") {
+        if m.contains("opus-4-7") || m.contains("opus-4-6") {
             return 1_000_000
         }
         return 200_000
@@ -459,6 +459,11 @@ final class ModelPricing {
             if lower.contains("flash") { return models["gemini-2.5-flash"] ?? defaultPricing }
             if lower.contains("pro") { return models["gemini-2.5-pro"] ?? defaultPricing }
         }
+        if lower.contains("opus-4-7") { return models["claude-opus-4-7"] ?? defaultPricing }
+        if lower.contains("opus-4-6") { return models["claude-opus-4-6"] ?? defaultPricing }
+        if lower.contains("opus-4-5") { return models["claude-opus-4-5-20251101"] ?? defaultPricing }
+        if lower.contains("opus-4-1") { return models["claude-opus-4-1-20250805"] ?? defaultPricing }
+        if lower.contains("opus-4") { return models["claude-opus-4-20250514"] ?? defaultPricing }
         if lower.contains("opus") { return models.first { $0.key.contains("opus") }?.value ?? defaultPricing }
         if lower.contains("haiku") { return models.first { $0.key.contains("haiku") }?.value ?? defaultPricing }
         if lower.contains("sonnet") { return models.first { $0.key.contains("sonnet") }?.value ?? defaultPricing }

@@ -10,6 +10,7 @@ struct SettingsView: View {
     @AppStorage("autoRefreshEnabled") private var autoRefreshEnabled = false
     @AppStorage("refreshInterval") private var refreshInterval = 300.0
     @AppStorage("preferredTerminal") private var preferredTerminal = "Auto"
+    @AppStorage("preferredEditor") private var preferredEditor = "VSCode"
     @AppStorage("appLanguage") private var appLanguage = "auto"
     @AppStorage("fontScale") private var fontScale = 1.0
     @AppStorage("customInterval") private var customInterval = false
@@ -66,6 +67,22 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.menu)
                 .font(.system(size: 12))
+
+                if preferredTerminal == "Editor" {
+                    Picker("settings.chooseEditor", selection: $preferredEditor) {
+                        ForEach(EditorApp.allCases) { app in
+                            if !app.isInstalled {
+                                Text("settings.notFound \(app.rawValue)")
+                                    .tag(app.rawValue)
+                            } else {
+                                Text(app.rawValue)
+                                    .tag(app.rawValue)
+                            }
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .font(.system(size: 12))
+                }
 
                 Toggle("settings.launchAtLogin", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, newValue in

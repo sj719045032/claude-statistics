@@ -9,6 +9,7 @@ enum TerminalApp: String, CaseIterable, Identifiable {
     case warp = "Warp"
     case kitty = "Kitty"
     case alacritty = "Alacritty"
+    case editor = "Editor"
 
     var id: String { rawValue }
 
@@ -31,13 +32,58 @@ enum TerminalApp: String, CaseIterable, Identifiable {
         case .warp: return NSWorkspace.shared.urlForApplication(withBundleIdentifier: "dev.warp.Warp-Stable") != nil
         case .kitty: return FileManager.default.fileExists(atPath: "/Applications/kitty.app")
         case .alacritty: return FileManager.default.fileExists(atPath: "/Applications/Alacritty.app")
+        case .editor: return true // always available; falls back to copy-only if no editor app is installed
         }
+    }
+}
+
+enum EditorApp: String, CaseIterable, Identifiable {
+    case vscode = "VSCode"
+    case cursor = "Cursor"
+    case windsurf = "Windsurf"
+    case trae = "Trae"
+
+    var id: String { rawValue }
+
+    var bundleId: String {
+        switch self {
+        case .vscode:   return "com.microsoft.VSCode"
+        case .cursor:   return "com.todesktop.230313mzl4w4u92"
+        case .windsurf: return "com.exafunction.windsurf"
+        case .trae:     return "com.trae.app"
+        }
+    }
+
+    var appURL: URL? {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId)
+    }
+
+    var isInstalled: Bool { appURL != nil }
+
+    static var preferred: EditorApp {
+        let raw = UserDefaults.standard.string(forKey: "preferredEditor") ?? "VSCode"
+        return EditorApp(rawValue: raw) ?? .vscode
+    }
+
+    static func setPreferred(_ app: EditorApp) {
+        UserDefaults.standard.set(app.rawValue, forKey: "preferredEditor")
+    }
+
+    /// Localized toast shown after copying the resume command (format: "Copied · Paste in <Editor> terminal (⌘V)")
+    static var resumeCopiedToastMessage: String {
+        String(format: NSLocalizedString("detail.resumeCopiedHint %@", comment: ""), Self.preferred.rawValue)
     }
 }
 
 enum TerminalLauncher {
     static func launch(executable: String, arguments: [String], cwd: String) {
         launchInTerminal(cwd: cwd, executable: executable, arguments: arguments)
+    }
+
+    /// Build the same `cd … && <cmd>` string used when launching a terminal, so it can be
+    /// copied to the clipboard and pasted into any shell (including VSCode's integrated terminal).
+    static func buildCommand(cwd: String, executable: String, arguments: [String]) -> String {
+        "cd \(shellEscape(cwd)) && \(shellCommand(executable: executable, arguments: arguments))"
     }
 
     private static func launchInTerminal(cwd: String, executable: String, arguments: [String]) {
@@ -67,7 +113,24 @@ enum TerminalLauncher {
             openInKitty(command: commandOnly, cwd: cwd)
         case .alacritty:
             openInAlacritty(command: commandOnly, cwd: cwd)
+        case .editor:
+            copyAndOpenInEditor(cwd: cwd, executable: executable, arguments: arguments)
         }
+    }
+
+    // MARK: - Editor (copy resume command + open project in external editor)
+
+    private static func copyAndOpenInEditor(cwd: String, executable: String, arguments: [String]) {
+        let cmd = buildCommand(cwd: cwd, executable: executable, arguments: arguments)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(cmd, forType: .string)
+
+        guard let editorURL = EditorApp.preferred.appURL else { return }
+        NSWorkspace.shared.open(
+            [URL(fileURLWithPath: cwd)],
+            withApplicationAt: editorURL,
+            configuration: NSWorkspace.OpenConfiguration()
+        )
     }
 
     // MARK: - Ghostty

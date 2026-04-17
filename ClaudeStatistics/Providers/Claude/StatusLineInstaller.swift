@@ -244,6 +244,7 @@ struct StatusLineInstaller {
 
         # Fallback pricing per million tokens: (input, output, cache_write_1h, cache_read)
         FALLBACK = {
+            "opus-4-7":   (5.0,  25.0, 10.0,  0.50),
             "opus-4-6":   (5.0,  25.0, 10.0,  0.50),
             "opus-4-5":   (5.0,  25.0, 10.0,  0.50),
             "opus-4-1":   (15.0, 75.0, 30.0,  1.50),

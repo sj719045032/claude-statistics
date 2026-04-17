@@ -24,6 +24,7 @@ private func costColor(_ cost: Double) -> Color {
 struct SessionListView: View {
     @ObservedObject var viewModel: SessionViewModel
     @ObservedObject var store: SessionDataStore
+    @EnvironmentObject var toastCenter: ToastCenter
     @State private var showDeleteConfirm = false
     @State private var deleteTarget: Set<String> = []
     @State private var selectedProjectForAnalytics: ProjectGroup?
@@ -166,7 +167,12 @@ struct SessionListView: View {
                                 isSelected: viewModel.selectedSession?.id == session.id,
                                 onTap: { viewModel.selectSession(session) },
                                 onNewSession: { viewModel.openNewSession(session) },
-                                onResume: { viewModel.resumeSession(session) },
+                                onResume: {
+                                    viewModel.resumeSession(session)
+                                    if TerminalApp.preferred == .editor {
+                                        toastCenter.show(EditorApp.resumeCopiedToastMessage)
+                                    }
+                                },
                                 onViewTranscript: { viewModel.openTranscript(for: session) }
                             )
                             .id("recent-\(session.id)")
@@ -225,7 +231,12 @@ struct SessionListView: View {
                                         }
                                     },
                                     onNewSession: { viewModel.openNewSession(session) },
-                                    onResume: { viewModel.resumeSession(session) },
+                                    onResume: {
+                                        viewModel.resumeSession(session)
+                                        if TerminalApp.preferred == .editor {
+                                            toastCenter.show(EditorApp.resumeCopiedToastMessage)
+                                        }
+                                    },
                                     onDelete: {
                                         deleteTarget = [session.id]
                                         showDeleteConfirm = true

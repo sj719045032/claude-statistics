@@ -31,6 +31,8 @@
 "detail.back" = "Back";
 "detail.copyPath" = "Copy path";
 "detail.copyId" = "Copy session ID";
+"detail.copyResumeCommand" = "Copy resume command";
+"detail.resumeCopiedHint %@" = "Copied · Paste in %@ terminal (⌘V)";
 "detail.new" = "New";
 "detail.resume" = "Resume";
 "detail.parsing" = "Parsing...";
@@ -127,6 +129,7 @@
 "settings.launchAtLogin" = "Launch at login";
 "settings.terminal" = "Terminal";
 "settings.resumeIn" = "Resume in";
+"settings.chooseEditor" = "Editor app";
 "settings.notFound %@" = "%@ (not found)";
 "settings.pricing" = "Pricing";
 "settings.managePricing" = "Manage Model Pricing";

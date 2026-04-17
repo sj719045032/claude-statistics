@@ -252,6 +252,10 @@ final class SessionViewModel: ObservableObject {
         store.provider.resumeSession(session)
     }
 
+    func resumeCommand(for session: Session) -> String {
+        store.provider.resumeCommand(for: session)
+    }
+
     func openNewSession(inDirectory path: String) {
         store.provider.openNewSession(inDirectory: path)
     }

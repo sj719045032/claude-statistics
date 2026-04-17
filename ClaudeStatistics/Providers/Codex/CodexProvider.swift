@@ -64,6 +64,12 @@ final class CodexProvider: SessionProvider, @unchecked Sendable {
         TerminalLauncher.launch(executable: "codex", arguments: ["resume", session.externalID], cwd: resolvedProjectPath(for: session))
     }
 
+    func resumeCommand(for session: Session) -> String {
+        TerminalLauncher.buildCommand(cwd: resolvedProjectPath(for: session),
+                                      executable: "codex",
+                                      arguments: ["resume", session.externalID])
+    }
+
     func openNewSession(inDirectory path: String) {
         TerminalLauncher.launch(executable: "codex", arguments: [], cwd: path)
     }

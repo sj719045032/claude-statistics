@@ -85,6 +85,12 @@ final class GeminiProvider: SessionProvider, @unchecked Sendable {
         TerminalLauncher.launch(executable: "gemini", arguments: ["resume", session.externalID], cwd: resolvedProjectPath(for: session))
     }
 
+    func resumeCommand(for session: Session) -> String {
+        TerminalLauncher.buildCommand(cwd: resolvedProjectPath(for: session),
+                                      executable: "gemini",
+                                      arguments: ["resume", session.externalID])
+    }
+
     func openNewSession(inDirectory path: String) {
         TerminalLauncher.launch(executable: "gemini", arguments: [], cwd: path)
     }

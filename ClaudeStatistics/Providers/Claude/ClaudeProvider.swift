@@ -76,6 +76,12 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
         TerminalLauncher.launch(executable: "claude", arguments: ["--resume", session.externalID], cwd: resolvedProjectPath(for: session))
     }
 
+    func resumeCommand(for session: Session) -> String {
+        TerminalLauncher.buildCommand(cwd: resolvedProjectPath(for: session),
+                                      executable: "claude",
+                                      arguments: ["--resume", session.externalID])
+    }
+
     func openNewSession(inDirectory path: String) {
         TerminalLauncher.launch(executable: "claude", arguments: [], cwd: path)
     }
@@ -95,6 +101,7 @@ struct ClaudeStatusLineAdapter: StatusLineInstalling {
 enum ClaudePricingCatalog {
     // Source: Anthropic Claude pricing (2026-03-20)
     static let builtinModels: [String: ModelPricing.Pricing] = [
+        "claude-opus-4-7":            ModelPricing.Pricing(input: 5.0, output: 25.0, cacheWrite5m: 6.25, cacheWrite1h: 10.0, cacheRead: 0.50),
         "claude-opus-4-6":            ModelPricing.Pricing(input: 5.0, output: 25.0, cacheWrite5m: 6.25, cacheWrite1h: 10.0, cacheRead: 0.50),
         "claude-opus-4-5-20251101":   ModelPricing.Pricing(input: 5.0, output: 25.0, cacheWrite5m: 6.25, cacheWrite1h: 10.0, cacheRead: 0.50),
         "claude-opus-4-1-20250805":   ModelPricing.Pricing(input: 15.0, output: 75.0, cacheWrite5m: 18.75, cacheWrite1h: 30.0, cacheRead: 1.50),

@@ -64,6 +64,7 @@ struct MenuBarView: View {
     @State private var tabOrder: [AppTab] = AppTab.loadOrder()
     @AppStorage("fontScale") private var fontScale = 1.0
     @Namespace private var tabNamespace
+    @StateObject private var toastCenter = ToastCenter()
 
     private var visibleTabs: [AppTab] {
         tabOrder.filter { $0.isAvailable(for: appState.providerCapabilities) }
@@ -184,6 +185,15 @@ struct MenuBarView: View {
             .animation(.easeInOut(duration: 0.3), value: store.parseProgress)
         }
         .frame(minWidth: 480, maxWidth: 800, minHeight: 520, maxHeight: 900)
+        .environmentObject(toastCenter)
+        .overlay(alignment: .top) {
+            if let msg = toastCenter.message {
+                ToastView(message: msg)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .allowsHitTesting(false)
+            }
+        }
         .onAppear { ensureSelectedTabIsAvailable() }
         .onChange(of: appState.providerKind) { _, _ in
             ensureSelectedTabIsAvailable()
@@ -227,7 +237,13 @@ struct MenuBarView: View {
                 stats: sessionViewModel.selectedSessionStats,
                 isLoading: sessionViewModel.isLoadingStats,
                 onNewSession: { sessionViewModel.openNewSession(session) },
-                onResume: { sessionViewModel.resumeSession(session) },
+                onResume: {
+                    sessionViewModel.resumeSession(session)
+                    if TerminalApp.preferred == .editor {
+                        toastCenter.show(EditorApp.resumeCopiedToastMessage)
+                    }
+                },
+                resumeCommand: sessionViewModel.resumeCommand(for: session),
                 loadTrendData: { granularity in
                     await sessionViewModel.loadTrendData(for: session, granularity: granularity)
                 },
@@ -351,5 +367,42 @@ struct PanelContentView: View {
             updaterService: appState.updaterService
         )
         .environment(\.locale, currentLocale)
+    }
+}
+
+// MARK: - Toast
+
+final class ToastCenter: ObservableObject {
+    @Published var message: String?
+    private var dismissTask: Task<Void, Never>?
+
+    @MainActor
+    func show(_ msg: String, duration: TimeInterval = 1.5) {
+        dismissTask?.cancel()
+        withAnimation(.easeOut(duration: 0.2)) { message = msg }
+        dismissTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                withAnimation(.easeIn(duration: 0.2)) { self?.message = nil }
+            }
+        }
+    }
+}
+
+struct ToastView: View {
+    let message: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+            Text(message)
+                .font(.system(size: 12))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+        .shadow(radius: 4)
     }
 }

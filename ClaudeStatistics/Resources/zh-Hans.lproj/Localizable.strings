@@ -31,6 +31,8 @@
 "detail.back" = "返回";
 "detail.copyPath" = "复制路径";
 "detail.copyId" = "复制会话 ID";
+"detail.copyResumeCommand" = "复制恢复命令";
+"detail.resumeCopiedHint %@" = "已复制 · 到 %@ 终端 ⌘V 粘贴";
 "detail.new" = "新建";
 "detail.resume" = "恢复";
 "detail.parsing" = "解析中…";
@@ -127,6 +129,7 @@
 "settings.launchAtLogin" = "开机自动启动";
 "settings.terminal" = "终端";
 "settings.resumeIn" = "恢复终端";
+"settings.chooseEditor" = "编辑器";
 "settings.notFound %@" = "%@（未找到）";
 "settings.pricing" = "定价";
 "settings.managePricing" = "管理模型定价";

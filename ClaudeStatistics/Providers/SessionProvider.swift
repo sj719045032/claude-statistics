@@ -211,6 +211,7 @@ protocol SessionProvider: Sendable {
     func openNewSession(_ session: Session)
     func resumeSession(_ session: Session)
     func openNewSession(inDirectory path: String)
+    func resumeCommand(for session: Session) -> String
 
     func fetchProfile() async -> UserProfile?
 }
