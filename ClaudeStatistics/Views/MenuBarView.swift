@@ -63,6 +63,7 @@ struct MenuBarView: View {
     @State private var selectedTab: AppTab = AppTab.loadOrder().first ?? .sessions
     @State private var tabOrder: [AppTab] = AppTab.loadOrder()
     @AppStorage("fontScale") private var fontScale = 1.0
+    @AppStorage("ignoredUpdateVersion") private var ignoredUpdateVersion = ""
     @Namespace private var tabNamespace
     @StateObject private var toastCenter = ToastCenter()
 
@@ -99,6 +100,14 @@ struct MenuBarView: View {
 
             Divider()
                 .padding(.top, 4)
+
+            if let version = updaterService.availableVersion, version != ignoredUpdateVersion {
+                UpdateBanner(
+                    version: version,
+                    onInstall: { updaterService.checkForUpdates() },
+                    onDismiss: { ignoredUpdateVersion = version }
+                )
+            }
 
             // Content
             GeometryReader { geo in
@@ -404,5 +413,59 @@ struct ToastView: View {
         .padding(.vertical, 8)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
         .shadow(radius: 4)
+    }
+}
+
+// MARK: - Update Banner
+
+struct UpdateBanner: View {
+    let version: String
+    let onInstall: () -> Void
+    let onDismiss: () -> Void
+
+    private var releaseURL: URL {
+        URL(string: "https://github.com/sj719045032/claude-statistics/releases/tag/v\(version)")!
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(.blue)
+
+            Text(String(format: NSLocalizedString("update.banner.available %@", comment: ""), "v\(version)"))
+                .font(.system(size: 12, weight: .medium))
+
+            Spacer()
+
+            Link(destination: releaseURL) {
+                HStack(spacing: 2) {
+                    Text("update.banner.notes")
+                        .font(.system(size: 11))
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 9))
+                }
+            }
+            .foregroundStyle(.blue)
+
+            Button(action: onInstall) {
+                Text("update.banner.install")
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+
+            Button(action: onDismiss) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(Text("update.banner.dismiss"))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color.blue.opacity(0.08))
+        .overlay(alignment: .bottom) { Divider() }
     }
 }

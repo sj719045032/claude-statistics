@@ -33,6 +33,10 @@
 "detail.copyId" = "复制会话 ID";
 "detail.copyResumeCommand" = "复制恢复命令";
 "detail.resumeCopiedHint %@" = "已复制 · 到 %@ 终端 ⌘V 粘贴";
+"update.banner.available %@" = "%@ 可用";
+"update.banner.notes" = "查看更新";
+"update.banner.install" = "立即更新";
+"update.banner.dismiss" = "忽略此版本";
 "detail.new" = "新建";
 "detail.resume" = "恢复";
 "detail.parsing" = "解析中…";

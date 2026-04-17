@@ -33,6 +33,10 @@
 "detail.copyId" = "Copy session ID";
 "detail.copyResumeCommand" = "Copy resume command";
 "detail.resumeCopiedHint %@" = "Copied · Paste in %@ terminal (⌘V)";
+"update.banner.available %@" = "%@ available";
+"update.banner.notes" = "Release notes";
+"update.banner.install" = "Install now";
+"update.banner.dismiss" = "Dismiss this version";
 "detail.new" = "New";
 "detail.resume" = "Resume";
 "detail.parsing" = "Parsing...";
