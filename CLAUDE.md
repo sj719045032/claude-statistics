@@ -39,3 +39,4 @@ gh auth switch --hostname github.com --user tinystone007
 - GitHub release must be published under `sj719045032` account (repo owner)
 - If `gh release create` fails with workflow scope error: `gh auth refresh -h github.com -s workflow`
 - DMG is not Apple signed/notarized. Users run: `xattr -cr /Applications/Claude\ Statistics.app`
+- **Release notes must be bilingual**: English section followed by `## 中文` section. Applies to every release.
