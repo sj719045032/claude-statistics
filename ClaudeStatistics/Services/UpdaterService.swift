@@ -67,6 +67,13 @@ final class UpdaterService: ObservableObject {
             .assign(to: &$canCheckForUpdates)
 
         try? controller.updater.start()
+
+        // Probe at launch to bypass Sparkle's SULastCheckTime throttle — otherwise
+        // users who relaunch within SUScheduledCheckInterval never see new versions.
+        // GentleReminderDelegate suppresses popups; only the menu-bar badge lights up.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            self?.controller.updater.checkForUpdatesInBackground()
+        }
     }
 
     func checkForUpdates() {
