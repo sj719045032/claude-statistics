@@ -1,0 +1,21 @@
+---
+import { getAlternateLanguage, type Language, siteCopy } from "../content/site";
+
+interface Props {
+  language: Language;
+}
+
+const { language } = Astro.props;
+const alternate = getAlternateLanguage(language);
+const copy = siteCopy[language];
+---
+
+<a
+  class="button button-ghost lang-switch shrink-0"
+  href={`/${alternate}/`}
+  data-language-switch
+  data-target-language={alternate}
+  aria-label={`${copy.switchLabel} / ${siteCopy[alternate].langLabel}`}
+>
+  {copy.switchLabel}
+</a>

@@ -49,3 +49,5 @@ Podfile.lock
 *.orig
 xcuserdata/
 .cs-launch
+.vercel
+node_modules/

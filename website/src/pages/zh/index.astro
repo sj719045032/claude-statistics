@@ -1,0 +1,40 @@
+---
+import HomePage from "../../components/HomePage.astro";
+import LanguageSwitch from "../../components/LanguageSwitch.astro";
+import SiteLayout from "../../layouts/SiteLayout.astro";
+import { siteCopy } from "../../content/site";
+
+const language = "zh" as const;
+const copy = siteCopy[language];
+---
+
+<SiteLayout language={language} currentPath="/zh/">
+  <Fragment slot="header">
+    <header class="site-header">
+      <a class="brand group" href="#top" aria-label="Claude Statistics 首页">
+        <img src="/icon.svg" alt="" />
+        <span>Claude Statistics</span>
+      </a>
+      <nav class="site-nav max-md:w-full max-md:flex-wrap" aria-label="Primary">
+        <a href="#features">{copy.nav.features}</a>
+        <a href="#capabilities">{copy.nav.capabilities}</a>
+        <a href="#accounts">{copy.nav.accounts}</a>
+        <a href="#gallery">{copy.nav.gallery}</a>
+        <a href="#download">{copy.nav.download}</a>
+      </nav>
+      <div class="header-actions max-md:w-full max-md:justify-between">
+        <LanguageSwitch language={language} />
+        <a class="button button-ghost" href="https://github.com/sj719045032/claude-statistics">{copy.common.github}</a>
+      </div>
+    </header>
+  </Fragment>
+
+  <HomePage language={language} />
+
+  <Fragment slot="footer">
+    <footer class="site-footer">
+      <p>{copy.footer.left}</p>
+      <p>{copy.footer.right}</p>
+    </footer>
+  </Fragment>
+</SiteLayout>

@@ -1,0 +1,79 @@
+---
+import "../styles/global.css";
+import { languages, type Language, siteCopy } from "../content/site";
+import LanguageSwitch from "../components/LanguageSwitch.astro";
+
+interface Props {
+  language: Language;
+  currentPath: string;
+}
+
+const { language, currentPath } = Astro.props;
+const copy = siteCopy[language];
+const alternateLinks = languages
+  .filter((item) => item !== language)
+  .map((item) => ({ lang: item, href: currentPath.replace(`/${language}/`, `/${item}/`) }));
+---
+
+<!doctype html>
+<html lang={language}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{copy.meta.title}</title>
+    <meta name="description" content={copy.meta.description} />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap"
+      rel="stylesheet"
+    />
+    <meta property="og:title" content={copy.meta.title} />
+    <meta property="og:description" content={copy.meta.description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/docs/screenshots/hero-overview.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script is:inline>
+      (() => {
+        const root = document.documentElement;
+        const stored = localStorage.getItem("claude-statistics-site-language");
+        if (stored) root.dataset.preferredLanguage = stored;
+      })();
+    </script>
+    {alternateLinks.map((link) => <link rel="alternate" hreflang={link.lang} href={link.href} />)}
+  </head>
+  <body>
+    <div class="page-shell">
+      <div class="ambient ambient-a"></div>
+      <div class="ambient ambient-b"></div>
+      <slot name="header" />
+      <slot />
+      <slot name="footer" />
+    </div>
+    <script is:inline define:vars={{ language }}>
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("is-visible");
+              observer.unobserve(entry.target);
+            }
+          });
+        },
+        { threshold: 0.18 }
+      );
+
+      document.querySelectorAll(".reveal").forEach((element, index) => {
+        element.style.transitionDelay = `${Math.min(index * 55, 240)}ms`;
+        observer.observe(element);
+      });
+
+      document.querySelectorAll("[data-language-switch]").forEach((element) => {
+        element.addEventListener("click", () => {
+          localStorage.setItem("claude-statistics-site-language", element.dataset.targetLanguage || language);
+        });
+      });
+    </script>
+  </body>
+</html>

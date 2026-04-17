@@ -1,0 +1,283 @@
+---
+import type { Language } from "../content/site";
+import { siteCopy } from "../content/site";
+
+interface Props {
+  language: Language;
+}
+
+const { language } = Astro.props;
+const copy = siteCopy[language];
+const galleryShowcase = [
+  {
+    src: "/ScreenShot_2026-04-18_011500_222.png",
+    alt: "All-time analytics view",
+    label: language === "zh" ? "全时段分析" : "All-time analytics",
+    caption: copy.gallery.items[1]?.caption,
+    featured: true
+  },
+  {
+    src: "/ScreenShot_2026-04-18_011545_649.png",
+    alt: "Share preview card",
+    label: language === "zh" ? "分享卡" : "Share preview",
+    caption:
+      language === "zh"
+        ? "角色卡、徽章、二维码和导出动作都收进一张可分享的成果卡里。"
+        : "Role cards, badges, QR code, and export actions in one polished share asset."
+  },
+  {
+    src: "/ScreenShot_2026-04-18_011643_667.png",
+    alt: "Settings and account switcher",
+    label: language === "zh" ? "账号与设置" : "Accounts and settings",
+    caption:
+      language === "zh"
+        ? "账号切换、自动刷新、语言和字号偏好都在同一个设置面板完成。"
+        : "Account switching, auto-refresh, language, and font preferences stay in one settings panel."
+  },
+  {
+    src: "/docs/screenshots/transcript-search.png",
+    alt: copy.gallery.items[3]?.alt,
+    label: language === "zh" ? "Transcript 搜索" : "Transcript search",
+    caption: copy.gallery.items[3]?.caption
+  }
+];
+---
+
+<main id="top" class="relative">
+  <section class="hero">
+    <div class="hero-copy max-w-3xl">
+      <p class="eyebrow">{copy.hero.eyebrow}</p>
+      <h1>{copy.hero.title}</h1>
+      <p class="hero-text">{copy.hero.text}</p>
+      <div class="hero-actions items-center">
+        <a class="button button-primary" href="https://github.com/sj719045032/claude-statistics/releases">
+          {copy.common.release}
+        </a>
+        <a class="button button-secondary" href="#gallery">{copy.common.screenshots}</a>
+      </div>
+      <ul class="hero-points" aria-label="Highlights">
+        {copy.hero.points.map((point) => <li>{point}</li>)}
+      </ul>
+    </div>
+
+    <div class="hero-stage" aria-hidden="true">
+      <div class="orbital-card orbital-summary">
+        <span class="pill pill-warm">{copy.common.allProviders}</span>
+        <strong>{copy.hero.summaryTitle}</strong>
+        <p>{copy.hero.summaryText}</p>
+      </div>
+      <div class="hero-shot frame hero-primary-shot">
+        <img src="/ScreenShot_2026-04-18_011500_222.png" alt={copy.gallery.items[0]?.alt} loading="eager" />
+      </div>
+      <div class="hero-shot frame hero-secondary-shot">
+        <img src="/ScreenShot_2026-04-18_011604_254.png" alt={copy.gallery.items[4]?.alt} loading="eager" />
+      </div>
+      <div class="orbital-card orbital-usage">
+        <span class="tiny-label">{copy.common.usageWindows}</span>
+        <div class="bar-stack">
+          <span style="--fill: 78%"></span>
+          <span style="--fill: 52%"></span>
+          <span style="--fill: 31%"></span>
+        </div>
+        <strong>{copy.hero.usageTitle}</strong>
+      </div>
+      <div class="hero-shot frame hero-tertiary-shot">
+        <img src="/ScreenShot_2026-04-18_011545_649.png" alt={copy.gallery.items[3]?.alt} loading="eager" />
+      </div>
+      <div class="orbital-card orbital-floating">
+        <span class="tiny-label">{copy.common.localFirst}</span>
+        <strong>{copy.hero.floatingTitle}</strong>
+      </div>
+    </div>
+  </section>
+
+  <section class="stats-ribbon" aria-label="Product proof points">
+    {copy.proofStats.map((item) => (
+      <div>
+        <span class="stat-value">{item.value}</span>
+        <span class="stat-label">{item.label}</span>
+      </div>
+    ))}
+  </section>
+
+  <section class="feature-grid" id="features">
+    <div class="feature-shell">
+      <div class="section-heading feature-heading">
+        <p class="eyebrow">{copy.features.eyebrow}</p>
+        <h2>{copy.features.title}</h2>
+        <p class="section-support">{copy.hero.text}</p>
+        <div class="feature-facts">
+          {copy.proofStats.slice(0, 2).map((item) => (
+            <div class="feature-fact">
+              <span class="feature-fact-value">{item.value}</span>
+              <span class="feature-fact-label">{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div class="bento-grid">
+      {copy.features.cards.map((card) => (
+        <article
+          class:list={[
+            "bento-card",
+            "reveal",
+            "transition-transform duration-300 md:hover:-translate-y-1",
+            card.large && "bento-large",
+            card.accent && "bento-accent"
+          ]}
+        >
+          <p class="card-kicker">{card.kicker}</p>
+          <h3>{card.title}</h3>
+          <p>{card.text}</p>
+        </article>
+      ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="capabilities" id="capabilities">
+    <div class="section-heading section-heading-compact">
+      <p class="eyebrow">{copy.capabilities.eyebrow}</p>
+      <h2>{copy.capabilities.title}</h2>
+    </div>
+    <div class="capability-grid capability-panel">
+      {copy.capabilities.cards.map((card, index) => (
+        <article class="capability-card reveal transition-transform duration-300 md:hover:-translate-y-1">
+          <span class="card-index">0{index + 1}</span>
+          <p class="card-kicker">{card.kicker}</p>
+          <h3>{card.title}</h3>
+          <ul class="mini-list">
+            {card.items.map((item) => <li>{item}</li>)}
+          </ul>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="account-switch" id="accounts">
+    <div class="account-shell">
+      <div class="account-layout">
+        <div class="account-copy-stack">
+          <div class="section-heading section-heading-compact account-heading">
+            <p class="eyebrow">{copy.accounts.eyebrow}</p>
+            <h2>{copy.accounts.title}</h2>
+          </div>
+          <article class="account-copy reveal transition-transform duration-300 md:hover:-translate-y-1">
+            <p>{copy.accounts.text}</p>
+            <ul class="check-list">
+              {copy.accounts.items.map((item) => <li>{item}</li>)}
+            </ul>
+          </article>
+        </div>
+      <aside
+        class="account-demo reveal transition-transform duration-300 md:hover:-translate-y-1"
+        aria-label="Managed account switching preview"
+      >
+        <img
+          class="account-demo-image"
+          src="/ScreenShot_2026-04-18_011643_667.png"
+          alt="Settings view with account switching, auto refresh, and language controls"
+          loading="lazy"
+        />
+      </aside>
+      </div>
+    </div>
+  </section>
+
+  <section class="share-showcase">
+    <div class="share-shell">
+      <div class="section-heading section-heading-compact">
+        <p class="eyebrow">{copy.share.eyebrow}</p>
+        <h2>{copy.share.title}</h2>
+        <p class="section-support">{copy.share.text}</p>
+        <div class="share-metrics" aria-label="Share card proof points">
+          {copy.share.metrics.map((item) => (
+            <div class="share-metric">
+              <span class="share-metric-value">{item.value}</span>
+              <span class="share-metric-label">{item.label}</span>
+            </div>
+          ))}
+        </div>
+        <ul class="check-list">
+          {copy.share.items.map((item) => <li>{item}</li>)}
+        </ul>
+      </div>
+      <div class="share-stage reveal transition-transform duration-300 md:hover:-translate-y-1">
+        <div class="share-shot frame">
+          <img
+            class="share-shot-image"
+            src="/ScreenShot_2026-04-18_011545_649.png"
+            alt="Share preview card with role badge, proof metrics, QR code, and export actions"
+            loading="lazy"
+          />
+        </div>
+        <div class="share-note">
+          <span class="pill pill-warm">{copy.common.localFirst}</span>
+          <strong>{copy.features.cards[5]?.title}</strong>
+          <p>{copy.integrations.cards[3]?.text}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="integrations">
+    <div class="section-heading section-heading-compact">
+      <p class="eyebrow">{copy.integrations.eyebrow}</p>
+      <h2>{copy.integrations.title}</h2>
+    </div>
+    <div class="integrations-grid">
+      {copy.integrations.cards.map((card) => (
+        <article class="integration-card reveal transition-transform duration-300 md:hover:-translate-y-1">
+          <p class="card-kicker">{card.kicker}</p>
+          <h3>{card.title}</h3>
+          <p>{card.text}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="gallery" id="gallery">
+    <div class="section-heading section-heading-compact">
+      <p class="eyebrow">{copy.gallery.eyebrow}</p>
+      <h2>{copy.gallery.title}</h2>
+    </div>
+    <div class="gallery-shell">
+      <figure class="gallery-card gallery-feature reveal transition-transform duration-300 md:hover:-translate-y-1">
+        <img src={galleryShowcase[0].src} alt={galleryShowcase[0].alt} loading="lazy" />
+        <figcaption>
+          <span class="gallery-label">{galleryShowcase[0].label}</span>
+          <strong>{galleryShowcase[0].caption}</strong>
+        </figcaption>
+      </figure>
+      <div class="gallery-side">
+        {galleryShowcase.slice(1).map((item) => (
+          <figure class="gallery-card gallery-mini reveal transition-transform duration-300 md:hover:-translate-y-1">
+            <img src={item.src} alt={item.alt} loading="lazy" />
+            <figcaption>
+              <span class="gallery-label">{item.label}</span>
+              <strong>{item.caption}</strong>
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="cta" id="download">
+    <div class="cta-card relative overflow-hidden">
+      <div class="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[radial-gradient(circle,rgba(140,240,143,0.24),transparent_68%)] blur-xl"></div>
+      <div class="pointer-events-none absolute -bottom-20 left-10 h-52 w-52 rounded-full bg-[radial-gradient(circle,rgba(91,184,255,0.2),transparent_68%)] blur-xl"></div>
+      <p class="eyebrow">{copy.cta.eyebrow}</p>
+      <h2>{copy.cta.title}</h2>
+      <p>{copy.cta.text}</p>
+      <div class="hero-actions">
+        <a class="button button-primary" href="https://github.com/sj719045032/claude-statistics/releases">
+          {copy.common.release}
+        </a>
+        <a class="button button-secondary" href="https://github.com/sj719045032/claude-statistics">
+          {copy.common.source}
+        </a>
+      </div>
+    </div>
+  </section>
+</main>
