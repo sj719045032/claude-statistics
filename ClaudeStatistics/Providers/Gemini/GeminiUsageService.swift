@@ -78,6 +78,10 @@ final class GeminiUsageService: ProviderUsageSource {
         }
     }
 
+    func resetLocalState() {
+        try? FileManager.default.removeItem(atPath: cacheFilePath())
+    }
+
     func fetchProfile() async -> UserProfile? {
         guard let settings = try? readSettings() else { return nil }
 

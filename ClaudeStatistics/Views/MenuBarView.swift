@@ -120,12 +120,18 @@ struct MenuBarView: View {
                     case .usage:
                         if appState.providerCapabilities.supportsUsage {
                             ScrollView {
-                                UsageView(viewModel: usageViewModel, store: store)
+                                UsageView(
+                                    appState: appState,
+                                    viewModel: usageViewModel,
+                                    profileViewModel: profileViewModel,
+                                    store: store
+                                )
                                     .padding(12)
                             }
                         }
                     case .settings:
                         SettingsView(
+                            appState: appState,
                             usageViewModel: usageViewModel,
                             profileViewModel: profileViewModel,
                             tabOrder: $tabOrder,

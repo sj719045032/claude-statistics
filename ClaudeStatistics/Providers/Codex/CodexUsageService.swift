@@ -67,6 +67,11 @@ final class CodexUsageService: ProviderUsageSource {
         }
     }
 
+    func resetLocalState() {
+        retryAfter = nil
+        try? FileManager.default.removeItem(atPath: cacheFilePath())
+    }
+
     // MARK: - Remote API
 
     private func fetchRemoteUsage(creds: CodexCredentials) async throws -> UsageData {

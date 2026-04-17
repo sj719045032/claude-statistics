@@ -76,52 +76,52 @@ enum EditorApp: String, CaseIterable, Identifiable {
 }
 
 enum TerminalLauncher {
-    static func launch(executable: String, arguments: [String], cwd: String) {
-        launchInTerminal(cwd: cwd, executable: executable, arguments: arguments)
+    static func launch(executable: String, arguments: [String], cwd: String, environment: [String: String] = [:]) {
+        launchInTerminal(cwd: cwd, executable: executable, arguments: arguments, environment: environment)
     }
 
     /// Build the same `cd … && <cmd>` string used when launching a terminal, so it can be
     /// copied to the clipboard and pasted into any shell (including VSCode's integrated terminal).
-    static func buildCommand(cwd: String, executable: String, arguments: [String]) -> String {
-        "cd \(shellEscape(cwd)) && \(shellCommand(executable: executable, arguments: arguments))"
+    static func buildCommand(cwd: String, executable: String, arguments: [String], environment: [String: String] = [:]) -> String {
+        "cd \(shellEscape(cwd)) && \(shellCommand(executable: executable, arguments: arguments, environment: environment))"
     }
 
-    private static func launchInTerminal(cwd: String, executable: String, arguments: [String]) {
-        let commandOnly = shellCommand(executable: executable, arguments: arguments)
+    private static func launchInTerminal(cwd: String, executable: String, arguments: [String], environment: [String: String]) {
+        let commandOnly = shellCommand(executable: executable, arguments: arguments, environment: environment)
         let command = "cd \(shellEscape(cwd)) && \(commandOnly)"
         let preferred = TerminalApp.preferred
         switch preferred {
         case .auto:
             if TerminalApp.ghostty.isInstalled {
-                openInGhostty(cwd: cwd, executable: executable, arguments: arguments)
+                openInGhostty(cwd: cwd, executable: executable, arguments: arguments, environment: environment)
             } else if TerminalApp.iterm.isInstalled {
                 openInITerm(command: command)
             } else if TerminalApp.warp.isInstalled {
-                openInWarp(cwd: cwd, executable: executable, arguments: arguments)
+                openInWarp(cwd: cwd, executable: executable, arguments: arguments, environment: environment)
             } else {
                 openInTerminalApp(command: command)
             }
         case .ghostty:
-            openInGhostty(cwd: cwd, executable: executable, arguments: arguments)
+            openInGhostty(cwd: cwd, executable: executable, arguments: arguments, environment: environment)
         case .iterm:
             openInITerm(command: command)
         case .terminal:
             openInTerminalApp(command: command)
         case .warp:
-            openInWarp(cwd: cwd, executable: executable, arguments: arguments)
+            openInWarp(cwd: cwd, executable: executable, arguments: arguments, environment: environment)
         case .kitty:
             openInKitty(command: commandOnly, cwd: cwd)
         case .alacritty:
             openInAlacritty(command: commandOnly, cwd: cwd)
         case .editor:
-            copyAndOpenInEditor(cwd: cwd, executable: executable, arguments: arguments)
+            copyAndOpenInEditor(cwd: cwd, executable: executable, arguments: arguments, environment: environment)
         }
     }
 
     // MARK: - Editor (copy resume command + open project in external editor)
 
-    private static func copyAndOpenInEditor(cwd: String, executable: String, arguments: [String]) {
-        let cmd = buildCommand(cwd: cwd, executable: executable, arguments: arguments)
+    private static func copyAndOpenInEditor(cwd: String, executable: String, arguments: [String], environment: [String: String]) {
+        let cmd = buildCommand(cwd: cwd, executable: executable, arguments: arguments, environment: environment)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(cmd, forType: .string)
 
@@ -135,8 +135,8 @@ enum TerminalLauncher {
 
     // MARK: - Ghostty
 
-    private static func openInGhostty(cwd: String, executable: String, arguments: [String]) {
-        let launchCommand = shellCommand(executable: executable, arguments: arguments)
+    private static func openInGhostty(cwd: String, executable: String, arguments: [String], environment: [String: String]) {
+        let launchCommand = shellCommand(executable: executable, arguments: arguments, environment: environment)
         let scriptPath = (cwd as NSString).appendingPathComponent(".cs-launch")
         let content = "#!/bin/zsh -l\nrm -f \(shellEscape(scriptPath))\nexec \(launchCommand)\n"
         guard (try? content.write(toFile: scriptPath, atomically: true, encoding: .utf8)) != nil,
@@ -181,8 +181,8 @@ enum TerminalLauncher {
 
     // MARK: - Warp
 
-    private static func openInWarp(cwd: String, executable: String, arguments: [String]) {
-        let launchCommand = shellCommand(executable: executable, arguments: arguments)
+    private static func openInWarp(cwd: String, executable: String, arguments: [String], environment: [String: String]) {
+        let launchCommand = shellCommand(executable: executable, arguments: arguments, environment: environment)
         let scriptPath = (cwd as NSString).appendingPathComponent(".cs-launch")
         let content = "#!/bin/bash\nrm -f \(shellEscape(scriptPath))\nexec \(launchCommand)\n"
         guard (try? content.write(toFile: scriptPath, atomically: true, encoding: .utf8)) != nil,
@@ -245,8 +245,12 @@ enum TerminalLauncher {
         "'" + str.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
-    private static func shellCommand(executable: String, arguments: [String]) -> String {
-        ([shellEscape(executable)] + arguments.map(shellEscape)).joined(separator: " ")
+    private static func shellCommand(executable: String, arguments: [String], environment: [String: String]) -> String {
+        let prefix = environment.keys.sorted().map { key in
+            "\(key)=\(shellEscape(environment[key] ?? ""))"
+        }
+        let envCommand = prefix.isEmpty ? [] : ["env"] + prefix
+        return (envCommand + [shellEscape(executable)] + arguments.map(shellEscape)).joined(separator: " ")
     }
 
     private static func escapeAppleScript(_ str: String) -> String {

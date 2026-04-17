@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct UsageView: View {
+    @ObservedObject var appState: AppState
     @ObservedObject var viewModel: UsageViewModel
+    @ObservedObject var profileViewModel: ProfileViewModel
     @ObservedObject var store: SessionDataStore
     @State private var selectedWindowTab: UsageWindowTab = .fiveHour
     @State private var selectedTrendWindowID: String = ""
@@ -84,6 +86,12 @@ extension UsageView {
         HStack(spacing: 8) {
             Text("usage.title")
                 .font(.headline)
+
+            if let accountSwitcherProvider = store.provider as? any ProviderAccountCardSupplementProviding {
+                accountSwitcherProvider.makeCompactAccountSwitcherAccessory(
+                    context: ProviderSettingsContext(appState: appState, profileViewModel: profileViewModel)
+                )
+            }
 
             Spacer()
 

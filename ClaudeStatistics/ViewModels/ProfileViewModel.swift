@@ -21,4 +21,11 @@ final class ProfileViewModel: ObservableObject {
         userProfile = await loader()
         profileLoading = false
     }
+
+    func forceRefresh() async {
+        guard !profileLoading, let loader else { return }
+        profileLoading = true
+        userProfile = await loader()
+        profileLoading = false
+    }
 }

@@ -11,6 +11,9 @@ final class AppState: ObservableObject {
     let usageViewModel = UsageViewModel()
     let profileViewModel = ProfileViewModel()
     let updaterService = UpdaterService()
+    let claudeAccountManager = ClaudeAccountManager()
+    let codexAccountManager = CodexAccountManager()
+    let geminiAccountManager = GeminiAccountManager()
     private var cancellables: Set<AnyCancellable> = []
     private var storesByProvider: [ProviderKind: SessionDataStore] = [:]
     private var sessionViewModelsByProvider: [ProviderKind: SessionViewModel] = [:]
@@ -92,6 +95,45 @@ final class AppState: ObservableObject {
     func stopAllStores() {
         for store in storesByProvider.values {
             store.stop()
+        }
+    }
+
+    func refreshProviderAfterAccountChange(_ kind: ProviderKind) {
+        switch kind {
+        case .claude:
+            claudeAccountManager.load()
+        case .codex:
+            codexAccountManager.load()
+        case .gemini:
+            geminiAccountManager.load()
+        }
+
+        if let existingStore = storesByProvider[kind] {
+            existingStore.stop()
+        }
+
+        let provider = ProviderRegistry.provider(for: kind)
+        let rebuiltStore = SessionDataStore(provider: provider)
+        let rebuiltViewModel = SessionViewModel(store: rebuiltStore)
+        storesByProvider[kind] = rebuiltStore
+        sessionViewModelsByProvider[kind] = rebuiltViewModel
+        rebuiltStore.start()
+
+        guard providerKind == kind else { return }
+
+        store = rebuiltStore
+        sessionViewModel = rebuiltViewModel
+        usageViewModel.store = rebuiltStore
+        configureUsageState(for: provider)
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.profileViewModel.forceRefresh()
+            await self.usageViewModel.forceRefresh()
+        }
+
+        if isPopoverVisible {
+            rebuiltStore.popoverDidOpen()
         }
     }
 

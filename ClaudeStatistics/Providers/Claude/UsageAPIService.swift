@@ -159,6 +159,11 @@ final class UsageAPIService: ProviderUsageSource {
         return readCacheFile(at: appCacheFilePath())
     }
 
+    func resetLocalState() {
+        retryAfter = nil
+        try? FileManager.default.removeItem(atPath: appCacheFilePath())
+    }
+
     private func readCacheFile(at path: String) -> (data: UsageData, fetchedAt: Date)? {
         guard let data = FileManager.default.contents(atPath: path) else { return nil }
 
@@ -233,7 +238,7 @@ enum UsageError: LocalizedError {
         case .invalidResponse: return "Invalid response"
         case .httpError(let code): return "HTTP error: \(code)"
         case .rateLimited(let seconds): return "Rate limited, retry in \(seconds)s"
-        case .unauthorized: return "Token expired — open Claude Code to refresh"
+        case .unauthorized: return "Token expired — open the CLI to refresh"
         case .decodingFailed(let detail, _): return "Decoding error: \(detail)"
         }
     }

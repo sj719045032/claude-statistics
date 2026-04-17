@@ -2,6 +2,7 @@ import SwiftUI
 import ServiceManagement
 
 struct SettingsView: View {
+    @ObservedObject var appState: AppState
     @ObservedObject var usageViewModel: UsageViewModel
     @ObservedObject var profileViewModel: ProfileViewModel
     @Binding var tabOrder: [AppTab]
@@ -361,88 +362,84 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var accountCardContent: some View {
-        HStack(spacing: 10) {
-            // Avatar
-            ZStack {
-                Circle()
-                    .fill(LinearGradient(
-                        colors: [Color.blue.opacity(0.2), Color.purple.opacity(0.15)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .frame(width: 36, height: 36)
-                    .shadow(color: .blue.opacity(0.15), radius: 4, y: 1)
-                Text(avatarInitial)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.blue)
-            }
-
-            if let profile = profileViewModel.userProfile {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(profile.account?.displayName ?? "–")
-                        .font(.system(size: 13, weight: .medium))
-                    Text(profile.account?.email ?? "")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(
+                            colors: [Color.blue.opacity(0.2), Color.purple.opacity(0.15)],
+                            startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .frame(width: 36, height: 36)
+                        .shadow(color: .blue.opacity(0.15), radius: 4, y: 1)
+                    Text(avatarInitial)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.blue)
                 }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 4) {
-                    if let org = profile.organization {
-                        if org.organizationType != nil {
-                            Text(org.orgTypeDisplayName)
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.primary.opacity(0.06))
-                                .clipShape(Capsule())
+
+                if let profile = profileViewModel.userProfile {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text(profile.account?.displayName ?? "–")
+                                .font(.system(size: 13, weight: .medium))
+                            if let org = profile.organization {
+                                Text(org.tierDisplayName)
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(.blue)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.blue.opacity(0.1))
+                                    .clipShape(Capsule())
+                            }
                         }
-                        Text(org.tierDisplayName)
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.blue)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.blue.opacity(0.1))
-                            .clipShape(Capsule())
+                        Text(profile.account?.email ?? "")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
                     }
-                    if let orgName = profile.organization?.name,
-                       !orgName.isEmpty,
-                       orgName != "Gemini CLI",
-                       orgName != "Claude" {
-                        Text(orgName)
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 0) {
+                        providerAccountCardAccessory
+                    }
+                } else if hasToken == true {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                                .font(.system(size: 10))
+                            Text("settings.found")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.green)
+                        }
+                        Text(credentialHintKey)
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                     }
-                }
-            } else if hasToken == true {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                    Spacer()
+                    providerAccountCardAccessory
+                } else if hasToken == false {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.red)
+                                .font(.system(size: 10))
+                            Text("settings.notFoundStatus")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.red)
+                        }
+                        Text(credentialHintKey)
                             .font(.system(size: 10))
-                        Text("settings.found")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(.tertiary)
                     }
-                    Text(credentialHintKey)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+                    Spacer()
+                    providerAccountCardAccessory
                 }
-                Spacer()
-            } else if hasToken == false {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.red)
-                            .font(.system(size: 10))
-                        Text("settings.notFoundStatus")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.red)
-                    }
-                    Text(credentialHintKey)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                }
-                Spacer()
             }
+        }
+    }
+
+    @ViewBuilder
+    private var providerAccountCardAccessory: some View {
+        if let supplementProvider = provider as? any ProviderAccountCardSupplementProviding {
+            supplementProvider.makeAccountCardAccessory(context: ProviderSettingsContext(appState: appState, profileViewModel: profileViewModel))
         }
     }
 
