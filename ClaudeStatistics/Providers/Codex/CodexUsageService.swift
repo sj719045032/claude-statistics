@@ -30,7 +30,7 @@ final class CodexUsageService: ProviderUsageSource {
 
     // MARK: - ProviderUsageSource
 
-    var dashboardURL: URL? { URL(string: "https://chatgpt.com/codex") }
+    var dashboardURL: URL? { nil }
 
     func loadCachedSnapshot() -> ProviderUsageSnapshot? {
         guard let data = FileManager.default.contents(atPath: cacheFilePath()),

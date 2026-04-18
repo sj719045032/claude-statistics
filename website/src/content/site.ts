@@ -130,7 +130,7 @@ export const siteCopy: Record<Language, SiteCopy> = {
       { value: "3", label: "AI coding providers in one app" },
       { value: "53-week", label: "heatmap and all-time trends" },
       { value: "Local", label: "parsing, search, and cost analysis" },
-      { value: "10 + 11", label: "share roles and unlockable badges" }
+      { value: "9 + 11", label: "share roles and unlockable badges" }
     ],
     features: {
       eyebrow: "Why it feels different",
@@ -236,12 +236,12 @@ export const siteCopy: Record<Language, SiteCopy> = {
       text:
         "Share Preview is not a generic export. It composes role labels, badge unlocks, cost and token proof, project coverage, and a QR-ready layout into something worth posting.",
       items: [
-        "10 role archetypes and 11 unlockable badges based on actual usage patterns",
+        "9 role archetypes and 11 unlockable badges based on actual usage patterns",
         "Native-resolution PNG export plus copy, save, and social share actions",
         "Built-in QR block so a card can point back to your repo, profile, or launch post"
       ],
       metrics: [
-        { value: "10", label: "role archetypes" },
+        { value: "9", label: "role archetypes" },
         { value: "11", label: "badge unlocks" },
         { value: "PNG", label: "native export" }
       ]
@@ -267,7 +267,7 @@ export const siteCopy: Record<Language, SiteCopy> = {
         },
         {
           kicker: "Share system",
-          title: "10 roles, 11 badges, QR code embeds, and native-resolution PNG export.",
+          title: "9 roles, 11 badges, QR code embeds, and native-resolution PNG export.",
           text: "Share cards turn usage history into something visual enough for social posts and team chats."
         }
       ]
@@ -309,7 +309,7 @@ export const siteCopy: Record<Language, SiteCopy> = {
       text: "Install the latest DMG from GitHub Releases, or clone the repository and build it locally with XcodeGen and Xcode 16+."
     },
     footer: {
-      left: "Claude Statistics is a native macOS menu bar app for AI session analytics.",
+      left: "Claude Statistics · Native macOS menu bar app · Built for serious AI workflows · MIT open source",
       right: "Built for people who use Claude Code, Codex CLI, and Gemini CLI enough to care about context, cost, and momentum."
     }
   },
@@ -353,7 +353,7 @@ export const siteCopy: Record<Language, SiteCopy> = {
       { value: "3", label: "一个应用覆盖三种 AI 编码工具" },
       { value: "53 周", label: "热力图与全时段趋势分析" },
       { value: "本地", label: "解析、搜索与成本分析都在本机完成" },
-      { value: "10 + 11", label: "角色卡与可解锁徽章系统" }
+      { value: "9 + 11", label: "角色卡与可解锁徽章系统" }
     ],
     features: {
       eyebrow: "为什么它看起来不一样",
@@ -459,12 +459,12 @@ export const siteCopy: Record<Language, SiteCopy> = {
       text:
         "Share Preview 不是普通导出图。它会把角色标签、徽章解锁、成本与 Token 证据、项目覆盖度，以及可扫码的版式组合成一张值得分享的卡片。",
       items: [
-        "基于真实使用模式生成 10 种角色和 11 个可解锁徽章",
+        "基于真实使用模式生成 9 种角色和 11 个可解锁徽章",
         "支持原生分辨率 PNG 导出，也支持复制、保存和社交分享",
         "内置二维码区域，可以指向仓库、主页或发布链接"
       ],
       metrics: [
-        { value: "10", label: "角色原型" },
+        { value: "9", label: "角色原型" },
         { value: "11", label: "徽章解锁" },
         { value: "PNG", label: "原生导出" }
       ]
@@ -490,7 +490,7 @@ export const siteCopy: Record<Language, SiteCopy> = {
         },
         {
           kicker: "分享系统",
-          title: "10 种角色、11 个徽章、二维码嵌入和原生分辨率 PNG 导出。",
+          title: "9 种角色、11 个徽章、二维码嵌入和原生分辨率 PNG 导出。",
           text: "让使用记录足够适合发社交媒体、团队群或个人主页。"
         }
       ]
@@ -532,7 +532,7 @@ export const siteCopy: Record<Language, SiteCopy> = {
       text: "你可以直接从 GitHub Releases 安装 DMG，也可以用 XcodeGen 和 Xcode 16+ 在本地构建。"
     },
     footer: {
-      left: "Claude Statistics 是一个原生 macOS 菜单栏 AI 会话分析工具。",
+      left: "Claude Statistics · 原生 macOS 菜单栏应用 · 为重度 AI 工作流打造 · MIT 开源",
       right: "适合那些真正频繁使用 Claude Code、Codex CLI 和 Gemini CLI，并且在意上下文、成本和节奏的人。"
     }
   }

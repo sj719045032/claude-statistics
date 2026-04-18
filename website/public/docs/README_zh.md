@@ -131,7 +131,7 @@ Claude Statistics 会自动发现并解析会话数据：Claude Code 来自 `~/.
 基于本地 transcript 数据做完整统计分析。
 
 - 全量汇总：总费用、会话数、Token 数、消息数
-- 周期聚合：**按天 / 按周 / 按月 / 按年**
+- 周期聚合：**按天 / 按周 / 按月**
 - 交互式费用柱状图，可点击下钻到周期详情
 - 周期详情页包含概览、趋势图、Token 分布、模型拆分
 - 缓存 Token 明细（5 分钟写入、1 小时写入、缓存读取）
@@ -186,7 +186,7 @@ Claude Statistics 会自动发现并解析会话数据：Claude Code 来自 `~/.
 
 从你的会话分析中生成精美、可分享的统计卡片。
 
-- **个性化角色** — 10 种独特的分享角色（Vibe Coding King、Tool Summoner、Night Shift Engineer 等），各有专属渐变色、SF Symbols 图标和 mascot 场景
+- **个性化角色** — 9 种独特的分享角色（Vibe Coding King、Tool Summoner、Night Shift Engineer 等），各有专属渐变色、SF Symbols 图标和 mascot 场景
 - **成就徽章** — 11 种可解锁徽章，涵盖时间段、上下文、模型偏好、工具使用、成本效率、爆发使用等类别
 - **证明指标** — 基于数据的硬核证据展示你的顶级数据（Token 数、会话数、工具使用、成本效率等）
 - **QR 码集成** — 每张卡片包含 QR 码，方便分享或快速访问

@@ -131,7 +131,7 @@ Built-in transcript browsing for full conversation history.
 Analyze usage from the local transcript data you already have.
 
 - All-time summary: total cost, sessions, tokens, messages
-- Period-based aggregation: **Daily / Weekly / Monthly / Yearly**
+- Period-based aggregation: **Daily / Weekly / Monthly**
 - Interactive cost bar chart with drill-down into period detail
 - Period detail pages with overview, trend chart, token distribution, and model breakdown
 - Cache token breakdown (5-minute write, 1-hour write, cache read)
@@ -186,7 +186,7 @@ Providers that are not installed are hidden or disabled automatically depending 
 
 Generate beautiful, shareable stat cards from your session analytics.
 
-- **Persona-driven roles** — 10 unique share roles (Vibe Coding King, Tool Summoner, Night Shift Engineer, etc.) with themed gradients, SF Symbols artwork, and mascot scenes
+- **Persona-driven roles** — 9 unique share roles (Vibe Coding King, Tool Summoner, Night Shift Engineer, etc.) with themed gradients, SF Symbols artwork, and mascot scenes
 - **Achievement badges** — 11 unlockable badges across categories like schedule, context, model preference, tooling, cost efficiency, and burst usage
 - **Proof metrics** — data-backed evidence showing your top stats (token counts, session counts, tool usage, cost efficiency)
 - **QR code integration** — each card includes a QR code for sharing or quick access
