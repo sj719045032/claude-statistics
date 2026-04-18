@@ -145,7 +145,7 @@
 "settings.found" = "Found";
 "settings.notFoundStatus" = "Not found";
 "settings.credentialHint" = "Reads from macOS Keychain or ~/.claude/.credentials.json";
-"settings.credentialHint.claude" = "Reads from macOS Keychain or ~/.claude/.credentials.json";
+"settings.credentialHint.claude" = "Reads from macOS Keychain";
 "settings.credentialHint.codex" = "Reads from ~/.codex/auth.json";
 "settings.credentialHint.gemini" = "Reads from ~/.gemini/settings.json and ~/.gemini/oauth_creds.json";
 "settings.codexAccounts" = "Codex Accounts";

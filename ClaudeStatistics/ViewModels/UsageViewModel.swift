@@ -73,7 +73,7 @@ final class UsageViewModel: ObservableObject {
             switch error {
             case .rateLimited:
                 if showRateLimitError {
-                    errorMessage = error.localizedDescription
+                    errorMessage = rateLimitMessage(for: error)
                 } else {
                     loadCache()
                 }
@@ -119,6 +119,14 @@ final class UsageViewModel: ObservableObject {
 
     func stopAutoRefresh() {
         autoRefresh?.stop()
+    }
+
+    private func rateLimitMessage(for error: UsageError) -> String {
+        guard usageSource is UsageAPIService else {
+            return error.localizedDescription
+        }
+
+        return error.localizedDescription
     }
 
     func clearForUnsupportedProvider() {

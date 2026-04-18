@@ -145,7 +145,7 @@
 "settings.found" = "已找到";
 "settings.notFoundStatus" = "未找到";
 "settings.credentialHint" = "从 macOS 钥匙串或 ~/.claude/.credentials.json 读取";
-"settings.credentialHint.claude" = "从 macOS 钥匙串或 ~/.claude/.credentials.json 读取";
+"settings.credentialHint.claude" = "从 macOS 钥匙串读取";
 "settings.credentialHint.codex" = "从 ~/.codex/auth.json 读取";
 "settings.credentialHint.gemini" = "从 ~/.gemini/settings.json 和 ~/.gemini/oauth_creds.json 读取";
 "settings.codexAccounts" = "Codex 账号";

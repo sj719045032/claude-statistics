@@ -3,13 +3,30 @@ import Foundation
 struct ClaudeAuthIdentity: Equatable, Sendable {
     let email: String?
     let displayName: String?
+    let organizationUUID: String?
+    let accountUUID: String?
 
     var normalizedEmail: String? {
         Self.normalizeEmail(email)
     }
 
+    var normalizedOrganizationUUID: String? {
+        Self.normalizeIdentifier(organizationUUID)
+    }
+
+    var normalizedAccountUUID: String? {
+        Self.normalizeIdentifier(accountUUID)
+    }
+
     var stableKey: String? {
-        normalizedEmail.map { "email:\($0)" }
+        guard let normalizedEmail else { return nil }
+        if let normalizedOrganizationUUID {
+            return "org:\(normalizedOrganizationUUID)|email:\(normalizedEmail)"
+        }
+        if let normalizedAccountUUID {
+            return "account:\(normalizedAccountUUID)|email:\(normalizedEmail)"
+        }
+        return "email:\(normalizedEmail)"
     }
 
     var displayLabel: String {
@@ -24,11 +41,18 @@ struct ClaudeAuthIdentity: Equatable, Sendable {
     }
 
     func matches(_ account: ClaudeManagedAccount) -> Bool {
-        normalizedEmail == account.normalizedEmail
+        stableKey == account.stableKey
     }
 
     private static func normalizeEmail(_ email: String?) -> String? {
         guard let trimmed = email?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return trimmed.lowercased()
+    }
+
+    private static func normalizeIdentifier(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
             return nil
         }
         return trimmed.lowercased()
@@ -38,6 +62,7 @@ struct ClaudeAuthIdentity: Equatable, Sendable {
 struct ClaudeAuthMaterial: Sendable {
     let rawJSONString: String
     let metadataJSONString: String?
+    let keychainAttributes: ClaudeKeychainItemAttributes?
     let identity: ClaudeAuthIdentity
 }
 
@@ -88,14 +113,16 @@ enum ClaudeAuthStore {
         return try parse(
             rawJSONString: rawJSONString,
             fallbackIdentity: metadataJSONString.flatMap(parseAccountMetadataIdentity),
-            metadataJSONString: metadataJSONString
+            metadataJSONString: metadataJSONString,
+            keychainAttributes: nil
         )
     }
 
     static func parse(
         rawJSONString: String,
         fallbackIdentity: ClaudeAuthIdentity? = nil,
-        metadataJSONString: String? = nil
+        metadataJSONString: String? = nil,
+        keychainAttributes: ClaudeKeychainItemAttributes? = nil
     ) throws -> ClaudeAuthMaterial {
         guard let data = rawJSONString.data(using: .utf8),
               let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -110,34 +137,30 @@ enum ClaudeAuthStore {
         let displayName = nonEmptyString(account?["name"])
             ?? nonEmptyString(json["displayName"])
             ?? nonEmptyString(json["name"])
+        let organizationUUID = nonEmptyString(account?["organizationUuid"])
+            ?? nonEmptyString(json["organizationUuid"])
+            ?? fallbackIdentity?.organizationUUID
+        let accountUUID = nonEmptyString(account?["accountUuid"])
+            ?? nonEmptyString(account?["uuid"])
+            ?? nonEmptyString(json["accountUuid"])
+            ?? fallbackIdentity?.accountUUID
 
         let identity = ClaudeAuthIdentity(
             email: email ?? fallbackIdentity?.email,
-            displayName: displayName ?? fallbackIdentity?.displayName
+            displayName: displayName ?? fallbackIdentity?.displayName,
+            organizationUUID: organizationUUID,
+            accountUUID: accountUUID
         )
         guard identity.normalizedEmail != nil else {
             throw ClaudeAuthStoreError.missingIdentity
         }
 
-        return ClaudeAuthMaterial(rawJSONString: rawJSONString, metadataJSONString: metadataJSONString, identity: identity)
-    }
-
-    static func writeAuthJSONString(_ rawJSONString: String, configPath: String) throws {
-        let configURL = URL(fileURLWithPath: configPath, isDirectory: true)
-        try FileManager.default.createDirectory(at: configURL, withIntermediateDirectories: true)
-        let credentialsURL = URL(fileURLWithPath: credentialsPath(forConfigPath: configPath), isDirectory: false)
-        try rawJSONString.write(to: credentialsURL, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: NSNumber(value: Int16(0o600))], ofItemAtPath: credentialsURL.path)
-    }
-
-    static func writeAuthMaterial(_ material: ClaudeAuthMaterial, configPath: String) throws {
-        try writeAuthJSONString(material.rawJSONString, configPath: configPath)
-
-        let metadataURL = URL(fileURLWithPath: accountMetadataPath(forConfigPath: configPath), isDirectory: false)
-        if let metadataJSONString = material.metadataJSONString {
-            try metadataJSONString.write(to: metadataURL, atomically: true, encoding: .utf8)
-            try FileManager.default.setAttributes([.posixPermissions: NSNumber(value: Int16(0o600))], ofItemAtPath: metadataURL.path)
-        }
+        return ClaudeAuthMaterial(
+            rawJSONString: rawJSONString,
+            metadataJSONString: metadataJSONString,
+            keychainAttributes: keychainAttributes,
+            identity: identity
+        )
     }
 
     static func writeAccountMetadata(_ metadataJSONString: String?, configPath: String = ambientConfigPath()) throws {
@@ -174,7 +197,14 @@ enum ClaudeAuthStore {
 
         let email = nonEmptyString(account["emailAddress"])
         let displayName = nonEmptyString(account["displayName"])
-        return ClaudeAuthIdentity(email: email, displayName: displayName)
+        let organizationUUID = nonEmptyString(account["organizationUuid"])
+        let accountUUID = nonEmptyString(account["accountUuid"])
+        return ClaudeAuthIdentity(
+            email: email,
+            displayName: displayName,
+            organizationUUID: organizationUUID,
+            accountUUID: accountUUID
+        )
     }
 
     private static func mergeAccountMetadata(_ rawJSONString: String, into metadataURL: URL) throws {
@@ -222,18 +252,72 @@ struct ClaudeManagedAccount: Codable, Identifiable, Hashable {
     let id: UUID
     let email: String
     let displayName: String?
-    let managedConfigPath: String
+    let organizationUUID: String?
+    let accountUUID: String?
+    let rawJSONString: String
+    let metadataJSONString: String?
+    let keychainAttributes: ClaudeKeychainItemAttributes?
     let createdAt: TimeInterval
     let updatedAt: TimeInterval
 
     var normalizedEmail: String {
         email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
+
+    var normalizedOrganizationUUID: String? {
+        organizationUUID?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    var normalizedAccountUUID: String? {
+        accountUUID?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    var stableKey: String {
+        if let normalizedOrganizationUUID {
+            return "org:\(normalizedOrganizationUUID)|email:\(normalizedEmail)"
+        }
+        if let normalizedAccountUUID {
+            return "account:\(normalizedAccountUUID)|email:\(normalizedEmail)"
+        }
+        return "email:\(normalizedEmail)"
+    }
+
+    var authMaterial: ClaudeAuthMaterial {
+        ClaudeAuthMaterial(
+            rawJSONString: rawJSONString,
+            metadataJSONString: metadataJSONString,
+            keychainAttributes: keychainAttributes,
+            identity: ClaudeAuthIdentity(
+                email: email,
+                displayName: displayName,
+                organizationUUID: organizationUUID,
+                accountUUID: accountUUID
+            )
+        )
+    }
 }
 
 private struct ClaudeManagedAccountSet: Codable {
     let version: Int
     let accounts: [ClaudeManagedAccount]
+}
+
+// MARK: - Legacy Migration
+
+private struct LegacyClaudeManagedAccount: Codable {
+    let id: UUID
+    let email: String
+    let displayName: String?
+    let organizationUUID: String?
+    let accountUUID: String?
+    let managedConfigPath: String
+    let createdAt: TimeInterval
+    let updatedAt: TimeInterval
+}
+
+private struct LegacyClaudeManagedAccountSet: Codable {
+    let version: Int
+    let accounts: [LegacyClaudeManagedAccount]
 }
 
 @MainActor
@@ -249,7 +333,7 @@ final class ClaudeAccountManager: ObservableObject {
 
     private let fileManager: FileManager
     private var addPollingTask: Task<Void, Never>?
-    private static let storeVersion = 1
+    private static let storeVersion = 2
 
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
@@ -267,7 +351,7 @@ final class ClaudeAccountManager: ObservableObject {
             if let material = readCurrentLiveMaterial() {
                 liveAccount = material.identity
                 do {
-                    _ = try upsertManagedAccount(from: material, candidateConfigPath: nil)
+                    _ = try upsertManagedAccount(from: material)
                 } catch {
                     DiagnosticLogger.shared.warning("Failed to auto-save current Claude account: \(error.localizedDescription)")
                 }
@@ -291,7 +375,7 @@ final class ClaudeAccountManager: ObservableObject {
         do {
             let previousStableKey = readCurrentLiveMaterial()?.identity.stableKey
             if let currentMaterial = readCurrentLiveMaterial() {
-                _ = try upsertManagedAccount(from: currentMaterial, candidateConfigPath: nil)
+                _ = try upsertManagedAccount(from: currentMaterial)
             }
 
             errorMessage = nil
@@ -336,7 +420,7 @@ final class ClaudeAccountManager: ObservableObject {
                 throw ClaudeAuthStoreError.notFound("managed account \(id.uuidString)")
             }
 
-            let targetMaterial = try ClaudeAuthStore.readAuthMaterial(configPath: target.managedConfigPath)
+            let targetMaterial = target.authMaterial
             try preserveCurrentLiveAccountIfNeeded(excluding: targetMaterial.identity)
             try activateLiveAccount(targetMaterial)
             load()
@@ -363,7 +447,6 @@ final class ClaudeAccountManager: ObservableObject {
             guard let account = snapshot.accounts.first(where: { $0.id == id }) else { return }
             let updated = snapshot.accounts.filter { $0.id != id }
             try storeSnapshot(ClaudeManagedAccountSet(version: Self.storeVersion, accounts: updated))
-            try removeManagedConfigIfSafe(atPath: account.managedConfigPath)
             load()
             noticeMessage = String(
                 format: NSLocalizedString("settings.claudeAccounts.removed %@", comment: ""),
@@ -391,7 +474,7 @@ final class ClaudeAccountManager: ObservableObject {
 
             if let material = readCurrentLiveMaterial() {
                 do {
-                    let account = try upsertManagedAccount(from: material, candidateConfigPath: nil)
+                    let account = try upsertManagedAccount(from: material)
                     try activateLiveAccount(material)
                     load()
                     addedAccountID = account.id
@@ -430,11 +513,14 @@ final class ClaudeAccountManager: ObservableObject {
             return
         }
 
-        _ = try upsertManagedAccount(from: liveMaterial, candidateConfigPath: nil)
+        _ = try upsertManagedAccount(from: liveMaterial)
     }
 
     private func activateLiveAccount(_ material: ClaudeAuthMaterial) throws {
-        try CredentialService.shared.writeRawCredentialJSONString(material.rawJSONString)
+        try CredentialService.shared.writeRawCredentialJSONString(
+            material.rawJSONString,
+            keychainAttributes: effectiveKeychainAttributes(for: material)
+        )
         try ClaudeAuthStore.writeAccountMetadata(material.metadataJSONString)
         UsageAPIService.shared.resetLocalState()
     }
@@ -486,32 +572,26 @@ final class ClaudeAccountManager: ObservableObject {
         return scriptURL.path
     }
 
-    private func upsertManagedAccount(from material: ClaudeAuthMaterial, candidateConfigPath: String?) throws -> ClaudeManagedAccount {
+    private func upsertManagedAccount(from material: ClaudeAuthMaterial) throws -> ClaudeManagedAccount {
         guard let normalizedEmail = material.identity.normalizedEmail else {
             throw ClaudeAuthStoreError.missingIdentity
         }
 
         let snapshot = try loadSnapshot()
-        let existing = snapshot.accounts.first(where: { $0.normalizedEmail == normalizedEmail })
+        let existing = findExistingAccount(for: material.identity, in: snapshot.accounts)
         let accountID = existing?.id ?? UUID()
-        let configPath: String = {
-            if let candidateConfigPath, !candidateConfigPath.isEmpty {
-                return candidateConfigPath
-            }
-            if let existing {
-                return existing.managedConfigPath
-            }
-            return makeManagedConfigURL(accountID: accountID).path
-        }()
-
-        try ClaudeAuthStore.writeAuthMaterial(material, configPath: configPath)
 
         let now = Date().timeIntervalSince1970
+        let keychainAttributes = effectiveKeychainAttributes(for: material)
         let account = ClaudeManagedAccount(
             id: accountID,
             email: normalizedEmail,
             displayName: material.identity.displayName,
-            managedConfigPath: configPath,
+            organizationUUID: material.identity.organizationUUID,
+            accountUUID: material.identity.accountUUID,
+            rawJSONString: material.rawJSONString,
+            metadataJSONString: material.metadataJSONString,
+            keychainAttributes: keychainAttributes,
             createdAt: existing?.createdAt ?? now,
             updatedAt: now
         )
@@ -519,25 +599,46 @@ final class ClaudeAccountManager: ObservableObject {
         let updatedAccounts = snapshot.accounts.filter { $0.id != accountID } + [account]
         try storeSnapshot(ClaudeManagedAccountSet(version: Self.storeVersion, accounts: updatedAccounts))
 
-        if let existing, existing.managedConfigPath != configPath {
-            try? removeManagedConfigIfSafe(atPath: existing.managedConfigPath)
+        return account
+    }
+
+    private func effectiveKeychainAttributes(for material: ClaudeAuthMaterial) -> ClaudeKeychainItemAttributes {
+        if let attributes = material.keychainAttributes, attributes.account?.isEmpty == false {
+            return attributes
+        }
+        return CredentialService.shared.makeKeychainAttributes(
+            account: material.identity.displayName ?? material.identity.email
+        )
+    }
+
+    private func findExistingAccount(for identity: ClaudeAuthIdentity, in accounts: [ClaudeManagedAccount]) -> ClaudeManagedAccount? {
+        if let stableKey = identity.stableKey,
+           let exactMatch = accounts.first(where: { $0.stableKey == stableKey }) {
+            return exactMatch
         }
 
-        return account
+        guard let normalizedEmail = identity.normalizedEmail else { return nil }
+        let sameEmailAccounts = accounts.filter { $0.normalizedEmail == normalizedEmail }
+        guard sameEmailAccounts.count == 1, let legacyCandidate = sameEmailAccounts.first else { return nil }
+
+        let accountNeedsUpgrade = legacyCandidate.normalizedOrganizationUUID == nil && legacyCandidate.normalizedAccountUUID == nil
+        let identityNeedsUpgrade = identity.normalizedOrganizationUUID == nil && identity.normalizedAccountUUID == nil
+        return (accountNeedsUpgrade || identityNeedsUpgrade) ? legacyCandidate : nil
     }
 
     private func readCurrentLiveMaterial() -> ClaudeAuthMaterial? {
         let metadataIdentity = ClaudeAuthStore.readAmbientAccountMetadataIdentity()
         let metadataJSONString = ClaudeAuthStore.readAmbientAccountMetadataJSONString()
-        if let rawJSONString = CredentialService.shared.readRawCredentialJSONString(),
+        if let credentialRecord = CredentialService.shared.readRawCredentialRecord(),
            let material = try? ClaudeAuthStore.parse(
-            rawJSONString: rawJSONString,
+            rawJSONString: credentialRecord.jsonString,
             fallbackIdentity: metadataIdentity,
-            metadataJSONString: metadataJSONString
+            metadataJSONString: metadataJSONString,
+            keychainAttributes: credentialRecord.keychainAttributes
            ) {
             return material
         }
-        return try? ClaudeAuthStore.readAuthMaterial()
+        return nil
     }
 
     private func loadSnapshot() throws -> ClaudeManagedAccountSet {
@@ -548,8 +649,29 @@ final class ClaudeAccountManager: ObservableObject {
 
         let data = try Data(contentsOf: storeURL)
         let decoder = JSONDecoder()
-        let snapshot = try decoder.decode(ClaudeManagedAccountSet.self, from: data)
-        return ClaudeManagedAccountSet(version: Self.storeVersion, accounts: snapshot.accounts)
+        if let snapshot = try? decoder.decode(ClaudeManagedAccountSet.self, from: data) {
+            return ClaudeManagedAccountSet(version: Self.storeVersion, accounts: snapshot.accounts)
+        }
+
+        let legacySnapshot = try decoder.decode(LegacyClaudeManagedAccountSet.self, from: data)
+        let convertedAccounts = legacySnapshot.accounts.compactMap { account -> ClaudeManagedAccount? in
+            guard let material = try? ClaudeAuthStore.readAuthMaterial(configPath: account.managedConfigPath) else {
+                return nil
+            }
+            return ClaudeManagedAccount(
+                id: account.id,
+                email: account.email,
+                displayName: account.displayName,
+                organizationUUID: account.organizationUUID ?? material.identity.organizationUUID,
+                accountUUID: account.accountUUID ?? material.identity.accountUUID,
+                rawJSONString: material.rawJSONString,
+                metadataJSONString: material.metadataJSONString,
+                keychainAttributes: nil,
+                createdAt: account.createdAt,
+                updatedAt: account.updatedAt
+            )
+        }
+        return ClaudeManagedAccountSet(version: Self.storeVersion, accounts: convertedAccounts)
     }
 
     private func storeSnapshot(_ snapshot: ClaudeManagedAccountSet) throws {
@@ -567,11 +689,7 @@ final class ClaudeAccountManager: ObservableObject {
         appSupportRootURL().appendingPathComponent("managed-claude-accounts.json", isDirectory: false)
     }
 
-    private func makeManagedConfigURL(accountID: UUID = UUID()) -> URL {
-        managedConfigsRootURL().appendingPathComponent(accountID.uuidString, isDirectory: true)
-    }
-
-    private func managedConfigsRootURL() -> URL {
+    private func legacyManagedConfigsRootURL() -> URL {
         appSupportRootURL().appendingPathComponent("managed-claude-configs", isDirectory: true)
     }
 
@@ -581,8 +699,8 @@ final class ClaudeAccountManager: ObservableObject {
         return base.appendingPathComponent("ClaudeStatistics", isDirectory: true)
     }
 
-    private func removeManagedConfigIfSafe(atPath path: String) throws {
-        let rootPath = managedConfigsRootURL().standardizedFileURL.path
+    private func removeLegacyManagedConfigIfSafe(atPath path: String) throws {
+        let rootPath = legacyManagedConfigsRootURL().standardizedFileURL.path
         let targetURL = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
         let rootPrefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
         guard targetURL.path.hasPrefix(rootPrefix) else { return }
@@ -592,17 +710,14 @@ final class ClaudeAccountManager: ObservableObject {
     }
 
     private func importOrphanedManagedConfigsIfNeeded() {
-        let rootURL = managedConfigsRootURL()
+        let rootURL = legacyManagedConfigsRootURL()
         guard let contents = try? fileManager.contentsOfDirectory(
             at: rootURL,
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles]
         ) else { return }
 
-        let snapshot = (try? loadSnapshot()) ?? ClaudeManagedAccountSet(version: Self.storeVersion, accounts: [])
-        let knownPaths = Set(snapshot.accounts.map(\.managedConfigPath))
-
-        for candidate in contents where !knownPaths.contains(candidate.path) {
+        for candidate in contents {
             guard let values = try? candidate.resourceValues(forKeys: [.isDirectoryKey]),
                   values.isDirectory == true,
                   let material = try? ClaudeAuthStore.readAuthMaterial(configPath: candidate.path) else {
@@ -610,7 +725,8 @@ final class ClaudeAccountManager: ObservableObject {
             }
 
             do {
-                _ = try upsertManagedAccount(from: material, candidateConfigPath: candidate.path)
+                _ = try upsertManagedAccount(from: material)
+                try? removeLegacyManagedConfigIfSafe(atPath: candidate.path)
             } catch {
                 DiagnosticLogger.shared.warning("Failed to import orphaned Claude config \(candidate.path): \(error.localizedDescription)")
             }

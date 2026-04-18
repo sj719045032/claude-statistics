@@ -7,42 +7,15 @@ final class UsageAPIService: ProviderUsageSource {
     private let profileURL = "https://api.anthropic.com/api/oauth/profile"
     private let cacheFileName = "usage-cache.json"
 
-    /// Tracks when we can next call the API (set on 429), persisted across restarts
-    private(set) var retryAfter: Date? {
-        get {
-            if let stored = UserDefaults.standard.object(forKey: "usageAPIRetryAfter") as? Date {
-                return stored > Date() ? stored : nil
-            }
-            return nil
-        }
-        set {
-            if let date = newValue {
-                UserDefaults.standard.set(date, forKey: "usageAPIRetryAfter")
-            } else {
-                UserDefaults.standard.removeObject(forKey: "usageAPIRetryAfter")
-            }
-        }
-    }
-
     private init() {}
 
     // MARK: - Fetch from API
 
     func fetchUsage() async throws -> UsageData {
-        // Respect retry-after
-        if let retryAfter {
-            if Date() < retryAfter {
-                let wait = max(1, Int(ceil(retryAfter.timeIntervalSinceNow)))
-                throw UsageError.rateLimited(retryInSeconds: wait)
-            } else {
-                // Expired, clear it
-                self.retryAfter = nil
-            }
-        }
-
-        guard let token = CredentialService.shared.getAccessToken() else {
+        guard let tokenInfo = CredentialService.shared.accessTokenInfo() else {
             throw UsageError.noCredentials
         }
+        DiagnosticLogger.shared.info("Claude usage request using \(tokenInfo.source.rawValue) credentials")
 
         guard let url = URL(string: apiURL) else {
             throw UsageError.invalidURL
@@ -50,7 +23,7 @@ final class UsageAPIService: ProviderUsageSource {
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(tokenInfo.token)", forHTTPHeaderField: "Authorization")
         request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
         request.setValue("claude-code/2.1", forHTTPHeaderField: "User-Agent")
         request.timeoutInterval = 15
@@ -65,7 +38,6 @@ final class UsageAPIService: ProviderUsageSource {
             // Parse Retry-After header, default to 15 minutes (API rarely returns this header)
             let retrySeconds = httpResponse.value(forHTTPHeaderField: "Retry-After")
                 .flatMap { Int($0) }.flatMap { $0 > 0 ? $0 : nil } ?? 900
-            retryAfter = Date().addingTimeInterval(TimeInterval(retrySeconds))
             throw UsageError.rateLimited(retryInSeconds: retrySeconds)
         }
 
@@ -76,9 +48,6 @@ final class UsageAPIService: ProviderUsageSource {
         guard httpResponse.statusCode == 200 else {
             throw UsageError.httpError(statusCode: httpResponse.statusCode)
         }
-
-        // Successful request, clear retry state
-        retryAfter = nil
 
         let decoder = JSONDecoder()
         let usageData: UsageData
@@ -162,7 +131,7 @@ final class UsageAPIService: ProviderUsageSource {
     }
 
     func resetLocalState() {
-        retryAfter = nil
+        UserDefaults.standard.removeObject(forKey: "usageAPIRetryAfter")
         try? FileManager.default.removeItem(atPath: appCacheFilePath())
     }
 
