@@ -89,15 +89,17 @@ final class SessionDataStore: ObservableObject {
     private func initialLoad() {
         parseProgress = "Scanning sessions..."
 
+        let provider = self.provider
+        let providerKind = provider.kind
+        let db = self.db
         Task.detached { [weak self] in
             guard let self else { return }
-            let db = self.db
-            let scannedSessions = Self.deduplicatedSessions(self.provider.scanSessions(), provider: self.provider.kind)
+            let scannedSessions = Self.deduplicatedSessions(provider.scanSessions(), provider: providerKind)
             DiagnosticLogger.shared.appLaunched(sessionCount: scannedSessions.count)
 
             // Load DB cache and determine which sessions need reparsing
-            let cache = db.loadAllCached(provider: self.provider.kind)
-            let indexedSessionIds = db.indexedSessionIds(provider: self.provider.kind)
+            let cache = db.loadAllCached(provider: providerKind)
+            let indexedSessionIds = db.indexedSessionIds(provider: providerKind)
             var dirtyIds: [Session] = []
             var indexRepairIds: [Session] = []
             var quickMap: [String: SessionQuickStats] = [:]
@@ -131,23 +133,27 @@ final class SessionDataStore: ObservableObject {
 
             if !interruptedIds.isEmpty {
                 DiagnosticLogger.shared.info(
-                    "[\(self.provider.kind.rawValue)] Resuming parse — \(interruptedIds.count) sessions had incomplete cache from previous run (will parse first)"
+                    "[\(providerKind.rawValue)] Resuming parse — \(interruptedIds.count) sessions had incomplete cache from previous run (will parse first)"
                 )
             }
 
+            let initialQuickMap = quickMap
+            let initialStatsMap = statsMap
+            let initialHasStats = !statsMap.isEmpty
+            let initialParseProgress: String? = dirtyIds.isEmpty ? nil : "Loading..."
             await MainActor.run {
                 self.sessions = scannedSessions
-                self.quickStats = quickMap
-                self.parsedStats = statsMap
-                if !statsMap.isEmpty { self.rebucket() }
-                self.parseProgress = dirtyIds.isEmpty ? nil : "Loading..."
+                self.quickStats = initialQuickMap
+                self.parsedStats = initialStatsMap
+                if initialHasStats { self.rebucket() }
+                self.parseProgress = initialParseProgress
             }
 
             if dirtyIds.isEmpty && indexRepairIds.isEmpty {
                 // Clean up DB entries for deleted sessions
                 let currentIds = Set(scannedSessions.map(\.id))
                 let staleIds = Set(cache.keys).subtracting(currentIds)
-                if !staleIds.isEmpty { db.removeSessions(provider: self.provider.kind, staleIds) }
+                if !staleIds.isEmpty { db.removeSessions(provider: providerKind, staleIds) }
 
                 await MainActor.run {
                     self.isFullParseComplete = true
@@ -166,8 +172,8 @@ final class SessionDataStore: ObservableObject {
             // Quick parse dirty sessions
             var quickBySessionId: [String: SessionQuickStats] = [:]
             for session in dirtyIds {
-                let quick = self.provider.parseQuickStats(at: session.filePath)
-                db.saveQuickStats(provider: self.provider.kind, sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, stats: quick)
+                let quick = provider.parseQuickStats(at: session.filePath)
+                db.saveQuickStats(provider: providerKind, sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, stats: quick)
                 quickBySessionId[session.id] = quick
                 await MainActor.run {
                     self.quickStats[session.id] = quick
@@ -191,7 +197,7 @@ final class SessionDataStore: ObservableObject {
                         let cachedSession = cache[session.id]
                         group.addTask {
                             await Self.parseValidatedSession(
-                                provider: self.provider,
+                                provider: provider,
                                 session: session,
                                 quick: quick,
                                 cached: cachedSession
@@ -211,7 +217,7 @@ final class SessionDataStore: ObservableObject {
                     guard let stats = result.committedStats else { continue }
                     guard let session = sessionsById[result.sessionId] else { continue }
                     db.saveSessionStatsAndIndex(
-                        provider: self.provider.kind,
+                        provider: providerKind,
                         sessionId: session.id,
                         fileSize: session.fileSize,
                         mtime: session.lastModified,
@@ -221,6 +227,8 @@ final class SessionDataStore: ObservableObject {
                 }
                 processed += results.count
 
+                let processedCount = processed
+                let shouldRebucket = processedCount % 20 < batchSize || processedCount == total
                 await MainActor.run {
                     for result in results {
                         self.handleParseRetryState(for: result.sessionId, shouldRetry: result.shouldRetry)
@@ -228,9 +236,9 @@ final class SessionDataStore: ObservableObject {
                             self.parsedStats[result.sessionId] = stats
                         }
                     }
-                    self.parseProgress = "Parsing \(processed)/\(total)"
-                    self.parsePercent = Double(processed) / Double(total)
-                    if processed % 20 < batchSize || processed == total {
+                    self.parseProgress = "Parsing \(processedCount)/\(total)"
+                    self.parsePercent = Double(processedCount) / Double(total)
+                    if shouldRebucket {
                         self.rebucket()
                     }
                 }
@@ -244,7 +252,7 @@ final class SessionDataStore: ObservableObject {
 
             if !indexRepairIds.isEmpty {
                 Self.repairSearchIndexes(
-                    provider: self.provider,
+                    provider: provider,
                     db: db,
                     for: indexRepairIds,
                     cache: cache
@@ -254,7 +262,7 @@ final class SessionDataStore: ObservableObject {
             // Clean up DB entries for deleted sessions
             let currentIds = Set(scannedSessions.map(\.id))
             let staleIds = Set(cache.keys).subtracting(currentIds)
-            if !staleIds.isEmpty { db.removeSessions(provider: self.provider.kind, staleIds) }
+            if !staleIds.isEmpty { db.removeSessions(provider: providerKind, staleIds) }
 
             await MainActor.run {
                 self.rebucket()
@@ -302,13 +310,15 @@ final class SessionDataStore: ObservableObject {
     }
 
     private func processDirtyIds(_ ids: Set<String>, forceRescan: Bool = false) {
+        let provider = self.provider
+        let providerKind = provider.kind
+        let db = self.db
         Task.detached { [weak self] in
             guard let self else { return }
-            let db = self.db
 
             // Rescan to pick up new/deleted files
-            let scannedSessions = Self.deduplicatedSessions(self.provider.scanSessions(), provider: self.provider.kind)
-            let cache = db.loadAllCached(provider: self.provider.kind)
+            let scannedSessions = Self.deduplicatedSessions(provider.scanSessions(), provider: providerKind)
+            let cache = db.loadAllCached(provider: providerKind)
 
             await MainActor.run {
                 self.sessions = scannedSessions
@@ -333,19 +343,19 @@ final class SessionDataStore: ObservableObject {
             }
 
             for (i, session) in dirtySessions.enumerated() {
-                let quick = self.provider.parseQuickStats(at: session.filePath)
-                db.saveQuickStats(provider: self.provider.kind, sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, stats: quick)
+                let quick = provider.parseQuickStats(at: session.filePath)
+                db.saveQuickStats(provider: providerKind, sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, stats: quick)
                 await MainActor.run { self.quickStats[session.id] = quick }
 
                 let outcome = await Self.parseValidatedSession(
-                    provider: self.provider,
+                    provider: provider,
                     session: session,
                     quick: quick,
                     cached: cache[session.id]
                 )
                 if let stats = outcome.committedStats {
                     db.saveSessionStatsAndIndex(
-                        provider: self.provider.kind,
+                        provider: providerKind,
                         sessionId: session.id,
                         fileSize: session.fileSize,
                         mtime: session.lastModified,
@@ -359,8 +369,9 @@ final class SessionDataStore: ObservableObject {
                         self.parsedStats[session.id] = stats
                     }
                     if showProgress {
-                        self.parseProgress = "Updating \(i + 1)/\(total)"
-                        self.parsePercent = Double(i + 1) / Double(total)
+                        let processed = i + 1
+                        self.parseProgress = "Updating \(processed)/\(total)"
+                        self.parsePercent = Double(processed) / Double(total)
                     }
                 }
             }

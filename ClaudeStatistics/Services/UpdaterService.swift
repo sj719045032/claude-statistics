@@ -31,7 +31,7 @@ final class UpdateCheckDelegate: NSObject, SPUUpdaterDelegate {
     weak var service: UpdaterService?
 
     nonisolated func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
-        let version = item.displayVersionString ?? item.versionString
+        let version = item.displayVersionString
         DispatchQueue.main.async { [weak self] in
             self?.service?.availableVersion = version
         }

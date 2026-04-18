@@ -8,6 +8,7 @@ final class StatusBarController: NSObject, ObservableObject {
     private var statusItem: NSStatusItem!
     private var panel: StatusBarPanel!
     private var eventMonitor: Any?
+    private var hotKeyManager: GlobalHotKeyManager?
     private var cancellables = Set<AnyCancellable>()
 
     let appState: AppState
@@ -18,6 +19,13 @@ final class StatusBarController: NSObject, ObservableObject {
         setupStatusItem()
         setupPanel()
         observeMenuBarText()
+        setupHotKey()
+    }
+
+    private func setupHotKey() {
+        hotKeyManager = GlobalHotKeyManager { [weak self] in
+            self?.togglePanel(nil)
+        }
     }
 
     // MARK: - Status Item

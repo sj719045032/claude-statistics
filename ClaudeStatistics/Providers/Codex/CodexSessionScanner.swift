@@ -14,7 +14,7 @@ final class CodexSessionScanner {
             return []
         }
 
-        var db: OpaquePointer? = Self.openCodexDB(path: dbPath)
+        let db: OpaquePointer? = Self.openCodexDB(path: dbPath)
         guard let db else { return [] }
         defer { sqlite3_close(db) }
 

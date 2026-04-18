@@ -22,6 +22,7 @@
 		3984119891F7BF33DEFA170B /* CodexAccountManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 684978AF102DA512FCD3D129 /* CodexAccountManager.swift */; };
 		3A28E84ED0B7490923FA86B0 /* ShareMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA8B62A57C9E8AD16345458A /* ShareMetrics.swift */; };
 		3AD8ED72F8D42B9DB0614F77 /* UpdaterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7AD5E89B648F5018E34233A /* UpdaterService.swift */; };
+		3EB9F1EB0E5CCFFEB816D80D /* GlobalHotKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B4066C394B5E23322D32189 /* GlobalHotKeyManager.swift */; };
 		3EFB09CA9B06B024D797832B /* UsageAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32FE333B9AD0368698B9A39F /* UsageAPIService.swift */; };
 		3F7B6FCC8858E6DEECB776A0 /* SessionDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D5BA98DFF322E54A1E5B1F2 /* SessionDataStore.swift */; };
 		424369442B1C850D63CBB8C4 /* CodexProviderAccountCardSupplement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A478AE0DFDC6ACA6A24199 /* CodexProviderAccountCardSupplement.swift */; };
@@ -115,6 +116,7 @@
 		5306E49F4AF08425229312F0 /* UsageViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageViewModel.swift; sourceTree = "<group>"; };
 		54DA495D7C6105F8AD37FD7D /* SessionScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionScanner.swift; sourceTree = "<group>"; };
 		58B71B5593D63536AB462D70 /* SessionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionViewModel.swift; sourceTree = "<group>"; };
+		5B4066C394B5E23322D32189 /* GlobalHotKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotKeyManager.swift; sourceTree = "<group>"; };
 		5BD468B7884551FA250E5E0C /* GeminiProviderAccountCardAccessory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiProviderAccountCardAccessory.swift; sourceTree = "<group>"; };
 		5CA29EE31F9DA05A4CB0442F /* TrendDataPoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendDataPoint.swift; sourceTree = "<group>"; };
 		609271D9D2750E6DBBCFFAC5 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
@@ -221,6 +223,7 @@
 			isa = PBXGroup;
 			children = (
 				FAAFBA5B9EEDC2BB22BAF700 /* AutoRefreshCoordinator.swift */,
+				5B4066C394B5E23322D32189 /* GlobalHotKeyManager.swift */,
 				D1519B833F38D44123500B58 /* LanguageManager.swift */,
 				1EBE034854D1539811ED0D5F /* SearchUtils.swift */,
 				C220944581C7418B7B1797F3 /* ShareImageExporter.swift */,
@@ -491,6 +494,7 @@
 				8A89E3E017EAC054C8AA6B8F /* GeminiStatusLineInstaller.swift in Sources */,
 				58108CACA592BE955CCE7191 /* GeminiTranscriptParser.swift in Sources */,
 				5349F8DCA8E3C9A2C61A67D6 /* GeminiUsageService.swift in Sources */,
+				3EB9F1EB0E5CCFFEB816D80D /* GlobalHotKeyManager.swift in Sources */,
 				E04B621B671D090DB9155348 /* LanguageManager.swift in Sources */,
 				F3272760285AF18F519D8E80 /* MenuBarView.swift in Sources */,
 				45713102A127B294274B48AB /* PricingFetchService.swift in Sources */,
@@ -563,11 +567,11 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2.7.7;
+				CURRENT_PROJECT_VERSION = 2.7.8;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = ClaudeStatistics/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 2.7.7;
+				MARKETING_VERSION = 2.7.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.ClaudeStatistics;
 				PRODUCT_NAME = "Claude Statistics";
 				SDKROOT = macosx;
@@ -640,11 +644,11 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2.7.7;
+				CURRENT_PROJECT_VERSION = 2.7.8;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = ClaudeStatistics/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 2.7.7;
+				MARKETING_VERSION = 2.7.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.ClaudeStatistics;
 				PRODUCT_NAME = "Claude Statistics";
 				SDKROOT = macosx;

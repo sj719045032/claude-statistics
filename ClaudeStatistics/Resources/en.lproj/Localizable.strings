@@ -131,6 +131,9 @@
 "settings.appearance" = "Appearance";
 "settings.customize" = "Customize";
 "settings.launchAtLogin" = "Launch at login";
+"settings.globalHotKey" = "Global shortcut";
+"settings.globalHotKeyShortcut" = "Shortcut";
+"settings.globalHotKeyRecording" = "Press keys...";
 "settings.terminal" = "Terminal";
 "settings.resumeIn" = "Resume in";
 "settings.chooseEditor" = "Editor app";

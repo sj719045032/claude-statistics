@@ -155,25 +155,15 @@ struct MenuBarView: View {
                 .font(.system(size: 11 * fontScale))
                 .foregroundStyle(.secondary)
 
-                Spacer()
                 if let progress = store.parseProgress {
-                    if let percent = store.parsePercent {
-                        ProgressView(value: percent)
-                            .frame(width: 100)
-                        Text(progress)
-                            .font(.system(size: 10 * fontScale))
-                            .foregroundStyle(.secondary)
-                            .fixedSize()
-                    } else {
-                        ProgressView()
-                            .scaleEffect(0.5)
-                            .frame(width: 10, height: 10)
-                        Text(progress)
-                            .font(.system(size: 10 * fontScale))
-                            .foregroundStyle(.secondary)
-                            .fixedSize()
-                    }
+                    ParseProgressBadge(
+                        progress: progress,
+                        percent: store.parsePercent,
+                        fontScale: fontScale
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
                 }
+
                 Spacer()
                 HStack(spacing: 8) {
                     if visibleProviders.count > 1 {
@@ -181,12 +171,13 @@ struct MenuBarView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "sparkles")
                                     .font(.system(size: 10 * fontScale, weight: .semibold))
-                                Text("share.action.shareAllProviders")
+                                Text("share.action.share")
                                     .font(.system(size: 10 * fontScale, weight: .medium))
                             }
                         }
                         .buttonStyle(.plain)
                         .foregroundStyle(.secondary)
+                        .help(Text("share.action.shareAllProviders"))
                     }
 
                     if !visibleProviders.isEmpty {
@@ -284,6 +275,46 @@ struct MenuBarView: View {
     private func openAllProvidersShare() {
         guard let result = appState.buildAllProvidersShareRoleResult() else { return }
         SharePreviewWindowController.show(result: result, source: .allProviders)
+    }
+}
+
+private struct ParseProgressBadge: View {
+    let progress: String
+    let percent: Double?
+    let fontScale: Double
+
+    private var compactText: String {
+        progress
+            .replacingOccurrences(of: "Parsing ", with: "")
+            .replacingOccurrences(of: "Loading...", with: "Loading")
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if let percent {
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.18))
+                    Capsule()
+                        .fill(Color.accentColor.opacity(0.9))
+                        .frame(width: max(6, 38 * min(max(percent, 0), 1)))
+                }
+                .frame(width: 38, height: 4)
+            } else {
+                ProgressView()
+                    .controlSize(.small)
+                    .scaleEffect(0.45)
+                    .frame(width: 8, height: 8)
+            }
+
+            Text(compactText)
+                .font(.system(size: 10 * fontScale, weight: .medium, design: .rounded))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .fixedSize()
+        }
+        .padding(.leading, 8)
+        .accessibilityLabel(progress)
     }
 }
 

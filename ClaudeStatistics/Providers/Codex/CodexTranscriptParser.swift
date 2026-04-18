@@ -68,7 +68,7 @@ final class CodexTranscriptParser {
             quick.estimatedCost = ModelPricing.estimateCost(
                 model: model,
                 inputTokens: latestUsage.inputTokens,
-                outputTokens: latestUsage.outputTokens + latestUsage.reasoningOutputTokens,
+                outputTokens: latestUsage.outputTokens,
                 cacheCreation5mTokens: 0,
                 cacheCreation1hTokens: 0,
                 cacheCreationTotalTokens: 0,
@@ -134,13 +134,13 @@ final class CodexTranscriptParser {
                 let sliceKey = fiveMinuteKey(for: timestamp)
                 var slice = stats.fiveMinSlices[sliceKey] ?? SessionStats.DaySlice()
                 slice.totalInputTokens += delta.inputTokens
-                slice.totalOutputTokens += delta.outputTokens + delta.reasoningOutputTokens
+                slice.totalOutputTokens += delta.outputTokens
                 slice.cacheReadTokens += delta.cachedInputTokens
                 slice.messageCount += 1
 
                 var modelStats = slice.modelBreakdown[activeModel, default: ModelTokenStats()]
                 modelStats.inputTokens += delta.inputTokens
-                modelStats.outputTokens += delta.outputTokens + delta.reasoningOutputTokens
+                modelStats.outputTokens += delta.outputTokens
                 modelStats.cacheReadTokens += delta.cachedInputTokens
                 modelStats.messageCount += 1
                 slice.modelBreakdown[activeModel] = modelStats
@@ -318,7 +318,7 @@ final class CodexTranscriptParser {
                 existing.cost += ModelPricing.estimateCost(
                     model: activeModel,
                     inputTokens: delta.inputTokens,
-                    outputTokens: delta.outputTokens + delta.reasoningOutputTokens,
+                    outputTokens: delta.outputTokens,
                     cacheCreation5mTokens: 0,
                     cacheCreation1hTokens: 0,
                     cacheCreationTotalTokens: 0,
@@ -530,33 +530,63 @@ private struct UsageSnapshot {
     let cachedInputTokens: Int
     let outputTokens: Int
     let reasoningOutputTokens: Int
+    let reportedTotalTokens: Int?
+    private let rawInputTokens: Int
+    private let rawCachedInputTokens: Int
+    private let rawOutputTokens: Int
+    private let rawReasoningOutputTokens: Int
 
     var totalTokens: Int {
-        inputTokens + cachedInputTokens + outputTokens + reasoningOutputTokens
+        reportedTotalTokens ?? (inputTokens + cachedInputTokens + outputTokens)
     }
 
     init?(json: [String: Any]) {
-        inputTokens = json["input_tokens"] as? Int ?? 0
-        cachedInputTokens = json["cached_input_tokens"] as? Int ?? 0
-        outputTokens = json["output_tokens"] as? Int ?? 0
-        reasoningOutputTokens = json["reasoning_output_tokens"] as? Int ?? 0
+        self.init(
+            rawInputTokens: json["input_tokens"] as? Int ?? 0,
+            rawCachedInputTokens: json["cached_input_tokens"] as? Int ?? 0,
+            rawOutputTokens: json["output_tokens"] as? Int ?? 0,
+            rawReasoningOutputTokens: json["reasoning_output_tokens"] as? Int ?? 0,
+            reportedTotalTokens: json["total_tokens"] as? Int
+        )
+    }
+
+    private init(rawInputTokens: Int, rawCachedInputTokens: Int, rawOutputTokens: Int, rawReasoningOutputTokens: Int, reportedTotalTokens rawReportedTotalTokens: Int?) {
+        let inputIncludesCached: Bool
+        let outputIncludesReasoning: Bool
+        if let rawReportedTotalTokens {
+            inputIncludesCached =
+                rawReportedTotalTokens == rawInputTokens + rawOutputTokens ||
+                rawReportedTotalTokens == rawInputTokens + rawOutputTokens + rawReasoningOutputTokens
+            outputIncludesReasoning =
+                rawReportedTotalTokens == rawInputTokens + rawOutputTokens ||
+                rawReportedTotalTokens == rawInputTokens + rawCachedInputTokens + rawOutputTokens
+        } else {
+            inputIncludesCached = true
+            outputIncludesReasoning = true
+        }
+
+        inputTokens = inputIncludesCached ? max(0, rawInputTokens - rawCachedInputTokens) : rawInputTokens
+        cachedInputTokens = rawCachedInputTokens
+        outputTokens = outputIncludesReasoning ? rawOutputTokens : rawOutputTokens + rawReasoningOutputTokens
+        reasoningOutputTokens = outputIncludesReasoning ? rawReasoningOutputTokens : 0
+        reportedTotalTokens = rawReportedTotalTokens
+        self.rawInputTokens = rawInputTokens
+        self.rawCachedInputTokens = rawCachedInputTokens
+        self.rawOutputTokens = rawOutputTokens
+        self.rawReasoningOutputTokens = rawReasoningOutputTokens
     }
 
     func delta(from previous: UsageSnapshot?) -> UsageSnapshot {
         guard let previous else { return self }
         return UsageSnapshot(
-            inputTokens: max(0, inputTokens - previous.inputTokens),
-            cachedInputTokens: max(0, cachedInputTokens - previous.cachedInputTokens),
-            outputTokens: max(0, outputTokens - previous.outputTokens),
-            reasoningOutputTokens: max(0, reasoningOutputTokens - previous.reasoningOutputTokens)
+            rawInputTokens: max(0, rawInputTokens - previous.rawInputTokens),
+            rawCachedInputTokens: max(0, rawCachedInputTokens - previous.rawCachedInputTokens),
+            rawOutputTokens: max(0, rawOutputTokens - previous.rawOutputTokens),
+            rawReasoningOutputTokens: max(0, rawReasoningOutputTokens - previous.rawReasoningOutputTokens),
+            reportedTotalTokens: reportedTotalTokens.flatMap { total in
+                previous.reportedTotalTokens.map { max(0, total - $0) } ?? total
+            }
         )
-    }
-
-    init(inputTokens: Int, cachedInputTokens: Int, outputTokens: Int, reasoningOutputTokens: Int) {
-        self.inputTokens = inputTokens
-        self.cachedInputTokens = cachedInputTokens
-        self.outputTokens = outputTokens
-        self.reasoningOutputTokens = reasoningOutputTokens
     }
 }
 

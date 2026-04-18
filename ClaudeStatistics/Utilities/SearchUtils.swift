@@ -131,7 +131,7 @@ enum SearchUtils {
         guard !q.isEmpty else { return markdown }
 
         // Step 1: Strip existing inline code backticks so only our highlights get yellow
-        var markdown = markdown.replacingOccurrences(of: "`([^`]+)`", with: "$1", options: .regularExpression)
+        let markdown = markdown.replacingOccurrences(of: "`([^`]+)`", with: "$1", options: .regularExpression)
 
         // Step 2: Wrap matched text with backticks for yellow inline code styling
         // Try exact substring first

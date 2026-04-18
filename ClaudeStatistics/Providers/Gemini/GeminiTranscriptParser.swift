@@ -320,7 +320,7 @@ final class GeminiTranscriptParser {
     private func parseTokens(_ json: [String: Any]?) -> GeminiTokenUsage? {
         guard let json else { return nil }
         
-        let input = intValue(json["input"] ?? json["input_tokens"] ?? json["prompt_tokens"])
+        let rawInput = intValue(json["input"] ?? json["input_tokens"] ?? json["prompt_tokens"])
         let output = intValue(json["output"] ?? json["output_tokens"] ?? json["completion_tokens"])
         let cached = intValue(json["cached"] ?? json["cached_tokens"] ?? json["cache_read_tokens"])
         let thoughts = intValue(json["thoughts"] ?? json["thought_tokens"])
@@ -328,7 +328,7 @@ final class GeminiTranscriptParser {
         let total = intValue(json["total"] ?? json["total_tokens"])
         
         // If we have total but missing breakdown, try to infer or at least return the total
-        if total > 0 && input == 0 && output == 0 {
+        if total > 0 && rawInput == 0 && output == 0 {
             return GeminiTokenUsage(
                 inputTokens: total, // Fallback: treat total as input if no breakdown
                 outputTokens: 0,
@@ -338,9 +338,14 @@ final class GeminiTranscriptParser {
                 rawTotalTokens: total
             )
         }
+
+        let billedOutput = output + thoughts + tool
+        let inputIncludesCached = total > 0
+            ? total == rawInput + billedOutput
+            : true
         
         return GeminiTokenUsage(
-            inputTokens: input,
+            inputTokens: inputIncludesCached ? max(0, rawInput - cached) : rawInput,
             outputTokens: output,
             cachedTokens: cached,
             thoughtTokens: thoughts,
@@ -608,6 +613,6 @@ struct GeminiTokenUsage {
     }
 
     var totalTokens: Int {
-        max(rawTotalTokens, inputTokens + cachedTokens + billedOutputTokens)
+        inputTokens + cachedTokens + billedOutputTokens
     }
 }

@@ -1,5 +1,6 @@
 import SwiftUI
 import ServiceManagement
+import Carbon
 
 struct SettingsView: View {
     @ObservedObject var appState: AppState
@@ -15,6 +16,9 @@ struct SettingsView: View {
     @AppStorage("appLanguage") private var appLanguage = "auto"
     @AppStorage("fontScale") private var fontScale = 1.0
     @AppStorage("customInterval") private var customInterval = false
+    @AppStorage(GlobalHotKeyShortcut.enabledKey) private var globalHotKeyEnabled = true
+    @AppStorage(GlobalHotKeyShortcut.keyCodeKey) private var globalHotKeyKeyCode = GlobalHotKeyShortcut.defaultKeyCode
+    @AppStorage(GlobalHotKeyShortcut.modifiersKey) private var globalHotKeyModifiers = GlobalHotKeyShortcut.defaultModifiers
     @State private var customMinutes = ""
     @State private var showPricing = false
     @State private var hasToken: Bool?
@@ -97,6 +101,15 @@ struct SettingsView: View {
                             launchAtLogin = SMAppService.mainApp.status == .enabled
                         }
                     }
+
+                Toggle("settings.globalHotKey", isOn: $globalHotKeyEnabled)
+
+                if globalHotKeyEnabled {
+                    HotKeyRecorderRow(
+                        keyCode: $globalHotKeyKeyCode,
+                        modifiers: $globalHotKeyModifiers
+                    )
+                }
             }
 
             // Auto Refresh
@@ -499,6 +512,102 @@ struct SettingsView: View {
         usageViewModel.startAutoRefresh()
     }
 
+}
+
+// MARK: - Hot Key Recorder
+
+private struct HotKeyRecorderRow: View {
+    @Binding var keyCode: Int
+    @Binding var modifiers: Int
+    @State private var isRecording = false
+    @State private var eventMonitor: Any?
+
+    private var shortcutText: String {
+        GlobalHotKeyShortcut.displayText(keyCode: keyCode, modifiers: modifiers)
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("settings.globalHotKeyShortcut")
+                .font(.system(size: 12))
+
+            Spacer()
+
+            Button(action: toggleRecording) {
+                Group {
+                    if isRecording {
+                        Text("settings.globalHotKeyRecording")
+                    } else {
+                        Text(shortcutText)
+                    }
+                }
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundStyle(isRecording ? .white : .primary)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .frame(minWidth: 82)
+                .background(isRecording ? Color.accentColor : Color.secondary.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            .buttonStyle(.plain)
+
+            if isRecording {
+                Button("session.cancel") {
+                    stopRecording()
+                }
+                .font(.system(size: 10))
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            }
+
+            Button("settings.resetDefault") {
+                keyCode = GlobalHotKeyShortcut.defaultKeyCode
+                modifiers = GlobalHotKeyShortcut.defaultModifiers
+            }
+            .font(.system(size: 10))
+            .buttonStyle(.plain)
+            .foregroundStyle(.blue)
+        }
+        .onDisappear { stopRecording() }
+    }
+
+    private func toggleRecording() {
+        if isRecording {
+            stopRecording()
+        } else {
+            startRecording()
+        }
+    }
+
+    private func startRecording() {
+        guard !isRecording else { return }
+        isRecording = true
+
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == UInt16(kVK_Escape) {
+                stopRecording()
+                return nil
+            }
+
+            let capturedModifiers = GlobalHotKeyShortcut.carbonModifiers(from: event.modifierFlags)
+            guard capturedModifiers != 0 else {
+                return nil
+            }
+
+            keyCode = Int(event.keyCode)
+            modifiers = capturedModifiers
+            stopRecording()
+            return nil
+        }
+    }
+
+    private func stopRecording() {
+        if let eventMonitor {
+            NSEvent.removeMonitor(eventMonitor)
+            self.eventMonitor = nil
+        }
+        isRecording = false
+    }
 }
 
 // MARK: - Tab Order Editor

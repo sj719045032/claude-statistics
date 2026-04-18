@@ -4,6 +4,7 @@ set -euo pipefail
 APP_NAME="Claude Statistics"
 BUILD_DIR="/tmp/claude-stats-build"
 APP_PATH="${BUILD_DIR}/Build/Products/Debug/${APP_NAME}.app"
+DEBUG_CODE_SIGN_IDENTITY="${DEBUG_CODE_SIGN_IDENTITY:-Claude Statistics Debug Code Signing}"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
 
 # 1. Kill all running instances and wait for full exit
@@ -31,10 +32,20 @@ fi
 
 echo "** BUILD SUCCEEDED **"
 
-# 4. Re-register with Launch Services so macOS knows this is the active build
+# 4. Prefer a stable local signing identity for debug builds.
+#    Ad-hoc signatures change across rebuilds, which makes Keychain ask for
+#    access repeatedly. A stable local identity keeps the app requirement stable.
+if security find-identity -v -p codesigning | grep -Fq "\"${DEBUG_CODE_SIGN_IDENTITY}\""; then
+  echo "==> Re-signing debug app with ${DEBUG_CODE_SIGN_IDENTITY}..."
+  codesign --force --deep --sign "${DEBUG_CODE_SIGN_IDENTITY}" "${APP_PATH}"
+else
+  echo "==> No stable debug signing identity found; keeping ad-hoc signature."
+fi
+
+# 5. Re-register with Launch Services so macOS knows this is the active build
 ${LSREGISTER} -f -R -trusted "${APP_PATH}"
 
-# 5. Launch directly by binary path (bypasses Launch Services entirely)
+# 6. Launch directly by binary path (bypasses Launch Services entirely)
 echo "==> Launching..."
 nohup "${APP_PATH}/Contents/MacOS/${APP_NAME}" >/dev/null 2>&1 &
 sleep 1

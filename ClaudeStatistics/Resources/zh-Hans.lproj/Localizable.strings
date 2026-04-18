@@ -131,6 +131,9 @@
 "settings.appearance" = "外观";
 "settings.customize" = "自定义";
 "settings.launchAtLogin" = "开机自动启动";
+"settings.globalHotKey" = "全局快捷键";
+"settings.globalHotKeyShortcut" = "快捷键";
+"settings.globalHotKeyRecording" = "请按快捷键...";
 "settings.terminal" = "终端";
 "settings.resumeIn" = "恢复终端";
 "settings.chooseEditor" = "编辑器";
