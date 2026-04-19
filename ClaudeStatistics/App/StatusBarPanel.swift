@@ -27,7 +27,7 @@ final class StatusBarPanel: NSPanel {
 
         // Popover-style background with rounded corners
         let effectView = NSVisualEffectView()
-        effectView.material = .popover
+        effectView.material = .sidebar
         effectView.blendingMode = .behindWindow
         effectView.state = .active
         effectView.wantsLayer = true
