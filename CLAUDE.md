@@ -40,3 +40,31 @@ gh auth switch --hostname github.com --user tinystone007
 - If `gh release create` fails with workflow scope error: `gh auth refresh -h github.com -s workflow`
 - DMG is not Apple signed/notarized. Users run: `xattr -cr /Applications/Claude\ Statistics.app`
 - **Release notes must be bilingual**: English section followed by `## 中文` section. Applies to every release.
+
+## Deploy Website to Vercel
+
+The marketing site is deployed from the **repo root**, not from `website/`.
+
+```bash
+# 1. Build locally first
+cd /path/to/claude-statistics/website
+ASTRO_TELEMETRY_DISABLED=1 npm run build
+
+# 2. Go back to repo root
+cd /path/to/claude-statistics
+
+# 3. Link to the existing Vercel project if needed
+npx vercel link --project claude-statistics --yes
+
+# 4. Deploy production from repo root
+npx vercel --prod --yes
+```
+
+**Important:**
+- Do **not** run `vercel link` or `vercel --prod` inside `website/`, or Vercel may create/link a separate project such as `website`.
+- The root `vercel.json` already points Vercel at the Astro app with:
+  - `installCommand: npm --prefix website install`
+  - `buildCommand: npm --prefix website run build`
+  - `outputDirectory: website/dist`
+- The intended Vercel project is `jinshitinystone-9840s-projects/claude-statistics`.
+- If Vercel fails with missing files under `website/public/*.symlink.bak`, remove those backup symlinks before redeploying.
