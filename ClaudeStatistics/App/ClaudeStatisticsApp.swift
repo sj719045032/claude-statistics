@@ -12,6 +12,7 @@ final class AppState: ObservableObject {
     let profileViewModel = ProfileViewModel()
     let updaterService = UpdaterService()
     let claudeAccountManager = ClaudeAccountManager()
+    let independentClaudeAccountManager = IndependentClaudeAccountManager()
     let codexAccountManager = CodexAccountManager()
     let geminiAccountManager = GeminiAccountManager()
     private var cancellables: Set<AnyCancellable> = []
@@ -102,6 +103,7 @@ final class AppState: ObservableObject {
         switch kind {
         case .claude:
             claudeAccountManager.load()
+            independentClaudeAccountManager.load()
         case .codex:
             codexAccountManager.load()
         case .gemini:

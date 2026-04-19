@@ -16,7 +16,12 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
     var pricingSourceLocalizationKey: String? { "pricing.source.claude" }
     var pricingSourceURL: URL? { URL(string: "https://docs.anthropic.com/en/docs/about-claude/pricing") }
     var pricingUpdatedLocalizationKey: String? { "pricing.updated.claude" }
-    var credentialHintLocalizationKey: String? { "settings.credentialHint.claude" }
+    var credentialHintLocalizationKey: String? {
+        switch ClaudeAccountModeController.shared.mode {
+        case .independent: return "settings.credentialHint.claude.independent"
+        case .sync: return "settings.credentialHint.claude"
+        }
+    }
 
     private init() {}
 

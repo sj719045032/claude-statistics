@@ -44,12 +44,16 @@ struct AccountSwitcherAccessory<Account: Identifiable>: View {
     @State private var pendingDeleteAccount: Account?
 
     var body: some View {
-        Button {
-            showingAccountsPopover.toggle()
-        } label: {
-            triggerLabel
+        Group {
+            if triggerStyle == .text {
+                Button { showingAccountsPopover.toggle() } label: { triggerLabel }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            } else {
+                Button { showingAccountsPopover.toggle() } label: { triggerLabel }
+                    .buttonStyle(.plain)
+            }
         }
-        .buttonStyle(.plain)
         .popover(isPresented: $showingAccountsPopover, arrowEdge: .top) {
             VStack(alignment: .leading, spacing: 0) {
                 if isAddingAccount {
@@ -145,10 +149,6 @@ struct AccountSwitcherAccessory<Account: Identifiable>: View {
                 }
             }
             .font(.system(size: 11, weight: .medium))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Color.primary.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         case .icon:
             ZStack {
                 if isAddingAccount {

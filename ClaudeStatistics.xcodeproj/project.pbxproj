@@ -81,6 +81,16 @@
 		F324566F7B85AFF3C7E1EEAC /* CalendarHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1390435247ECA654A169EB3C /* CalendarHeatmap.swift */; };
 		F3272760285AF18F519D8E80 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41054FA7DE043B7E25B4A88E /* MenuBarView.swift */; };
 		F34E915FE87F63D8BB7181BD /* ClaudeAccountManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C931907E9B4996736E4A7373 /* ClaudeAccountManager.swift */; };
+		93144733B8D8158FFEA5722B /* ClaudeManagedAccountStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8D55081F64A4E5F2DCFDCE9 /* ClaudeManagedAccountStore.swift */; };
+		2E94C1E3DF7D489D577235DD /* ClaudePKCE.swift in Sources */ = {isa = PBXBuildFile; fileRef = 503126B380AED83625F38420 /* ClaudePKCE.swift */; };
+		01C05942E1E6432F87327684 /* ClaudeOAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 569D811F9E307311934F46F4 /* ClaudeOAuthClient.swift */; };
+		0A7E7F410B22E7FBC873AADC /* ClaudeOAuthCallbackServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EDD5C325B5E89809A38D503 /* ClaudeOAuthCallbackServer.swift */; };
+		F3392D15D25583CB6EE9295F /* IndependentClaudeCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3329A311D27053D3E66E766E /* IndependentClaudeCredentialStore.swift */; };
+		9F1C1F53DDA6BC64D54E8AC4 /* ClaudeAccountModeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62D55214241388C93B043AB5 /* ClaudeAccountModeController.swift */; };
+		8BA83BEF2EE8210FF2B1CA28 /* IndependentClaudeAccountViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FA232D735D8D5FAC9A279AE /* IndependentClaudeAccountViewModel.swift */; };
+		D83E71B1BD5022DD30FDED7E /* IndependentClaudeAccountManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA11521F6D9CA40162416E11 /* IndependentClaudeAccountManager.swift */; };
+		9E57B69C05F8336D223CB776 /* ClaudeAccountSourcePickerRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB4AD05C49B625CB9CF6AF98 /* ClaudeAccountSourcePickerRow.swift */; };
+		1DCACE253099E8A2EFE0457A /* ClaudeOAuthLoginSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 626B15A5F772ACA0D0BD0E1D /* ClaudeOAuthLoginSheet.swift */; };
 		F7761B0329D579925F2DB98E /* UsageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3511F107E29217FB16567AF9 /* UsageView.swift */; };
 		FA20F885511C5F92715056F9 /* FSEventsWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35EC230BC5F1EF207A984D87 /* FSEventsWatcher.swift */; };
 		FD14DC1AD66B5C54FED7B078 /* CodexSessionScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872985FBB1CB099BD6D4B01E /* CodexSessionScanner.swift */; };
@@ -150,6 +160,16 @@
 		C220944581C7418B7B1797F3 /* ShareImageExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareImageExporter.swift; sourceTree = "<group>"; };
 		C3374C538E77CED126DE3016 /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
 		C931907E9B4996736E4A7373 /* ClaudeAccountManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeAccountManager.swift; sourceTree = "<group>"; };
+		E8D55081F64A4E5F2DCFDCE9 /* ClaudeManagedAccountStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeManagedAccountStore.swift; sourceTree = "<group>"; };
+		503126B380AED83625F38420 /* ClaudePKCE.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudePKCE.swift; sourceTree = "<group>"; };
+		569D811F9E307311934F46F4 /* ClaudeOAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeOAuthClient.swift; sourceTree = "<group>"; };
+		6EDD5C325B5E89809A38D503 /* ClaudeOAuthCallbackServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeOAuthCallbackServer.swift; sourceTree = "<group>"; };
+		3329A311D27053D3E66E766E /* IndependentClaudeCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndependentClaudeCredentialStore.swift; sourceTree = "<group>"; };
+		62D55214241388C93B043AB5 /* ClaudeAccountModeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeAccountModeController.swift; sourceTree = "<group>"; };
+		5FA232D735D8D5FAC9A279AE /* IndependentClaudeAccountViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndependentClaudeAccountViewModel.swift; sourceTree = "<group>"; };
+		BA11521F6D9CA40162416E11 /* IndependentClaudeAccountManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndependentClaudeAccountManager.swift; sourceTree = "<group>"; };
+		AB4AD05C49B625CB9CF6AF98 /* ClaudeAccountSourcePickerRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeAccountSourcePickerRow.swift; sourceTree = "<group>"; };
+		626B15A5F772ACA0D0BD0E1D /* ClaudeOAuthLoginSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeOAuthLoginSheet.swift; sourceTree = "<group>"; };
 		CAF9A88BAC1F779F77E517EB /* SessionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListView.swift; sourceTree = "<group>"; };
 		CCF8FD132C6328D09C336FB9 /* CodexProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexProvider.swift; sourceTree = "<group>"; };
 		CD0415091A24EBCDA6840A49 /* SessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetailView.swift; sourceTree = "<group>"; };
@@ -200,7 +220,17 @@
 			isa = PBXGroup;
 			children = (
 				C931907E9B4996736E4A7373 /* ClaudeAccountManager.swift */,
+				62D55214241388C93B043AB5 /* ClaudeAccountModeController.swift */,
+				AB4AD05C49B625CB9CF6AF98 /* ClaudeAccountSourcePickerRow.swift */,
+				E8D55081F64A4E5F2DCFDCE9 /* ClaudeManagedAccountStore.swift */,
+				6EDD5C325B5E89809A38D503 /* ClaudeOAuthCallbackServer.swift */,
+				569D811F9E307311934F46F4 /* ClaudeOAuthClient.swift */,
+				626B15A5F772ACA0D0BD0E1D /* ClaudeOAuthLoginSheet.swift */,
+				503126B380AED83625F38420 /* ClaudePKCE.swift */,
 				7AA9035C5B842200A3C1F84E /* ClaudeProvider.swift */,
+				BA11521F6D9CA40162416E11 /* IndependentClaudeAccountManager.swift */,
+				5FA232D735D8D5FAC9A279AE /* IndependentClaudeAccountViewModel.swift */,
+				3329A311D27053D3E66E766E /* IndependentClaudeCredentialStore.swift */,
 				669DD3F7CA0ACD5A8FFF69A3 /* ClaudeProviderAccountCardAccessory.swift */,
 				EA6D16472FCD12FE7A8C1891 /* CredentialService.swift */,
 				54DA495D7C6105F8AD37FD7D /* SessionScanner.swift */,
@@ -472,7 +502,17 @@
 				4A69484840B48CDE187957E0 /* AutoRefreshCoordinator.swift in Sources */,
 				F324566F7B85AFF3C7E1EEAC /* CalendarHeatmap.swift in Sources */,
 				F34E915FE87F63D8BB7181BD /* ClaudeAccountManager.swift in Sources */,
+				9F1C1F53DDA6BC64D54E8AC4 /* ClaudeAccountModeController.swift in Sources */,
+				9E57B69C05F8336D223CB776 /* ClaudeAccountSourcePickerRow.swift in Sources */,
+				93144733B8D8158FFEA5722B /* ClaudeManagedAccountStore.swift in Sources */,
+				0A7E7F410B22E7FBC873AADC /* ClaudeOAuthCallbackServer.swift in Sources */,
+				01C05942E1E6432F87327684 /* ClaudeOAuthClient.swift in Sources */,
+				1DCACE253099E8A2EFE0457A /* ClaudeOAuthLoginSheet.swift in Sources */,
+				2E94C1E3DF7D489D577235DD /* ClaudePKCE.swift in Sources */,
 				EC17520544A6FEEA8B3F3430 /* ClaudeProvider.swift in Sources */,
+				D83E71B1BD5022DD30FDED7E /* IndependentClaudeAccountManager.swift in Sources */,
+				8BA83BEF2EE8210FF2B1CA28 /* IndependentClaudeAccountViewModel.swift in Sources */,
+				F3392D15D25583CB6EE9295F /* IndependentClaudeCredentialStore.swift in Sources */,
 				480C7AC744109467B48A6A47 /* ClaudeProviderAccountCardAccessory.swift in Sources */,
 				FEFC2968DA07D06063D40E24 /* ClaudeStatisticsApp.swift in Sources */,
 				3984119891F7BF33DEFA170B /* CodexAccountManager.swift in Sources */,

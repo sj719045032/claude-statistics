@@ -149,6 +149,7 @@
 "settings.notFoundStatus" = "Not found";
 "settings.credentialHint" = "Reads from macOS Keychain or ~/.claude/.credentials.json";
 "settings.credentialHint.claude" = "Reads from macOS Keychain";
+"settings.credentialHint.claude.independent" = "Sign in to use this app's own credentials";
 "settings.credentialHint.codex" = "Reads from ~/.codex/auth.json";
 "settings.credentialHint.gemini" = "Reads from ~/.gemini/settings.json and ~/.gemini/oauth_creds.json";
 "settings.codexAccounts" = "Codex Accounts";
@@ -389,3 +390,43 @@
 "share.scope.allTime" = "AI Footprint";
 "share.scope.allProviders" = "All AI Footprint";
 "share.scope.lastYear" = "Last 365 Days";
+
+// Claude account source mode
+"claude.accountSource" = "Account source";
+"claude.accountSource.triggerPrefix" = "Source";
+"claude.accountSource.sectionHeader" = "Claude Account";
+"claude.accountSource.menuHeader" = "Where Claude Statistics gets credentials";
+"claude.accountSource.independent" = "This app (own sign-in)";
+"claude.accountSource.independent.short" = "This app";
+"claude.accountSource.sync" = "Claude CLI account";
+"claude.accountSource.sync.short" = "Claude CLI";
+"claude.accountSource.syncWarning.title" = "Share credentials with Claude CLI?";
+"claude.accountSource.syncWarning.message" = "Sharing lets you switch between multiple CLI accounts from this app.\n\nTrade-off: macOS may ask for your login keychain password on first access and after each app upgrade. Your current app-only sign-in is kept and you can switch back anytime.";
+"claude.accountSource.syncWarning.confirm" = "Switch";
+
+// Claude OAuth sign-in sheet
+"claude.oauth.signIn" = "Sign in";
+"claude.oauth.signOut" = "Sign out";
+"claude.oauth.signedIn" = "Signed in";
+"claude.oauth.notSignedIn" = "Not signed in";
+"claude.oauth.cancel" = "Cancel";
+"claude.oauth.close" = "Close";
+"claude.oauth.done" = "Done";
+"claude.oauth.retry" = "Try Again";
+"claude.oauth.finishing" = "Finishing up…";
+"claude.oauth.expired" = "Expired";
+"claude.oauth.expiresIn %@" = "Expires in %@";
+
+"claude.oauth.title.signIn" = "Sign in to Claude";
+"claude.oauth.title.opening" = "Opening browser…";
+"claude.oauth.title.waiting" = "Waiting for sign-in";
+"claude.oauth.title.finishing" = "Finishing up…";
+"claude.oauth.title.success" = "Signed in";
+"claude.oauth.title.failed" = "Sign-in failed";
+
+"claude.oauth.description.idle" = "Sign in to your Claude account so this app can show your usage without sharing credentials with the CLI.";
+"claude.oauth.description.opening" = "Your browser will open the Claude sign-in page in a moment.";
+"claude.oauth.description.waiting" = "Complete sign-in in your browser. The page will return here automatically.";
+"claude.oauth.description.exchanging" = "Exchanging authorization code for tokens…";
+"claude.oauth.description.success" = "You can close this panel now.";
+"claude.oauth.description.successWithEmail %@" = "Signed in as %@.";

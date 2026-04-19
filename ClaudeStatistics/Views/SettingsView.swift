@@ -57,6 +57,12 @@ struct SettingsView: View {
             Divider()
 
             Form {
+            if provider.kind == .claude {
+                Section("claude.accountSource.sectionHeader") {
+                    ClaudeAccountSourcePickerRow()
+                }
+            }
+
             // Terminal + Launch at Login
             Section("settings.general") {
                 Picker("settings.resumeIn", selection: $preferredTerminal) {

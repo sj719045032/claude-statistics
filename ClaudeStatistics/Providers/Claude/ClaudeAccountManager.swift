@@ -297,11 +297,6 @@ struct ClaudeManagedAccount: Codable, Identifiable, Hashable {
     }
 }
 
-private struct ClaudeManagedAccountSet: Codable {
-    let version: Int
-    let accounts: [ClaudeManagedAccount]
-}
-
 // MARK: - Legacy Migration
 
 private struct LegacyClaudeManagedAccount: Codable {
@@ -333,7 +328,6 @@ final class ClaudeAccountManager: ObservableObject {
 
     private let fileManager: FileManager
     private var addPollingTask: Task<Void, Never>?
-    private static let storeVersion = 2
 
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
@@ -345,6 +339,14 @@ final class ClaudeAccountManager: ObservableObject {
     }
 
     func load() {
+        guard ClaudeAccountModeController.shared.mode == .sync else {
+            // Independent mode: managed accounts list stays empty; the UI shows the
+            // single self-managed account from IndependentClaudeCredentialStore.
+            liveAccount = nil
+            managedAccounts = []
+            return
+        }
+
         importOrphanedManagedConfigsIfNeeded()
 
         do {
@@ -446,7 +448,7 @@ final class ClaudeAccountManager: ObservableObject {
             let snapshot = try loadSnapshot()
             guard let account = snapshot.accounts.first(where: { $0.id == id }) else { return }
             let updated = snapshot.accounts.filter { $0.id != id }
-            try storeSnapshot(ClaudeManagedAccountSet(version: Self.storeVersion, accounts: updated))
+            try storeSnapshot(ClaudeManagedAccountSet(version: ClaudeManagedAccountStore.storeVersion, accounts: updated))
             load()
             noticeMessage = String(
                 format: NSLocalizedString("settings.claudeAccounts.removed %@", comment: ""),
@@ -597,7 +599,7 @@ final class ClaudeAccountManager: ObservableObject {
         )
 
         let updatedAccounts = snapshot.accounts.filter { $0.id != accountID } + [account]
-        try storeSnapshot(ClaudeManagedAccountSet(version: Self.storeVersion, accounts: updatedAccounts))
+        try storeSnapshot(ClaudeManagedAccountSet(version: ClaudeManagedAccountStore.storeVersion, accounts: updatedAccounts))
 
         return account
     }
@@ -642,18 +644,17 @@ final class ClaudeAccountManager: ObservableObject {
     }
 
     private func loadSnapshot() throws -> ClaudeManagedAccountSet {
-        let storeURL = managedStoreURL()
+        let storeURL = ClaudeManagedAccountStore.storeURL()
         guard fileManager.fileExists(atPath: storeURL.path) else {
-            return ClaudeManagedAccountSet(version: Self.storeVersion, accounts: [])
+            return ClaudeManagedAccountSet(version: ClaudeManagedAccountStore.storeVersion, accounts: [])
+        }
+
+        if let snapshot = ClaudeManagedAccountStore.loadSet() {
+            return snapshot
         }
 
         let data = try Data(contentsOf: storeURL)
-        let decoder = JSONDecoder()
-        if let snapshot = try? decoder.decode(ClaudeManagedAccountSet.self, from: data) {
-            return ClaudeManagedAccountSet(version: Self.storeVersion, accounts: snapshot.accounts)
-        }
-
-        let legacySnapshot = try decoder.decode(LegacyClaudeManagedAccountSet.self, from: data)
+        let legacySnapshot = try JSONDecoder().decode(LegacyClaudeManagedAccountSet.self, from: data)
         let convertedAccounts = legacySnapshot.accounts.compactMap { account -> ClaudeManagedAccount? in
             guard let material = try? ClaudeAuthStore.readAuthMaterial(configPath: account.managedConfigPath) else {
                 return nil
@@ -671,22 +672,11 @@ final class ClaudeAccountManager: ObservableObject {
                 updatedAt: account.updatedAt
             )
         }
-        return ClaudeManagedAccountSet(version: Self.storeVersion, accounts: convertedAccounts)
+        return ClaudeManagedAccountSet(version: ClaudeManagedAccountStore.storeVersion, accounts: convertedAccounts)
     }
 
     private func storeSnapshot(_ snapshot: ClaudeManagedAccountSet) throws {
-        let storeURL = managedStoreURL()
-        try fileManager.createDirectory(at: storeURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(snapshot)
-        try data.write(to: storeURL, options: .atomic)
-        try fileManager.setAttributes([.posixPermissions: NSNumber(value: Int16(0o600))], ofItemAtPath: storeURL.path)
-    }
-
-    private func managedStoreURL() -> URL {
-        appSupportRootURL().appendingPathComponent("managed-claude-accounts.json", isDirectory: false)
+        try ClaudeManagedAccountStore.save(snapshot)
     }
 
     private func legacyManagedConfigsRootURL() -> URL {

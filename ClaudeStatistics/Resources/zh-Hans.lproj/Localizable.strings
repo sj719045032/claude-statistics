@@ -149,6 +149,7 @@
 "settings.notFoundStatus" = "未找到";
 "settings.credentialHint" = "从 macOS 钥匙串或 ~/.claude/.credentials.json 读取";
 "settings.credentialHint.claude" = "从 macOS 钥匙串读取";
+"settings.credentialHint.claude.independent" = "请登录以使用本应用的独立凭据";
 "settings.credentialHint.codex" = "从 ~/.codex/auth.json 读取";
 "settings.credentialHint.gemini" = "从 ~/.gemini/settings.json 和 ~/.gemini/oauth_creds.json 读取";
 "settings.codexAccounts" = "Codex 账号";
@@ -389,3 +390,43 @@
 "share.scope.allTime" = "AI 足迹";
 "share.scope.allProviders" = "全 AI 足迹";
 "share.scope.lastYear" = "最近 365 天";
+
+// Claude account source mode
+"claude.accountSource" = "账号来源";
+"claude.accountSource.triggerPrefix" = "账号来源";
+"claude.accountSource.sectionHeader" = "Claude 账号";
+"claude.accountSource.menuHeader" = "Claude Statistics 从哪里获取凭据";
+"claude.accountSource.independent" = "本应用独立登录";
+"claude.accountSource.independent.short" = "本应用";
+"claude.accountSource.sync" = "共享 Claude CLI 账号";
+"claude.accountSource.sync.short" = "Claude CLI";
+"claude.accountSource.syncWarning.title" = "共享 Claude CLI 账号？";
+"claude.accountSource.syncWarning.message" = "共享后可以在本应用里切换多个 CLI 账号。\n\n代价：首次访问以及每次应用升级后，macOS 可能要求输入登录钥匙串密码。当前本应用独立登录的账号会保留，随时可以切回。";
+"claude.accountSource.syncWarning.confirm" = "切换";
+
+// Claude OAuth sign-in sheet
+"claude.oauth.signIn" = "登录";
+"claude.oauth.signOut" = "退出登录";
+"claude.oauth.signedIn" = "已登录";
+"claude.oauth.notSignedIn" = "未登录";
+"claude.oauth.cancel" = "取消";
+"claude.oauth.close" = "关闭";
+"claude.oauth.done" = "完成";
+"claude.oauth.retry" = "重试";
+"claude.oauth.finishing" = "完成中…";
+"claude.oauth.expired" = "已过期";
+"claude.oauth.expiresIn %@" = "%@ 后过期";
+
+"claude.oauth.title.signIn" = "登录 Claude";
+"claude.oauth.title.opening" = "正在打开浏览器…";
+"claude.oauth.title.waiting" = "等待浏览器授权";
+"claude.oauth.title.finishing" = "完成中…";
+"claude.oauth.title.success" = "登录成功";
+"claude.oauth.title.failed" = "登录失败";
+
+"claude.oauth.description.idle" = "登录你的 Claude 账号，使本应用不经 CLI 凭据即可显示用量。";
+"claude.oauth.description.opening" = "浏览器即将打开 Claude 登录页。";
+"claude.oauth.description.waiting" = "请在浏览器中完成登录，页面会自动返回到此。";
+"claude.oauth.description.exchanging" = "正在用授权码换取令牌…";
+"claude.oauth.description.success" = "你可以关闭此窗口了。";
+"claude.oauth.description.successWithEmail %@" = "已登录账号 %@。";

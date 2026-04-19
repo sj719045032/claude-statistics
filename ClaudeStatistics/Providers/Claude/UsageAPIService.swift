@@ -66,9 +66,29 @@ final class UsageAPIService: ProviderUsageSource {
 
     // MARK: - Token Refresh
 
-    /// Trigger Claude Code CLI to refresh the OAuth token
+    /// Refresh the Claude OAuth token. In Independent mode the app performs the refresh
+    /// itself via the Anthropic token endpoint. In Sync mode it delegates to the CLI.
     func refreshToken() async -> Bool {
-        // GUI apps have limited PATH — resolve claude binary explicitly
+        switch ClaudeAccountModeController.shared.mode {
+        case .independent:
+            return await refreshTokenIndependent()
+        case .sync:
+            return refreshTokenViaCLI()
+        }
+    }
+
+    private func refreshTokenIndependent() async -> Bool {
+        do {
+            _ = try await IndependentClaudeCredentialStore.shared.refreshActiveNow()
+            CredentialService.shared.invalidate()
+            return true
+        } catch {
+            DiagnosticLogger.shared.warning("Independent token refresh failed: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    private func refreshTokenViaCLI() -> Bool {
         let candidates = [
             "\(NSHomeDirectory())/.local/bin/claude",
             "/usr/local/bin/claude",
@@ -89,6 +109,9 @@ final class UsageAPIService: ProviderUsageSource {
             try process.run()
             process.waitUntilExit()
             let success = process.terminationStatus == 0
+            if success {
+                CredentialService.shared.invalidate(forceBypassBackup: true)
+            }
             return success
         } catch {
             return false
