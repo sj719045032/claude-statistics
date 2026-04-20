@@ -99,6 +99,31 @@ struct ClaudeStatusLineAdapter: StatusLineInstalling {
     var hasRestoreOption: Bool { StatusLineInstaller.hasBackup }
     var titleLocalizationKey: String { "statusLine.title" }
     var descriptionLocalizationKey: String { "statusLine.description" }
+    var legendSections: [StatusLineLegendSection] {
+        [
+            StatusLineLegendSection(
+                titleLocalizationKey: "statusLine.legend.section.metrics",
+                items: [
+                    StatusLineLegendItem(example: "5h 42%(3h20m)", descriptionLocalizationKey: "statusLine.legend.metric.fiveHour"),
+                    StatusLineLegendItem(example: "7d 38%(2d4h)", descriptionLocalizationKey: "statusLine.legend.metric.sevenDay"),
+                    StatusLineLegendItem(example: "↑ 128k  ↓ 24k", descriptionLocalizationKey: "statusLine.legend.metric.tokens"),
+                    StatusLineLegendItem(example: "⇡ 8k  ⇣ 120k", descriptionLocalizationKey: "statusLine.legend.metric.cache")
+                ]
+            ),
+            StatusLineLegendSection(
+                titleLocalizationKey: "statusLine.legend.section.git",
+                items: [
+                    StatusLineLegendItem(example: "✓", descriptionLocalizationKey: "statusLine.legend.git.clean"),
+                    StatusLineLegendItem(example: "×", descriptionLocalizationKey: "statusLine.legend.git.dirty"),
+                    StatusLineLegendItem(example: "ahead:2 behind:1", descriptionLocalizationKey: "statusLine.legend.git.sync"),
+                    StatusLineLegendItem(example: "stage:3", descriptionLocalizationKey: "statusLine.legend.git.staged"),
+                    StatusLineLegendItem(example: "mod:2", descriptionLocalizationKey: "statusLine.legend.git.modified"),
+                    StatusLineLegendItem(example: "new:1", descriptionLocalizationKey: "statusLine.legend.git.untracked"),
+                    StatusLineLegendItem(example: "stash:4", descriptionLocalizationKey: "statusLine.legend.git.stash")
+                ]
+            )
+        ]
+    }
     func install() throws { try StatusLineInstaller.install() }
     func restore() throws { try StatusLineInstaller.restore() }
 }

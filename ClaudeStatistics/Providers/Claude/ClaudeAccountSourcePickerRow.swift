@@ -4,48 +4,54 @@ import SwiftUI
 /// Shown in Settings (only when the active provider is Claude), not in the account card.
 struct ClaudeAccountSourcePickerRow: View {
     @State private var mode: ClaudeAccountMode = ClaudeAccountModeController.shared.mode
-    @State private var showingSyncWarning = false
-    @State private var pendingMode: ClaudeAccountMode?
+    @State private var showsHelp = false
 
     var body: some View {
-        Picker("claude.accountSource", selection: Binding(
-            get: { mode },
-            set: { request(switchTo: $0) }
-        )) {
-            Text("claude.accountSource.independent").tag(ClaudeAccountMode.independent)
-            Text("claude.accountSource.sync").tag(ClaudeAccountMode.sync)
+        HStack(spacing: 8) {
+            Text("claude.accountSource")
+                .font(.system(size: 12))
+
+            Button {
+                showsHelp.toggle()
+            } label: {
+                Image(systemName: "questionmark.circle")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $showsHelp, arrowEdge: .top) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("claude.accountSource.help.title")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("claude.accountSource.help.message")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(width: 300, alignment: .leading)
+                .padding(12)
+            }
+
+            Spacer()
+
+            Picker("", selection: Binding(
+                get: { mode },
+                set: { commit($0) }
+            )) {
+                Text("claude.accountSource.independent").tag(ClaudeAccountMode.independent)
+                Text("claude.accountSource.sync").tag(ClaudeAccountMode.sync)
+            }
+            .labelsHidden()
+            .frame(maxWidth: 190, alignment: .trailing)
         }
         .pickerStyle(.menu)
         .font(.system(size: 12))
         .onReceive(NotificationCenter.default.publisher(for: .claudeAccountModeChanged)) { _ in
             mode = ClaudeAccountModeController.shared.mode
         }
-        .alert("claude.accountSource.syncWarning.title", isPresented: $showingSyncWarning) {
-            Button("claude.oauth.cancel", role: .cancel) {
-                pendingMode = nil
-            }
-            Button("claude.accountSource.syncWarning.confirm") {
-                if let target = pendingMode {
-                    commit(target)
-                }
-                pendingMode = nil
-            }
-        } message: {
-            Text("claude.accountSource.syncWarning.message")
-        }
-    }
-
-    private func request(switchTo newMode: ClaudeAccountMode) {
-        guard newMode != mode else { return }
-        if newMode == .sync {
-            pendingMode = newMode
-            showingSyncWarning = true
-        } else {
-            commit(newMode)
-        }
     }
 
     private func commit(_ newMode: ClaudeAccountMode) {
+        guard newMode != mode else { return }
         mode = newMode
         ClaudeAccountModeController.shared.setMode(newMode)
     }

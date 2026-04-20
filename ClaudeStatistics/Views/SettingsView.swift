@@ -9,7 +9,7 @@ struct SettingsView: View {
     @Binding var tabOrder: [AppTab]
     @ObservedObject var updaterService: UpdaterService
     let provider: any SessionProvider
-    @AppStorage("autoRefreshEnabled") private var autoRefreshEnabled = false
+    @AppStorage("autoRefreshEnabled") private var autoRefreshEnabled = true
     @AppStorage("refreshInterval") private var refreshInterval = 300.0
     @AppStorage("preferredTerminal") private var preferredTerminal = "Auto"
     @AppStorage("preferredEditor") private var preferredEditor = "VSCode"
@@ -23,6 +23,7 @@ struct SettingsView: View {
     @State private var showPricing = false
     @State private var hasToken: Bool?
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var isTabOrderExpanded = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -57,169 +58,9 @@ struct SettingsView: View {
             Divider()
 
             Form {
-            if provider.kind == .claude {
-                Section("claude.accountSource.sectionHeader") {
-                    ClaudeAccountSourcePickerRow()
-                }
-            }
-
-            // Terminal + Launch at Login
-            Section("settings.general") {
-                Picker("settings.resumeIn", selection: $preferredTerminal) {
-                    ForEach(TerminalApp.allCases) { app in
-                        if app != .auto && !app.isInstalled {
-                            Text("settings.notFound \(app.rawValue)")
-                                .tag(app.rawValue)
-                        } else {
-                            Text(app.rawValue)
-                                .tag(app.rawValue)
-                        }
-                    }
-                }
-                .pickerStyle(.menu)
-                .font(.system(size: 12))
-
-                if preferredTerminal == "Editor" {
-                    Picker("settings.chooseEditor", selection: $preferredEditor) {
-                        ForEach(EditorApp.allCases) { app in
-                            if !app.isInstalled {
-                                Text("settings.notFound \(app.rawValue)")
-                                    .tag(app.rawValue)
-                            } else {
-                                Text(app.rawValue)
-                                    .tag(app.rawValue)
-                            }
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .font(.system(size: 12))
-                }
-
-                Toggle("settings.launchAtLogin", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { _, newValue in
-                        do {
-                            if newValue {
-                                try SMAppService.mainApp.register()
-                            } else {
-                                try SMAppService.mainApp.unregister()
-                            }
-                        } catch {
-                            launchAtLogin = SMAppService.mainApp.status == .enabled
-                        }
-                    }
-
-                Toggle("settings.globalHotKey", isOn: $globalHotKeyEnabled)
-
-                if globalHotKeyEnabled {
-                    HotKeyRecorderRow(
-                        keyCode: $globalHotKeyKeyCode,
-                        modifiers: $globalHotKeyModifiers
-                    )
-                }
-            }
-
-            // Auto Refresh
-            if provider.capabilities.supportsUsage {
-            Section("settings.autoRefresh") {
-                Toggle("settings.enableAutoRefresh", isOn: $autoRefreshEnabled)
-                    .onChange(of: autoRefreshEnabled) { _, newValue in
-                        if newValue {
-                            usageViewModel.autoRefreshInterval = refreshInterval
-                            usageViewModel.startAutoRefresh()
-                        } else {
-                            usageViewModel.stopAutoRefresh()
-                        }
-                    }
-
-                if autoRefreshEnabled {
-                    HStack(spacing: 8) {
-                        ForEach([5, 10, 30], id: \.self) { min in
-                            Button {
-                                customInterval = false
-                                refreshInterval = Double(min * 60)
-                                usageViewModel.autoRefreshInterval = refreshInterval
-                                usageViewModel.startAutoRefresh()
-                            } label: {
-                                Text("\(min)min")
-                                    .font(.system(size: 11))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
-                                    .background(!customInterval && refreshInterval == Double(min * 60) ? Color.blue : Color.gray.opacity(0.15))
-                                    .foregroundStyle(!customInterval && refreshInterval == Double(min * 60) ? .white : .primary)
-                                    .cornerRadius(4)
-                            }
-                            .buttonStyle(.plain)
-                        }
-
-                        HStack(spacing: 3) {
-                            TextField("", text: $customMinutes)
-                                .textFieldStyle(.roundedBorder)
-                                .font(.system(size: 11, design: .monospaced))
-                                .frame(width: 40)
-                                .onAppear {
-                                    if customInterval {
-                                        customMinutes = String(Int(refreshInterval / 60))
-                                    }
-                                }
-                                .onSubmit {
-                                    applyCustomInterval()
-                                }
-                                .onChange(of: customMinutes) { _, newValue in
-                                    if !newValue.isEmpty {
-                                        customInterval = true
-                                        applyCustomInterval()
-                                    }
-                                }
-                            Text("min")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-
-                Text("settings.autoRefreshHint")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            }
-
-            // Language + Font Size
-            Section("settings.appearance") {
-                Picker("settings.language", selection: $appLanguage) {
-                    Text("language.auto").tag("auto")
-                    Text("language.en").tag("en")
-                    Text("language.zhHans").tag("zh-Hans")
-                }
-                .pickerStyle(.menu)
-                .font(.system(size: 12))
-                .onChange(of: appLanguage) { _, newValue in
-                    LanguageManager.apply(newValue)
-                }
-
-                HStack(spacing: 8) {
-                    Text("settings.fontSize")
-                        .font(.system(size: 12))
-                    Image(systemName: "textformat.size.smaller")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                    Slider(value: $fontScale, in: 0.85...1.25, step: 0.05)
-                    Image(systemName: "textformat.size.larger")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
-                    Text(String(format: "%.0f%%", fontScale * 100))
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 36)
-                    if fontScale != 1.0 {
-                        Button("settings.resetDefault") {
-                            fontScale = 1.0
-                        }
-                        .font(.system(size: 10))
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.blue)
-                    }
-                }
-            }
+            generalSection
+            autoRefreshSection
+            appearanceSection
 
             // Pricing
             if provider.capabilities.supportsCost {
@@ -238,22 +79,6 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.plain)
             }
-            }
-
-            // Status Line + Tab Order
-            Section("settings.customize") {
-                if let installer = provider.statusLineInstaller {
-                    StatusLineSection(installer: installer)
-                        .id(provider.kind)
-                }
-
-                TabOrderEditor(tabOrder: $tabOrder)
-                Button("settings.resetDefault") {
-                    tabOrder = AppTab.defaultOrder
-                    AppTab.saveOrder(tabOrder)
-                }
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
             }
 
             // About + Diagnostics
@@ -506,6 +331,217 @@ struct SettingsView: View {
         LocalizedStringKey(provider.credentialHintLocalizationKey ?? "settings.credentialHint")
     }
 
+    @ViewBuilder
+    private var generalSection: some View {
+        Section("settings.general") {
+            if provider.kind == .claude {
+                ClaudeAccountSourcePickerRow()
+            }
+
+            Picker("settings.resumeIn", selection: $preferredTerminal) {
+                ForEach(TerminalApp.allCases) { app in
+                    if app != .auto && !app.isInstalled {
+                        Text("settings.notFound \(app.rawValue)")
+                            .tag(app.rawValue)
+                    } else {
+                        Text(app.rawValue)
+                            .tag(app.rawValue)
+                    }
+                }
+            }
+            .pickerStyle(.menu)
+            .font(.system(size: 12))
+
+            if preferredTerminal == "Editor" {
+                Picker("settings.chooseEditor", selection: $preferredEditor) {
+                    ForEach(EditorApp.allCases) { app in
+                        if !app.isInstalled {
+                            Text("settings.notFound \(app.rawValue)")
+                                .tag(app.rawValue)
+                        } else {
+                            Text(app.rawValue)
+                                .tag(app.rawValue)
+                        }
+                    }
+                }
+                .pickerStyle(.menu)
+                .font(.system(size: 12))
+            }
+
+            Toggle("settings.launchAtLogin", isOn: $launchAtLogin)
+                .onChange(of: launchAtLogin) { _, newValue in
+                    do {
+                        if newValue {
+                            try SMAppService.mainApp.register()
+                        } else {
+                            try SMAppService.mainApp.unregister()
+                        }
+                    } catch {
+                        launchAtLogin = SMAppService.mainApp.status == .enabled
+                    }
+                }
+
+            Toggle("settings.globalHotKey", isOn: $globalHotKeyEnabled)
+
+            if globalHotKeyEnabled {
+                HotKeyRecorderRow(
+                    keyCode: $globalHotKeyKeyCode,
+                    modifiers: $globalHotKeyModifiers
+                )
+            }
+
+            if let installer = provider.statusLineInstaller {
+                StatusLineSection(installer: installer)
+                    .id(provider.kind)
+            }
+
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        isTabOrderExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Label("settings.tabOrder", systemImage: "rectangle.3.group")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.primary)
+
+                        Spacer()
+
+                        Image(systemName: isTabOrderExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if isTabOrderExpanded {
+                    VStack(alignment: .leading, spacing: 12) {
+                        TabOrderEditor(tabOrder: $tabOrder, showsHeader: false)
+
+                        Divider()
+
+                        Button("settings.resetDefault") {
+                            tabOrder = AppTab.defaultOrder
+                            AppTab.saveOrder(tabOrder)
+                        }
+                        .font(.system(size: 11))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                    }
+                    .padding(.top, 6)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var autoRefreshSection: some View {
+        if provider.capabilities.supportsUsage {
+            Section("settings.autoRefresh") {
+                Toggle("settings.enableAutoRefresh", isOn: $autoRefreshEnabled)
+                    .onChange(of: autoRefreshEnabled) { _, newValue in
+                        if newValue {
+                            usageViewModel.autoRefreshInterval = refreshInterval
+                            usageViewModel.startAutoRefresh()
+                        } else {
+                            usageViewModel.stopAutoRefresh()
+                        }
+                    }
+
+                if autoRefreshEnabled {
+                    HStack(spacing: 8) {
+                        ForEach([5, 10, 30], id: \.self) { min in
+                            Button {
+                                customInterval = false
+                                refreshInterval = Double(min * 60)
+                                usageViewModel.autoRefreshInterval = refreshInterval
+                                usageViewModel.startAutoRefresh()
+                            } label: {
+                                Text("\(min)min")
+                                    .font(.system(size: 11))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(!customInterval && refreshInterval == Double(min * 60) ? Color.blue : Color.gray.opacity(0.15))
+                                    .foregroundStyle(!customInterval && refreshInterval == Double(min * 60) ? .white : .primary)
+                                    .cornerRadius(4)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        HStack(spacing: 3) {
+                            TextField("", text: $customMinutes)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(size: 11, design: .monospaced))
+                                .frame(width: 40)
+                                .onAppear {
+                                    if customInterval {
+                                        customMinutes = String(Int(refreshInterval / 60))
+                                    }
+                                }
+                                .onSubmit {
+                                    applyCustomInterval()
+                                }
+                                .onChange(of: customMinutes) { _, newValue in
+                                    if !newValue.isEmpty {
+                                        customInterval = true
+                                        applyCustomInterval()
+                                    }
+                                }
+                            Text("min")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Text("settings.autoRefreshHint")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private var appearanceSection: some View {
+        Section("settings.appearance") {
+            Picker("settings.language", selection: $appLanguage) {
+                Text("language.auto").tag("auto")
+                Text("language.en").tag("en")
+                Text("language.zhHans").tag("zh-Hans")
+            }
+            .pickerStyle(.menu)
+            .font(.system(size: 12))
+            .onChange(of: appLanguage) { _, newValue in
+                LanguageManager.apply(newValue)
+            }
+
+            HStack(spacing: 8) {
+                Text("settings.fontSize")
+                    .font(.system(size: 12))
+                Image(systemName: "textformat.size.smaller")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                Slider(value: $fontScale, in: 0.85...1.25, step: 0.05)
+                Image(systemName: "textformat.size.larger")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                Text(String(format: "%.0f%%", fontScale * 100))
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 36)
+                if fontScale != 1.0 {
+                    Button("settings.resetDefault") {
+                        fontScale = 1.0
+                    }
+                    .font(.system(size: 10))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.blue)
+                }
+            }
+        }
+    }
+
     private func applyCustomInterval() {
         guard let minutes = Int(customMinutes), minutes >= 1 else {
             customInterval = false
@@ -620,11 +656,18 @@ private struct HotKeyRecorderRow: View {
 
 struct TabOrderEditor: View {
     @Binding var tabOrder: [AppTab]
+    var showsHeader: Bool = true
     @State private var selectedTab: AppTab?
     @State private var hoveredTab: AppTab?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
+            if showsHeader {
+                Label("settings.tabOrder", systemImage: "rectangle.3.group")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.primary)
+            }
+
             Text("settings.tabOrderHint")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
@@ -632,6 +675,7 @@ struct TabOrderEditor: View {
             HStack(spacing: 0) {
                 ForEach(tabOrder) { tab in
                     let isSelected = selectedTab == tab
+
                     HStack(spacing: 4) {
                         if isSelected {
                             arrowButton(direction: -1, tab: tab)
@@ -1150,14 +1194,13 @@ struct StatusLineSection: View {
     let installer: any StatusLineInstalling
 
     @State private var isInstalled: Bool
-    @State private var hasRestore: Bool
+    @State private var showsLegendPopover = false
     @State private var message: LocalizedStringKey?
     @State private var isError = false
 
     init(installer: any StatusLineInstalling) {
         self.installer = installer
         _isInstalled = State(initialValue: installer.isInstalled)
-        _hasRestore = State(initialValue: installer.hasRestoreOption)
     }
 
     var body: some View {
@@ -1165,69 +1208,83 @@ struct StatusLineSection: View {
             HStack {
                 Label(LocalizedStringKey(installer.titleLocalizationKey), systemImage: "terminal")
                     .font(.system(size: 12))
+
+                if !installer.legendSections.isEmpty {
+                    Button {
+                        showsLegendPopover.toggle()
+                    } label: {
+                        Image(systemName: "questionmark.circle")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $showsLegendPopover, arrowEdge: .top) {
+                        legendContent
+                            .frame(width: 330, alignment: .leading)
+                            .padding(12)
+                    }
+                }
+
                 Spacer()
-                if isInstalled {
-                    Text("statusLine.integrated")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.green)
-                } else {
-                    Text("statusLine.notIntegrated")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                }
+
+                Toggle("", isOn: Binding(
+                    get: { isInstalled },
+                    set: { setEnabled($0) }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
             }
 
-            Text(LocalizedStringKey(installer.descriptionLocalizationKey))
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-
-            HStack(spacing: 8) {
-                if isInstalled {
-                    Button("statusLine.update") { install() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                } else {
-                    Button("statusLine.install") { install() }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                }
-
-                if hasRestore {
-                    Button("statusLine.restore") { restore() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                }
-            }
-
-            if let message {
+            if let message, isError {
                 Text(message)
                     .font(.system(size: 10))
-                    .foregroundStyle(isError ? .red : .green)
+                    .foregroundStyle(.red)
             }
         }
     }
 
-    private func install() {
-        do {
-            try installer.install()
-            isInstalled = installer.isInstalled
-            hasRestore = installer.hasRestoreOption
-            message = "statusLine.installSuccess"
-            isError = false
-        } catch {
-            message = LocalizedStringKey(error.localizedDescription)
-            isError = true
+    @ViewBuilder
+    private var legendContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(installer.legendSections) { section in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(LocalizedStringKey(section.titleLocalizationKey))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+
+                    ForEach(section.items) { item in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(verbatim: item.example)
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(.primary)
+                                .frame(width: 148, alignment: .leading)
+
+                            Text(LocalizedStringKey(item.descriptionLocalizationKey))
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+                .padding(.top, 2)
+            }
         }
+        .padding(.top, 2)
     }
 
-    private func restore() {
+    private func setEnabled(_ enabled: Bool) {
         do {
-            try installer.restore()
+            if enabled {
+                try installer.install()
+            } else {
+                try installer.restore()
+            }
+
             isInstalled = installer.isInstalled
-            hasRestore = installer.hasRestoreOption
-            message = "statusLine.restoreSuccess"
+            message = nil
             isError = false
         } catch {
+            isInstalled = installer.isInstalled
             message = LocalizedStringKey(error.localizedDescription)
             isError = true
         }

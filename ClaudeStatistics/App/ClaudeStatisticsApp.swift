@@ -2,6 +2,25 @@ import SwiftUI
 import Combine
 import TelemetryDeck
 
+private enum DefaultSettings {
+    static func register() {
+        UserDefaults.standard.register(defaults: [
+            "autoRefreshEnabled": true,
+            "refreshInterval": 300.0
+        ])
+    }
+}
+
+private enum StatusLineSync {
+    static func refreshManagedIntegrations() {
+        for kind in ProviderRegistry.supportedProviders {
+            let provider = ProviderRegistry.provider(for: kind)
+            guard let installer = provider.statusLineInstaller, installer.isInstalled else { continue }
+            try? installer.install()
+        }
+    }
+}
+
 @MainActor
 final class AppState: ObservableObject {
     @Published private(set) var providerKind: ProviderKind
@@ -20,6 +39,9 @@ final class AppState: ObservableObject {
     private var sessionViewModelsByProvider: [ProviderKind: SessionViewModel] = [:]
 
     init() {
+        DefaultSettings.register()
+        StatusLineSync.refreshManagedIntegrations()
+
         let selectedKind = ProviderRegistry.selectedProviderKind()
         providerKind = selectedKind
         let availableKinds = Set(ProviderRegistry.availableProviders())

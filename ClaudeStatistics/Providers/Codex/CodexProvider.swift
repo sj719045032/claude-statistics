@@ -79,9 +79,24 @@ final class CodexProvider: SessionProvider, @unchecked Sendable {
 
 struct CodexStatusLineAdapter: StatusLineInstalling {
     var isInstalled: Bool { CodexStatusLineInstaller.isInstalled }
+    var hasRestoreOption: Bool { CodexStatusLineInstaller.hasBackup }
     var titleLocalizationKey: String { "statusLine.codex.title" }
     var descriptionLocalizationKey: String { "statusLine.codex.description" }
+    var legendSections: [StatusLineLegendSection] {
+        [
+            StatusLineLegendSection(
+                titleLocalizationKey: "statusLine.legend.section.codex",
+                items: [
+                    StatusLineLegendItem(example: "5h 42%", descriptionLocalizationKey: "statusLine.legend.codex.fiveHour"),
+                    StatusLineLegendItem(example: "7d 36%", descriptionLocalizationKey: "statusLine.legend.codex.sevenDay"),
+                    StatusLineLegendItem(example: "ctx 68%", descriptionLocalizationKey: "statusLine.legend.codex.context"),
+                    StatusLineLegendItem(example: "↑ 128k  ↓ 24k", descriptionLocalizationKey: "statusLine.legend.codex.tokens")
+                ]
+            )
+        ]
+    }
     func install() throws { try CodexStatusLineInstaller.install() }
+    func restore() throws { try CodexStatusLineInstaller.restore() }
 }
 
 enum CodexPricingCatalog {

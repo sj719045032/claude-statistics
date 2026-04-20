@@ -13,7 +13,7 @@ struct StatusLineInstaller {
     /// Check if our integrated script is currently installed and settings.json is synced
     static var isInstalled: Bool {
         guard let content = try? String(contentsOfFile: scriptPath, encoding: .utf8),
-              content.contains(marker) else { return false }
+              content.contains(markerPrefix) else { return false }
         return isSettingsSynced
     }
 
@@ -472,18 +472,18 @@ struct StatusLineInstaller {
           if [ -n "$ab" ]; then
             behind=$(echo "$ab" | awk '{print $1}')
             ahead=$(echo "$ab" | awk '{print $2}')
-            [ "$ahead" -gt 0 ] 2>/dev/null && git_ab="${git_ab}${green}+${ahead}${reset}"
-            [ "$behind" -gt 0 ] 2>/dev/null && git_ab="${git_ab}${red}-${behind}${reset}"
+            [ "$ahead" -gt 0 ] 2>/dev/null && git_ab="${git_ab}${green}ahead:${ahead}${reset}"
+            [ "$behind" -gt 0 ] 2>/dev/null && git_ab="${git_ab} ${red}behind:${behind}${reset}"
           fi
 
           git_stash=""
           stash_n=$(git -C "$cwd" stash list 2>/dev/null | wc -l | tr -d ' ')
-          [ "$stash_n" -gt 0 ] 2>/dev/null && git_stash=" ${lgray}s${yellow}${stash_n}${reset}"
+          [ "$stash_n" -gt 0 ] 2>/dev/null && git_stash=" ${lgray}stash:${yellow}${stash_n}${reset}"
 
           git_detail=""
-          [ "$staged" -gt 0 ] 2>/dev/null && git_detail="${git_detail} ${green}s${staged}${reset}"
-          [ "$modified" -gt 0 ] 2>/dev/null && git_detail="${git_detail} ${yellow}m${modified}${reset}"
-          [ "$untracked" -gt 0 ] 2>/dev/null && git_detail="${git_detail} ${lgray}u${untracked}${reset}"
+          [ "$staged" -gt 0 ] 2>/dev/null && git_detail="${git_detail} ${green}stage:${staged}${reset}"
+          [ "$modified" -gt 0 ] 2>/dev/null && git_detail="${git_detail} ${yellow}mod:${modified}${reset}"
+          [ "$untracked" -gt 0 ] 2>/dev/null && git_detail="${git_detail} ${lgray}new:${untracked}${reset}"
 
           git_section=" ${icon_git:+${blue}${icon_git} }${cyan}${git_branch}${reset} ${git_dirty}"
           [ -n "$git_ab" ] && git_section="${git_section} ${git_ab}"
@@ -572,25 +572,80 @@ struct StatusLineInstaller {
         stdin_5h_r = int('$rl_5h_reset')
         stdin_7d_r = int('$rl_7d_reset')
 
+        def make_window(utilization, reset_iso):
+            return {'utilization': utilization, 'resets_at': reset_iso}
+
+        def merge_window(api_window, api_fetched_at, stdin_window, stdin_fetched_at):
+            if not api_window:
+                return stdin_window
+            if not stdin_window:
+                return api_window
+
+            api_reset = api_window.get('resets_at') or ''
+            stdin_reset = stdin_window.get('resets_at') or ''
+            if api_reset == stdin_reset:
+                return {
+                    'utilization': max(float(api_window.get('utilization', 0)), float(stdin_window.get('utilization', 0))),
+                    'resets_at': api_reset or stdin_reset or None,
+                }
+
+            api_ts = int(api_fetched_at or 0)
+            stdin_ts = int(stdin_fetched_at or 0)
+            return stdin_window if stdin_ts >= api_ts else api_window
+
         # --- Update usage-cache.json ---
-        # Fix: update on value increase OR window reset (resets_at change)
         try:
             with open('$APP_USAGE_CACHE') as f:
                 out = json.load(f)
         except:
-            out = {'fetched_at': '0', 'data': {}}
+            out = {'fetched_at': '0', 'data': {}, 'sources': {}}
 
-        data = out.get('data', {})
+        data = out.get('data', {}) or {}
+        sources = out.get('sources', {}) or {}
+        api_source = sources.get('api', {}) or {}
+        stdin_source = sources.get('stdin', {}) or {}
+
+        if not api_source and isinstance(data, dict):
+            api_source = {'fetched_at': str(out.get('fetched_at', '0'))}
+            if isinstance(data.get('five_hour'), dict):
+                api_source['five_hour'] = data.get('five_hour')
+            if isinstance(data.get('seven_day'), dict):
+                api_source['seven_day'] = data.get('seven_day')
 
         new_5h_r = ts_to_iso(stdin_5h_r)
-        if stdin_5h > data.get('five_hour', {}).get('utilization', -1) or new_5h_r != data.get('five_hour', {}).get('resets_at', ''):
-            data['five_hour'] = {'utilization': stdin_5h, 'resets_at': new_5h_r}
-
         new_7d_r = ts_to_iso(stdin_7d_r)
-        if stdin_7d > data.get('seven_day', {}).get('utilization', -1) or new_7d_r != data.get('seven_day', {}).get('resets_at', ''):
-            data['seven_day'] = {'utilization': stdin_7d, 'resets_at': new_7d_r}
+        stdin_source = {
+            'fetched_at': str(now_ts),
+            'five_hour': make_window(stdin_5h, new_5h_r),
+            'seven_day': make_window(stdin_7d, new_7d_r),
+        }
+
+        merged_five_hour = merge_window(
+            api_source.get('five_hour'),
+            api_source.get('fetched_at'),
+            stdin_source.get('five_hour'),
+            stdin_source.get('fetched_at'),
+        )
+        merged_seven_day = merge_window(
+            api_source.get('seven_day'),
+            api_source.get('fetched_at'),
+            stdin_source.get('seven_day'),
+            stdin_source.get('fetched_at'),
+        )
+
+        if merged_five_hour:
+            data['five_hour'] = merged_five_hour
+        else:
+            data.pop('five_hour', None)
+
+        if merged_seven_day:
+            data['seven_day'] = merged_seven_day
+        else:
+            data.pop('seven_day', None)
 
         out['data'] = data
+        out['sources'] = {'api': api_source, 'stdin': stdin_source}
+        out['fetched_at'] = str(now_ts)
         with open('$APP_USAGE_CACHE', 'w') as f:
             json.dump(out, f)
 

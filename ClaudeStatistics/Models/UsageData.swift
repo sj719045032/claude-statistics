@@ -119,6 +119,35 @@ struct UsageCacheFile: Codable {
     }
 }
 
+struct ClaudeUsageCacheFile: Codable {
+    let fetchedAt: String
+    let data: UsageData
+    let sources: ClaudeUsageCacheSources?
+
+    enum CodingKeys: String, CodingKey {
+        case fetchedAt = "fetched_at"
+        case data
+        case sources
+    }
+}
+
+struct ClaudeUsageCacheSources: Codable {
+    let api: ClaudeUsageCacheSourceSnapshot?
+    let stdin: ClaudeUsageCacheSourceSnapshot?
+}
+
+struct ClaudeUsageCacheSourceSnapshot: Codable {
+    let fetchedAt: String
+    let fiveHour: UsageWindow?
+    let sevenDay: UsageWindow?
+
+    enum CodingKeys: String, CodingKey {
+        case fetchedAt = "fetched_at"
+        case fiveHour = "five_hour"
+        case sevenDay = "seven_day"
+    }
+}
+
 // MARK: - User Profile
 
 struct UserProfile: Codable {

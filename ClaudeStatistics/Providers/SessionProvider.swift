@@ -133,6 +133,7 @@ struct SearchIndexMessage {
 
 protocol ProviderUsageSource {
     var dashboardURL: URL? { get }
+    var usageCacheFilePath: String? { get }
 
     func loadCachedSnapshot() -> ProviderUsageSnapshot?
     func refreshSnapshot() async throws -> ProviderUsageSnapshot
@@ -141,6 +142,7 @@ protocol ProviderUsageSource {
 
 extension ProviderUsageSource {
     var dashboardURL: URL? { nil }
+    var usageCacheFilePath: String? { nil }
     var historyStore: UsageHistoryStore? { nil }
 
     func refreshCredentials() async -> Bool {
@@ -152,6 +154,20 @@ protocol ProviderPricingFetching {
     func fetchPricing() async throws -> [String: ModelPricing.Pricing]
 }
 
+struct StatusLineLegendItem: Identifiable {
+    let example: String
+    let descriptionLocalizationKey: String
+
+    var id: String { "\(example)::\(descriptionLocalizationKey)" }
+}
+
+struct StatusLineLegendSection: Identifiable {
+    let titleLocalizationKey: String
+    let items: [StatusLineLegendItem]
+
+    var id: String { titleLocalizationKey }
+}
+
 /// Encapsulates statusline install/restore operations for a specific provider.
 /// Title and description localization keys are plain strings to avoid SwiftUI import.
 protocol StatusLineInstalling {
@@ -160,12 +176,14 @@ protocol StatusLineInstalling {
     var hasRestoreOption: Bool { get }
     var titleLocalizationKey: String { get }
     var descriptionLocalizationKey: String { get }
+    var legendSections: [StatusLineLegendSection] { get }
     func install() throws
     func restore() throws
 }
 
 extension StatusLineInstalling {
     var hasRestoreOption: Bool { false }
+    var legendSections: [StatusLineLegendSection] { [] }
     func restore() throws {}
 }
 

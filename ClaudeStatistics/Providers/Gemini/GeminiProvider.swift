@@ -101,6 +101,19 @@ struct GeminiStatusLineAdapter: StatusLineInstalling {
     var hasRestoreOption: Bool { GeminiStatusLineInstaller.hasBackup }
     var titleLocalizationKey: String { "statusLine.gemini.title" }
     var descriptionLocalizationKey: String { "statusLine.gemini.description" }
+    var legendSections: [StatusLineLegendSection] {
+        [
+            StatusLineLegendSection(
+                titleLocalizationKey: "statusLine.legend.section.gemini",
+                items: [
+                    StatusLineLegendItem(example: "workspace", descriptionLocalizationKey: "statusLine.legend.gemini.workspace"),
+                    StatusLineLegendItem(example: "gemini-2.5-pro", descriptionLocalizationKey: "statusLine.legend.gemini.model"),
+                    StatusLineLegendItem(example: "quota 58%", descriptionLocalizationKey: "statusLine.legend.gemini.quota"),
+                    StatusLineLegendItem(example: "auth / sandbox", descriptionLocalizationKey: "statusLine.legend.gemini.state")
+                ]
+            )
+        ]
+    }
     func install() throws { try GeminiStatusLineInstaller.install() }
     func restore() throws { try GeminiStatusLineInstaller.restore() }
 }

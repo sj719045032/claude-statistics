@@ -162,6 +162,12 @@ final class UsageAPIService: ProviderUsageSource {
         guard let data = FileManager.default.contents(atPath: path) else { return nil }
 
         do {
+            if let cache = try? JSONDecoder().decode(ClaudeUsageCacheFile.self, from: data),
+               let timestamp = TimeInterval(cache.fetchedAt) {
+                let fetchedAt = Date(timeIntervalSince1970: timestamp)
+                return (data: cache.data, fetchedAt: fetchedAt)
+            }
+
             let cache = try JSONDecoder().decode(UsageCacheFile.self, from: data)
             guard let timestamp = TimeInterval(cache.fetchedAt) else { return nil }
             let fetchedAt = Date(timeIntervalSince1970: timestamp)
@@ -172,17 +178,120 @@ final class UsageAPIService: ProviderUsageSource {
     }
 
     private func saveToCache(_ usageData: UsageData) {
-        let cache = UsageCacheFile(
-            fetchedAt: String(Int(Date().timeIntervalSince1970)),
-            data: usageData
+        let path = appCacheFilePath()
+        let now = String(Int(Date().timeIntervalSince1970))
+        let existingCache = readClaudeCacheFile(at: path)
+        let fallbackStdin = existingCache.flatMap { legacyStdinSource(from: $0, apiUsage: usageData) }
+        let stdinSource = existingCache?.sources?.stdin ?? fallbackStdin
+        let apiSource = ClaudeUsageCacheSourceSnapshot(
+            fetchedAt: now,
+            fiveHour: usageData.fiveHour,
+            sevenDay: usageData.sevenDay
+        )
+        let mergedData = mergeUsageData(apiUsage: usageData, apiSource: apiSource, stdinSource: stdinSource)
+        let cache = ClaudeUsageCacheFile(
+            fetchedAt: now,
+            data: mergedData,
+            sources: ClaudeUsageCacheSources(api: apiSource, stdin: stdinSource)
         )
 
         do {
             let data = try JSONEncoder().encode(cache)
-            let path = appCacheFilePath()
             try data.write(to: URL(fileURLWithPath: path))
         } catch {
             // Silently fail cache write
+        }
+    }
+
+    private func readClaudeCacheFile(at path: String) -> ClaudeUsageCacheFile? {
+        guard let data = FileManager.default.contents(atPath: path) else { return nil }
+        let decoder = JSONDecoder()
+
+        if let cache = try? decoder.decode(ClaudeUsageCacheFile.self, from: data) {
+            return cache
+        }
+
+        guard let legacy = try? decoder.decode(UsageCacheFile.self, from: data) else {
+            return nil
+        }
+
+        return ClaudeUsageCacheFile(
+            fetchedAt: legacy.fetchedAt,
+            data: legacy.data,
+            sources: nil
+        )
+    }
+
+    private func legacyStdinSource(from cache: ClaudeUsageCacheFile, apiUsage: UsageData) -> ClaudeUsageCacheSourceSnapshot? {
+        let inferredFiveHour = inferLegacyWindow(existing: cache.data.fiveHour, api: apiUsage.fiveHour)
+        let inferredSevenDay = inferLegacyWindow(existing: cache.data.sevenDay, api: apiUsage.sevenDay)
+        guard inferredFiveHour != nil || inferredSevenDay != nil else { return nil }
+
+        return ClaudeUsageCacheSourceSnapshot(
+            fetchedAt: cache.fetchedAt,
+            fiveHour: inferredFiveHour,
+            sevenDay: inferredSevenDay
+        )
+    }
+
+    private func inferLegacyWindow(existing: UsageWindow?, api: UsageWindow?) -> UsageWindow? {
+        guard let existing else { return nil }
+        guard let api else { return existing }
+        guard existing.resetsAt == api.resetsAt, existing.utilization > api.utilization else { return nil }
+        return existing
+    }
+
+    private func mergeUsageData(
+        apiUsage: UsageData,
+        apiSource: ClaudeUsageCacheSourceSnapshot?,
+        stdinSource: ClaudeUsageCacheSourceSnapshot?
+    ) -> UsageData {
+        UsageData(
+            fiveHour: mergeWindow(
+                api: apiSource?.fiveHour,
+                apiFetchedAt: apiSource?.fetchedAt,
+                stdin: stdinSource?.fiveHour,
+                stdinFetchedAt: stdinSource?.fetchedAt
+            ),
+            sevenDay: mergeWindow(
+                api: apiSource?.sevenDay,
+                apiFetchedAt: apiSource?.fetchedAt,
+                stdin: stdinSource?.sevenDay,
+                stdinFetchedAt: stdinSource?.fetchedAt
+            ),
+            sevenDayOauthApps: apiUsage.sevenDayOauthApps,
+            sevenDayOpus: apiUsage.sevenDayOpus,
+            sevenDaySonnet: apiUsage.sevenDaySonnet,
+            sevenDayCowork: apiUsage.sevenDayCowork,
+            providerBuckets: apiUsage.providerBuckets,
+            extraUsage: apiUsage.extraUsage
+        )
+    }
+
+    private func mergeWindow(
+        api: UsageWindow?,
+        apiFetchedAt: String?,
+        stdin: UsageWindow?,
+        stdinFetchedAt: String?
+    ) -> UsageWindow? {
+        switch (api, stdin) {
+        case (nil, nil):
+            return nil
+        case let (api?, nil):
+            return api
+        case let (nil, stdin?):
+            return stdin
+        case let (api?, stdin?):
+            if api.resetsAt == stdin.resetsAt {
+                return UsageWindow(
+                    utilization: max(api.utilization, stdin.utilization),
+                    resetsAt: api.resetsAt ?? stdin.resetsAt
+                )
+            }
+
+            let apiTimestamp = TimeInterval(apiFetchedAt ?? "") ?? 0
+            let stdinTimestamp = TimeInterval(stdinFetchedAt ?? "") ?? 0
+            return stdinTimestamp >= apiTimestamp ? stdin : api
         }
     }
 
@@ -199,6 +308,10 @@ final class UsageAPIService: ProviderUsageSource {
 extension UsageAPIService {
     var dashboardURL: URL? {
         URL(string: "https://claude.ai/settings/usage")
+    }
+
+    var usageCacheFilePath: String? {
+        appCacheFilePath()
     }
 
     func loadCachedSnapshot() -> ProviderUsageSnapshot? {

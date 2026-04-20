@@ -31,6 +31,7 @@ final class CodexUsageService: ProviderUsageSource {
     // MARK: - ProviderUsageSource
 
     var dashboardURL: URL? { nil }
+    var usageCacheFilePath: String? { cacheFilePath() }
 
     func loadCachedSnapshot() -> ProviderUsageSnapshot? {
         guard let data = FileManager.default.contents(atPath: cacheFilePath()),

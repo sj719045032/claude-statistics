@@ -51,3 +51,4 @@ xcuserdata/
 .cs-launch
 .vercel
 node_modules/
+.qwen/

@@ -3,6 +3,7 @@ import Foundation
 /// Manages the Codex terminal status line configuration in ~/.codex/config.toml
 struct CodexStatusLineInstaller {
     static let configPath = (NSHomeDirectory() as NSString).appendingPathComponent(".codex/config.toml")
+    static let backupPath = (NSHomeDirectory() as NSString).appendingPathComponent(".codex/status-line-config.toml.bak")
 
     /// Recommended layout preset — mirrors the user's preferred config
     static let presetItems: [String] = [
@@ -19,10 +20,19 @@ struct CodexStatusLineInstaller {
         return usageComponents.isSubset(of: Set(items))
     }
 
+    static var hasBackup: Bool {
+        FileManager.default.fileExists(atPath: backupPath)
+    }
+
     /// Write the full preset to config.toml's [tui].status_line
     static func install() throws {
+        let fm = FileManager.default
         guard var content = try? String(contentsOfFile: configPath, encoding: .utf8) else {
             throw CodexStatusLineError.configNotFound
+        }
+
+        if !isInstalled && !fm.fileExists(atPath: backupPath) {
+            try content.write(toFile: backupPath, atomically: true, encoding: .utf8)
         }
 
         let newLine = formatStatusLine(presetItems)
@@ -40,6 +50,19 @@ struct CodexStatusLineInstaller {
 
         content = lines.joined(separator: "\n")
         try content.write(toFile: configPath, atomically: true, encoding: .utf8)
+    }
+
+    static func restore() throws {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: backupPath) else {
+            throw CodexStatusLineError.noBackup
+        }
+
+        if fm.fileExists(atPath: configPath) {
+            try fm.removeItem(atPath: configPath)
+        }
+        try fm.copyItem(atPath: backupPath, toPath: configPath)
+        try fm.removeItem(atPath: backupPath)
     }
 
     // MARK: - Private
@@ -76,8 +99,14 @@ struct CodexStatusLineInstaller {
 
 enum CodexStatusLineError: LocalizedError {
     case configNotFound
+    case noBackup
 
     var errorDescription: String? {
-        "~/.codex/config.toml not found. Run `codex` at least once to initialize it."
+        switch self {
+        case .configNotFound:
+            return "~/.codex/config.toml not found. Run `codex` at least once to initialize it."
+        case .noBackup:
+            return "No Codex status line backup found."
+        }
     }
 }

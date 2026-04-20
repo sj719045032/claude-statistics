@@ -1,6 +1,41 @@
 import Foundation
 import SwiftUI
 
+private final class UsageCacheWatcher {
+    private var source: DispatchSourceFileSystemObject?
+
+    init?(filePath: String, onChange: @escaping () -> Void) {
+        let directory = (filePath as NSString).deletingLastPathComponent
+        guard !directory.isEmpty else { return nil }
+
+        let fd = open(directory, O_EVTONLY)
+        guard fd >= 0 else { return nil }
+
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: [.write, .rename, .delete],
+            queue: DispatchQueue.main
+        )
+
+        source.setEventHandler(handler: onChange)
+        source.setCancelHandler { [fd] in
+            close(fd)
+        }
+        source.resume()
+
+        self.source = source
+    }
+
+    func stop() {
+        source?.cancel()
+        source = nil
+    }
+
+    deinit {
+        stop()
+    }
+}
+
 @MainActor
 final class UsageViewModel: ObservableObject {
     @Published var usageData: UsageData?
@@ -13,6 +48,7 @@ final class UsageViewModel: ObservableObject {
     private var autoRefresh: AutoRefreshCoordinator?
     private var usageSource: (any ProviderUsageSource)?
     private var usagePresentation: ProviderUsagePresentation = .standard
+    private var cacheWatcher: UsageCacheWatcher?
     weak var store: SessionDataStore?
 
     init() {
@@ -28,6 +64,7 @@ final class UsageViewModel: ObservableObject {
 
     func configure(source: (any ProviderUsageSource)?, usagePresentation: ProviderUsagePresentation) {
         stopAutoRefresh()
+        stopWatchingCache()
         usageSource = source
         self.usagePresentation = usagePresentation
         dashboardURL = source?.dashboardURL
@@ -35,6 +72,7 @@ final class UsageViewModel: ObservableObject {
         errorMessage = nil
         lastFetchedAt = nil
         isLoading = false
+        startWatchingCacheIfNeeded()
     }
 
     func loadCache() {
@@ -131,6 +169,20 @@ final class UsageViewModel: ObservableObject {
 
     func clearForUnsupportedProvider() {
         configure(source: nil, usagePresentation: usagePresentation)
+    }
+
+    private func startWatchingCacheIfNeeded() {
+        guard let cacheFilePath = usageSource?.usageCacheFilePath else { return }
+        cacheWatcher = UsageCacheWatcher(filePath: cacheFilePath) { [weak self] in
+            guard let self else { return }
+            guard self.usageSource?.usageCacheFilePath == cacheFilePath else { return }
+            self.loadCache()
+        }
+    }
+
+    private func stopWatchingCache() {
+        cacheWatcher?.stop()
+        cacheWatcher = nil
     }
 
     private func refreshIfStale() async {
