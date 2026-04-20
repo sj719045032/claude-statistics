@@ -226,6 +226,15 @@ struct SettingsView: View {
                             Text(profile.account?.displayName ?? "–")
                                 .font(.system(size: 13, weight: .medium))
                             if let org = profile.organization {
+                                if org.organizationType != nil {
+                                    Text(org.orgTypeDisplayName)
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(.secondary)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.gray.opacity(0.1))
+                                        .clipShape(Capsule())
+                                }
                                 Text(org.tierDisplayName)
                                     .font(.system(size: 10, weight: .semibold))
                                     .foregroundStyle(.blue)

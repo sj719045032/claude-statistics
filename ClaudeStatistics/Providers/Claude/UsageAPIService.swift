@@ -237,8 +237,26 @@ final class UsageAPIService: ProviderUsageSource {
     private func inferLegacyWindow(existing: UsageWindow?, api: UsageWindow?) -> UsageWindow? {
         guard let existing else { return nil }
         guard let api else { return existing }
-        guard existing.resetsAt == api.resetsAt, existing.utilization > api.utilization else { return nil }
+        guard sameResetWindow(existing.resetsAt, api.resetsAt), existing.utilization > api.utilization else { return nil }
         return existing
+    }
+
+    // API returns resets_at with microsecond precision (e.g. "...:59.957465+00:00"),
+    // while Claude Code stdin rounds to integer seconds — the two sources can straddle
+    // a minute boundary for the same window. Compare within a 60s tolerance.
+    private func sameResetWindow(_ a: String?, _ b: String?) -> Bool {
+        if a == b { return true }
+        guard let dateA = parseResetsAt(a), let dateB = parseResetsAt(b) else { return false }
+        return abs(dateA.timeIntervalSince(dateB)) < 60
+    }
+
+    private func parseResetsAt(_ value: String?) -> Date? {
+        guard let value, !value.isEmpty else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: value) { return date }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: value)
     }
 
     private func mergeUsageData(
@@ -282,7 +300,7 @@ final class UsageAPIService: ProviderUsageSource {
         case let (nil, stdin?):
             return stdin
         case let (api?, stdin?):
-            if api.resetsAt == stdin.resetsAt {
+            if sameResetWindow(api.resetsAt, stdin.resetsAt) {
                 return UsageWindow(
                     utilization: max(api.utilization, stdin.utilization),
                     resetsAt: api.resetsAt ?? stdin.resetsAt

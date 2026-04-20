@@ -2,33 +2,94 @@ import Foundation
 import SwiftUI
 
 private final class UsageCacheWatcher {
-    private var source: DispatchSourceFileSystemObject?
+    private let filePath: String
+    private let directory: String
+    private let onChange: () -> Void
+    private var fileSource: DispatchSourceFileSystemObject?
+    private var directorySource: DispatchSourceFileSystemObject?
 
     init?(filePath: String, onChange: @escaping () -> Void) {
-        let directory = (filePath as NSString).deletingLastPathComponent
-        guard !directory.isEmpty else { return nil }
+        let dir = (filePath as NSString).deletingLastPathComponent
+        guard !dir.isEmpty else { return nil }
 
-        let fd = open(directory, O_EVTONLY)
-        guard fd >= 0 else { return nil }
+        self.filePath = filePath
+        self.directory = dir
+        self.onChange = onChange
+
+        if !startFileWatch() {
+            guard startDirectoryWatch() else { return nil }
+        }
+    }
+
+    // Watches the file itself so in-place truncate+write (Python/Swift both do this)
+    // produces .write events. Directory-level watching misses these.
+    @discardableResult
+    private func startFileWatch() -> Bool {
+        stopFileWatch()
+        let fd = open(filePath, O_EVTONLY)
+        guard fd >= 0 else { return false }
 
         let source = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd,
-            eventMask: [.write, .rename, .delete],
+            eventMask: [.write, .extend, .attrib, .rename, .delete, .revoke],
             queue: DispatchQueue.main
         )
 
-        source.setEventHandler(handler: onChange)
-        source.setCancelHandler { [fd] in
-            close(fd)
+        source.setEventHandler { [weak self] in
+            guard let self, let currentSource = self.fileSource else { return }
+            let flags = currentSource.data
+            self.onChange()
+            // Atomic-replace scenarios invalidate the fd — reopen against the path.
+            if !flags.intersection([.rename, .delete, .revoke]).isEmpty {
+                _ = self.startFileWatch()
+            }
         }
-        source.resume()
+        source.setCancelHandler { [fd] in close(fd) }
 
-        self.source = source
+        fileSource = source
+        stopDirectoryWatch()
+        source.resume()
+        return true
+    }
+
+    @discardableResult
+    private func startDirectoryWatch() -> Bool {
+        stopDirectoryWatch()
+        let fd = open(directory, O_EVTONLY)
+        guard fd >= 0 else { return false }
+
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: [.write],
+            queue: DispatchQueue.main
+        )
+
+        source.setEventHandler { [weak self] in
+            guard let self else { return }
+            if FileManager.default.fileExists(atPath: self.filePath), self.startFileWatch() {
+                self.onChange()
+            }
+        }
+        source.setCancelHandler { [fd] in close(fd) }
+
+        directorySource = source
+        source.resume()
+        return true
+    }
+
+    private func stopFileWatch() {
+        fileSource?.cancel()
+        fileSource = nil
+    }
+
+    private func stopDirectoryWatch() {
+        directorySource?.cancel()
+        directorySource = nil
     }
 
     func stop() {
-        source?.cancel()
-        source = nil
+        stopFileWatch()
+        stopDirectoryWatch()
     }
 
     deinit {

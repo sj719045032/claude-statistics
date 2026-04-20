@@ -575,6 +575,23 @@ struct StatusLineInstaller {
         def make_window(utilization, reset_iso):
             return {'utilization': utilization, 'resets_at': reset_iso}
 
+        def parse_reset_ts(s):
+            if not s:
+                return None
+            try:
+                # Supports '...Z' and '...+00:00', with/without fractional seconds.
+                return datetime.fromisoformat(s.replace('Z', '+00:00')).timestamp()
+            except Exception:
+                return None
+
+        def same_reset_window(a, b):
+            if a == b:
+                return True
+            ta, tb = parse_reset_ts(a), parse_reset_ts(b)
+            if ta is None or tb is None:
+                return False
+            return abs(ta - tb) < 60
+
         def merge_window(api_window, api_fetched_at, stdin_window, stdin_fetched_at):
             if not api_window:
                 return stdin_window
@@ -583,7 +600,7 @@ struct StatusLineInstaller {
 
             api_reset = api_window.get('resets_at') or ''
             stdin_reset = stdin_window.get('resets_at') or ''
-            if api_reset == stdin_reset:
+            if same_reset_window(api_reset, stdin_reset):
                 return {
                     'utilization': max(float(api_window.get('utilization', 0)), float(stdin_window.get('utilization', 0))),
                     'resets_at': api_reset or stdin_reset or None,
