@@ -24,6 +24,8 @@ struct SettingsView: View {
     @State private var hasToken: Bool?
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var isTabOrderExpanded = false
+    @State private var isRefreshIntervalExpanded = false
+    @State private var isAppearanceExpanded = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -58,36 +60,24 @@ struct SettingsView: View {
             Divider()
 
             Form {
-            generalSection
-            autoRefreshSection
-            appearanceSection
-
-            // Pricing
-            if provider.capabilities.supportsCost {
-            Section("settings.pricing") {
-                Button(action: { showPricing = true }) {
-                    HStack {
-                        Label("settings.managePricing", systemImage: "dollarsign.circle")
-                        Spacer()
-                        Text("settings.models \(ModelPricing.shared.models.count)")
-                            .foregroundStyle(.secondary)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
-                    }
-                    .font(.system(size: 12))
+            if let installer = provider.statusLineInstaller {
+                Section("settings.recommended") {
+                    StatusLineSection(installer: installer)
+                        .id(provider.kind)
                 }
-                .buttonStyle(.plain)
             }
-            }
+
+            generalSection
 
             // About + Diagnostics
             Section("settings.about") {
-                HStack {
+                HStack(spacing: 6) {
+                    SettingsRowIcon(name: "info.circle")
                     Text("app.name")
                         .font(.system(size: 12, weight: .medium))
                     Spacer()
                     Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "–")
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                     #if DEBUG
                     Text("DEBUG")
@@ -108,11 +98,11 @@ struct SettingsView: View {
                             .cornerRadius(4)
                     }
                 }
-                .font(.system(size: 12))
 
                 Button(action: { updaterService.checkForUpdates() }) {
                     HStack {
                         Label("settings.checkForUpdates", systemImage: "arrow.triangle.2.circlepath")
+                            .labelStyle(SettingsRowLabelStyle())
                         Spacer()
                         if updaterService.hasUpdate {
                             Circle()
@@ -120,7 +110,6 @@ struct SettingsView: View {
                                 .frame(width: 8, height: 8)
                         }
                     }
-                    .font(.system(size: 12))
                 }
                 .buttonStyle(.plain)
                 .disabled(!updaterService.canCheckForUpdates)
@@ -131,13 +120,13 @@ struct SettingsView: View {
                     }
                 }) {
                     HStack {
-                        Label("settings.github", systemImage: "safari")
+                        Label("settings.github", systemImage: "chevron.left.forwardslash.chevron.right")
+                            .labelStyle(SettingsRowLabelStyle())
                         Spacer()
                         Image(systemName: "arrow.up.forward.square")
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                     }
-                    .font(.system(size: 12))
                 }
                 .buttonStyle(.plain)
 
@@ -148,12 +137,12 @@ struct SettingsView: View {
                 }) {
                     HStack {
                         Label("settings.reportIssue", systemImage: "exclamationmark.bubble")
+                            .labelStyle(SettingsRowLabelStyle())
                         Spacer()
                         Image(systemName: "arrow.up.forward.square")
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                     }
-                    .font(.system(size: 12))
                 }
                 .buttonStyle(.plain)
 
@@ -168,12 +157,12 @@ struct SettingsView: View {
                 }) {
                     HStack {
                         Label("settings.exportLog", systemImage: "doc.text.magnifyingglass")
+                            .labelStyle(SettingsRowLabelStyle())
                         Spacer()
                         Image(systemName: "arrow.up.forward.square")
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                     }
-                    .font(.system(size: 12))
                 }
                 .buttonStyle(.plain)
             }
@@ -347,7 +336,7 @@ struct SettingsView: View {
                 ClaudeAccountSourcePickerRow()
             }
 
-            Picker("settings.resumeIn", selection: $preferredTerminal) {
+            Picker(selection: $preferredTerminal) {
                 ForEach(TerminalApp.allCases) { app in
                     if app != .auto && !app.isInstalled {
                         Text("settings.notFound \(app.rawValue)")
@@ -357,12 +346,14 @@ struct SettingsView: View {
                             .tag(app.rawValue)
                     }
                 }
+            } label: {
+                Label("settings.resumeIn", systemImage: "terminal")
+                    .labelStyle(SettingsRowLabelStyle())
             }
             .pickerStyle(.menu)
-            .font(.system(size: 12))
 
             if preferredTerminal == "Editor" {
-                Picker("settings.chooseEditor", selection: $preferredEditor) {
+                Picker(selection: $preferredEditor) {
                     ForEach(EditorApp.allCases) { app in
                         if !app.isInstalled {
                             Text("settings.notFound \(app.rawValue)")
@@ -372,25 +363,33 @@ struct SettingsView: View {
                                 .tag(app.rawValue)
                         }
                     }
+                } label: {
+                    Label("settings.chooseEditor", systemImage: "doc.text")
+                        .labelStyle(SettingsRowLabelStyle())
                 }
                 .pickerStyle(.menu)
-                .font(.system(size: 12))
             }
 
-            Toggle("settings.launchAtLogin", isOn: $launchAtLogin)
-                .onChange(of: launchAtLogin) { _, newValue in
-                    do {
-                        if newValue {
-                            try SMAppService.mainApp.register()
-                        } else {
-                            try SMAppService.mainApp.unregister()
-                        }
-                    } catch {
-                        launchAtLogin = SMAppService.mainApp.status == .enabled
+            Toggle(isOn: $launchAtLogin) {
+                Label("settings.launchAtLogin", systemImage: "power")
+                    .labelStyle(SettingsRowLabelStyle())
+            }
+            .onChange(of: launchAtLogin) { _, newValue in
+                do {
+                    if newValue {
+                        try SMAppService.mainApp.register()
+                    } else {
+                        try SMAppService.mainApp.unregister()
                     }
+                } catch {
+                    launchAtLogin = SMAppService.mainApp.status == .enabled
                 }
+            }
 
-            Toggle("settings.globalHotKey", isOn: $globalHotKeyEnabled)
+            Toggle(isOn: $globalHotKeyEnabled) {
+                Label("settings.globalHotKey", systemImage: "command")
+                    .labelStyle(SettingsRowLabelStyle())
+            }
 
             if globalHotKeyEnabled {
                 HotKeyRecorderRow(
@@ -399,154 +398,204 @@ struct SettingsView: View {
                 )
             }
 
-            if let installer = provider.statusLineInstaller {
-                StatusLineSection(installer: installer)
-                    .id(provider.kind)
-            }
-
-            VStack(alignment: .leading, spacing: 0) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        isTabOrderExpanded.toggle()
-                    }
-                } label: {
-                    HStack(spacing: 8) {
-                        Label("settings.tabOrder", systemImage: "rectangle.3.group")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.primary)
-
-                        Spacer()
-
-                        Image(systemName: isTabOrderExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
-                if isTabOrderExpanded {
-                    VStack(alignment: .leading, spacing: 12) {
-                        TabOrderEditor(tabOrder: $tabOrder, showsHeader: false)
-
-                        Divider()
-
-                        Button("settings.resetDefault") {
-                            tabOrder = AppTab.defaultOrder
-                            AppTab.saveOrder(tabOrder)
-                        }
-                        .font(.system(size: 11))
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.secondary)
-                    }
-                    .padding(.top, 6)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var autoRefreshSection: some View {
-        if provider.capabilities.supportsUsage {
-            Section("settings.autoRefresh") {
-                Toggle("settings.enableAutoRefresh", isOn: $autoRefreshEnabled)
-                    .onChange(of: autoRefreshEnabled) { _, newValue in
-                        if newValue {
-                            usageViewModel.autoRefreshInterval = refreshInterval
-                            usageViewModel.startAutoRefresh()
-                        } else {
-                            usageViewModel.stopAutoRefresh()
-                        }
-                    }
-
-                if autoRefreshEnabled {
-                    HStack(spacing: 8) {
-                        ForEach([5, 10, 30], id: \.self) { min in
-                            Button {
-                                customInterval = false
-                                refreshInterval = Double(min * 60)
-                                usageViewModel.autoRefreshInterval = refreshInterval
-                                usageViewModel.startAutoRefresh()
-                            } label: {
-                                Text("\(min)min")
-                                    .font(.system(size: 11))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
-                                    .background(!customInterval && refreshInterval == Double(min * 60) ? Color.blue : Color.gray.opacity(0.15))
-                                    .foregroundStyle(!customInterval && refreshInterval == Double(min * 60) ? .white : .primary)
-                                    .cornerRadius(4)
-                            }
-                            .buttonStyle(.plain)
-                        }
-
-                        HStack(spacing: 3) {
-                            TextField("", text: $customMinutes)
-                                .textFieldStyle(.roundedBorder)
-                                .font(.system(size: 11, design: .monospaced))
-                                .frame(width: 40)
-                                .onAppear {
-                                    if customInterval {
-                                        customMinutes = String(Int(refreshInterval / 60))
-                                    }
-                                }
-                                .onSubmit {
-                                    applyCustomInterval()
-                                }
-                                .onChange(of: customMinutes) { _, newValue in
-                                    if !newValue.isEmpty {
-                                        customInterval = true
-                                        applyCustomInterval()
-                                    }
-                                }
-                            Text("min")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-
-                Text("settings.autoRefreshHint")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-        }
-    }
-
-    private var appearanceSection: some View {
-        Section("settings.appearance") {
-            Picker("settings.language", selection: $appLanguage) {
+            Picker(selection: $appLanguage) {
                 Text("language.auto").tag("auto")
                 Text("language.en").tag("en")
                 Text("language.zhHans").tag("zh-Hans")
+            } label: {
+                Label("settings.language", systemImage: "globe")
+                    .labelStyle(SettingsRowLabelStyle())
             }
             .pickerStyle(.menu)
-            .font(.system(size: 12))
             .onChange(of: appLanguage) { _, newValue in
                 LanguageManager.apply(newValue)
             }
 
-            HStack(spacing: 8) {
-                Text("settings.fontSize")
-                    .font(.system(size: 12))
-                Image(systemName: "textformat.size.smaller")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                Slider(value: $fontScale, in: 0.85...1.25, step: 0.05)
-                Image(systemName: "textformat.size.larger")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                Text(String(format: "%.0f%%", fontScale * 100))
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 36)
-                if fontScale != 1.0 {
-                    Button("settings.resetDefault") {
-                        fontScale = 1.0
-                    }
-                    .font(.system(size: 10))
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.blue)
+            if provider.capabilities.supportsUsage {
+                Toggle(isOn: $autoRefreshEnabled) {
+                    Label("settings.enableAutoRefresh", systemImage: "arrow.triangle.2.circlepath")
+                        .labelStyle(SettingsRowLabelStyle())
                 }
+                .onChange(of: autoRefreshEnabled) { _, newValue in
+                    if newValue {
+                        usageViewModel.autoRefreshInterval = refreshInterval
+                        usageViewModel.startAutoRefresh()
+                    } else {
+                        usageViewModel.stopAutoRefresh()
+                    }
+                }
+
+                if autoRefreshEnabled {
+                    disclosureRow(
+                        title: "settings.autoRefresh",
+                        icon: "clock.arrow.circlepath",
+                        isExpanded: $isRefreshIntervalExpanded,
+                        summary: refreshIntervalSummary
+                    ) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 8) {
+                                ForEach([5, 10, 30], id: \.self) { min in
+                                    Button {
+                                        customInterval = false
+                                        refreshInterval = Double(min * 60)
+                                        usageViewModel.autoRefreshInterval = refreshInterval
+                                        usageViewModel.startAutoRefresh()
+                                    } label: {
+                                        Text("\(min)min")
+                                            .font(.system(size: 11))
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 3)
+                                            .background(!customInterval && refreshInterval == Double(min * 60) ? Color.blue : Color.gray.opacity(0.15))
+                                            .foregroundStyle(!customInterval && refreshInterval == Double(min * 60) ? .white : .primary)
+                                            .cornerRadius(4)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+
+                                HStack(spacing: 3) {
+                                    TextField("", text: $customMinutes)
+                                        .textFieldStyle(.roundedBorder)
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .frame(width: 40)
+                                        .onAppear {
+                                            if customInterval {
+                                                customMinutes = String(Int(refreshInterval / 60))
+                                            }
+                                        }
+                                        .onSubmit {
+                                            applyCustomInterval()
+                                        }
+                                        .onChange(of: customMinutes) { _, newValue in
+                                            if !newValue.isEmpty {
+                                                customInterval = true
+                                                applyCustomInterval()
+                                            }
+                                        }
+                                    Text("min")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+
+                            Text("settings.autoRefreshHint")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+            }
+
+            disclosureRow(
+                title: "settings.appearance",
+                icon: "textformat.size",
+                isExpanded: $isAppearanceExpanded,
+                summary: String(format: "%.0f%%", fontScale * 100)
+            ) {
+                HStack(spacing: 8) {
+                    Image(systemName: "textformat.size.smaller")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    Slider(value: $fontScale, in: 0.85...1.25, step: 0.05)
+                    Image(systemName: "textformat.size.larger")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                    Text(String(format: "%.0f%%", fontScale * 100))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 36)
+                    if fontScale != 1.0 {
+                        Button("settings.resetDefault") {
+                            fontScale = 1.0
+                        }
+                        .font(.system(size: 10))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.blue)
+                    }
+                }
+            }
+
+            disclosureRow(
+                title: "settings.tabOrder",
+                icon: "rectangle.3.group",
+                isExpanded: $isTabOrderExpanded,
+                summary: nil
+            ) {
+                VStack(alignment: .leading, spacing: 12) {
+                    TabOrderEditor(tabOrder: $tabOrder, showsHeader: false)
+
+                    Divider()
+
+                    Button("settings.resetDefault") {
+                        tabOrder = AppTab.defaultOrder
+                        AppTab.saveOrder(tabOrder)
+                    }
+                    .font(.system(size: 11))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                }
+            }
+
+            if provider.capabilities.supportsCost {
+                Button(action: { showPricing = true }) {
+                    HStack {
+                        Label("settings.managePricing", systemImage: "dollarsign.circle")
+                            .labelStyle(SettingsRowLabelStyle())
+                        Spacer()
+                        Text("settings.models \(ModelPricing.shared.models.count)")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var refreshIntervalSummary: String {
+        let minutes = Int(refreshInterval / 60)
+        return "\(minutes) min"
+    }
+
+    @ViewBuilder
+    private func disclosureRow<Content: View>(
+        title: LocalizedStringKey,
+        icon: String,
+        isExpanded: Binding<Bool>,
+        summary: String?,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    isExpanded.wrappedValue.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Label(title, systemImage: icon)
+                        .labelStyle(SettingsRowLabelStyle())
+
+                    Spacer()
+
+                    if let summary, !isExpanded.wrappedValue {
+                        Text(summary)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Image(systemName: isExpanded.wrappedValue ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded.wrappedValue {
+                content()
+                    .padding(.top, 6)
             }
         }
     }
@@ -565,6 +614,31 @@ struct SettingsView: View {
 
 }
 
+// MARK: - Row Icon Helpers (shared within SettingsView.swift)
+
+struct SettingsRowIcon: View {
+    let name: String
+    var body: some View {
+        Image(systemName: name)
+            .font(.system(size: 12))
+            .foregroundStyle(.secondary)
+            .frame(width: 18, alignment: .leading)
+    }
+}
+
+struct SettingsRowLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 6) {
+            configuration.icon
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .frame(width: 18, alignment: .leading)
+            configuration.title
+                .font(.system(size: 12))
+        }
+    }
+}
+
 // MARK: - Hot Key Recorder
 
 private struct HotKeyRecorderRow: View {
@@ -578,7 +652,8 @@ private struct HotKeyRecorderRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
+            SettingsRowIcon(name: "keyboard")
             Text("settings.globalHotKeyShortcut")
                 .font(.system(size: 12))
 
@@ -1214,23 +1289,42 @@ struct StatusLineSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Label(LocalizedStringKey(installer.titleLocalizationKey), systemImage: "terminal")
-                    .font(.system(size: 12))
+            HStack(alignment: .top, spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.blue.opacity(0.12))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: "terminal")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.blue)
+                }
 
-                if !installer.legendSections.isEmpty {
-                    Button {
-                        showsLegendPopover.toggle()
-                    } label: {
-                        Image(systemName: "questionmark.circle")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .popover(isPresented: $showsLegendPopover, arrowEdge: .top) {
-                        legendContent
-                            .frame(width: 330, alignment: .leading)
-                            .padding(12)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(LocalizedStringKey(installer.titleLocalizationKey))
+                        .font(.system(size: 13, weight: .medium))
+                    Text(LocalizedStringKey(installer.descriptionLocalizationKey))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !installer.legendSections.isEmpty {
+                        Button {
+                            showsLegendPopover.toggle()
+                        } label: {
+                            HStack(spacing: 3) {
+                                Image(systemName: "questionmark.circle")
+                                    .font(.system(size: 10))
+                                Text("statusLine.legend.title")
+                                    .font(.system(size: 10))
+                            }
+                            .foregroundStyle(.blue)
+                        }
+                        .buttonStyle(.plain)
+                        .popover(isPresented: $showsLegendPopover, arrowEdge: .top) {
+                            legendContent
+                                .frame(width: 330, alignment: .leading)
+                                .padding(12)
+                        }
+                        .padding(.top, 1)
                     }
                 }
 
@@ -1241,14 +1335,13 @@ struct StatusLineSection: View {
                     set: { setEnabled($0) }
                 ))
                 .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.small)
             }
 
             if let message, isError {
                 Text(message)
                     .font(.system(size: 10))
                     .foregroundStyle(.red)
+                    .padding(.leading, 42)
             }
         }
     }

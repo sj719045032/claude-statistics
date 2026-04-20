@@ -7,7 +7,8 @@ struct ClaudeAccountSourcePickerRow: View {
     @State private var showsHelp = false
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
+            SettingsRowIcon(name: "person.badge.key")
             Text("claude.accountSource")
                 .font(.system(size: 12))
 

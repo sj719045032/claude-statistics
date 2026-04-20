@@ -203,6 +203,7 @@
 "settings.tabOrderHint" = "点击标签后用箭头调整顺序";
 "settings.resetDefault" = "恢复默认";
 "settings.statusLine" = "状态行";
+"settings.recommended" = "推荐";
 "settings.diagnostics" = "诊断";
 "settings.exportLog" = "打开诊断日志";
 "settings.exportLogHint" = "反馈问题时请附带此日志。路径：~/.claude/claude-statistics-diagnostic.log";
