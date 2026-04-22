@@ -12,6 +12,10 @@ final class CodexProvider: SessionProvider, @unchecked Sendable {
 
     // credentialStatus: nil — Codex profile is decoded locally, no explicit credential check needed
     var statusLineInstaller: (any StatusLineInstalling)? { CodexStatusLineAdapter() }
+    var notchHookInstaller: (any HookInstalling)? { CodexHookInstaller() }
+    // Codex's hook runtime only fires PermissionRequest (on sandbox escalation)
+    // and Stop (= taskDone). No Notification idle_prompt, no StopFailure.
+    var supportedNotchEvents: Set<NotchEventKind> { [.permission, .taskDone] }
     var pricingFetcher: (any ProviderPricingFetching)? { CodexPricingFetchService.shared }
     var pricingSourceLocalizationKey: String? { "pricing.source.codex" }
     var pricingSourceURL: URL? { URL(string: "https://developers.openai.com/api/docs/pricing") }

@@ -2,6 +2,7 @@ import Foundation
 
 final class CodexTranscriptParser {
     static let shared = CodexTranscriptParser()
+    private static let assistantPreviewLimit = 4000
 
     private let isoFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
@@ -42,9 +43,25 @@ final class CodexTranscriptParser {
                         userCount += 1
                         if quick.topic == nil { quick.topic = cleaned }
                         quick.lastPrompt = truncate(cleaned, limit: 200)
+                        quick.lastPromptAt = event.timestamp
                     } else if role == "assistant" {
                         assistantCount += 1
+                        if let text = extractMessageText(from: event.payload) {
+                            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !trimmed.isEmpty {
+                                quick.lastOutputPreview = truncate(trimmed, limit: Self.assistantPreviewLimit)
+                                quick.lastOutputPreviewAt = event.timestamp
+                            }
+                        }
                     }
+                } else if payloadType == "function_call" {
+                    let rawName = (event.payload["name"] as? String) ?? "tool"
+                    let arguments = (event.payload["arguments"] as? String) ?? ""
+                    let descriptor = toolDescriptor(name: rawName, arguments: arguments)
+                    quick.lastToolName = descriptor.toolName
+                    quick.lastToolSummary = toolActivitySummary(for: descriptor)
+                    quick.lastToolDetail = descriptor.detail.map { truncate($0, limit: 400) }
+                    quick.lastToolAt = event.timestamp
                 }
 
             case "event_msg":
@@ -106,16 +123,30 @@ final class CodexTranscriptParser {
                     if role == "user", let text = extractMessageText(from: event.payload), let cleaned = cleanUserText(text) {
                         stats.userMessageCount += 1
                         stats.lastPrompt = truncate(cleaned, limit: 200)
+                        stats.lastPromptAt = event.timestamp
                         if let timestamp = event.timestamp {
                             userMessageTimes.append(fiveMinuteKey(for: timestamp))
                         }
                     } else if role == "assistant" {
                         stats.assistantMessageCount += 1
+                        if let text = extractMessageText(from: event.payload) {
+                            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !trimmed.isEmpty {
+                                stats.lastOutputPreview = truncate(trimmed, limit: Self.assistantPreviewLimit)
+                                stats.lastOutputPreviewAt = event.timestamp
+                            }
+                        }
                     }
                 } else if payloadType == "function_call",
                           let rawName = event.payload["name"] as? String,
                           let timestamp = event.timestamp {
-                    toolUseTimes.append((fiveMinuteKey(for: timestamp), normalizedToolName(rawName)))
+                    let arguments = (event.payload["arguments"] as? String) ?? ""
+                    let descriptor = toolDescriptor(name: rawName, arguments: arguments)
+                    stats.lastToolName = descriptor.toolName
+                    stats.lastToolSummary = toolActivitySummary(for: descriptor)
+                    stats.lastToolDetail = descriptor.detail.map { truncate($0, limit: 400) }
+                    stats.lastToolAt = timestamp
+                    toolUseTimes.append((fiveMinuteKey(for: timestamp), descriptor.toolName))
                 }
 
             case "event_msg":
@@ -491,6 +522,14 @@ final class CodexTranscriptParser {
             let summary = fallback.isEmpty ? toolName : truncate(fallback.components(separatedBy: .newlines).first ?? fallback, limit: 140)
             return ToolDescriptor(toolName: toolName, summary: summary, detail: fallback.isEmpty ? nil : fallback)
         }
+    }
+
+    private func toolActivitySummary(for descriptor: ToolDescriptor) -> String {
+        let summary = descriptor.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !summary.isEmpty, summary.lowercased() != descriptor.toolName.lowercased() else {
+            return descriptor.toolName
+        }
+        return "\(descriptor.toolName) \(summary)"
     }
 
     private func parseObjectString(_ raw: String) -> [String: Any]? {

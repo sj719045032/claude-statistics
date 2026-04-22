@@ -52,3 +52,6 @@ xcuserdata/
 .vercel
 node_modules/
 .qwen/
+# Python compiled caches next to bundled hook scripts
+__pycache__/
+*.pyc

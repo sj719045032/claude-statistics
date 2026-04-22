@@ -288,14 +288,10 @@ final class SessionDataStore: ObservableObject {
         let needsRescan = provider.alwaysRescanOnFileChanges
         guard needsRescan || !changedIds.isEmpty else { return }
 
-        if isPopoverVisible {
-            processDirtyIds(changedIds, forceRescan: needsRescan)
-        } else {
-            if needsRescan {
-                pendingRescan = true
-            }
-            dirtySessionIds.formUnion(changedIds)
-        }
+        // Keep background session metadata fresh for the notch/island even when the
+        // popover is closed. Parsing stays serialized on the store queue, so this
+        // remains bounded while avoiding stale active-session previews.
+        processDirtyIds(changedIds, forceRescan: needsRescan)
     }
 
     // MARK: - Dirty session processing

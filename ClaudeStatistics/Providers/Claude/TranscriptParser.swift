@@ -5,6 +5,11 @@ final class TranscriptParser {
 
     private init() {}
 
+    /// Max length of an assistant preview text. Kept generous so the notch
+    /// expanded waiting card can show full multi-paragraph markdown without
+    /// losing the tail. Session-list rows UI-side already limits lines.
+    static let assistantPreviewLimit = 4000
+
     /// Per-message accumulated data (streaming produces multiple entries; we keep the last/final one)
     private struct MessageAccum {
         var model: String
@@ -87,9 +92,10 @@ final class TranscriptParser {
                 if let message = json["message"] as? [String: Any] {
                     let text: String? = (message["content"] as? String)
                         ?? (message["content"] as? [[String: Any]])?.compactMap({ $0["text"] as? String }).joined(separator: "\n")
-                    if let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if let text,
+                       let cleaned = Self.cleanUserDisplayText(text) {
                         stats.lastPrompt = cleaned.count > 200 ? String(cleaned.prefix(200)) + "…" : cleaned
+                        stats.lastPromptAt = timestamp
                     }
                 }
 
@@ -142,6 +148,11 @@ final class TranscriptParser {
                             }
                         }
                     }
+                }
+
+                if let preview = Self.extractAssistantPreview(fromRawMessage: message) {
+                    stats.lastOutputPreview = preview
+                    stats.lastOutputPreviewAt = timestamp
                 }
             }
         }
@@ -434,6 +445,7 @@ final class TranscriptParser {
             let tailContent = String(decoding: tailData, as: UTF8.self)
             let tailLines = tailContent.components(separatedBy: "\n")
             var foundPrompt = false
+            var foundOutputPreview = false
             var latestSlug: String?
             var latestCustomTitle: String?
             for line in tailLines.reversed() {
@@ -452,12 +464,20 @@ final class TranscriptParser {
 
                 if !foundPrompt, entry.type == "user" || entry.type == "human" {
                     if let text = Self.extractUserText(from: entry) {
-                        let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                        if !cleaned.isEmpty {
+                        if let cleaned = Self.cleanUserDisplayText(text) {
                             quick.lastPrompt = cleaned.count > 200 ? String(cleaned.prefix(200)) + "…" : cleaned
+                            quick.lastPromptAt = entry.timestampDate
                             foundPrompt = true
                         }
                     }
+                }
+
+                if !foundOutputPreview, entry.type == "assistant",
+                   let message = entry.message,
+                   let preview = Self.extractAssistantPreview(from: message) {
+                    quick.lastOutputPreview = preview
+                    quick.lastOutputPreviewAt = entry.timestampDate
+                    foundOutputPreview = true
                 }
             }
             quick.sessionName = latestCustomTitle ?? latestSlug
@@ -502,8 +522,7 @@ final class TranscriptParser {
             case "queue-operation":
                 // Queued user messages (e.g. interrupted and re-sent)
                 guard entry.operation == "enqueue" else { continue }
-                guard let text = entry.content, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
-                let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard let text = entry.content, let cleaned = Self.cleanUserDisplayText(text) else { continue }
                 messages.append(TranscriptDisplayMessage(
                     id: "msg-\(index)", role: "user", text: cleaned, timestamp: entry.timestampDate
                 ))
@@ -511,15 +530,7 @@ final class TranscriptParser {
 
             case "user", "human":
                 guard let text = Self.extractAllText(from: entry) else { continue }
-                let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !cleaned.isEmpty else { continue }
-
-                if cleaned.hasPrefix("<") && (
-                    cleaned.contains("<ide_opened_file>") ||
-                    cleaned.contains("<command-message>") ||
-                    cleaned.contains("<local-command-caveat>") ||
-                    cleaned.contains("<system-reminder>")
-                ) { continue }
+                guard let cleaned = Self.cleanUserDisplayText(text) else { continue }
 
                 // Skip pure image-path messages (image already shown by [Image #N] message)
                 if cleaned.hasPrefix("[Image: source:") && cleaned.hasSuffix("]") { continue }
@@ -775,15 +786,90 @@ final class TranscriptParser {
         return nil
     }
 
+    private static func clampAssistantPreview(_ s: String) -> String {
+        s.count > assistantPreviewLimit ? String(s.prefix(assistantPreviewLimit)) + "…" : s
+    }
+
+    private static func extractAssistantPreview(from message: TranscriptMessage) -> String? {
+        if let contentString = message.contentString {
+            let trimmed = contentString.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                return clampAssistantPreview(trimmed)
+            }
+        }
+
+        guard let items = message.content else { return nil }
+        for item in items.reversed() {
+            switch item {
+            case .text(let text):
+                let trimmed = text.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty, !trimmed.hasPrefix("[Request interrupted by user") else { continue }
+                return clampAssistantPreview(trimmed)
+            case .toolResult(let result):
+                guard let text = extractToolResultText(result.content)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                      !text.isEmpty else { continue }
+                return clampAssistantPreview(text)
+            case .toolUse(let tool):
+                let summary = toolSummaryAndDetail(name: tool.name ?? "Tool", input: tool.input).0
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !summary.isEmpty else { continue }
+                return clampAssistantPreview(summary)
+            case .thinking(let thinking):
+                let text = (thinking.thinking ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else { continue }
+                return clampAssistantPreview(text)
+            case .unknown:
+                continue
+            }
+        }
+        return nil
+    }
+
+    private static func extractAssistantPreview(fromRawMessage message: [String: Any]) -> String? {
+        if let contentString = message["content"] as? String {
+            let trimmed = contentString.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                return clampAssistantPreview(trimmed)
+            }
+        }
+
+        guard let items = message["content"] as? [[String: Any]] else { return nil }
+        for item in items.reversed() {
+            switch item["type"] as? String {
+            case "text":
+                let trimmed = (item["text"] as? String ?? "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty, !trimmed.hasPrefix("[Request interrupted by user") else { continue }
+                return clampAssistantPreview(trimmed)
+            case "tool_result":
+                let content = item["content"].map(AnyCodable.init)
+                guard let text = extractToolResultText(content)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                      !text.isEmpty else { continue }
+                return clampAssistantPreview(text)
+            case "tool_use":
+                let input = item["input"].map(AnyCodable.init)
+                let summary = toolSummaryAndDetail(name: item["name"] as? String ?? "Tool", input: input).0
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !summary.isEmpty else { continue }
+                return clampAssistantPreview(summary)
+            case "thinking":
+                let text = (item["thinking"] as? String ?? "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else { continue }
+                return clampAssistantPreview(text)
+            default:
+                continue
+            }
+        }
+        return nil
+    }
+
     private static func cleanSearchText(_ text: String) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count > 2 else { return nil }
-        if trimmed.hasPrefix("<") && (
-            trimmed.contains("<ide_opened_file>") ||
-            trimmed.contains("<command-message>") ||
-            trimmed.contains("<local-command-caveat>") ||
-            trimmed.contains("<system-reminder>")
-        ) { return nil }
+        if isInternalUserMessage(trimmed) { return nil }
         if trimmed.hasPrefix("[Image: source:") && trimmed.hasSuffix("]") { return nil }
 
         let stripped = SearchUtils.stripMarkdown(trimmed)
@@ -849,16 +935,7 @@ final class TranscriptParser {
 
     /// Clean up user text into a short topic line
     private static func cleanTopic(_ text: String) -> String? {
-        // Skip system/IDE messages
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.hasPrefix("<") && (
-            trimmed.contains("<ide_opened_file>") ||
-            trimmed.contains("<command-message>") ||
-            trimmed.contains("<local-command-caveat>") ||
-            trimmed.contains("<system-reminder>")
-        ) {
-            return nil
-        }
+        guard let trimmed = cleanUserDisplayText(text) else { return nil }
 
         // Take the first meaningful line
         let firstLine = trimmed.components(separatedBy: .newlines)
@@ -867,5 +944,30 @@ final class TranscriptParser {
 
         if firstLine.isEmpty { return nil }
         return firstLine
+    }
+
+    private static func cleanUserDisplayText(_ text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !isInternalUserMessage(trimmed) else { return nil }
+        return trimmed
+    }
+
+    private static func isInternalUserMessage(_ text: String) -> Bool {
+        guard text.hasPrefix("<") else { return false }
+
+        if text.range(
+            of: #"^<{1,2}/?[A-Za-z][A-Za-z0-9_-]*(\s+[^>]*)?>{1,2}$"#,
+            options: .regularExpression
+        ) != nil {
+            return true
+        }
+
+        return text.contains("<ide_opened_file>")
+            || text.contains("<command-message>")
+            || text.contains("<local-command-caveat>")
+            || text.contains("<system-reminder>")
+            || text.contains("<task-notification>")
+            || text.contains("<task-id>")
+            || text.contains("<tool-use-id>")
     }
 }

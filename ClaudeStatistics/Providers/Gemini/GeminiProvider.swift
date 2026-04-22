@@ -12,6 +12,10 @@ final class GeminiProvider: SessionProvider, @unchecked Sendable {
     let usagePresentation = ProviderUsagePresentation.gemini
     var credentialStatus: Bool? { GeminiUsageService.shared.hasUsableCredentials }
     var statusLineInstaller: (any StatusLineInstalling)? { GeminiStatusLineAdapter() }
+    var notchHookInstaller: (any HookInstalling)? { GeminiHookInstaller() }
+    // Gemini CLI currently exposes ToolPermission via Notification and has no
+    // idle-prompt equivalent, so Gemini notch events are permission + task done.
+    var supportedNotchEvents: Set<NotchEventKind> { [.permission, .taskDone] }
     var pricingFetcher: (any ProviderPricingFetching)? { GeminiPricingFetchService.shared }
     var pricingSourceLocalizationKey: String? { "pricing.source.gemini" }
     var pricingSourceURL: URL? { URL(string: "https://ai.google.dev/gemini-api/docs/pricing") }

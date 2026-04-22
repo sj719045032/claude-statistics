@@ -1,0 +1,185 @@
+import Foundation
+
+struct GeminiHookInstaller: HookInstalling {
+    let provider: ProviderKind = .gemini
+
+    private static let scriptName = "claude-stats-gemini-hook"
+    private static let managedMarker = "claude-stats-gemini-hook.py"
+
+    private let supportedHookEvents = [
+        "BeforeAgent",
+        "BeforeTool",
+        "BeforeToolSelection",
+        "BeforeModel",
+        "AfterTool",
+        "AfterModel",
+        "AfterAgent",
+        "SessionStart",
+        "SessionEnd",
+        "PreCompress",
+        "Notification",
+    ]
+
+    private var geminiDir: String {
+        (NSHomeDirectory() as NSString).appendingPathComponent(".gemini")
+    }
+
+    private var hooksDir: String {
+        (geminiDir as NSString).appendingPathComponent("hooks")
+    }
+
+    private var settingsPath: String {
+        (geminiDir as NSString).appendingPathComponent("settings.json")
+    }
+
+    private var scriptPath: String {
+        (hooksDir as NSString).appendingPathComponent("\(Self.scriptName).py")
+    }
+
+    private var commandPath: String {
+        scriptPath
+    }
+
+    var isInstalled: Bool {
+        guard FileManager.default.fileExists(atPath: scriptPath) else { return false }
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: settingsPath)),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let hooks = root["hooks"] as? [String: Any] else {
+            return false
+        }
+
+        for (_, value) in hooks {
+            guard let definitions = value as? [[String: Any]] else { continue }
+            for definition in definitions {
+                guard let inner = definition["hooks"] as? [[String: Any]] else { continue }
+                if inner.contains(where: { Self.isManagedCommand($0["command"] as? String ?? "") }) {
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+
+    func install() async throws -> HookInstallResult {
+        guard HookInstallerUtils.python3Available() else {
+            return .python3Missing
+        }
+
+        let snapshots = [
+            FileSnapshot.capture(at: settingsPath),
+            FileSnapshot.capture(at: scriptPath),
+        ]
+
+        do {
+            var root = try readSettingsJSON() ?? [:]
+            var hooks = root["hooks"] as? [String: Any] ?? [:]
+
+            pruneManagedHooks(from: &hooks)
+
+            for event in supportedHookEvents {
+                var definitions = hooks[event] as? [[String: Any]] ?? []
+                definitions.append([
+                    "hooks": [[
+                        "type": "command",
+                        "command": commandPath,
+                    ]]
+                ])
+                hooks[event] = definitions
+            }
+
+            root["hooks"] = hooks
+            try writeSettingsJSON(root)
+            try HookInstallerUtils.installScript(bundleResourceName: Self.scriptName, destinationDir: hooksDir)
+        } catch {
+            for snapshot in snapshots {
+                try? snapshot.restore()
+            }
+            throw error
+        }
+
+        return .success
+    }
+
+    func uninstall() async throws -> HookInstallResult {
+        let snapshots = [
+            FileSnapshot.capture(at: settingsPath),
+            FileSnapshot.capture(at: scriptPath),
+        ]
+
+        do {
+            HookInstallerUtils.removeScript(at: scriptPath)
+            guard FileManager.default.fileExists(atPath: settingsPath) else {
+                return .success
+            }
+
+            guard var root = try readSettingsJSON(),
+                  var hooks = root["hooks"] as? [String: Any] else {
+                throw HookError.jsonParseError
+            }
+
+            pruneManagedHooks(from: &hooks)
+            if hooks.isEmpty {
+                root.removeValue(forKey: "hooks")
+            } else {
+                root["hooks"] = hooks
+            }
+
+            try writeSettingsJSON(root)
+        } catch {
+            for snapshot in snapshots {
+                try? snapshot.restore()
+            }
+            throw error
+        }
+
+        return .success
+    }
+
+    private func readSettingsJSON() throws -> [String: Any]? {
+        guard FileManager.default.fileExists(atPath: settingsPath) else {
+            return nil
+        }
+
+        let data = try Data(contentsOf: URL(fileURLWithPath: settingsPath))
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw HookError.jsonParseError
+        }
+        return root
+    }
+
+    private func writeSettingsJSON(_ root: [String: Any]) throws {
+        let fm = FileManager.default
+        try fm.createDirectory(atPath: geminiDir, withIntermediateDirectories: true)
+        let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
+        try data.write(to: URL(fileURLWithPath: settingsPath), options: .atomic)
+    }
+
+    private func pruneManagedHooks(from hooks: inout [String: Any]) {
+        for (event, value) in hooks {
+            guard let definitions = value as? [[String: Any]] else { continue }
+            let sanitized = definitions.compactMap { definition -> [String: Any]? in
+                guard let inner = definition["hooks"] as? [[String: Any]] else {
+                    return definition
+                }
+
+                let retained = inner.filter { !Self.isManagedCommand($0["command"] as? String ?? "") }
+                guard !retained.isEmpty else { return nil }
+
+                var updated = definition
+                updated["hooks"] = retained
+                return updated
+            }
+
+            if sanitized.isEmpty {
+                hooks.removeValue(forKey: event)
+            } else {
+                hooks[event] = sanitized
+            }
+        }
+    }
+
+    private static func isManagedCommand(_ command: String) -> Bool {
+        command.contains(managedMarker)
+    }
+}

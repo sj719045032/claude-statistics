@@ -1,6 +1,7 @@
 import SwiftUI
 import ServiceManagement
 import Carbon
+import ApplicationServices
 
 struct SettingsView: View {
     @ObservedObject var appState: AppState
@@ -16,11 +17,10 @@ struct SettingsView: View {
     @AppStorage("appLanguage") private var appLanguage = "auto"
     @AppStorage("fontScale") private var fontScale = 1.0
     @AppStorage("customInterval") private var customInterval = false
-    @AppStorage(GlobalHotKeyShortcut.enabledKey) private var globalHotKeyEnabled = true
-    @AppStorage(GlobalHotKeyShortcut.keyCodeKey) private var globalHotKeyKeyCode = GlobalHotKeyShortcut.defaultKeyCode
-    @AppStorage(GlobalHotKeyShortcut.modifiersKey) private var globalHotKeyModifiers = GlobalHotKeyShortcut.defaultModifiers
     @State private var customMinutes = ""
     @State private var showPricing = false
+    @State private var showNotchSettings = false
+    @State private var showKeyboardShortcuts = false
     @State private var hasToken: Bool?
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var isTabOrderExpanded = false
@@ -31,6 +31,10 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             if showPricing {
                 PricingManageView(provider: provider, onBack: { showPricing = false })
+            } else if showNotchSettings {
+                NotchNotificationsDetailView(provider: provider.kind, onBack: { showNotchSettings = false })
+            } else if showKeyboardShortcuts {
+                KeyboardShortcutsSettingsView(onBack: { showKeyboardShortcuts = false })
             } else {
                 settingsContent
             }
@@ -60,10 +64,13 @@ struct SettingsView: View {
             Divider()
 
             Form {
-            if let installer = provider.statusLineInstaller {
-                Section("settings.recommended") {
+            Section("settings.recommended") {
+                if let installer = provider.statusLineInstaller {
                     StatusLineSection(installer: installer)
                         .id(provider.kind)
+                }
+                NotchNotificationsSection(provider: provider.kind) {
+                    showNotchSettings = true
                 }
             }
 
@@ -386,17 +393,20 @@ struct SettingsView: View {
                 }
             }
 
-            Toggle(isOn: $globalHotKeyEnabled) {
-                Label("settings.globalHotKey", systemImage: "command")
-                    .labelStyle(SettingsRowLabelStyle())
+            Button(action: { showKeyboardShortcuts = true }) {
+                HStack {
+                    Label("settings.keyboardShortcuts", systemImage: "command")
+                        .labelStyle(SettingsRowLabelStyle())
+                    Spacer()
+                    Text("settings.shortcutsCount \(2)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
             }
-
-            if globalHotKeyEnabled {
-                HotKeyRecorderRow(
-                    keyCode: $globalHotKeyKeyCode,
-                    modifiers: $globalHotKeyModifiers
-                )
-            }
+            .buttonStyle(.plain)
 
             Picker(selection: $appLanguage) {
                 Text("language.auto").tag("auto")
@@ -644,6 +654,10 @@ struct SettingsRowLabelStyle: LabelStyle {
 private struct HotKeyRecorderRow: View {
     @Binding var keyCode: Int
     @Binding var modifiers: Int
+    var titleKey: LocalizedStringKey = "settings.globalHotKeyShortcut"
+    var iconName = "keyboard"
+    var defaultKeyCode = GlobalHotKeyShortcut.defaultKeyCode
+    var defaultModifiers = GlobalHotKeyShortcut.defaultModifiers
     @State private var isRecording = false
     @State private var eventMonitor: Any?
 
@@ -653,8 +667,8 @@ private struct HotKeyRecorderRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            SettingsRowIcon(name: "keyboard")
-            Text("settings.globalHotKeyShortcut")
+            SettingsRowIcon(name: iconName)
+            Text(titleKey)
                 .font(.system(size: 12))
 
             Spacer()
@@ -687,12 +701,246 @@ private struct HotKeyRecorderRow: View {
             }
 
             Button("settings.resetDefault") {
-                keyCode = GlobalHotKeyShortcut.defaultKeyCode
-                modifiers = GlobalHotKeyShortcut.defaultModifiers
+                keyCode = defaultKeyCode
+                modifiers = defaultModifiers
             }
             .font(.system(size: 10))
             .buttonStyle(.plain)
             .foregroundStyle(.blue)
+        }
+        .onDisappear { stopRecording() }
+    }
+
+    private func toggleRecording() {
+        if isRecording {
+            stopRecording()
+        } else {
+            startRecording()
+        }
+    }
+
+    private func startRecording() {
+        guard !isRecording else { return }
+        isRecording = true
+
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == UInt16(kVK_Escape) {
+                stopRecording()
+                return nil
+            }
+
+            let capturedModifiers = GlobalHotKeyShortcut.carbonModifiers(from: event.modifierFlags)
+            guard capturedModifiers != 0 else {
+                return nil
+            }
+
+            keyCode = Int(event.keyCode)
+            modifiers = capturedModifiers
+            stopRecording()
+            return nil
+        }
+    }
+
+    private func stopRecording() {
+        if let eventMonitor {
+            NSEvent.removeMonitor(eventMonitor)
+            self.eventMonitor = nil
+        }
+        isRecording = false
+    }
+}
+
+private struct KeyboardShortcutsSettingsView: View {
+    let onBack: () -> Void
+
+    @AppStorage(GlobalHotKeyShortcut.enabledKey) private var panelEnabled = true
+    @AppStorage(GlobalHotKeyShortcut.keyCodeKey) private var panelKeyCode = GlobalHotKeyAction.panel.defaultKeyCode
+    @AppStorage(GlobalHotKeyShortcut.modifiersKey) private var panelModifiers = GlobalHotKeyAction.panel.defaultModifiers
+    @AppStorage(GlobalHotKeyShortcut.islandEnabledKey) private var islandEnabled = true
+    @AppStorage(GlobalHotKeyShortcut.islandKeyCodeKey) private var islandKeyCode = GlobalHotKeyAction.island.defaultKeyCode
+    @AppStorage(GlobalHotKeyShortcut.islandModifiersKey) private var islandModifiers = GlobalHotKeyAction.island.defaultModifiers
+    @AppStorage(NotchPreferences.keyboardControlsEnabledKey) private var keyboardControlsEnabled = true
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Button(action: onBack) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chevron.left")
+                        Text("settings.back")
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Text("settings.keyboardShortcuts")
+                    .font(.system(size: 13, weight: .semibold))
+
+                Spacer().frame(width: 60)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            Form {
+                Section("settings.shortcut.section.notch") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .center, spacing: 10) {
+                            SettingsRowIcon(name: "keyboard")
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("settings.notchKeyboardControls.title")
+                                    .font(.system(size: 12, weight: .medium))
+                                Text("settings.notchKeyboardControls.subtitle")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            Toggle("", isOn: $keyboardControlsEnabled).labelsHidden()
+                        }
+                        if keyboardControlsEnabled {
+                            AccessibilityStatusRow()
+                        }
+                    }
+                }
+
+                Section("settings.shortcut.section.interface") {
+                    ShortcutSettingGroup(
+                        action: .panel,
+                        enabled: $panelEnabled,
+                        keyCode: $panelKeyCode,
+                        modifiers: $panelModifiers
+                    )
+
+                    ShortcutSettingGroup(
+                        action: .island,
+                        enabled: $islandEnabled,
+                        keyCode: $islandKeyCode,
+                        modifiers: $islandModifiers
+                    )
+                }
+            }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+        }
+    }
+}
+
+private struct AccessibilityStatusRow: View {
+    // Re-check on appear + every 2s while this settings pane is visible, so
+    // flipping the switch in System Settings is reflected without relaunch.
+    @State private var trusted = AXIsProcessTrusted()
+    private let tick = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: trusted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .foregroundStyle(trusted ? Color.green : Color.orange)
+                .font(.system(size: 11))
+            Text(trusted
+                 ? LanguageManager.localizedString("settings.notchKeyboardControls.accessibility.granted")
+                 : LanguageManager.localizedString("settings.notchKeyboardControls.accessibility.missing"))
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 4)
+            if !trusted {
+                Button("settings.notchKeyboardControls.accessibility.openSettings") {
+                    handleOpenAccessibilitySettings()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .tint(.orange)
+            }
+        }
+        .padding(.leading, 28) // Align under the primary row's text column.
+        .onReceive(tick) { _ in trusted = AXIsProcessTrusted() }
+    }
+
+    private func handleOpenAccessibilitySettings() {
+        // Force this process to register with TCC so the app appears in the
+        // Accessibility list. A CGEventTap creation attempt is the canonical
+        // way to trigger that registration — it fails when untrusted (which
+        // is exactly our state), and the failure is what makes TCC remember
+        // us and add an entry to System Settings. Tap is discarded.
+        let mask = (1 << CGEventType.keyDown.rawValue)
+        let noopCallback: CGEventTapCallBack = { _, _, event, _ in
+            Unmanaged.passUnretained(event)
+        }
+        if let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: CGEventMask(mask),
+            callback: noopCallback,
+            userInfo: nil
+        ) {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
+        }
+
+        // Dismiss the popover so the user can see the System Settings window.
+        NotificationCenter.default.post(name: .closeStatusBarPanel, object: nil)
+
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+}
+
+private struct ShortcutSettingGroup: View {
+    let action: GlobalHotKeyAction
+    @Binding var enabled: Bool
+    @Binding var keyCode: Int
+    @Binding var modifiers: Int
+    @State private var isRecording = false
+    @State private var eventMonitor: Any?
+
+    private var shortcutText: String {
+        GlobalHotKeyShortcut.displayText(keyCode: keyCode, modifiers: modifiers)
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            SettingsRowIcon(name: action.iconName)
+            Text(LocalizedStringKey(action.titleKey))
+                .font(.system(size: 12, weight: .medium))
+
+            Spacer(minLength: 8)
+
+            if enabled {
+                Button(action: toggleRecording) {
+                    Text(isRecording ? LanguageManager.localizedString("settings.globalHotKeyRecording") : shortcutText)
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(isRecording ? .white : .primary)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .frame(minWidth: 82)
+                        .background(isRecording ? Color.accentColor : Color.secondary.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                }
+                .buttonStyle(.plain)
+
+                if isRecording {
+                    Button("session.cancel") {
+                        stopRecording()
+                    }
+                    .font(.system(size: 10))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                }
+
+                Button("settings.resetDefault") {
+                    keyCode = action.defaultKeyCode
+                    modifiers = action.defaultModifiers
+                }
+                .font(.system(size: 10))
+                .buttonStyle(.plain)
+                .foregroundStyle(.blue)
+            }
+
+            Toggle("", isOn: $enabled)
+                .labelsHidden()
         }
         .onDisappear { stopRecording() }
     }
@@ -1289,7 +1537,7 @@ struct StatusLineSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .center, spacing: 10) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(Color.blue.opacity(0.12))
@@ -1299,33 +1547,35 @@ struct StatusLineSection: View {
                         .foregroundStyle(.blue)
                 }
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(LocalizedStringKey(installer.titleLocalizationKey))
-                        .font(.system(size: 13, weight: .medium))
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(LocalizedStringKey(installer.titleLocalizationKey))
+                            .font(.system(size: 13, weight: .medium))
+
+                        if !installer.legendSections.isEmpty {
+                            Button {
+                                showsLegendPopover.toggle()
+                            } label: {
+                                Image(systemName: "questionmark.circle")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .popover(isPresented: $showsLegendPopover, arrowEdge: .top) {
+                                legendContent
+                                    .frame(width: 330, alignment: .leading)
+                                    .padding(12)
+                            }
+                        }
+                    }
+
                     Text(LocalizedStringKey(installer.descriptionLocalizationKey))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                         .fixedSize(horizontal: false, vertical: true)
-                    if !installer.legendSections.isEmpty {
-                        Button {
-                            showsLegendPopover.toggle()
-                        } label: {
-                            HStack(spacing: 3) {
-                                Image(systemName: "questionmark.circle")
-                                    .font(.system(size: 10))
-                                Text("statusLine.legend.title")
-                                    .font(.system(size: 10))
-                            }
-                            .foregroundStyle(.blue)
-                        }
-                        .buttonStyle(.plain)
-                        .popover(isPresented: $showsLegendPopover, arrowEdge: .top) {
-                            legendContent
-                                .frame(width: 330, alignment: .leading)
-                                .padding(12)
-                        }
-                        .padding(.top, 1)
-                    }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 Spacer()
@@ -1391,4 +1641,315 @@ struct StatusLineSection: View {
             isError = true
         }
     }
+}
+
+// MARK: - Notch Notifications
+
+struct NotchNotificationsSection: View {
+    let provider: ProviderKind
+    let onOpenDetail: () -> Void
+
+    @AppStorage(NotchPreferences.claudeKey) private var claudeEnabled: Bool = true
+    @AppStorage(NotchPreferences.codexKey)  private var codexEnabled:  Bool = true
+    @AppStorage(NotchPreferences.geminiKey) private var geminiEnabled: Bool = true
+    @State private var isHovered = false
+
+    private var isEnabled: Bool {
+        switch provider {
+        case .claude: return claudeEnabled
+        case .codex:  return codexEnabled
+        case .gemini: return geminiEnabled
+        }
+    }
+
+    private var available: Bool {
+        ProviderRegistry.provider(for: provider).notchHookInstaller != nil
+    }
+
+    private var masterBinding: Binding<Bool> {
+        Binding(
+            get: { isEnabled },
+            set: { newValue in
+                switch provider {
+                case .claude: claudeEnabled = newValue
+                case .codex:  codexEnabled  = newValue
+                case .gemini: geminiEnabled = newValue
+                }
+                NotchPreferences.setEnabled(newValue, for: provider)
+            }
+        )
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.orange.opacity(isHovered ? 0.22 : 0.14))
+                    .frame(width: 32, height: 32)
+                Image(systemName: "bell.badge")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.orange)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("notch.settings.title")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(available && isHovered ? Color.white.opacity(0.95) : .primary)
+                Text(available ? summaryText : LanguageManager.localizedString("notch.settings.provider.comingSoon"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(available && isHovered ? Color.white.opacity(0.55) : Color.secondary.opacity(0.55))
+                .frame(width: 12, height: 20)
+
+            Toggle("", isOn: masterBinding)
+                .labelsHidden()
+                .buttonStyle(.borderless)
+                .disabled(!available)
+        }
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            guard available else {
+                isHovered = false
+                return
+            }
+            isHovered = hovering
+        }
+        .onTapGesture {
+            if available { onOpenDetail() }
+        }
+    }
+
+    private var summaryText: String {
+        let supported = ProviderRegistry.provider(for: provider).supportedNotchEvents
+        let onCount = supported.filter { event in
+            UserDefaults.standard.object(forKey: event.defaultsKey) == nil
+                || UserDefaults.standard.bool(forKey: event.defaultsKey)
+        }.count
+        if !isEnabled {
+            return LanguageManager.localizedString("notch.settings.summary.off")
+        }
+        return String(format: LanguageManager.localizedString("notch.settings.summary.on"), onCount)
+    }
+}
+
+private struct NotchNotificationsDetailView: View {
+    let provider: ProviderKind
+    let onBack: () -> Void
+
+    @AppStorage(NotchPreferences.claudeKey) private var claudeEnabled: Bool = true
+    @AppStorage(NotchPreferences.codexKey)  private var codexEnabled:  Bool = true
+    @AppStorage(NotchPreferences.geminiKey) private var geminiEnabled: Bool = true
+    @AppStorage("notch.sound.enabled") private var soundEnabled: Bool = true
+    @AppStorage(NotchEventKind.permission.defaultsKey)   private var permissionEnabled: Bool = true
+    @AppStorage(NotchEventKind.waitingInput.defaultsKey) private var waitingInputEnabled: Bool = true
+    @AppStorage(NotchEventKind.taskDone.defaultsKey)     private var taskDoneEnabled: Bool = true
+    @AppStorage(NotchEventKind.taskFailed.defaultsKey)   private var taskFailedEnabled: Bool = true
+
+    private var isProviderEnabled: Bool {
+        switch provider {
+        case .claude: return claudeEnabled
+        case .codex:  return codexEnabled
+        case .gemini: return geminiEnabled
+        }
+    }
+
+    private var masterBinding: Binding<Bool> {
+        Binding(
+            get: { isProviderEnabled },
+            set: { newValue in
+                switch provider {
+                case .claude: claudeEnabled = newValue
+                case .codex:  codexEnabled  = newValue
+                case .gemini: geminiEnabled = newValue
+                }
+                NotchPreferences.setEnabled(newValue, for: provider)
+            }
+        )
+    }
+
+    private func eventBinding(for kind: NotchEventKind) -> Binding<Bool> {
+        switch kind {
+        case .permission:   return $permissionEnabled
+        case .waitingInput: return $waitingInputEnabled
+        case .taskDone:     return $taskDoneEnabled
+        case .taskFailed:   return $taskFailedEnabled
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Button(action: onBack) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chevron.left")
+                        Text("settings.back")
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Text(providerTitle)
+                    .font(.system(size: 13, weight: .semibold))
+
+                Spacer().frame(width: 60)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            Form {
+                Section("notch.settings.detailSection.global") {
+                    HStack(spacing: 10) {
+                        SettingsRowIcon(name: "bell.badge")
+                        Text("notch.settings.title")
+                            .font(.system(size: 12, weight: .medium))
+                        Spacer()
+                        Toggle("", isOn: masterBinding).labelsHidden()
+                    }
+
+                    HStack(spacing: 10) {
+                        SettingsRowIcon(name: "speaker.wave.2")
+                        Text("notch.settings.sound")
+                            .font(.system(size: 12, weight: .medium))
+                        Spacer()
+                        Toggle("", isOn: $soundEnabled).labelsHidden()
+                    }
+                    .disabled(!isProviderEnabled)
+
+                    if isProviderEnabled {
+                        NotchScreenPickerRow()
+                    }
+                }
+
+                let supported = ProviderRegistry.provider(for: provider).supportedNotchEvents
+                if !supported.isEmpty {
+                    Section(providerTitle) {
+                        ForEach(NotchEventKind.allCases.filter(supported.contains), id: \.self) { kind in
+                            eventToggleRow(
+                                icon: kind.icon,
+                                titleKey: kind.titleKey,
+                                binding: eventBinding(for: kind)
+                            )
+                            .disabled(!isProviderEnabled)
+                        }
+                    }
+                }
+            }
+            .formStyle(.grouped)
+        }
+    }
+
+    private var providerTitle: String {
+        switch provider {
+        case .claude: return LanguageManager.localizedString("notch.settings.provider.claude")
+        case .codex:  return LanguageManager.localizedString("notch.settings.provider.codex")
+        case .gemini: return LanguageManager.localizedString("notch.settings.provider.gemini")
+        }
+    }
+
+    private func eventToggleRow(icon: String, titleKey: String, binding: Binding<Bool>) -> some View {
+        HStack(spacing: 10) {
+            SettingsRowIcon(name: icon)
+            Text(LocalizedStringKey(titleKey))
+                .font(.system(size: 12, weight: .medium))
+            Spacer()
+            Toggle("", isOn: binding).labelsHidden()
+        }
+    }
+}
+
+private struct NotchScreenPickerRow: View {
+    @AppStorage(NotchPreferences.screenSelectionKey) private var screenSelection = NotchPreferences.mainScreenSelection
+    @State private var screenRevision = 0
+
+    private var screens: [NSScreen] {
+        let _ = screenRevision
+        return NSScreen.screens
+    }
+
+    private var selectionBinding: Binding<String> {
+        Binding(
+            get: { normalizedSelection },
+            set: { newValue in
+                screenSelection = newValue
+                NotchPreferences.setScreenSelection(newValue)
+            }
+        )
+    }
+
+    private var normalizedSelection: String {
+        if screenSelection == NotchPreferences.mainScreenSelection {
+            return screenSelection
+        }
+        let availableIDs = Set(screens.map(notchScreenIdentifier))
+        return availableIDs.contains(screenSelection) ? screenSelection : NotchPreferences.mainScreenSelection
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            SettingsRowIcon(name: "display")
+            Text("notch.settings.screen")
+                .font(.system(size: 12, weight: .medium))
+
+            Spacer()
+
+            Picker("", selection: selectionBinding) {
+                Text("notch.settings.screen.main")
+                    .tag(NotchPreferences.mainScreenSelection)
+
+                ForEach(screens, id: \.notchSettingsID) { screen in
+                    Text(screenLabel(screen))
+                        .tag(notchScreenIdentifier(screen))
+                }
+            }
+            .labelsHidden()
+            .frame(minWidth: 260, maxWidth: .infinity, alignment: .trailing)
+        }
+        .onAppear {
+            normalizeSelectionIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
+            screenRevision &+= 1
+            normalizeSelectionIfNeeded()
+        }
+    }
+
+    private func screenLabel(_ screen: NSScreen) -> String {
+        let base = screen.localizedName
+        let size = "\(Int(screen.frame.width))x\(Int(screen.frame.height))"
+        let suffix: String
+        if screenHasNotch(screen) {
+            suffix = LanguageManager.localizedString("notch.settings.screen.notch")
+        } else if isSameAsMain(screen) {
+            suffix = LanguageManager.localizedString("notch.settings.screen.currentMain")
+        } else {
+            suffix = size
+        }
+        return "\(base) · \(suffix)"
+    }
+
+    private func isSameAsMain(_ screen: NSScreen) -> Bool {
+        guard let main = NSScreen.main else { return false }
+        return notchScreenIdentifier(screen) == notchScreenIdentifier(main)
+    }
+
+    private func normalizeSelectionIfNeeded() {
+        let normalized = normalizedSelection
+        guard normalized != screenSelection else { return }
+        screenSelection = normalized
+        NotchPreferences.setScreenSelection(normalized)
+    }
+}
+
+private extension NSScreen {
+    var notchSettingsID: String { notchScreenIdentifier(self) }
 }

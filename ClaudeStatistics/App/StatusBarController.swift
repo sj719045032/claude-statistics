@@ -2,6 +2,13 @@ import AppKit
 import SwiftUI
 import Combine
 
+extension Notification.Name {
+    /// Posted when something inside the popover wants it dismissed — e.g.
+    /// the settings pane's "Open Accessibility Settings" button handing off
+    /// focus to System Settings.
+    static let closeStatusBarPanel = Notification.Name("ClaudeStatistics.closeStatusBarPanel")
+}
+
 /// Manages the NSStatusItem and the floating panel.
 @MainActor
 final class StatusBarController: NSObject, ObservableObject {
@@ -12,20 +19,43 @@ final class StatusBarController: NSObject, ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     let appState: AppState
+    private let onIslandShortcut: @MainActor () -> Bool
 
-    init(appState: AppState) {
+    init(appState: AppState, onIslandShortcut: @escaping @MainActor () -> Bool = { false }) {
         self.appState = appState
+        self.onIslandShortcut = onIslandShortcut
         super.init()
         setupStatusItem()
         setupPanel()
         observeMenuBarText()
         setupHotKey()
+
+        // Allow anywhere in the app (e.g. the "open system settings" button
+        // in SettingsView) to request the popover panel be dismissed.
+        NotificationCenter.default.addObserver(
+            forName: .closeStatusBarPanel,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.panel.isVisible else { return }
+                self.hidePanel()
+            }
+        }
     }
 
     private func setupHotKey() {
-        hotKeyManager = GlobalHotKeyManager { [weak self] in
-            self?.togglePanel(nil)
-        }
+        hotKeyManager = GlobalHotKeyManager(actions: [
+            .panel: { [weak self] in
+                self?.togglePanel(nil)
+            },
+            .island: { [weak self] in
+                guard let self else { return }
+                if !self.onIslandShortcut() {
+                    self.togglePanel(nil)
+                }
+            }
+        ])
     }
 
     // MARK: - Status Item

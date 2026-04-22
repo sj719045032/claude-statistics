@@ -53,6 +53,13 @@ struct SessionStats: Codable {
     var startTime: Date?
     var endTime: Date?
     var lastPrompt: String?
+    var lastPromptAt: Date?
+    var lastOutputPreview: String?
+    var lastOutputPreviewAt: Date?
+    var lastToolName: String?
+    var lastToolSummary: String?
+    var lastToolDetail: String?
+    var lastToolAt: Date?
     var contextTokens: Int = 0          // last message's input context size (input + cache_read)
     var userMessageCount: Int = 0
     var assistantMessageCount: Int = 0
@@ -194,7 +201,8 @@ struct SessionStats: Codable {
 
     // MARK: - Codable (only stored fields)
     enum CodingKeys: String, CodingKey {
-        case model, startTime, endTime, lastPrompt, contextTokens
+        case model, startTime, endTime, lastPrompt, lastPromptAt, lastOutputPreview, lastOutputPreviewAt
+        case lastToolName, lastToolSummary, lastToolDetail, lastToolAt, contextTokens
         case userMessageCount, assistantMessageCount, fiveMinSlices
     }
 
@@ -204,6 +212,13 @@ struct SessionStats: Codable {
         try container.encodeIfPresent(startTime, forKey: .startTime)
         try container.encodeIfPresent(endTime, forKey: .endTime)
         try container.encodeIfPresent(lastPrompt, forKey: .lastPrompt)
+        try container.encodeIfPresent(lastPromptAt, forKey: .lastPromptAt)
+        try container.encodeIfPresent(lastOutputPreview, forKey: .lastOutputPreview)
+        try container.encodeIfPresent(lastOutputPreviewAt, forKey: .lastOutputPreviewAt)
+        try container.encodeIfPresent(lastToolName, forKey: .lastToolName)
+        try container.encodeIfPresent(lastToolSummary, forKey: .lastToolSummary)
+        try container.encodeIfPresent(lastToolDetail, forKey: .lastToolDetail)
+        try container.encodeIfPresent(lastToolAt, forKey: .lastToolAt)
         try container.encode(contextTokens, forKey: .contextTokens)
         try container.encode(userMessageCount, forKey: .userMessageCount)
         try container.encode(assistantMessageCount, forKey: .assistantMessageCount)
@@ -219,6 +234,13 @@ struct SessionStats: Codable {
         startTime = try container.decodeIfPresent(Date.self, forKey: .startTime)
         endTime = try container.decodeIfPresent(Date.self, forKey: .endTime)
         lastPrompt = try container.decodeIfPresent(String.self, forKey: .lastPrompt)
+        lastPromptAt = try container.decodeIfPresent(Date.self, forKey: .lastPromptAt)
+        lastOutputPreview = try container.decodeIfPresent(String.self, forKey: .lastOutputPreview)
+        lastOutputPreviewAt = try container.decodeIfPresent(Date.self, forKey: .lastOutputPreviewAt)
+        lastToolName = try container.decodeIfPresent(String.self, forKey: .lastToolName)
+        lastToolSummary = try container.decodeIfPresent(String.self, forKey: .lastToolSummary)
+        lastToolDetail = try container.decodeIfPresent(String.self, forKey: .lastToolDetail)
+        lastToolAt = try container.decodeIfPresent(Date.self, forKey: .lastToolAt)
         contextTokens = try container.decodeIfPresent(Int.self, forKey: .contextTokens) ?? 0
         userMessageCount = try container.decodeIfPresent(Int.self, forKey: .userMessageCount) ?? 0
         assistantMessageCount = try container.decodeIfPresent(Int.self, forKey: .assistantMessageCount) ?? 0

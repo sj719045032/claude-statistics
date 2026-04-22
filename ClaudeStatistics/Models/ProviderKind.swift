@@ -14,6 +14,11 @@ enum ProviderKind: String, CaseIterable, Identifiable, Codable {
         case .gemini: return "Gemini"
         }
     }
+
+    /// UserDefaults key for this provider's notch master switch. Anchored on
+    /// the enum's rawValue so adding a new provider needs no central table
+    /// edit — each provider owns its own string.
+    var notchEnabledDefaultsKey: String { "notch.enabled.\(rawValue)" }
 }
 
 struct ProviderCapabilities: Codable, Equatable {

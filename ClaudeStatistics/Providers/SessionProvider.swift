@@ -201,6 +201,12 @@ protocol SessionProvider: Sendable {
     var credentialStatus: Bool? { get }
     /// Returns the statusline installer for this provider, or `nil` if not supported.
     var statusLineInstaller: (any StatusLineInstalling)? { get }
+    /// Returns the notch hook installer for this provider, or `nil` if the
+    /// provider has no notch hook support yet.
+    var notchHookInstaller: (any HookInstalling)? { get }
+    /// Subset of `NotchEventKind` this provider can actually emit. UI hides
+    /// filters for events not in this set so toggling has no silent no-op.
+    var supportedNotchEvents: Set<NotchEventKind> { get }
     /// Provider-owned built-in model pricing seeds.
     var builtinPricingModels: [String: ModelPricing.Pricing] { get }
     /// Optional provider-specific remote pricing fetcher.
@@ -242,6 +248,8 @@ extension SessionProvider {
 
     var credentialStatus: Bool? { nil }
     var statusLineInstaller: (any StatusLineInstalling)? { nil }
+    var notchHookInstaller: (any HookInstalling)? { nil }
+    var supportedNotchEvents: Set<NotchEventKind> { [] }
     var builtinPricingModels: [String: ModelPricing.Pricing] { [:] }
     var pricingFetcher: (any ProviderPricingFetching)? { nil }
     var pricingSourceLocalizationKey: String? { nil }

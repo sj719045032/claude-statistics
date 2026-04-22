@@ -30,11 +30,17 @@ final class AppState: ObservableObject {
     let usageViewModel = UsageViewModel()
     let profileViewModel = ProfileViewModel()
     let updaterService = UpdaterService()
+    let notchCenter = NotchNotificationCenter()
+    lazy var activeSessionsTracker = ActiveSessionsTracker { [weak self] in
+        guard let self else { return [] }
+        return self.collectActiveSessions()
+    }
     let claudeAccountManager = ClaudeAccountManager()
     let independentClaudeAccountManager = IndependentClaudeAccountManager()
     let codexAccountManager = CodexAccountManager()
     let geminiAccountManager = GeminiAccountManager()
     private var cancellables: Set<AnyCancellable> = []
+    private var activeSessionRefreshCancellables: [ProviderKind: Set<AnyCancellable>] = [:]
     private var storesByProvider: [ProviderKind: SessionDataStore] = [:]
     private var sessionViewModelsByProvider: [ProviderKind: SessionViewModel] = [:]
 
@@ -68,6 +74,10 @@ final class AppState: ObservableObject {
         self.sessionViewModel = sessionViewModelsByProvider[selectedKind]!
         usageViewModel.store = store
         configureUsageState(for: store.provider)
+
+        for (kind, store) in storesByProvider {
+            bindActiveSessionRefresh(for: kind, store: store)
+        }
 
         // Sync subscription weekly reset date to SessionDataStore
         usageViewModel.$usageData
@@ -121,6 +131,19 @@ final class AppState: ObservableObject {
         }
     }
 
+    func purgeNotchRuntime(for providers: [ProviderKind]) {
+        for kind in providers {
+            notchCenter.purgeProvider(kind)
+            activeSessionsTracker.purgeRuntime(for: kind)
+        }
+    }
+
+    func refreshNotchActiveSessionsIfEnabled() {
+        if NotchPreferences.anyProviderEnabled {
+            activeSessionsTracker.refresh()
+        }
+    }
+
     func refreshProviderAfterAccountChange(_ kind: ProviderKind) {
         switch kind {
         case .claude:
@@ -142,6 +165,7 @@ final class AppState: ObservableObject {
         storesByProvider[kind] = rebuiltStore
         sessionViewModelsByProvider[kind] = rebuiltViewModel
         rebuiltStore.start()
+        bindActiveSessionRefresh(for: kind, store: rebuiltStore)
 
         guard providerKind == kind else { return }
 
@@ -159,6 +183,101 @@ final class AppState: ObservableObject {
         if isPopoverVisible {
             rebuiltStore.popoverDidOpen()
         }
+    }
+
+    fileprivate func collectActiveSessions() -> [ActiveSession] {
+        func newestText(
+            parsedText: String?,
+            parsedAt: Date?,
+            quickText: String?,
+            quickAt: Date?
+        ) -> (text: String?, at: Date?) {
+            guard parsedText != nil || quickText != nil else { return (nil, nil) }
+
+            switch (parsedAt, quickAt) {
+            case let (p?, q?) where q > p:
+                return (quickText ?? parsedText, q)
+            case let (p?, _):
+                return (parsedText ?? quickText, p)
+            case (nil, let q?):
+                return (quickText ?? parsedText, q)
+            case (nil, nil):
+                return (parsedText ?? quickText, nil)
+            }
+        }
+
+        func newestTool(
+            parsed: SessionStats?,
+            quick: SessionQuickStats?
+        ) -> (name: String?, summary: String?, detail: String?, at: Date?) {
+            guard parsed?.lastToolSummary != nil || quick?.lastToolSummary != nil else {
+                return (nil, nil, nil, nil)
+            }
+
+            switch (parsed?.lastToolAt, quick?.lastToolAt) {
+            case let (p?, q?) where q > p:
+                return (quick?.lastToolName, quick?.lastToolSummary, quick?.lastToolDetail, q)
+            case let (p?, _):
+                return (parsed?.lastToolName, parsed?.lastToolSummary, parsed?.lastToolDetail, p)
+            case (nil, let q?):
+                return (quick?.lastToolName, quick?.lastToolSummary, quick?.lastToolDetail, q)
+            case (nil, nil):
+                if let parsed, parsed.lastToolSummary != nil {
+                    return (parsed.lastToolName, parsed.lastToolSummary, parsed.lastToolDetail, nil)
+                }
+                return (quick?.lastToolName, quick?.lastToolSummary, quick?.lastToolDetail, nil)
+            }
+        }
+
+        var result: [ActiveSession] = []
+        for (kind, store) in storesByProvider {
+            guard NotchPreferences.isEnabled(kind) else { continue }
+            for s in store.sessions {
+                let parsed = store.parsedStats[s.id]
+                let quick = store.quickStats[s.id]
+                let latestPrompt = newestText(
+                    parsedText: parsed?.lastPrompt,
+                    parsedAt: parsed?.lastPromptAt,
+                    quickText: quick?.lastPrompt,
+                    quickAt: quick?.lastPromptAt
+                )
+                let latestPreview = newestText(
+                    parsedText: parsed?.lastOutputPreview,
+                    parsedAt: parsed?.lastOutputPreviewAt,
+                    quickText: quick?.lastOutputPreview,
+                    quickAt: quick?.lastOutputPreviewAt
+                )
+                let latestTool = newestTool(parsed: parsed, quick: quick)
+
+                var active = ActiveSession(
+                    id: s.id,
+                    sessionId: s.externalID,
+                    provider: kind,
+                    projectName: s.displayName,
+                    projectPath: s.cwd ?? s.projectPath,
+                    currentActivity: latestTool.summary,
+                    latestPrompt: latestPrompt.text,
+                    latestPromptAt: latestPrompt.at,
+                    latestPreview: latestPreview.text,
+                    latestPreviewAt: latestPreview.at,
+                    lastActivityAt: latestTool.at ?? latestPreview.at ?? latestPrompt.at ?? s.lastModified,
+                    tty: nil,
+                    pid: nil,
+                    terminalName: nil,
+                    terminalSocket: nil,
+                    terminalWindowID: nil,
+                    terminalTabID: nil,
+                    terminalStableID: nil
+                )
+                active.currentToolName = latestTool.name
+                active.currentToolDetail = latestTool.detail
+                if latestTool.at != nil {
+                    active.status = .running
+                }
+                result.append(active)
+            }
+        }
+        return result
     }
 
     func buildAllProvidersShareRoleResult() -> ShareRoleResult? {
@@ -223,7 +342,26 @@ final class AppState: ObservableObject {
         storesByProvider[kind] = store
         sessionViewModelsByProvider[kind] = viewModel
         store.start()
+        bindActiveSessionRefresh(for: kind, store: store)
         return (store, viewModel)
+    }
+
+    private func bindActiveSessionRefresh(for kind: ProviderKind, store: SessionDataStore) {
+        activeSessionRefreshCancellables[kind]?.forEach { $0.cancel() }
+
+        var bag = Set<AnyCancellable>()
+        Publishers.Merge3(
+            store.$sessions.map { _ in () }.eraseToAnyPublisher(),
+            store.$quickStats.map { _ in () }.eraseToAnyPublisher(),
+            store.$parsedStats.map { _ in () }.eraseToAnyPublisher()
+        )
+        .debounce(for: .milliseconds(80), scheduler: RunLoop.main)
+        .sink { [weak self] _ in
+            self?.activeSessionsTracker.refresh()
+        }
+        .store(in: &bag)
+
+        activeSessionRefreshCancellables[kind] = bag
     }
 }
 
@@ -231,17 +369,118 @@ final class AppState: ObservableObject {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var statusBarController: StatusBarController!
     let appState = AppState()
+    private var notchBridge: AttentionBridge?
+    private var notchWindowController: NotchWindowController?
+    private var notchStateObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let config = TelemetryDeck.Config(appID: "C5662554-D78C-4334-A745-3661642DBE3D")
         TelemetryDeck.initialize(config: config)
 
         LanguageManager.setup()
-        statusBarController = StatusBarController(appState: appState)
+        NotchPreferences.migrateLegacyIfNeeded()
+
+        statusBarController = StatusBarController(appState: appState) { [weak self] in
+            self?.handleIslandShortcut() ?? false
+        }
+        appState.notchCenter.activeSessionsTracker = appState.activeSessionsTracker
+
+        applyNotchProviderPreferences()
+
+        // Register with TCC so this build shows up in System Settings →
+        // Accessibility without the user having to invoke a keyboard-captured
+        // action first. Creating a CGEventTap — even one we immediately
+        // throw away — is enough to make the entry appear (separate entries
+        // for Release and Debug since their bundle IDs differ). This stays
+        // silent: no system prompt, no UI disruption.
+        Self.registerForAccessibilityVisibility()
+
+        notchStateObserver = NotificationCenter.default.addObserver(
+            forName: NotchPreferences.stateChangedNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.handleNotchStateChanged() }
+        }
+    }
+
+    private static func registerForAccessibilityVisibility() {
+        let mask = (1 << CGEventType.keyDown.rawValue)
+        let noopCallback: CGEventTapCallBack = { _, _, event, _ in
+            Unmanaged.passUnretained(event)
+        }
+        if let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: CGEventMask(mask),
+            callback: noopCallback,
+            userInfo: nil
+        ) {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         appState.stopAllStores()
+        notchBridge?.stop()
+        if let notchStateObserver {
+            NotificationCenter.default.removeObserver(notchStateObserver)
+        }
+    }
+
+    /// Spin up bridge + tracker + window only when at least one provider is
+    /// enabled; tear them all down once every provider is off. Idempotent.
+    private func reconcileNotchStack() {
+        if NotchPreferences.anyProviderEnabled {
+            if notchBridge == nil {
+                let bridge = AttentionBridge()
+                bridge.notchCenter = appState.notchCenter
+                bridge.start()
+                notchBridge = bridge
+            }
+            appState.activeSessionsTracker.start()
+            if notchWindowController == nil {
+                notchWindowController = NotchWindowController(
+                    notchCenter: appState.notchCenter,
+                    activeTracker: appState.activeSessionsTracker
+                )
+            }
+        } else {
+            notchBridge?.stop()
+            notchBridge = nil
+            appState.activeSessionsTracker.stop()
+            notchWindowController?.close()
+            notchWindowController = nil
+        }
+    }
+
+    private func handleIslandShortcut() -> Bool {
+        guard NotchPreferences.anyProviderEnabled else { return false }
+        guard NotchPreferences.keyboardControlsEnabled else { return false }
+        reconcileNotchStack()
+        guard let notchWindowController else { return false }
+        notchWindowController.toggleIdlePeekFromShortcut()
+        return true
+    }
+
+    /// Single app-level reconciliation point for per-provider notch switches.
+    /// Providers declare hook/install capabilities; the app owns global runtime
+    /// effects such as active cards, the socket bridge, and the island window.
+    private func applyNotchProviderPreferences() {
+        Task { _ = try? await NotchHookSync.syncCurrent() }
+
+        let disabledProviders = ProviderRegistry.supportedProviders.filter {
+            !NotchPreferences.isEnabled($0)
+        }
+        appState.purgeNotchRuntime(for: disabledProviders)
+        reconcileNotchStack()
+        appState.refreshNotchActiveSessionsIfEnabled()
+    }
+
+    private func handleNotchStateChanged() {
+        applyNotchProviderPreferences()
     }
 }
 

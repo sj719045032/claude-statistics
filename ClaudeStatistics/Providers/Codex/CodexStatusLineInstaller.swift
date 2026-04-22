@@ -54,15 +54,35 @@ struct CodexStatusLineInstaller {
 
     static func restore() throws {
         let fm = FileManager.default
-        guard fm.fileExists(atPath: backupPath) else {
-            throw CodexStatusLineError.noBackup
+        if fm.fileExists(atPath: backupPath) {
+            if fm.fileExists(atPath: configPath) {
+                try fm.removeItem(atPath: configPath)
+            }
+            try fm.copyItem(atPath: backupPath, toPath: configPath)
+            try fm.removeItem(atPath: backupPath)
+            return
         }
 
-        if fm.fileExists(atPath: configPath) {
-            try fm.removeItem(atPath: configPath)
+        // If no backup exists, still allow the user to turn the integration off.
+        // Preserve non-ClaudeStatistics status-line items instead of deleting the
+        // whole config.toml or blocking the toggle.
+        guard var content = try? String(contentsOfFile: configPath, encoding: .utf8) else {
+            throw CodexStatusLineError.configNotFound
         }
-        try fm.copyItem(atPath: backupPath, toPath: configPath)
-        try fm.removeItem(atPath: backupPath)
+
+        var lines = content.components(separatedBy: "\n")
+        guard let idx = lines.firstIndex(where: { isStatusLineLine($0) }) else { return }
+
+        let currentItems = readStatusLineItems(from: lines[idx]) ?? []
+        let remaining = currentItems.filter { !usageComponents.contains($0) }
+        if remaining.isEmpty {
+            lines.remove(at: idx)
+        } else {
+            lines[idx] = formatStatusLine(remaining)
+        }
+
+        content = lines.joined(separator: "\n")
+        try content.write(toFile: configPath, atomically: true, encoding: .utf8)
     }
 
     // MARK: - Private
@@ -70,21 +90,24 @@ struct CodexStatusLineInstaller {
     private static func readStatusLineItems() -> [String]? {
         guard let content = try? String(contentsOfFile: configPath, encoding: .utf8) else { return nil }
         for line in content.components(separatedBy: "\n") {
-            guard isStatusLineLine(line),
-                  let start = line.firstIndex(of: "["),
-                  let end = line.lastIndex(of: "]"),
-                  start < end
-            else { continue }
-
-            let inner = String(line[line.index(after: start)..<end])
-            let items = inner.components(separatedBy: ",").compactMap { token -> String? in
-                let t = token.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard t.hasPrefix("\""), t.hasSuffix("\""), t.count >= 2 else { return nil }
-                return String(t.dropFirst().dropLast())
-            }
-            return items
+            if let items = readStatusLineItems(from: line) { return items }
         }
         return nil
+    }
+
+    private static func readStatusLineItems(from line: String) -> [String]? {
+        guard isStatusLineLine(line),
+              let start = line.firstIndex(of: "["),
+              let end = line.lastIndex(of: "]"),
+              start < end
+        else { return nil }
+
+        let inner = String(line[line.index(after: start)..<end])
+        return inner.components(separatedBy: ",").compactMap { token -> String? in
+            let t = token.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard t.hasPrefix("\""), t.hasSuffix("\""), t.count >= 2 else { return nil }
+            return String(t.dropFirst().dropLast())
+        }
     }
 
     private static func isStatusLineLine(_ line: String) -> Bool {

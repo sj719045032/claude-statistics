@@ -277,16 +277,31 @@ This script:
 ### Build DMG
 
 ```bash
-bash scripts/build-dmg.sh 2.0.0
-# Output: build/ClaudeStatistics-2.0.0.dmg
+bash scripts/build-dmg.sh 2.9.1
+# Outputs:
+#   build/ClaudeStatistics-2.9.1.dmg
+#   build/ClaudeStatistics-2.9.1.zip           — full Sparkle update
+#   build/releases-archive/*.delta             — incremental Sparkle updates
 ```
 
 The script will:
 
 1. Build a Release configuration with the specified version
-2. Create a drag-to-install DMG
-3. Sign the DMG with Sparkle's EdDSA key
-4. Update `appcast.xml`
+2. Create a drag-to-install DMG and a ZIP for Sparkle
+3. Sign both with Sparkle's EdDSA key
+4. Maintain `build/releases-archive/` (historical ZIPs + deltas)
+5. Regenerate `appcast.xml` via `generate_appcast`, including a
+   `<sparkle:deltas>` block for every prior version still in the archive
+6. Print a ready-to-paste `gh release create` command at the end with all
+   required assets (DMG, full ZIP, every new `.delta` file)
+
+**Incremental updates**: first release ships full ZIPs only; starting from
+the second release, existing users auto-download tiny `.delta` patches
+(often < 1 MB). If `build/releases-archive/` is empty on a fresh checkout,
+seed it by downloading the most recent 2–3 shipped ZIPs from GitHub releases
+before running `build-dmg.sh`. Version numbers must be pure dotted numeric
+(`2.9.1`), otherwise Sparkle's version comparison can't rank them and delta
+generation is skipped.
 
 ### Publish a Release
 
@@ -299,15 +314,15 @@ git push
 # 2. Switch to the publishing account
 gh auth switch --hostname github.com --user sj719045032
 
-# 3. Create the GitHub release
-gh release create vX.Y.Z build/ClaudeStatistics-X.Y.Z.dmg \
-  --title "vX.Y.Z" --notes "Release notes"
+# 3. Run the `gh release create` command the build script printed — it
+#    already includes the DMG, the full ZIP, and every generated delta.
 
 # 4. Switch back if needed
 gh auth switch --hostname github.com --user tinystone007
 ```
 
-Existing users receive updates through Sparkle's in-app updater.
+Existing users receive updates through Sparkle's in-app updater — deltas when
+possible, full ZIP as fallback.
 
 ## Configuration
 
@@ -324,6 +339,45 @@ Model pricing is stored in `~/.claude-statistics/pricing.json` and can be edited
 | Language | Auto / English / Simplified Chinese |
 | Font Scale | Adjust panel content scale |
 | Diagnostics | Open/export app logs |
+
+## Credits & Acknowledgments
+
+Claude Statistics stands on the shoulders of excellent open source work and
+community projects. Huge thanks to:
+
+### Inspiration
+
+- **[claude-island](https://github.com/agam778/claude-island)** (Apache 2.0)
+  — architectural inspiration for the notch notifications layer (local socket
+  model, notch-shape rendering, hook installer idempotency). We re-implemented
+  the ideas independently; no code is copied.
+- **[codex-island-app](https://github.com/superagent-ai/codex-island-app)**
+  — inspiration for the terminal-focus playbook (`AppleScript → AX →
+  NSRunningApplication.activate` layered fallback, TTY variant normalization).
+  Ideas only, no code copied.
+
+### Core dependencies
+
+- **[Sparkle](https://github.com/sparkle-project/Sparkle)** — signed auto-update
+  framework powering in-app upgrades, delta patches, and EdDSA-signed appcasts.
+- **[MarkdownView](https://github.com/LiYanan2004/MarkdownView)** — rich
+  Markdown rendering inside the notch cards and session detail view (brings
+  along `cmark-gfm`, `Highlightr`, `LaTeXSwiftUI`, `MathJaxSwift`,
+  `HTMLEntities`, `SwiftDraw`, and `swift-markdown`).
+- **[TelemetryDeck SwiftSDK](https://github.com/TelemetryDeck/SwiftSDK)** —
+  privacy-respecting anonymous usage analytics (no personal data collected).
+
+### Platform / tooling
+
+- **[Anthropic Claude Code](https://docs.anthropic.com/en/docs/claude-code)**,
+  **[OpenAI Codex CLI](https://github.com/openai/codex)**, and
+  **[Google Gemini CLI](https://github.com/google-gemini/gemini-cli)**
+  — the three coding assistants this app reads, tracks, and augments.
+- **[XcodeGen](https://github.com/yonaskolb/XcodeGen)** — keeps the `.xcodeproj`
+  regeneratable from `project.yml`.
+
+If you spot an open source project we're using but haven't credited here,
+please open an issue — we're happy to add it.
 
 ## Star History
 

@@ -26,6 +26,8 @@
     <string></string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>点击通知后打开你刚才操作的终端窗口</string>
     <key>SUFeedURL</key>
     <string>https://raw.githubusercontent.com/sj719045032/claude-statistics/main/appcast.xml</string>
     <key>SUPublicEDKey</key>

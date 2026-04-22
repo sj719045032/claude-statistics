@@ -2,29 +2,90 @@ import AppKit
 import Carbon
 import Foundation
 
+enum GlobalHotKeyAction: Int, CaseIterable, Identifiable {
+    case panel = 1
+    case island = 2
+
+    var id: Int { rawValue }
+
+    var enabledKey: String {
+        switch self {
+        case .panel: return "globalHotKeyEnabled"
+        case .island: return "globalHotKeyIslandEnabled"
+        }
+    }
+
+    var keyCodeKey: String {
+        switch self {
+        case .panel: return "globalHotKeyKeyCode"
+        case .island: return "globalHotKeyIslandKeyCode"
+        }
+    }
+
+    var modifiersKey: String {
+        switch self {
+        case .panel: return "globalHotKeyModifiers"
+        case .island: return "globalHotKeyIslandModifiers"
+        }
+    }
+
+    var defaultKeyCode: Int {
+        switch self {
+        case .panel: return Int(kVK_ANSI_S)
+        case .island: return Int(kVK_ANSI_I)
+        }
+    }
+
+    var defaultModifiers: Int {
+        Int(controlKey | cmdKey)
+    }
+
+    var titleKey: String {
+        switch self {
+        case .panel: return "settings.shortcut.menuBarPanel"
+        case .island: return "settings.shortcut.island"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .panel: return "menubar.rectangle"
+        case .island: return "capsule.tophalf.filled"
+        }
+    }
+}
+
 struct GlobalHotKeyShortcut: Equatable {
     static let enabledKey = "globalHotKeyEnabled"
     static let keyCodeKey = "globalHotKeyKeyCode"
     static let modifiersKey = "globalHotKeyModifiers"
+    static let islandEnabledKey = GlobalHotKeyAction.island.enabledKey
+    static let islandKeyCodeKey = GlobalHotKeyAction.island.keyCodeKey
+    static let islandModifiersKey = GlobalHotKeyAction.island.modifiersKey
 
     static let defaultKeyCode = Int(kVK_ANSI_S)
     static let defaultModifiers = Int(controlKey | cmdKey)
+    static let defaultIslandKeyCode = Int(kVK_ANSI_I)
 
     let keyCode: Int
     let modifiers: Int
 
     static var current: GlobalHotKeyShortcut? {
-        let defaults = UserDefaults.standard
-        if defaults.object(forKey: enabledKey) == nil {
-            defaults.set(true, forKey: enabledKey)
-        }
-        guard defaults.bool(forKey: enabledKey) else { return nil }
+        current(for: .panel)
+    }
 
-        let storedKeyCode = defaults.object(forKey: keyCodeKey) as? Int
-        let storedModifiers = defaults.object(forKey: modifiersKey) as? Int
+    static func current(for action: GlobalHotKeyAction) -> GlobalHotKeyShortcut? {
+        let defaults = UserDefaults.standard
+        if defaults.object(forKey: action.enabledKey) == nil {
+            defaults.set(true, forKey: action.enabledKey)
+        }
+        guard defaults.bool(forKey: action.enabledKey) else { return nil }
+
+        let storedKeyCode = defaults.object(forKey: action.keyCodeKey) as? Int
+        let storedModifiers = defaults.object(forKey: action.modifiersKey) as? Int
         return GlobalHotKeyShortcut(
-            keyCode: storedKeyCode ?? defaultKeyCode,
-            modifiers: storedModifiers ?? defaultModifiers
+            keyCode: storedKeyCode ?? action.defaultKeyCode,
+            modifiers: storedModifiers ?? action.defaultModifiers
         )
     }
 
@@ -95,17 +156,14 @@ struct GlobalHotKeyShortcut: Equatable {
 }
 
 final class GlobalHotKeyManager {
-    private var hotKeyRef: EventHotKeyRef?
+    private var hotKeyRefs: [GlobalHotKeyAction: EventHotKeyRef] = [:]
     private var eventHandlerRef: EventHandlerRef?
     private var defaultsObserver: NSObjectProtocol?
-    private let action: @MainActor () -> Void
-    private let hotKeyID = EventHotKeyID(
-        signature: OSType(UInt32(ascii: "CSHK")),
-        id: 1
-    )
+    private let actions: [GlobalHotKeyAction: @MainActor () -> Void]
+    private let signature = OSType(UInt32(ascii: "CSHK"))
 
-    init(action: @escaping @MainActor () -> Void) {
-        self.action = action
+    init(actions: [GlobalHotKeyAction: @MainActor () -> Void]) {
+        self.actions = actions
         installEventHandler()
         registerCurrentShortcut()
 
@@ -119,7 +177,7 @@ final class GlobalHotKeyManager {
     }
 
     deinit {
-        unregisterHotKey()
+        unregisterHotKeys()
         if let eventHandlerRef {
             RemoveEventHandler(eventHandlerRef)
         }
@@ -129,33 +187,38 @@ final class GlobalHotKeyManager {
     }
 
     private func registerCurrentShortcut() {
-        unregisterHotKey()
-        guard let shortcut = GlobalHotKeyShortcut.current else { return }
+        unregisterHotKeys()
 
-        var ref: EventHotKeyRef?
-        let status = RegisterEventHotKey(
-            UInt32(shortcut.keyCode),
-            UInt32(shortcut.modifiers),
-            hotKeyID,
-            GetApplicationEventTarget(),
-            0,
-            &ref
-        )
+        for action in GlobalHotKeyAction.allCases {
+            guard actions[action] != nil,
+                  let shortcut = GlobalHotKeyShortcut.current(for: action) else { continue }
 
-        if status == noErr {
-            hotKeyRef = ref
-        } else {
-            DiagnosticLogger.shared.warning(
-                "Global hotkey registration failed for \(shortcut.displayText) (status=\(status))"
+            var ref: EventHotKeyRef?
+            let hotKeyID = EventHotKeyID(signature: signature, id: UInt32(action.rawValue))
+            let status = RegisterEventHotKey(
+                UInt32(shortcut.keyCode),
+                UInt32(shortcut.modifiers),
+                hotKeyID,
+                GetApplicationEventTarget(),
+                0,
+                &ref
             )
+
+            if status == noErr {
+                hotKeyRefs[action] = ref
+            } else {
+                DiagnosticLogger.shared.warning(
+                    "Global hotkey registration failed for \(shortcut.displayText) action=\(action) (status=\(status))"
+                )
+            }
         }
     }
 
-    private func unregisterHotKey() {
-        if let hotKeyRef {
+    private func unregisterHotKeys() {
+        for hotKeyRef in hotKeyRefs.values {
             UnregisterEventHotKey(hotKeyRef)
-            self.hotKeyRef = nil
         }
+        hotKeyRefs.removeAll()
     }
 
     private func installEventHandler() {
@@ -174,11 +237,24 @@ final class GlobalHotKeyManager {
         }
     }
 
-    private static let handleHotKeyEvent: EventHandlerUPP = { _, _, userData in
+    private static let handleHotKeyEvent: EventHandlerUPP = { _, event, userData in
         guard let userData else { return noErr }
         let manager = Unmanaged<GlobalHotKeyManager>.fromOpaque(userData).takeUnretainedValue()
+        var hotKeyID = EventHotKeyID()
+        GetEventParameter(
+            event,
+            EventParamName(kEventParamDirectObject),
+            EventParamType(typeEventHotKeyID),
+            nil,
+            MemoryLayout<EventHotKeyID>.size,
+            nil,
+            &hotKeyID
+        )
+        guard let action = GlobalHotKeyAction(rawValue: Int(hotKeyID.id)) else {
+            return noErr
+        }
         Task { @MainActor in
-            manager.action()
+            manager.actions[action]?()
         }
         return noErr
     }

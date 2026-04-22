@@ -277,16 +277,29 @@ bash scripts/run-debug.sh
 ### 构建 DMG
 
 ```bash
-bash scripts/build-dmg.sh 2.0.0
-# 输出: build/ClaudeStatistics-2.0.0.dmg
+bash scripts/build-dmg.sh 2.9.1
+# 输出:
+#   build/ClaudeStatistics-2.9.1.dmg
+#   build/ClaudeStatistics-2.9.1.zip           — Sparkle 完整更新包
+#   build/releases-archive/*.delta             — Sparkle 增量更新补丁
 ```
 
 脚本会自动：
 
 1. 以指定版本进行 Release 构建
-2. 生成拖拽安装 DMG
-3. 用 Sparkle 的 EdDSA 密钥对 DMG 签名
-4. 更新 `appcast.xml`
+2. 生成拖拽安装 DMG 和供 Sparkle 使用的 ZIP
+3. 用 Sparkle 的 EdDSA 密钥对两者签名
+4. 维护 `build/releases-archive/`（历史 ZIP + delta 补丁）
+5. 通过 `generate_appcast` 重新生成 `appcast.xml`，并为 archive 中每个
+   历史版本写入 `<sparkle:deltas>` 块
+6. 在结尾打印一条现成的 `gh release create` 命令，包含 DMG、完整 ZIP
+   以及本次生成的所有 `.delta` 文件
+
+**增量更新**：首次发版只有完整 ZIP；从第二次发版开始，老用户升级时会自动
+下载几百 KB 到几 MB 的 delta 补丁。全新 checkout 下 `build/releases-archive/`
+是空的，先从 GitHub releases 下载最近 2–3 个历史 ZIP 放进去，再跑
+`build-dmg.sh`。版本号必须是纯数字 dotted 格式（`2.9.1`），否则 Sparkle
+无法比较版本顺序，会跳过 delta 生成。
 
 ### 发布版本
 
@@ -299,15 +312,15 @@ git push
 # 2. 切换到发布账号
 gh auth switch --hostname github.com --user sj719045032
 
-# 3. 创建 GitHub Release
-gh release create vX.Y.Z build/ClaudeStatistics-X.Y.Z.dmg \
-  --title "vX.Y.Z" --notes "发布说明"
+# 3. 运行 build 脚本末尾打印的 `gh release create` 命令 —— 里面已经
+#    包含 DMG、完整 ZIP 以及本次生成的所有 delta 文件。
 
 # 4. 如有需要切回默认账号
 gh auth switch --hostname github.com --user tinystone007
 ```
 
-已安装用户会通过 Sparkle 应用内更新收到新版本。
+已安装用户会通过 Sparkle 应用内更新收到新版本——能下 delta 就下 delta，
+否则回退到完整 ZIP。
 
 ## 配置说明
 
@@ -324,6 +337,42 @@ gh auth switch --hostname github.com --user tinystone007
 | 语言 | 自动 / 英文 / 简体中文 |
 | 字体缩放 | 调整面板内容缩放比例 |
 | 诊断日志 | 打开 / 导出应用日志 |
+
+## 致谢
+
+Claude Statistics 站在许多优秀开源项目和社区工作的肩膀上，在此鸣谢：
+
+### 灵感来源
+
+- **[claude-island](https://github.com/agam778/claude-island)**（Apache 2.0）
+  —— 刘海通知层的架构思路（本地 socket 模型、刘海形状渲染、hook 安装的
+  幂等性）。我们独立重写了实现，不复制任何代码。
+- **[codex-island-app](https://github.com/superagent-ai/codex-island-app)**
+  —— 终端聚焦策略（`AppleScript → AX → NSRunningApplication.activate` 三层
+  降级、TTY 变体归一化）的设计思路。仅借鉴思路，不复制代码。
+
+### 核心依赖
+
+- **[Sparkle](https://github.com/sparkle-project/Sparkle)** —— 签名自动更新
+  框架，提供应用内升级、增量补丁和 EdDSA 签名的 appcast。
+- **[MarkdownView](https://github.com/LiYanan2004/MarkdownView)** —— 刘海卡片
+  和 session 详情里的 Markdown 渲染（间接带来 `cmark-gfm`、`Highlightr`、
+  `LaTeXSwiftUI`、`MathJaxSwift`、`HTMLEntities`、`SwiftDraw`、
+  `swift-markdown` 等子依赖）。
+- **[TelemetryDeck SwiftSDK](https://github.com/TelemetryDeck/SwiftSDK)** ——
+  尊重隐私的匿名用量分析（不收集任何个人数据）。
+
+### 平台 / 工具
+
+- **[Anthropic Claude Code](https://docs.anthropic.com/en/docs/claude-code)**、
+  **[OpenAI Codex CLI](https://github.com/openai/codex)** 和
+  **[Google Gemini CLI](https://github.com/google-gemini/gemini-cli)**
+  —— 本应用监测、统计和增强的三个编程助手。
+- **[XcodeGen](https://github.com/yonaskolb/XcodeGen)** —— 让 `.xcodeproj` 可
+  从 `project.yml` 重新生成。
+
+如果我们用到了某个开源项目却没在此鸣谢，欢迎开 issue 告知，我们很乐意
+补上。
 
 ## 许可证
 

@@ -12,6 +12,8 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
 
     var credentialStatus: Bool? { CredentialService.shared.getAccessToken() != nil }
     var statusLineInstaller: (any StatusLineInstalling)? { ClaudeStatusLineAdapter() }
+    var notchHookInstaller: (any HookInstalling)? { ClaudeHookInstaller() }
+    var supportedNotchEvents: Set<NotchEventKind> { [.permission, .waitingInput, .taskDone, .taskFailed] }
     var pricingFetcher: (any ProviderPricingFetching)? { PricingFetchService.shared }
     var pricingSourceLocalizationKey: String? { "pricing.source.claude" }
     var pricingSourceURL: URL? { URL(string: "https://docs.anthropic.com/en/docs/about-claude/pricing") }

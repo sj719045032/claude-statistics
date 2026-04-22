@@ -82,43 +82,83 @@ rm -rf "${BUILD_DIR}"
 DMG_SIZE=$(du -h "${DMG_OUTPUT}" | cut -f1 | xargs)
 ZIP_SIZE=$(du -h "${ZIP_OUTPUT}" | cut -f1 | xargs)
 
-echo "==> Signing ZIP for Sparkle..."
-SIGNATURE=$("${SPARKLE_BIN}/sign_update" "${ZIP_OUTPUT}" 2>&1)
+ARCHIVE_DIR="build/releases-archive"
+mkdir -p "${ARCHIVE_DIR}"
 
-echo "==> Generating appcast.xml..."
-DOWNLOAD_URL="${REPO_URL}/releases/download/v${VERSION}/${DMG_NAME}-${VERSION}.zip"
-PUB_DATE=$(date -R)
+# Snapshot delta files that existed before this run so we only upload
+# the ones freshly produced for v${VERSION}.
+BEFORE_DELTAS=$(mktemp)
+find "${ARCHIVE_DIR}" -maxdepth 1 -name "*.delta" 2>/dev/null | sort > "${BEFORE_DELTAS}"
 
-cat > appcast.xml <<APPCAST_EOF
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
-  <channel>
-    <title>${APP_NAME}</title>
-    <link>${REPO_URL}</link>
-    <item>
-      <title>Version ${VERSION}</title>
-      <pubDate>${PUB_DATE}</pubDate>
-      <sparkle:version>${VERSION}</sparkle:version>
-      <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <enclosure url="${DOWNLOAD_URL}"
-                 type="application/octet-stream"
-                 ${SIGNATURE} />
-    </item>
-  </channel>
-</rss>
-APPCAST_EOF
+# Copy the new ZIP into the archive so generate_appcast can diff against
+# earlier versions sitting there. (Historical ZIPs stay in this directory —
+# don't delete them; that's what powers the deltas.)
+cp "${ZIP_OUTPUT}" "${ARCHIVE_DIR}/"
+
+echo "==> Generating appcast.xml (with Sparkle deltas)..."
+DOWNLOAD_URL_PREFIX="${REPO_URL}/releases/download/v${VERSION}/"
+"${SPARKLE_BIN}/generate_appcast" \
+  --download-url-prefix "${DOWNLOAD_URL_PREFIX}" \
+  --maximum-deltas 3 \
+  --maximum-versions 3 \
+  --link "${REPO_URL}" \
+  "${ARCHIVE_DIR}"
+
+# The generated appcast lives inside the archive dir — copy it to repo root
+# where Sparkle's SUFeedURL points.
+cp "${ARCHIVE_DIR}/appcast.xml" appcast.xml
+
+# Collect only the delta files produced in this run.
+AFTER_DELTAS=$(mktemp)
+find "${ARCHIVE_DIR}" -maxdepth 1 -name "*.delta" 2>/dev/null | sort > "${AFTER_DELTAS}"
+NEW_DELTAS=$(comm -13 "${BEFORE_DELTAS}" "${AFTER_DELTAS}")
+rm -f "${BEFORE_DELTAS}" "${AFTER_DELTAS}"
+
+DELTA_COUNT=0
+DELTA_TOTAL_BYTES=0
+if [ -n "${NEW_DELTAS}" ]; then
+  while IFS= read -r d; do
+    [ -z "$d" ] && continue
+    DELTA_COUNT=$((DELTA_COUNT + 1))
+    size=$(stat -f%z "$d")
+    DELTA_TOTAL_BYTES=$((DELTA_TOTAL_BYTES + size))
+  done <<<"${NEW_DELTAS}"
+fi
 
 echo ""
 echo "==> Done!"
-echo "    DMG: ${DMG_OUTPUT} (${DMG_SIZE})"
-echo "    ZIP: ${ZIP_OUTPUT} (${ZIP_SIZE}) — for Sparkle auto-update"
+echo "    DMG:    ${DMG_OUTPUT} (${DMG_SIZE})"
+echo "    ZIP:    ${ZIP_OUTPUT} (${ZIP_SIZE}) — full update"
+if [ "${DELTA_COUNT}" -gt 0 ]; then
+  DELTA_HUMAN=$(du -h -I "${ARCHIVE_DIR}"/*.delta 2>/dev/null | awk '{s+=$1"M"} END{print s}' || echo "${DELTA_TOTAL_BYTES} bytes")
+  echo "    Deltas: ${DELTA_COUNT} file(s) in ${ARCHIVE_DIR}/ — incremental updates"
+  while IFS= read -r d; do
+    [ -z "$d" ] && continue
+    sz=$(du -h "$d" | cut -f1 | xargs)
+    echo "            - $(basename "$d") (${sz})"
+  done <<<"${NEW_DELTAS}"
+else
+  echo "    Deltas: none (archive had no prior versions to diff against)"
+fi
+
 echo ""
 echo "==> appcast.xml updated with v${VERSION}"
 echo ""
+
+# Build the gh release upload file list.
+UPLOAD_ARGS="${DMG_OUTPUT} ${ZIP_OUTPUT}"
+while IFS= read -r d; do
+  [ -z "$d" ] && continue
+  UPLOAD_ARGS="${UPLOAD_ARGS} \"${d}\""
+done <<<"${NEW_DELTAS}"
+
 echo "Next steps:"
 echo "  1. git add appcast.xml && git commit && git push"
-echo "  2. gh release create v${VERSION} ${DMG_OUTPUT} ${ZIP_OUTPUT} --title 'v${VERSION}'"
+echo "  2. gh release create v${VERSION} ${UPLOAD_ARGS} --title 'v${VERSION}'"
 echo ""
 echo "Note: This DMG is not signed/notarized by Apple."
 echo "Users need to run: xattr -cr /Applications/${APP_NAME}.app"
+echo ""
+echo "Archive dir (${ARCHIVE_DIR}/) keeps historical ZIPs for delta generation."
+echo "Keep at least the last couple of versions there; generate_appcast will"
+echo "auto-prune beyond --maximum-versions and move extras to old_updates/."

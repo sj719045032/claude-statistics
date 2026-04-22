@@ -2,6 +2,7 @@ import Foundation
 
 final class GeminiTranscriptParser {
     static let shared = GeminiTranscriptParser()
+    private static let assistantPreviewLimit = 4000
 
     private let isoFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
@@ -54,6 +55,7 @@ final class GeminiTranscriptParser {
                 userCount += 1
                 if quick.topic == nil { quick.topic = cleaned }
                 quick.lastPrompt = truncate(cleaned, limit: 200)
+                quick.lastPromptAt = message.timestamp
 
             case "gemini":
                 assistantCount += 1
@@ -61,11 +63,24 @@ final class GeminiTranscriptParser {
                     latestModel = model
                     quick.model = model
                 }
+                if let text = normalizedText(message.text) {
+                    quick.lastOutputPreview = truncate(text, limit: Self.assistantPreviewLimit)
+                    quick.lastOutputPreviewAt = message.timestamp
+                } else if let toolCall = message.toolCalls.last {
+                    quick.lastOutputPreview = truncate(toolSummary(for: toolCall), limit: Self.assistantPreviewLimit)
+                    quick.lastOutputPreviewAt = message.timestamp
+                }
                 if let tokens = message.tokens {
                     quick.totalTokens += tokens.totalTokens
                     if let model = normalizedText(message.model) ?? latestModel {
                         quick.estimatedCost += estimatedCost(for: tokens, model: model)
                     }
+                }
+                if let toolCall = message.toolCalls.last {
+                    quick.lastToolName = normalizedToolName(toolCall)
+                    quick.lastToolSummary = toolActivitySummary(for: toolCall)
+                    quick.lastToolDetail = toolDetail(for: toolCall).map { truncate($0, limit: 400) }
+                    quick.lastToolAt = message.timestamp
                 }
 
             default:
@@ -100,6 +115,7 @@ final class GeminiTranscriptParser {
                 guard let cleaned = cleanUserText(message.text) else { continue }
                 stats.userMessageCount += 1
                 stats.lastPrompt = truncate(cleaned, limit: 200)
+                stats.lastPromptAt = message.timestamp
                 if let timestamp = message.timestamp {
                     stats.fiveMinSlices[fiveMinuteKey(for: timestamp), default: SessionStats.DaySlice()].messageCount += 1
                 }
@@ -109,6 +125,13 @@ final class GeminiTranscriptParser {
                 if let model = normalizedText(message.model) {
                     activeModel = model
                     stats.model = model
+                }
+                if let text = normalizedText(message.text) {
+                    stats.lastOutputPreview = truncate(text, limit: Self.assistantPreviewLimit)
+                    stats.lastOutputPreviewAt = message.timestamp
+                } else if let toolCall = message.toolCalls.last {
+                    stats.lastOutputPreview = truncate(toolSummary(for: toolCall), limit: Self.assistantPreviewLimit)
+                    stats.lastOutputPreviewAt = message.timestamp
                 }
 
                 let sliceKey = message.timestamp.map(fiveMinuteKey(for:))
@@ -141,6 +164,12 @@ final class GeminiTranscriptParser {
                         let toolName = normalizedToolName(toolCall)
                         stats.fiveMinSlices[sliceKey, default: SessionStats.DaySlice()].toolUseCounts[toolName, default: 0] += 1
                     }
+                }
+                if let toolCall = message.toolCalls.last {
+                    stats.lastToolName = normalizedToolName(toolCall)
+                    stats.lastToolSummary = toolActivitySummary(for: toolCall)
+                    stats.lastToolDetail = toolDetail(for: toolCall).map { truncate($0, limit: 400) }
+                    stats.lastToolAt = message.timestamp
                 }
 
             default:
@@ -505,6 +534,75 @@ final class GeminiTranscriptParser {
         return normalizedToolName(toolCall)
     }
 
+    private func toolActivitySummary(for toolCall: GeminiToolCall) -> String {
+        let toolName = normalizedToolName(toolCall)
+
+        if let args = toolCall.args as? [String: Any] {
+            switch toolName.lowercased() {
+            case "bash":
+                if let command = normalizedText(args["command"] ?? args["cmd"]) {
+                    return truncate("Running: \(command)", limit: 140)
+                }
+                return "Running command…"
+
+            case "read", "readfile":
+                if let path = normalizedText(args["file_path"] ?? args["path"] ?? args["filePath"]) {
+                    return truncate("Reading \(lastPathComponent(path))…", limit: 140)
+                }
+                return "Reading…"
+
+            case "write":
+                if let path = normalizedText(args["file_path"] ?? args["path"] ?? args["filePath"]) {
+                    return truncate("Writing \(lastPathComponent(path))…", limit: 140)
+                }
+                return "Writing…"
+
+            case "edit", "replace":
+                if let path = normalizedText(args["file_path"] ?? args["path"] ?? args["filePath"]) {
+                    return truncate("Editing \(lastPathComponent(path))…", limit: 140)
+                }
+                return "Editing…"
+
+            case "grep":
+                if let pattern = normalizedText(args["pattern"]) {
+                    return truncate("Searching: \(pattern)", limit: 140)
+                }
+                return "Searching…"
+
+            case "glob", "findfiles":
+                if let path = normalizedText(args["path"] ?? args["file_path"] ?? args["filePath"]) {
+                    return truncate("Finding files in \(lastPathComponent(path))…", limit: 140)
+                }
+                return "Finding files…"
+
+            case "fetch", "webfetch":
+                if let url = normalizedText(args["url"]) {
+                    return truncate("Fetching: \(url)", limit: 140)
+                }
+                return "Fetching…"
+
+            case "websearch":
+                if let query = normalizedText(args["query"] ?? args["q"] ?? args["prompt"]) {
+                    return truncate("Searching: \(query)", limit: 140)
+                }
+                return "Searching the web…"
+
+            default:
+                break
+            }
+        }
+
+        if let summary = normalizedText(toolCall.description) {
+            return truncate(summary, limit: 140)
+        }
+
+        let fallback = toolSummary(for: toolCall)
+        if fallback.caseInsensitiveCompare(toolName) != .orderedSame {
+            return fallback
+        }
+        return toolName
+    }
+
     private func toolDetail(for toolCall: GeminiToolCall) -> String? {
         var parts: [String] = []
 
@@ -528,7 +626,7 @@ final class GeminiTranscriptParser {
 
     private func extractedToolOutput(from raw: Any?) -> String? {
         if let text = normalizedText(raw) {
-            return text
+            return sanitizedToolOutput(text)
         }
 
         if let array = raw as? [Any] {
@@ -544,7 +642,7 @@ final class GeminiTranscriptParser {
 
         for key in ["output", "resultDisplay", "description"] {
             if let text = normalizedText(dict[key]) {
-                return text
+                return sanitizedToolOutput(text)
             }
         }
 
@@ -555,6 +653,44 @@ final class GeminiTranscriptParser {
         }
 
         return nil
+    }
+
+    private func sanitizedToolOutput(_ raw: String) -> String? {
+        let cleaned = raw
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { cleanedToolOutputLine(String($0)) }
+            .filter { !$0.isEmpty && !isUnhelpfulToolMetadataLine($0) }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return cleaned.isEmpty ? nil : cleaned
+    }
+
+    private func cleanedToolOutputLine(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+
+        if trimmed.lowercased().hasPrefix("output:") {
+            let stripped = trimmed.dropFirst("Output:".count)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return stripped
+        }
+
+        return trimmed
+    }
+
+    private func isUnhelpfulToolMetadataLine(_ text: String) -> Bool {
+        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalized.hasPrefix("process group pgid:")
+            || normalized.hasPrefix("background pids:")
+    }
+
+    private func lastPathComponent(_ path: String) -> String {
+        let expanded = (path as NSString).expandingTildeInPath
+        let last = URL(fileURLWithPath: expanded).lastPathComponent
+        return last.isEmpty ? path : last
     }
 
     private func jsonString(from raw: Any?) -> String? {
