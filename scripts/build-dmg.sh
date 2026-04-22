@@ -104,6 +104,29 @@ DOWNLOAD_URL_PREFIX="${REPO_URL}/releases/download/v${VERSION}/"
   --link "${REPO_URL}" \
   "${ARCHIVE_DIR}"
 
+# Rename generated deltas so they don't contain spaces — GitHub's release
+# upload silently rewrites spaces to dots in the stored asset name, which
+# would break the appcast URL (which generate_appcast encoded as %20).
+# Doing the rename here keeps filenames aligned end-to-end.
+AFTER_DELTAS_RAW=$(mktemp)
+find "${ARCHIVE_DIR}" -maxdepth 1 -name "*.delta" 2>/dev/null | sort > "${AFTER_DELTAS_RAW}"
+while IFS= read -r d; do
+  [ -z "$d" ] && continue
+  case "$d" in *" "*)
+    new="$(echo "$d" | tr ' ' '.')"
+    if [ ! -e "$new" ]; then
+      mv "$d" "$new"
+    fi
+    ;;
+  esac
+done <"${AFTER_DELTAS_RAW}"
+rm -f "${AFTER_DELTAS_RAW}"
+
+# Patch the appcast's delta URLs to match the renamed files.
+# `generate_appcast` percent-encodes spaces to %20; rewrite those to dots.
+sed -i '' -E 's/Claude%20Statistics([0-9A-Za-z.-]*\.delta)/Claude.Statistics\1/g' \
+  "${ARCHIVE_DIR}/appcast.xml"
+
 # The generated appcast lives inside the archive dir — copy it to repo root
 # where Sparkle's SUFeedURL points.
 cp "${ARCHIVE_DIR}/appcast.xml" appcast.xml
