@@ -536,3 +536,6 @@
 "notch.sessionStart.title" = "%@ session 开始";
 "notch.compact.failed" = "任务失败";
 "notch.compact.sessionStart" = "%@ session";
+"settings.menuBarDisplay" = "菜单栏显示";
+"settings.menuBarDisplay.all" = "全部";
+"settings.menuBarDisplay.none" = "无";

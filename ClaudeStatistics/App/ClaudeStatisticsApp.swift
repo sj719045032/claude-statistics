@@ -8,6 +8,7 @@ private enum DefaultSettings {
             "autoRefreshEnabled": true,
             "refreshInterval": 300.0
         ])
+        MenuBarPreferences.register()
     }
 }
 
@@ -28,6 +29,12 @@ final class AppState: ObservableObject {
     @Published private(set) var sessionViewModel: SessionViewModel
     @Published private(set) var isPopoverVisible = false
     let usageViewModel = UsageViewModel()
+    /// Per-provider usage view models for providers that are *not* currently
+    /// selected. Keeps the menu bar strip able to show every enabled
+    /// provider's usage without interfering with `usageViewModel`'s single
+    /// active-provider contract. The current provider is always served via
+    /// `usageViewModel` (see `usageViewModel(for:)`).
+    @Published private(set) var secondaryUsageViewModels: [ProviderKind: UsageViewModel] = [:]
     let profileViewModel = ProfileViewModel()
     let updaterService = UpdaterService()
     let notchCenter = NotchNotificationCenter()
@@ -79,6 +86,46 @@ final class AppState: ObservableObject {
                 self?.store.weeklyResetDate = resetDate
             }
             .store(in: &cancellables)
+
+        // Boot one independent UsageViewModel per non-current startup provider
+        // so the menu bar can display all enabled providers' usage in
+        // parallel, using the same refresh cadence as the single-provider
+        // path.
+        for kind in startupKinds where kind != selectedKind {
+            secondaryUsageViewModels[kind] = makeSecondaryUsageViewModel(for: kind)
+        }
+    }
+
+    /// VM getter that maps a provider kind to its live UsageViewModel.
+    /// Current provider → the primary `usageViewModel` singleton;
+    /// others → the per-provider secondary VMs.
+    func usageViewModel(for kind: ProviderKind) -> UsageViewModel? {
+        if kind == providerKind { return usageViewModel }
+        return secondaryUsageViewModels[kind]
+    }
+
+    private func makeSecondaryUsageViewModel(for kind: ProviderKind) -> UsageViewModel {
+        let vm = UsageViewModel()
+        guard let store = storesByProvider[kind] else { return vm }
+        vm.store = store
+        let provider = ProviderRegistry.provider(for: kind)
+        vm.configure(source: provider.usageSource, usagePresentation: provider.usagePresentation)
+        if provider.capabilities.supportsUsage {
+            vm.loadCache()
+            if UserDefaults.standard.bool(forKey: "autoRefreshEnabled") {
+                vm.startAutoRefresh()
+            }
+        } else {
+            vm.clearForUnsupportedProvider()
+        }
+        vm.$usageData
+            .map { $0?.sevenDay?.resetsAtDate }
+            .removeDuplicates()
+            .sink { [weak self] resetDate in
+                self?.storesByProvider[kind]?.weeklyResetDate = resetDate
+            }
+            .store(in: &cancellables)
+        return vm
     }
 
     var provider: any SessionProvider { store.provider }
@@ -89,6 +136,8 @@ final class AppState: ObservableObject {
         guard kind != providerKind else { return }
         let available = ProviderRegistry.availableProviders()
         guard available.isEmpty || available.contains(kind) else { return }
+
+        let oldKind = providerKind
 
         ProviderRegistry.persistSelectedProvider(kind)
         providerKind = kind
@@ -101,6 +150,17 @@ final class AppState: ObservableObject {
         sessionViewModel = context.viewModel
         usageViewModel.store = nextStore
         configureUsageState(for: nextStore.provider)
+
+        // Promote the incoming kind out of the secondary pool (it is now
+        // served by the primary `usageViewModel`) and demote the outgoing
+        // kind into the secondary pool so the menu bar strip keeps its
+        // usage fresh in the background.
+        if let promoted = secondaryUsageViewModels.removeValue(forKey: kind) {
+            promoted.stopAutoRefresh()
+        }
+        if storesByProvider[oldKind] != nil {
+            secondaryUsageViewModels[oldKind] = makeSecondaryUsageViewModel(for: oldKind)
+        }
 
         if isPopoverVisible {
             nextStore.popoverDidOpen()
@@ -120,6 +180,9 @@ final class AppState: ObservableObject {
     func stopAllStores() {
         for store in storesByProvider.values {
             store.stop()
+        }
+        for vm in secondaryUsageViewModels.values {
+            vm.stopAutoRefresh()
         }
     }
 
@@ -158,21 +221,28 @@ final class AppState: ObservableObject {
         sessionViewModelsByProvider[kind] = rebuiltViewModel
         rebuiltStore.start()
 
-        guard providerKind == kind else { return }
+        if providerKind == kind {
+            store = rebuiltStore
+            sessionViewModel = rebuiltViewModel
+            usageViewModel.store = rebuiltStore
+            configureUsageState(for: provider)
 
-        store = rebuiltStore
-        sessionViewModel = rebuiltViewModel
-        usageViewModel.store = rebuiltStore
-        configureUsageState(for: provider)
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                await self.profileViewModel.forceRefresh()
+                await self.usageViewModel.forceRefresh()
+            }
 
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            await self.profileViewModel.forceRefresh()
-            await self.usageViewModel.forceRefresh()
-        }
-
-        if isPopoverVisible {
-            rebuiltStore.popoverDidOpen()
+            if isPopoverVisible {
+                rebuiltStore.popoverDidOpen()
+            }
+        } else {
+            // Non-current provider — rebuild its secondary VM so the menu bar
+            // strip reflects the account change.
+            if let old = secondaryUsageViewModels.removeValue(forKey: kind) {
+                old.stopAutoRefresh()
+            }
+            secondaryUsageViewModels[kind] = makeSecondaryUsageViewModel(for: kind)
         }
     }
 

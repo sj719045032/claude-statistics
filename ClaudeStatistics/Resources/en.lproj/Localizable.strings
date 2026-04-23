@@ -536,3 +536,6 @@
 "notch.sessionStart.title" = "%@ session started";
 "notch.compact.failed" = "Task failed";
 "notch.compact.sessionStart" = "%@ session";
+"settings.menuBarDisplay" = "Menu bar display";
+"settings.menuBarDisplay.all" = "All";
+"settings.menuBarDisplay.none" = "None";

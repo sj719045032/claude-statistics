@@ -36,6 +36,29 @@ struct ProviderUsageTrendPresentation: Identifiable, Hashable {
     var modelFamily: String? = nil
 }
 
+enum MenuBarStripFormat {
+    /// "Flash Lite" → "FL", "Pro" → "P", "GPT 5" → "G5".
+    /// Takes the first alphanumeric character of each space-separated
+    /// token. Uppercased so short labels read cleanly in the menu bar.
+    static func initials(of title: String) -> String {
+        let tokens = title.split { !$0.isLetter && !$0.isNumber }
+        let letters = tokens.compactMap { $0.first.map(Character.init) }
+        let joined = String(letters).uppercased()
+        return joined.isEmpty ? title : joined
+    }
+}
+
+/// One page in the rotating multi-provider menu bar strip. Split into
+/// `prefix` (window or bucket label, e.g. "5h", "FL") and `value`
+/// (e.g. "72%") so the cell can stack them across two lines. `usedPercent`
+/// is always *consumed* fraction (0–100), never "remaining", so colour
+/// thresholds behave the same across providers.
+struct MenuBarStripSegment: Equatable {
+    let prefix: String
+    let value: String
+    let usedPercent: Double
+}
+
 struct ProviderUsagePresentation {
     enum PreferredWindow {
         case short
@@ -244,6 +267,43 @@ protocol SessionProvider: Sendable {
 extension SessionProvider {
     var usagePresentation: ProviderUsagePresentation {
         .standard
+    }
+
+    /// Short rotating segments shown in the multi-provider menu bar strip.
+    /// Each segment is one "page" that rotates every few seconds alongside
+    /// the provider's icon. Default implementation derives sensible
+    /// segments from `usagePresentation.menuBarMetric`; providers can
+    /// override for custom behaviour.
+    ///
+    /// All segments reflect *used* percentage so colour thresholds and
+    /// comparisons behave the same across providers. Gemini's buckets
+    /// expose remaining percentage natively; we invert it here.
+    func menuBarStripSegments(from usage: UsageData?) -> [MenuBarStripSegment] {
+        guard let usage else { return [] }
+        switch usagePresentation.menuBarMetric {
+        case .preferredWindow:
+            var segments: [MenuBarStripSegment] = []
+            if let short = usage.fiveHour, let tab = usagePresentation.shortWindow?.tabLabel {
+                let used = short.utilization
+                segments.append(.init(prefix: tab, value: "\(Int(used.rounded()))%", usedPercent: used))
+            }
+            if let long = usage.sevenDay, let tab = usagePresentation.longWindow?.tabLabel {
+                let used = long.utilization
+                segments.append(.init(prefix: tab, value: "\(Int(used.rounded()))%", usedPercent: used))
+            }
+            return segments
+        case .primaryQuotaBucket:
+            guard let buckets = usage.providerBuckets, !buckets.isEmpty else { return [] }
+            return buckets.map { bucket in
+                let abbr = MenuBarStripFormat.initials(of: bucket.title)
+                let used = max(0, min(100, 100 - bucket.remainingPercentage))
+                return MenuBarStripSegment(
+                    prefix: abbr,
+                    value: "\(Int(used.rounded()))%",
+                    usedPercent: used
+                )
+            }
+        }
     }
 
     var credentialStatus: Bool? { nil }

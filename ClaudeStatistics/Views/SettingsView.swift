@@ -18,6 +18,9 @@ struct SettingsView: View {
     @AppStorage("fontScale") private var fontScale = 1.0
     @AppStorage("customInterval") private var customInterval = false
     @AppStorage("diagnostic.verbose.enabled") private var verboseLogging = false
+    @AppStorage(MenuBarPreferences.key(for: .claude)) private var menuBarClaude = true
+    @AppStorage(MenuBarPreferences.key(for: .codex)) private var menuBarCodex = true
+    @AppStorage(MenuBarPreferences.key(for: .gemini)) private var menuBarGemini = true
     // Developer tools unlocked by tapping the app name 7 times in the About
     // section. Ephemeral (@State) — each app restart re-locks so the
     // verbose-logging toggle can't get forgotten in the "on" state silently.
@@ -33,6 +36,7 @@ struct SettingsView: View {
     @State private var isTabOrderExpanded = false
     @State private var isRefreshIntervalExpanded = false
     @State private var isAppearanceExpanded = false
+    @State private var isMenuBarDisplayExpanded = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -542,6 +546,26 @@ struct SettingsView: View {
                 }
             }
 
+            disclosureRow(
+                title: "settings.menuBarDisplay",
+                icon: "menubar.rectangle",
+                isExpanded: $isMenuBarDisplayExpanded,
+                summary: menuBarDisplaySummary
+            ) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle(isOn: $menuBarClaude) {
+                        providerToggleLabel("Claude", asset: "ClaudeProviderIcon")
+                    }
+                    Toggle(isOn: $menuBarCodex) {
+                        providerToggleLabel("Codex", asset: "CodexProviderIcon")
+                    }
+                    Toggle(isOn: $menuBarGemini) {
+                        providerToggleLabel("Gemini", asset: "GeminiProviderIcon")
+                    }
+                }
+                .padding(.leading, 4)
+            }
+
             if provider.capabilities.supportsCost {
                 Button(action: { showPricing = true }) {
                     HStack {
@@ -665,6 +689,28 @@ struct SettingsView: View {
                     .padding(.top, 6)
             }
         }
+    }
+
+    @ViewBuilder
+    private func providerToggleLabel(_ title: String, asset: String) -> some View {
+        Label {
+            Text(title).font(.system(size: 12))
+        } icon: {
+            Image(asset)
+                .resizable()
+                .renderingMode(.template)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 12, height: 12)
+                .foregroundStyle(.secondary)
+                .frame(width: 18, alignment: .leading)
+        }
+    }
+
+    private var menuBarDisplaySummary: String {
+        let count = [menuBarClaude, menuBarCodex, menuBarGemini].filter { $0 }.count
+        if count == 3 { return LanguageManager.localizedString("settings.menuBarDisplay.all") }
+        if count == 0 { return LanguageManager.localizedString("settings.menuBarDisplay.none") }
+        return "\(count)"
     }
 
     private func applyCustomInterval() {
@@ -2281,3 +2327,4 @@ private struct NotchScreenPickerRow: View {
 private extension NSScreen {
     var notchSettingsID: String { notchScreenIdentifier(self) }
 }
+

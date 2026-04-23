@@ -62,33 +62,45 @@ final class StatusBarController: NSObject, ObservableObject {
 
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        if let button = statusItem.button {
-            button.image = NSImage(named: "MenuBarIcon")
-            button.image?.isTemplate = true
-            button.imagePosition = .imageLeading
-            button.title = appState.menuBarText
-            button.font = .monospacedSystemFont(ofSize: 11, weight: .medium)
-            button.target = self
-            button.action = #selector(togglePanel)
+        guard let button = statusItem.button else { return }
+        button.target = self
+        button.action = #selector(togglePanel)
+        // Disable the default button image/title so the hosting view renders
+        // unobstructed.
+        button.image = nil
+        button.title = ""
+
+        // SwiftUI measures its own size; NSStatusItem doesn't auto-track
+        // subview intrinsic size, so the strip hands its measured width
+        // back here and we pin `statusItem.length` to it. Minimum width
+        // keeps the button clickable even before the first measurement
+        // arrives.
+        let strip = MenuBarUsageStrip(appState: appState) { [weak self] size in
+            guard let self else { return }
+            let desired = max(28, size.width.rounded(.up))
+            if self.statusItem.length != desired {
+                self.statusItem.length = desired
+            }
         }
+        let hosting = NSHostingView(rootView: strip)
+        hosting.translatesAutoresizingMaskIntoConstraints = false
+        button.addSubview(hosting)
+
+        NSLayoutConstraint.activate([
+            hosting.topAnchor.constraint(equalTo: button.topAnchor),
+            hosting.bottomAnchor.constraint(equalTo: button.bottomAnchor),
+            hosting.leadingAnchor.constraint(equalTo: button.leadingAnchor),
+            hosting.trailingAnchor.constraint(equalTo: button.trailingAnchor),
+        ])
+
+        // Seed a reasonable initial width so the strip isn't clipped on
+        // first display while SwiftUI runs its first measurement pass.
+        statusItem.length = hosting.fittingSize.width > 0 ? hosting.fittingSize.width : 96
     }
 
     private func observeMenuBarText() {
-        appState.usageViewModel.objectWillChange
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                guard let self else { return }
-                self.statusItem.button?.title = self.appState.menuBarText
-            }
-            .store(in: &cancellables)
-
-        appState.$providerKind
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                guard let self else { return }
-                self.statusItem.button?.title = self.appState.menuBarText
-            }
-            .store(in: &cancellables)
+        // No longer needed — SwiftUI inside NSHostingView subscribes to
+        // each UsageViewModel directly and re-renders on data changes.
     }
 
     // MARK: - Panel
@@ -171,5 +183,112 @@ final class StatusBarController: NSObject, ObservableObject {
         } else {
             panel.setFrameOrigin(NSPoint(x: x, y: y))
         }
+    }
+}
+
+// MARK: - Menu bar usage strip (multi-provider display)
+
+/// Status bar button content: one compact cell per user-enabled provider
+/// with icon on top and current usage text below. Subscribes to the
+/// provider-specific UsageViewModel via AppState so updates propagate
+/// without manual wiring.
+struct MenuBarUsageStrip: View {
+    @ObservedObject var appState: AppState
+    @AppStorage(MenuBarPreferences.key(for: .claude)) private var claudeVisible = true
+    @AppStorage(MenuBarPreferences.key(for: .codex)) private var codexVisible = true
+    @AppStorage(MenuBarPreferences.key(for: .gemini)) private var geminiVisible = true
+    var onSizeChange: (CGSize) -> Void = { _ in }
+
+    /// Shared rotation counter — lives on the strip (not inside each cell)
+    /// so every cell advances to the next segment at exactly the same
+    /// moment. One timer, one tick, no drift between cells.
+    @State private var tick: Int = 0
+    private static let rotationInterval: TimeInterval = 3
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(visibleKinds, id: \.self) { kind in
+                if let vm = appState.usageViewModel(for: kind) {
+                    MenuBarUsageCell(kind: kind, viewModel: vm, tick: tick)
+                }
+            }
+        }
+        .fixedSize()
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(key: MenuBarStripSizeKey.self, value: proxy.size)
+            }
+        )
+        .onPreferenceChange(MenuBarStripSizeKey.self, perform: onSizeChange)
+        .onReceive(Timer.publish(every: Self.rotationInterval, on: .main, in: .common).autoconnect()) { _ in
+            tick &+= 1
+        }
+    }
+
+    private var visibleKinds: [ProviderKind] {
+        var kinds: [ProviderKind] = []
+        if claudeVisible { kinds.append(.claude) }
+        if codexVisible { kinds.append(.codex) }
+        if geminiVisible { kinds.append(.gemini) }
+        return kinds
+    }
+}
+
+private struct MenuBarStripSizeKey: PreferenceKey {
+    static var defaultValue: CGSize = .zero
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        value = nextValue()
+    }
+}
+
+private struct MenuBarUsageCell: View {
+    let kind: ProviderKind
+    @ObservedObject var viewModel: UsageViewModel
+    /// Shared rotation counter driven by the parent `MenuBarUsageStrip` so
+    /// all cells advance in lockstep.
+    let tick: Int
+
+    /// Fixed cell width. Tight-fit around icon(15) + inner spacing(2) +
+    /// text (~20pt for "100%") = 37pt, snapped to 38 so the cell doesn't
+    /// breathe as segment values change.
+    private static let cellWidth: CGFloat = 38
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Image(kind.statusIconAssetName)
+                .resizable()
+                .renderingMode(.template)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 15, height: 15)
+                .foregroundStyle(.primary)
+            VStack(alignment: .center, spacing: -1) {
+                Text(currentSegment?.prefix ?? "—")
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                Text(currentSegment?.value ?? " ")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            }
+            .foregroundStyle(color(for: currentSegment))
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+        }
+        .frame(width: Self.cellWidth, alignment: .leading)
+        .help(kind.displayName)
+    }
+
+    private var segments: [MenuBarStripSegment] {
+        ProviderRegistry.provider(for: kind).menuBarStripSegments(from: viewModel.usageData)
+    }
+
+    private var currentSegment: MenuBarStripSegment? {
+        let segs = segments
+        guard !segs.isEmpty else { return nil }
+        return segs[abs(tick) % segs.count]
+    }
+
+    private func color(for segment: MenuBarStripSegment?) -> Color {
+        guard let segment else { return .secondary }
+        if segment.usedPercent >= 80 { return .red }
+        if segment.usedPercent >= 50 { return .orange }
+        return .primary
     }
 }
