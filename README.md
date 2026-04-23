@@ -4,16 +4,13 @@
 
 A native macOS menu bar app for monitoring your [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), and Gemini CLI sessions, subscription usage, and token/cost analytics in real time.
 
-## v2.6.0 Highlights
+## v3.1.0 Highlights
 
-- **Brand-new All-Time view** — Stats tab now opens on a full-panel overview with `All / Daily / Weekly / Monthly` tabs (the rarely-useful Yearly tab has been retired)
-- **GitHub-style activity heatmap** — 53-week grid coloured by daily token volume, with a year-picker, hover-to-reveal details, and `Less → More` legend
-- **Top Projects ranking** — at-a-glance ranking of projects by all-time cost, with animated progress bars
-- **Messages count aligned with Anthropic's AI Footprint** — tool uses now included in the message total (≤ 0.3% off the official number)
-- **Codex provider WAL DB recovery** — fixes a regression where Codex sessions silently failed to load when the CLI left `-shm`/`-wal` sidecar files behind
-- **Crash-recovery telemetry** — startup log now reports `Resuming parse — N sessions had incomplete cache` when prior runs were killed mid-parse
-- **Heatmap performance** — cached `DateFormatter` and removed per-cell animations for smooth scrolling across 371 cells
-- **UX polish** — absolute numbers instead of percentages in the Tokens & Models breakdown, removed "~" estimated-cost markers, cleaner overview card with 4 metrics in a single row
+- **Notch Island** — live activity surface docked to the MacBook notch for every running Claude Code / Codex / Gemini session. Permission cards (Allow/Deny), waiting-input hints, and one-keystroke focus back into the exact terminal tab where the session lives.
+- **Ghostty tab-accurate focus** — clicking a session card jumps to the exact Ghostty tab the session is running in, even when multiple sessions share the same project directory (surface id → window+tab → cwd fallbacks).
+- **Multi-provider menu bar strip** — menu bar shows every enabled provider (Claude / Codex / Gemini) side by side: icon + rotating window/quota usage, colour-coded at 50% (orange) and 80% (red) consumed.
+- **Gemini OAuth auto-refresh** — attaches the Gemini CLI `client_secret` so refresh no longer silently fails with `HTTP 400 client_secret is missing`.
+- **Hooks engine rewritten in Swift** — replaced Python hook scripts with a single Swift HookCLI binary; faster cold start, simpler install, uniform diagnostics.
 
 ![Claude Statistics overview](docs/screenshots/hero-overview.png)
 
@@ -78,9 +75,28 @@ This script builds using the dedicated debug DerivedData path and relaunches the
 Claude Statistics lives in your macOS menu bar and opens as a floating panel.
 
 - Native **NSStatusItem + floating panel** experience
-- Reactive menu bar status text based on subscription usage
+- **Multi-provider usage strip** — every enabled provider (Claude / Codex / Gemini) gets its own cell in the menu bar, icon + rotating window/quota usage, colour-coded at 50% / 80% consumed; per-provider visibility toggles under Settings → Menu bar display
 - Fast access to Sessions, Stats, Usage, and Settings from one compact panel
 - No dock icon — built as a lightweight menu bar utility
+
+### Notch Island
+
+A live activity surface docked to the MacBook notch (Dynamic Island–style; falls back to a top-screen pill on non-notch Macs). Turns `claude` / `codex` / `gemini` hook events into on-screen interactions so you never have to leave the notch to handle an approval or know what's running.
+
+![Notch Island](docs/screenshots/notch-island.png)
+
+- **Active sessions panel** — one glance at the notch shows every running Claude Code / Codex / Gemini session, grouped by project, with live status: waiting / working / awaiting approval
+- **Permission cards** — Claude Code `PermissionRequest` hooks surface as inline Allow / Deny cards; decisions are written back through the hook protocol, no terminal switch needed
+- **Waiting-input indicator** — idle sessions waiting on your next prompt show a subtle notch pulse so you can glance without expanding the island
+- **One-keystroke focus return** — `Return` (or click) on a selected card jumps straight into that session's exact terminal tab. Precise-by-default routing:
+  - Ghostty: surface id → window + tab id → cwd fallbacks
+  - iTerm2: tty match
+  - Terminal.app: tty match
+  - Kitty / WezTerm / Alacritty: native CLI focus
+- **Session lifecycle pulses** — session start / end, tool use, subagent start / stop, pre/post-compact events, all optional and per-provider
+- **Per-provider master switches** — enable or disable notch notifications independently for Claude / Codex / Gemini under Settings → Notch
+- **Global shortcut** — bring the island forward with a customizable hotkey (Settings → Keyboard shortcuts), with arrow-key navigation inside
+- **Focus-preserving keyboard capture** — uses a global `CGEventTap` so the island doesn't steal key window from your terminal / editor mid-session
 
 ### Session Management
 

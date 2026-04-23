@@ -4,16 +4,13 @@
 
 一款原生 macOS 菜单栏应用，用于实时查看 [Claude Code](https://docs.anthropic.com/en/docs/claude-code)、[Codex CLI](https://github.com/openai/codex) 和 Gemini CLI 的会话、订阅用量以及 Token / 费用统计。
 
-## v2.6.0 亮点
+## v3.1.0 亮点
 
-- **全新的 All-Time 视图** — Stats 面板改为 `全部 / 按天 / 按周 / 按月` 四个维度，默认打开 All 视图（删除了利用率较低的年视图）
-- **GitHub 风格活跃度热力图** — 53 周网格按日 token 量着色，支持年份切换、hover 查看当日详情，下方附 `少 → 多` 图例
-- **项目排行榜** — 按历史总花费排序的项目排行，带动画进度条
-- **消息计数对齐 Anthropic AI Footprint** — 工具调用现在也计入消息总数（与官方数据误差 ≤ 0.3%）
-- **Codex WAL 数据库恢复** — 修复 Codex CLI 留下 `-shm`/`-wal` 临时文件时无法扫描到会话的回归问题
-- **中断恢复可观测性** — 启动时在日志中标记 `Resuming parse — N sessions had incomplete cache`，前次被 kill 的会话自动重解析
-- **Heatmap 性能** — 缓存 `DateFormatter`、移除 per-cell 动画，371 个格子滑动流畅
-- **UX 细节打磨** — Tokens & Models 分项改为具体数字（不再是百分比），去掉估算金额的 "~" 符号，Overview 卡片 4 个指标一行更紧凑
+- **刘海岛（Notch Island）** — 停驻在 MacBook 刘海区的实时活动面板，展示所有在跑的 Claude Code / Codex / Gemini 会话。权限审批卡片（Allow/Deny）、等待输入提示、一键跳回会话所在的精确终端 tab。
+- **Ghostty 精确 tab 定位** — 点击会话卡跳转到运行它的那个 Ghostty tab（不仅仅激活应用），同目录多会话场景也能区分（surface id → window+tab → cwd 逐级 fallback）。
+- **多 Provider 菜单栏用量条** — 菜单栏并排展示所有已启用 Provider 的用量：图标 + 循环显示时间窗/配额，≥50% 橙色、≥80% 红色警示。
+- **Gemini OAuth 自动刷新** — 补上 Gemini CLI 的 `client_secret`，不再因 `HTTP 400 client_secret is missing` 静默失败。
+- **Hooks 引擎改写为 Swift** — Python hook 脚本整体替换为单个 Swift HookCLI 二进制，冷启动更快、部署更简洁、诊断更统一。
 
 ![Claude Statistics 总览](screenshots/hero-overview.png)
 
@@ -78,9 +75,27 @@ bash scripts/run-debug.sh
 Claude Statistics 常驻 macOS 菜单栏，通过浮动面板展示所有核心信息。
 
 - 原生 **NSStatusItem + 浮动面板** 体验
-- 菜单栏标题随订阅用量实时变化
+- **多 Provider 用量条** — 每个已启用的 Provider（Claude / Codex / Gemini）各占一格，图标 + 循环显示时间窗/配额，≥50% 橙、≥80% 红警示;可在 Settings → 菜单栏显示 中按 Provider 勾选隐藏
 - 在一个紧凑面板中快速访问 Sessions、Stats、Usage、Settings
 - 无 Dock 图标，定位就是轻量级菜单栏工具
+
+### 刘海岛（Notch Island）
+
+停驻在 MacBook 刘海区的实时活动面板（动态岛式呈现;非刘海屏 Mac 上退化为屏幕顶部的胶囊）。把 `claude` / `codex` / `gemini` 的 hook 事件变成屏幕上可交互的卡片,不必离开刘海就能处理审批、查看在跑会话。
+
+![刘海岛](screenshots/notch-island.png)
+
+- **会话活动面板** — 一眼扫到所有在跑的 Claude Code / Codex / Gemini 会话,按项目分组,实时状态标注（等待输入 / 工作中 / 等待审批）
+- **权限审批卡** — Claude Code 的 `PermissionRequest` hook 以 Allow / Deny 卡片形式弹出,决定回写到 hook 协议,全程不用切回终端
+- **等待输入提示** — 会话等你下一条 prompt 时刘海有一个轻柔的脉冲,不需要展开就能感知
+- **一键跳回精确 tab** — 选中卡片按 `Return`(或点击)直接跳进会话所在的那个终端 tab。按 terminal 精确定位:
+  - Ghostty: surface id → window + tab id → cwd 逐级 fallback
+  - iTerm2 / Terminal.app: 按 tty 匹配
+  - Kitty / WezTerm / Alacritty: 原生 CLI 聚焦
+- **会话生命周期脉冲** — 会话启动 / 结束、工具调用、subagent 启停、pre/post-compact 事件均可选开启,按 Provider 粒度
+- **Provider 级开关** — Claude / Codex / Gemini 可各自独立开关刘海通知(Settings → Notch)
+- **全局快捷键** — 自定义热键唤起刘海岛(Settings → 键盘快捷键),支持方向键导航
+- **不抢键盘焦点** — 通过全局 `CGEventTap` 实现,刘海不会在会话进行中把 key window 从终端/编辑器抢走
 
 ### 会话管理
 

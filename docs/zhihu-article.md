@@ -1,5 +1,16 @@
 # 我做了一个 macOS 菜单栏 App，实时监控 Claude Code 的 Token 消耗和订阅用量
 
+> **2026-04-23 · v3.1.0 更新**
+>
+> 文章写于早期版本（仅支持 Claude Code），当前 Claude Statistics 已经演化成一个针对整个 AI 编程终端生态的控制台。最近这版新加的几个重点能力：
+>
+> - **刘海岛（Notch Island）** — 停驻在 MacBook 刘海区的实时活动面板，展示所有在跑的 Claude Code / Codex / Gemini 会话。权限审批卡片（Allow/Deny）、等待输入提示、一键 `Return` 跳回会话所在的精确终端 tab。
+> - **Ghostty 精确 tab 定位** — 点击会话卡跳转到运行它的那个 Ghostty tab（而不仅仅激活应用），同目录下多会话也能区分（走 surface id → window+tab → cwd 逐级 fallback）。
+> - **多 Provider 菜单栏用量条** — 菜单栏并排展示 Claude / Codex / Gemini 的用量：图标 + 循环显示时间窗/配额，≥50% 橙色、≥80% 红色警示。
+> - **Gemini OAuth 自动刷新、Hooks 引擎改写为 Swift** — 细节稳定性改进。
+>
+> 下面的内容保留了最初的故事背景，但具体功能与架构描述以 README 为准。
+
 ## 一、那张账单
 
 用 Claude Code 一个月之后，我收到了一封邮件。

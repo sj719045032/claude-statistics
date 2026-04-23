@@ -1,5 +1,16 @@
 # Reddit Post — r/ClaudeAI
 
+> **2026-04-23 · v3.1.0 update**
+>
+> Original post reflected the early Claude-only version. Current Claude Statistics has grown into a control center for the whole AI-coding terminal ecosystem. Recent additions:
+>
+> - **Notch Island** — live activity surface docked to the MacBook notch showing every running Claude Code / Codex / Gemini session; inline Allow / Deny permission cards; waiting-input pulses; one-keystroke focus return into the exact terminal tab.
+> - **Ghostty tab-accurate focus** — clicking a session card lands on the exact Ghostty tab the session is running in, even when multiple sessions share the same project directory (surface id → window+tab → cwd fallbacks).
+> - **Multi-provider menu bar strip** — the menu bar shows every enabled provider (Claude / Codex / Gemini) side by side: icon + rotating window/quota usage, colour-coded at 50% / 80% consumed.
+> - **Gemini OAuth auto-refresh + Swift HookCLI** — stability + faster startup.
+>
+> Body below is the original post; for the current feature list refer to README.
+
 ## Title
 
 I built a macOS menu bar app to track Claude Code sessions, token usage, and costs in real time

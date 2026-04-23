@@ -137,10 +137,16 @@ export const siteCopy: Record<Language, SiteCopy> = {
       title: "A native-feeling command center with the visual confidence of a modern product site.",
       cards: [
         {
+          kicker: "Notch Island",
+          title: "Every running Claude / Codex / Gemini session handled from the MacBook notch.",
+          text: "Live activity surface with inline Allow / Deny permission cards, waiting-input pulses, and one-keystroke focus back into the exact terminal tab the session is running in.",
+          large: true,
+          accent: true
+        },
+        {
           kicker: "Session intelligence",
           title: "Search transcripts, inspect tools, and jump back into the exact project context.",
-          text: "Browse grouped sessions, inspect token and model breakdowns, and reopen work in your preferred terminal.",
-          large: true
+          text: "Browse grouped sessions, inspect token and model breakdowns, and reopen work in your preferred terminal."
         },
         {
           kicker: "Usage visibility",
@@ -174,6 +180,15 @@ export const siteCopy: Record<Language, SiteCopy> = {
       eyebrow: "What the app actually covers",
       title: "More than a dashboard: session control, transcript search, provider switching, and operational detail.",
       cards: [
+        {
+          kicker: "Notch Island",
+          title: "Live activity surface for every running session.",
+          items: [
+            "Active sessions grouped by project with live status (waiting / working / awaiting approval)",
+            "Inline Allow / Deny cards for Claude Code permission requests, written back through the hook protocol",
+            "One-keystroke focus return to the exact Ghostty surface / iTerm2 / Terminal tab"
+          ]
+        },
         {
           kicker: "Session control",
           title: "Recent sessions, grouped projects, hover actions, and fast resume flows.",
@@ -360,10 +375,16 @@ export const siteCopy: Record<Language, SiteCopy> = {
       title: "既有原生工具的质感，也有现代产品官网该有的视觉张力。",
       cards: [
         {
+          kicker: "刘海岛",
+          title: "所有在跑的 Claude / Codex / Gemini 会话，从 MacBook 刘海区一键处理。",
+          text: "实时活动面板：权限审批卡（Allow / Deny）、等待输入提示，一键 Return 跳回会话所在的精确终端 tab。",
+          large: true,
+          accent: true
+        },
+        {
           kicker: "会话 intelligence",
           title: "搜索 transcript、查看工具调用，并回到准确的项目上下文继续工作。",
-          text: "你可以浏览分组会话、查看 token 和模型拆分，并用偏好的终端一键恢复工作流。",
-          large: true
+          text: "你可以浏览分组会话、查看 token 和模型拆分，并用偏好的终端一键恢复工作流。"
         },
         {
           kicker: "配额可见性",
@@ -397,6 +418,15 @@ export const siteCopy: Record<Language, SiteCopy> = {
       eyebrow: "它到底覆盖了什么",
       title: "不只是一个 dashboard，而是会话控制、搜索、切换和运营细节的完整工具面。",
       cards: [
+        {
+          kicker: "刘海岛",
+          title: "所有在跑的会话实时活动面板。",
+          items: [
+            "按项目分组的在跑会话列表，实时状态（等待输入 / 工作中 / 等待审批）",
+            "Claude Code 权限请求内联 Allow / Deny 卡片，回写到 hook 协议，全程不切终端",
+            "一键跳回 Ghostty 精确 surface / iTerm2 tty / Terminal tab"
+          ]
+        },
         {
           kicker: "会话控制",
           title: "最近会话、项目分组、hover 操作和快速恢复流程。",
