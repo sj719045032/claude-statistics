@@ -245,10 +245,16 @@ final class SessionViewModel: ObservableObject {
     }
 
     func openNewSession(_ session: Session) {
+        if TerminalSetupCoordinator.shared.prepareForTerminalAction() {
+            return
+        }
         store.provider.openNewSession(session)
     }
 
     func resumeSession(_ session: Session) {
+        if TerminalSetupCoordinator.shared.prepareForTerminalAction() {
+            return
+        }
         store.provider.resumeSession(session)
     }
 
@@ -257,6 +263,9 @@ final class SessionViewModel: ObservableObject {
     }
 
     func openNewSession(inDirectory path: String) {
+        if TerminalSetupCoordinator.shared.prepareForTerminalAction() {
+            return
+        }
         store.provider.openNewSession(inDirectory: path)
     }
 

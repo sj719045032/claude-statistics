@@ -4,7 +4,7 @@ struct ClaudeHookInstaller: HookInstalling {
     let provider: ProviderKind = .claude
 
     private static let scriptName     = "claude-stats-claude-hook"
-    private static let managedMarker  = "claude-stats-"
+    private static let managedMarkers = ["claude-stats-", "--claude-stats-hook-provider"]
 
     private var hooksDir: String {
         (NSHomeDirectory() as NSString).appendingPathComponent(".claude/hooks")
@@ -19,12 +19,11 @@ struct ClaudeHookInstaller: HookInstalling {
     }
 
     private var commandPath: String {
-        "~/.claude/hooks/\(Self.scriptName).py"
+        HookInstallerUtils.currentHookCommand(provider: provider)
     }
 
     // Event list — install both notification events and silent tracking events so
-    // the active-session list can track real live terminals instead of guessing
-    // from transcript mtimes alone.
+    // the active-session list is driven entirely by live hook payloads.
     private func eventNames() -> [String] {
         [
             "UserPromptSubmit",   // silent tracking — prompt sent
@@ -47,7 +46,6 @@ struct ClaudeHookInstaller: HookInstalling {
     // MARK: - HookInstalling
 
     var isInstalled: Bool {
-        guard FileManager.default.fileExists(atPath: scriptPath) else { return false }
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: settingsPath)),
               let obj  = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let hooks = obj["hooks"] as? [String: Any] else {
@@ -58,7 +56,8 @@ struct ClaudeHookInstaller: HookInstalling {
             for matcher in matchers {
                 guard let inner = matcher["hooks"] as? [[String: Any]] else { continue }
                 for h in inner {
-                    if let cmd = h["command"] as? String, cmd.contains(Self.managedMarker) {
+                    if let cmd = h["command"] as? String,
+                       Self.managedMarkers.contains(where: { cmd.contains($0) }) {
                         return true
                     }
                 }
@@ -68,11 +67,10 @@ struct ClaudeHookInstaller: HookInstalling {
     }
 
     func install() async throws -> HookInstallResult {
-        guard HookInstallerUtils.python3Available() else {
-            return .python3Missing
-        }
-
-        let snapshot = FileSnapshot.capture(at: settingsPath)
+        let snapshots = [
+            FileSnapshot.capture(at: settingsPath),
+            FileSnapshot.capture(at: scriptPath),
+        ]
 
         do {
             let fm = FileManager.default
@@ -119,10 +117,11 @@ struct ClaudeHookInstaller: HookInstalling {
 
             let output = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
             try output.write(to: URL(fileURLWithPath: settingsPath), options: .atomic)
-
-            try HookInstallerUtils.installScript(bundleResourceName: Self.scriptName, destinationDir: hooksDir)
+            HookInstallerUtils.removeScript(at: scriptPath)
         } catch {
-            try? snapshot.restore()
+            for snapshot in snapshots {
+                try? snapshot.restore()
+            }
             throw error
         }
         return .success
@@ -177,7 +176,8 @@ struct ClaudeHookInstaller: HookInstalling {
         matchers.filter { matcher in
             guard let inner = matcher["hooks"] as? [[String: Any]] else { return true }
             return !inner.contains { h in
-                (h["command"] as? String)?.contains(Self.managedMarker) == true
+                let command = h["command"] as? String ?? ""
+                return Self.managedMarkers.contains { command.contains($0) }
             }
         }
     }

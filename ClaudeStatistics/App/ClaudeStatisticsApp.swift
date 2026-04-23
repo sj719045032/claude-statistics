@@ -31,16 +31,12 @@ final class AppState: ObservableObject {
     let profileViewModel = ProfileViewModel()
     let updaterService = UpdaterService()
     let notchCenter = NotchNotificationCenter()
-    lazy var activeSessionsTracker = ActiveSessionsTracker { [weak self] in
-        guard let self else { return [] }
-        return self.collectActiveSessions()
-    }
+    lazy var activeSessionsTracker = ActiveSessionsTracker()
     let claudeAccountManager = ClaudeAccountManager()
     let independentClaudeAccountManager = IndependentClaudeAccountManager()
     let codexAccountManager = CodexAccountManager()
     let geminiAccountManager = GeminiAccountManager()
     private var cancellables: Set<AnyCancellable> = []
-    private var activeSessionRefreshCancellables: [ProviderKind: Set<AnyCancellable>] = [:]
     private var storesByProvider: [ProviderKind: SessionDataStore] = [:]
     private var sessionViewModelsByProvider: [ProviderKind: SessionViewModel] = [:]
 
@@ -74,10 +70,6 @@ final class AppState: ObservableObject {
         self.sessionViewModel = sessionViewModelsByProvider[selectedKind]!
         usageViewModel.store = store
         configureUsageState(for: store.provider)
-
-        for (kind, store) in storesByProvider {
-            bindActiveSessionRefresh(for: kind, store: store)
-        }
 
         // Sync subscription weekly reset date to SessionDataStore
         usageViewModel.$usageData
@@ -165,7 +157,6 @@ final class AppState: ObservableObject {
         storesByProvider[kind] = rebuiltStore
         sessionViewModelsByProvider[kind] = rebuiltViewModel
         rebuiltStore.start()
-        bindActiveSessionRefresh(for: kind, store: rebuiltStore)
 
         guard providerKind == kind else { return }
 
@@ -183,101 +174,6 @@ final class AppState: ObservableObject {
         if isPopoverVisible {
             rebuiltStore.popoverDidOpen()
         }
-    }
-
-    fileprivate func collectActiveSessions() -> [ActiveSession] {
-        func newestText(
-            parsedText: String?,
-            parsedAt: Date?,
-            quickText: String?,
-            quickAt: Date?
-        ) -> (text: String?, at: Date?) {
-            guard parsedText != nil || quickText != nil else { return (nil, nil) }
-
-            switch (parsedAt, quickAt) {
-            case let (p?, q?) where q > p:
-                return (quickText ?? parsedText, q)
-            case let (p?, _):
-                return (parsedText ?? quickText, p)
-            case (nil, let q?):
-                return (quickText ?? parsedText, q)
-            case (nil, nil):
-                return (parsedText ?? quickText, nil)
-            }
-        }
-
-        func newestTool(
-            parsed: SessionStats?,
-            quick: SessionQuickStats?
-        ) -> (name: String?, summary: String?, detail: String?, at: Date?) {
-            guard parsed?.lastToolSummary != nil || quick?.lastToolSummary != nil else {
-                return (nil, nil, nil, nil)
-            }
-
-            switch (parsed?.lastToolAt, quick?.lastToolAt) {
-            case let (p?, q?) where q > p:
-                return (quick?.lastToolName, quick?.lastToolSummary, quick?.lastToolDetail, q)
-            case let (p?, _):
-                return (parsed?.lastToolName, parsed?.lastToolSummary, parsed?.lastToolDetail, p)
-            case (nil, let q?):
-                return (quick?.lastToolName, quick?.lastToolSummary, quick?.lastToolDetail, q)
-            case (nil, nil):
-                if let parsed, parsed.lastToolSummary != nil {
-                    return (parsed.lastToolName, parsed.lastToolSummary, parsed.lastToolDetail, nil)
-                }
-                return (quick?.lastToolName, quick?.lastToolSummary, quick?.lastToolDetail, nil)
-            }
-        }
-
-        var result: [ActiveSession] = []
-        for (kind, store) in storesByProvider {
-            guard NotchPreferences.isEnabled(kind) else { continue }
-            for s in store.sessions {
-                let parsed = store.parsedStats[s.id]
-                let quick = store.quickStats[s.id]
-                let latestPrompt = newestText(
-                    parsedText: parsed?.lastPrompt,
-                    parsedAt: parsed?.lastPromptAt,
-                    quickText: quick?.lastPrompt,
-                    quickAt: quick?.lastPromptAt
-                )
-                let latestPreview = newestText(
-                    parsedText: parsed?.lastOutputPreview,
-                    parsedAt: parsed?.lastOutputPreviewAt,
-                    quickText: quick?.lastOutputPreview,
-                    quickAt: quick?.lastOutputPreviewAt
-                )
-                let latestTool = newestTool(parsed: parsed, quick: quick)
-
-                var active = ActiveSession(
-                    id: s.id,
-                    sessionId: s.externalID,
-                    provider: kind,
-                    projectName: s.displayName,
-                    projectPath: s.cwd ?? s.projectPath,
-                    currentActivity: latestTool.summary,
-                    latestPrompt: latestPrompt.text,
-                    latestPromptAt: latestPrompt.at,
-                    latestPreview: latestPreview.text,
-                    latestPreviewAt: latestPreview.at,
-                    lastActivityAt: latestTool.at ?? latestPreview.at ?? latestPrompt.at ?? s.lastModified,
-                    tty: nil,
-                    pid: nil,
-                    terminalName: nil,
-                    terminalSocket: nil,
-                    terminalWindowID: nil,
-                    terminalTabID: nil,
-                    terminalStableID: nil
-                )
-                active.currentToolName = latestTool.name
-                active.currentToolDetail = latestTool.detail
-                if latestTool.at != nil {
-                    active.status = .running
-                }
-                result.append(active)
-            }
-        }
-        return result
     }
 
     func buildAllProvidersShareRoleResult() -> ShareRoleResult? {
@@ -342,26 +238,7 @@ final class AppState: ObservableObject {
         storesByProvider[kind] = store
         sessionViewModelsByProvider[kind] = viewModel
         store.start()
-        bindActiveSessionRefresh(for: kind, store: store)
         return (store, viewModel)
-    }
-
-    private func bindActiveSessionRefresh(for kind: ProviderKind, store: SessionDataStore) {
-        activeSessionRefreshCancellables[kind]?.forEach { $0.cancel() }
-
-        var bag = Set<AnyCancellable>()
-        Publishers.Merge3(
-            store.$sessions.map { _ in () }.eraseToAnyPublisher(),
-            store.$quickStats.map { _ in () }.eraseToAnyPublisher(),
-            store.$parsedStats.map { _ in () }.eraseToAnyPublisher()
-        )
-        .debounce(for: .milliseconds(80), scheduler: RunLoop.main)
-        .sink { [weak self] _ in
-            self?.activeSessionsTracker.refresh()
-        }
-        .store(in: &bag)
-
-        activeSessionRefreshCancellables[kind] = bag
     }
 }
 
@@ -372,8 +249,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var notchBridge: AttentionBridge?
     private var notchWindowController: NotchWindowController?
     private var notchStateObserver: NSObjectProtocol?
-
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Menu-bar app + local socket bridge + pending approval state means we
+        // should stay alive even when there is no key window. Letting AppKit's
+        // automatic termination reclaim us breaks in-flight hook responses.
+        let processInfo = ProcessInfo.processInfo
+        processInfo.disableAutomaticTermination("Claude Statistics maintains background CLI integrations")
+        processInfo.disableSuddenTermination()
+
+        let bundleID = Bundle.main.bundleIdentifier ?? "unknown"
+        let executablePath = Bundle.main.executableURL?.path ?? ProcessInfo.processInfo.arguments.first ?? "unknown"
+        DiagnosticLogger.shared.appProcessStarted(
+            pid: ProcessInfo.processInfo.processIdentifier,
+            bundleID: bundleID,
+            executablePath: executablePath
+        )
+
         let config = TelemetryDeck.Config(appID: "C5662554-D78C-4334-A745-3661642DBE3D")
         TelemetryDeck.initialize(config: config)
 
@@ -405,6 +296,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private static func registerForAccessibilityVisibility() {
+        // Silently register this bundle id with TCC. Without this, ad-hoc
+        // signed debug builds never appear in System Settings → Privacy &
+        // Security → Accessibility at all — TCC only learns about the app
+        // after a prompt, and a silent CGEventTap probe that *fails* doesn't
+        // count. Passing prompt=false adds the entry with its switch off so
+        // the user can flip it themselves without a popup.
+        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        _ = AXIsProcessTrustedWithOptions([promptKey: false] as CFDictionary)
+
+        // Debug builds (different bundle id) need a manual nudge: if the
+        // silent register above didn't stick, fire the prompt once. This is
+        // conditional on the debug bundle id to avoid bothering release
+        // users — they got their permissions through a previous install.
+        let isDebugBundle = (Bundle.main.bundleIdentifier ?? "").hasSuffix(".debug")
+        if isDebugBundle, !AXIsProcessTrusted() {
+            let key = "debug.accessibility.promptShown"
+            let shown = UserDefaults.standard.bool(forKey: key)
+            if !shown {
+                // LSUIElement apps don't get the prompt dialog unless we force
+                // them to the front. Activate, prompt, then let the app drop
+                // back to being a menu-bar resident on its own.
+                NSApp.setActivationPolicy(.regular)
+                NSApp.activate(ignoringOtherApps: true)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    _ = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
+                    UserDefaults.standard.set(true, forKey: key)
+                    // Restore menu-bar-only policy after the prompt has fired.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        NSApp.setActivationPolicy(.accessory)
+                    }
+                }
+            }
+        }
+
+        // If the user has already granted access, probe a tap once so macOS
+        // wires up the permission for this launch without waiting for the
+        // first keyboard interception.
         let mask = (1 << CGEventType.keyDown.rawValue)
         let noopCallback: CGEventTapCallBack = { _, _, event, _ in
             Unmanaged.passUnretained(event)
@@ -423,6 +351,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        DiagnosticLogger.shared.appProcessWillTerminate(
+            pid: ProcessInfo.processInfo.processIdentifier,
+            bundleID: Bundle.main.bundleIdentifier ?? "unknown"
+        )
         appState.stopAllStores()
         notchBridge?.stop()
         if let notchStateObserver {
@@ -484,7 +416,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-@main
 struct ClaudeStatisticsApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 

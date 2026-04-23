@@ -147,6 +147,8 @@
 "settings.globalHotKeyRecording" = "Press keys...";
 "settings.terminal" = "Terminal";
 "settings.resumeIn" = "Resume in";
+"settings.defaultTerminal" = "Default Terminal";
+"settings.terminalFocus" = "Terminal Focus";
 "settings.chooseEditor" = "Editor app";
 "settings.notFound %@" = "%@ (not found)";
 "settings.pricing" = "Pricing";
@@ -217,6 +219,7 @@
 "settings.recommended" = "Recommended";
 "settings.diagnostics" = "Diagnostics";
 "settings.exportLog" = "Open Diagnostic Log";
+"settings.verboseLogging" = "Verbose Logging (debug)";
 "settings.exportLogHint" = "Share this log when reporting issues. Path: ~/.claude/claude-statistics-diagnostic.log";
 "settings.about" = "About";
 "settings.version" = "Version";
@@ -521,6 +524,8 @@
 "notch.settings.screen.currentMain" = "Current main";
 "notch.settings.screen.notch" = "Built-in notch";
 "notch.settings.sound" = "Play sound on permission request";
+"notch.settings.focusSilence" = "Silence when terminal is focused";
+"notch.settings.focusSilence.hint" = "Turn off to always show the notch card, useful for debugging.";
 "notch.settings.claudeHooks" = "Claude Code hooks";
 "notch.settings.hooks.installed" = "Installed";
 "notch.settings.hooks.notInstalled" = "Not installed";

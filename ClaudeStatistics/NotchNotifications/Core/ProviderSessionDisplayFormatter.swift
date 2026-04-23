@@ -56,9 +56,9 @@ struct ProviderSessionDisplayFormatter {
 
     private var latestPreviewCandidate: (text: String?, symbol: String) {
         switch displayMode {
-        case .codex:
-            return (codexPreviewLine, "sparkles")
-        case .claude, .gemini:
+        case .codex, .gemini:
+            return (commandFilteredPreviewLine, "sparkles")
+        case .claude:
             return (session.previewLine, "sparkles")
         }
     }
@@ -143,13 +143,13 @@ struct ProviderSessionDisplayFormatter {
 
         let supporting = firstDisplayLine(
             from: [
-                currentActivityCandidate,
-                currentToolDetailCandidate,
-                fallbackCurrentActivityCandidate,
-                fallbackCurrentToolDetailCandidate,
-                latestToolOutputCandidate,
                 latestPromptCandidate,
-                latestPreviewCandidate
+                latestPreviewCandidate,
+                latestToolOutputCandidate,
+                currentToolDetailCandidate,
+                currentActivityCandidate,
+                fallbackCurrentToolDetailCandidate,
+                fallbackCurrentActivityCandidate
             ],
             excluding: operation?.text
         )
@@ -172,13 +172,13 @@ struct ProviderSessionDisplayFormatter {
 
         let supporting = firstDisplayLine(
             from: [
-                currentActivityCandidate,
-                currentToolDetailCandidate,
-                fallbackCurrentActivityCandidate,
-                fallbackCurrentToolDetailCandidate,
                 latestToolOutputCandidate,
                 latestPromptCandidate,
-                latestPreviewCandidate
+                latestPreviewCandidate,
+                currentToolDetailCandidate,
+                currentActivityCandidate,
+                fallbackCurrentToolDetailCandidate,
+                fallbackCurrentActivityCandidate
             ],
             excluding: operation?.text
         )
@@ -318,7 +318,7 @@ struct ProviderSessionDisplayFormatter {
         return deduped
     }
 
-    private var codexPreviewLine: String? {
+    private var commandFilteredPreviewLine: String? {
         guard let preview = session.previewLine else { return nil }
         return Self.isCommandLikeText(preview) ? nil : preview
     }
@@ -431,6 +431,7 @@ struct ProviderSessionDisplayFormatter {
             || normalized == "…"
             || normalized.allSatisfy { !$0.isLetter && !$0.isNumber }
         if genericNoise { return true }
+        if isJsonLikeBlob(normalized) { return true }
 
         switch mode {
         case .gemini:
@@ -439,6 +440,15 @@ struct ProviderSessionDisplayFormatter {
         case .claude, .codex:
             return false
         }
+    }
+
+    // Raw JSON blobs leak into preview when hook payloads stringify an internal
+    // object (Codex PreToolUse). Suppress them so the row isn't noise.
+    private static func isJsonLikeBlob(_ normalizedText: String) -> Bool {
+        let trimmed = normalizedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 16 else { return false }
+        guard let first = trimmed.first, first == "{" || first == "[" else { return false }
+        return trimmed.contains("\":")
     }
 
     private static func isInternalMarkupValue(_ text: String) -> Bool {

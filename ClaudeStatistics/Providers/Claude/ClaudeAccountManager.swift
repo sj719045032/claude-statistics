@@ -385,10 +385,12 @@ final class ClaudeAccountManager: ObservableObject {
             isAddingAccount = true
 
             let loginScriptPath = try makeClaudeLoginScript()
-            TerminalLauncher.launch(
-                executable: loginScriptPath,
-                arguments: [],
-                cwd: NSHomeDirectory()
+            TerminalRegistry.launch(
+                TerminalLaunchRequest(
+                    executable: loginScriptPath,
+                    arguments: [],
+                    cwd: NSHomeDirectory()
+                )
             )
 
             addPollingTask?.cancel()

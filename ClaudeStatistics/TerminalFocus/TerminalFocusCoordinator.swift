@@ -48,7 +48,7 @@ actor TerminalFocusCoordinator {
         stableTerminalID: String?
     ) async -> TerminalFocusCapability {
         DiagnosticLogger.shared.info(
-            "Terminal focus requested key=\(cacheKey) pid=\(pid.map(String.init) ?? "-") tty=\(tty ?? "-") terminal=\(terminalName ?? "-") stableID=\(stableTerminalID ?? "-") cwd=\(projectPath ?? "-")"
+            "Terminal focus requested key=\(cacheKey) pid=\(pid.map(String.init) ?? "-") tty=\(tty ?? "-") terminal=\(terminalName ?? "-") socket=\(terminalSocket ?? "-") stableID=\(stableTerminalID ?? "-") cwd=\(projectPath ?? "-")"
         )
 
         if let immediateTarget = makeImmediateTarget(
@@ -103,14 +103,21 @@ actor TerminalFocusCoordinator {
         stableTerminalID: String?
     ) -> TerminalFocusTarget? {
         let cached = cachedTargets[cacheKey]
-        let bundleId = TerminalAppRegistry.bundleId(forTerminalName: terminalName)
+        let bundleId = TerminalRegistry.bundleId(forTerminalName: terminalName)
             ?? cached?.bundleId
             ?? Self.inferBundleId(pid: pid, terminalName: terminalName)
+        let canUseCachedTerminalIdentity = focusIdentityProvider(for: bundleId)?
+            .shouldUseCachedIdentity(
+                requestedWindowID: terminalWindowID,
+                requestedTabID: terminalTabID,
+                requestedStableID: stableTerminalID,
+                cachedTarget: cached
+            ) ?? true
         let resolvedTTY = tty?.nilIfEmpty ?? cached?.tty
         let resolvedProjectPath = projectPath?.nilIfEmpty ?? cached?.projectPath
-        let resolvedWindowID = terminalWindowID?.nilIfEmpty ?? cached?.terminalWindowID
-        let resolvedTabID = terminalTabID?.nilIfEmpty ?? cached?.terminalTabID
-        let resolvedStableID = stableTerminalID?.nilIfEmpty ?? cached?.terminalStableID
+        let resolvedWindowID = terminalWindowID?.nilIfEmpty ?? (canUseCachedTerminalIdentity ? cached?.terminalWindowID : nil)
+        let resolvedTabID = terminalTabID?.nilIfEmpty ?? (canUseCachedTerminalIdentity ? cached?.terminalTabID : nil)
+        let resolvedStableID = stableTerminalID?.nilIfEmpty ?? (canUseCachedTerminalIdentity ? cached?.terminalStableID : nil)
         let resolvedSocket = terminalSocket?.nilIfEmpty ?? cached?.terminalSocket
         let resolvedPid = pid ?? cached?.terminalPid
         let resolvedName = terminalName?.nilIfEmpty ?? cached?.terminalName
@@ -126,27 +133,7 @@ actor TerminalFocusCoordinator {
             return nil
         }
 
-        let route = TerminalAppRegistry.route(for: bundleId)
-        let capability: TerminalFocusCapability
-        switch route {
-        case .appleScript:
-            let hasLocator = resolvedTTY != nil
-                || resolvedProjectPath != nil
-                || resolvedWindowID != nil
-                || resolvedTabID != nil
-                || resolvedStableID != nil
-            capability = hasLocator ? .ready : .appOnly
-        case .cli:
-            capability = (resolvedTTY != nil || resolvedProjectPath != nil || resolvedStableID != nil || resolvedTabID != nil || resolvedWindowID != nil)
-                ? .ready
-                : .appOnly
-        case .accessibility:
-            capability = resolvedPid != nil && AccessibilityFocuser.isTrusted ? .ready : .appOnly
-        case .activate:
-            capability = .appOnly
-        }
-
-        return TerminalFocusTarget(
+        let target = TerminalFocusTarget(
             terminalPid: resolvedPid,
             bundleId: bundleId,
             tty: resolvedTTY,
@@ -156,141 +143,55 @@ actor TerminalFocusCoordinator {
             terminalWindowID: resolvedWindowID,
             terminalTabID: resolvedTabID,
             terminalStableID: resolvedStableID,
-            capability: capability,
+            capability: .unresolved,
             capturedAt: Date()
         )
+        return target.withResolvedCapability()
     }
 
     private func attemptDirectFocus(
         target: TerminalFocusTarget,
         cacheKey: String
     ) async -> TerminalFocusCapability? {
-        let route = TerminalAppRegistry.route(for: target.bundleId)
+        let route = TerminalRegistry.route(for: target.bundleId)
         DiagnosticLogger.shared.info(
-            "Terminal focus direct route=\(String(describing: route)) key=\(cacheKey) bundle=\(target.bundleId ?? "?") pid=\(target.terminalPid.map(String.init) ?? "-") tty=\(target.tty ?? "-") cwd=\(target.projectPath ?? "-") tabID=\(target.terminalTabID ?? "-") stableID=\(target.terminalStableID ?? "-")"
+            "Terminal focus direct route=\(String(describing: route)) key=\(cacheKey) bundle=\(target.bundleId ?? "?") pid=\(target.terminalPid.map(String.init) ?? "-") tty=\(target.tty ?? "-") cwd=\(target.projectPath ?? "-") socket=\(target.terminalSocket ?? "-") tabID=\(target.terminalTabID ?? "-") stableID=\(target.terminalStableID ?? "-")"
         )
 
-        switch route {
-        case .appleScript:
-            let result = AppleScriptFocuser.focus(
-                bundleId: target.bundleId,
-                tty: target.tty,
-                projectPath: target.projectPath,
-                terminalWindowID: target.terminalWindowID,
-                terminalTabID: target.terminalTabID,
-                stableTerminalID: target.terminalStableID
-            )
-            if case .success(let resolvedStableID) = result {
-                cacheFocusedTarget(target, resolvedStableID: resolvedStableID, cacheKey: cacheKey)
-                DiagnosticLogger.shared.info("Terminal focus direct success key=\(cacheKey)")
-                return .ready
-            }
+        guard let handler = TerminalFocusRouteRegistry.handler(for: route),
+              let result = await handler.directFocus(target: target) else {
+            recoverCachedIdentityAfterDirectFocusFailure(target: target, cacheKey: cacheKey)
             DiagnosticLogger.shared.warning("Terminal focus direct miss key=\(cacheKey) bundle=\(target.bundleId ?? "?")")
             return nil
-        case .cli(let kind):
-            if CLIFocuser.focus(
-                kind: kind,
-                tty: target.tty,
-                projectPath: target.projectPath,
-                terminalSocket: target.terminalSocket,
-                terminalWindowID: target.terminalWindowID,
-                terminalTabID: target.terminalTabID,
-                stableTerminalID: target.terminalStableID
-            ) {
-                cacheFocusedTarget(target, resolvedStableID: target.terminalStableID, cacheKey: cacheKey)
-                DiagnosticLogger.shared.info("Terminal focus direct CLI success key=\(cacheKey)")
-                return .ready
-            }
-            DiagnosticLogger.shared.warning("Terminal focus direct CLI miss key=\(cacheKey) bundle=\(target.bundleId ?? "?")")
-            return nil
-        case .accessibility, .activate:
+        }
+        guard acceptsResolvedStableID(result.resolvedStableID, target: target, cacheKey: cacheKey) else {
+            recoverCachedIdentityAfterDirectFocusFailure(target: target, cacheKey: cacheKey)
             return nil
         }
+        cacheFocusedTarget(target, resolvedStableID: result.resolvedStableID, cacheKey: cacheKey)
+        DiagnosticLogger.shared.info("Terminal focus direct success key=\(cacheKey)")
+        return result.capability
     }
 
     private func attemptResolvedFocus(
         target: TerminalFocusTarget,
         cacheKey: String
     ) async -> TerminalFocusCapability? {
-        let route = TerminalAppRegistry.route(for: target.bundleId)
+        let route = TerminalRegistry.route(for: target.bundleId)
         DiagnosticLogger.shared.info(
-            "Terminal focus route=\(String(describing: route)) key=\(cacheKey) bundle=\(target.bundleId ?? "?") pid=\(target.terminalPid.map(String.init) ?? "-") tty=\(target.tty ?? "-") cwd=\(target.projectPath ?? "-") tabID=\(target.terminalTabID ?? "-") stableID=\(target.terminalStableID ?? "-")"
+            "Terminal focus route=\(String(describing: route)) key=\(cacheKey) bundle=\(target.bundleId ?? "?") pid=\(target.terminalPid.map(String.init) ?? "-") tty=\(target.tty ?? "-") cwd=\(target.projectPath ?? "-") socket=\(target.terminalSocket ?? "-") tabID=\(target.terminalTabID ?? "-") stableID=\(target.terminalStableID ?? "-")"
         )
 
-        switch route {
-        case .appleScript:
-            _ = await MainActor.run {
-                ActivateFocuser.focus(pid: target.terminalPid, bundleId: target.bundleId, projectPath: nil)
-            }
-            let result = AppleScriptFocuser.focus(
-                bundleId: target.bundleId,
-                tty: target.tty,
-                projectPath: target.projectPath,
-                terminalWindowID: target.terminalWindowID,
-                terminalTabID: target.terminalTabID,
-                stableTerminalID: target.terminalStableID
-            )
-            if case .success(let resolvedStableID) = result {
-                cacheFocusedTarget(target, resolvedStableID: resolvedStableID, cacheKey: cacheKey)
-                return .ready
-            }
-            if let terminalPid = target.terminalPid,
-               AccessibilityFocuser.focus(pid: terminalPid, projectPath: target.projectPath) {
-                cacheFocusedTarget(target, resolvedStableID: target.terminalStableID, cacheKey: cacheKey)
-                return .ready
-            }
-            if await MainActor.run(body: {
-                ActivateFocuser.focus(pid: target.terminalPid, bundleId: target.bundleId, projectPath: target.projectPath)
-            }) {
-                cacheFocusedTarget(target, resolvedStableID: target.terminalStableID, cacheKey: cacheKey)
-                return .appOnly
-            }
-        case .cli(let kind):
-            if CLIFocuser.focus(
-                kind: kind,
-                tty: target.tty,
-                projectPath: target.projectPath,
-                terminalSocket: target.terminalSocket,
-                terminalWindowID: target.terminalWindowID,
-                terminalTabID: target.terminalTabID,
-                stableTerminalID: target.terminalStableID
-            ) {
-                cacheFocusedTarget(target, resolvedStableID: target.terminalStableID, cacheKey: cacheKey)
-                return .ready
-            }
-            if let terminalPid = target.terminalPid,
-               AccessibilityFocuser.focus(pid: terminalPid, projectPath: target.projectPath) {
-                cacheFocusedTarget(target, resolvedStableID: target.terminalStableID, cacheKey: cacheKey)
-                return .ready
-            }
-            if await MainActor.run(body: {
-                ActivateFocuser.focus(pid: target.terminalPid, bundleId: target.bundleId, projectPath: target.projectPath)
-            }) {
-                cacheFocusedTarget(target, resolvedStableID: target.terminalStableID, cacheKey: cacheKey)
-                return .appOnly
-            }
-        case .accessibility:
-            if let terminalPid = target.terminalPid,
-               AccessibilityFocuser.focus(pid: terminalPid, projectPath: target.projectPath) {
-                cacheFocusedTarget(target, resolvedStableID: target.terminalStableID, cacheKey: cacheKey)
-                return .ready
-            }
-            if await MainActor.run(body: {
-                ActivateFocuser.focus(pid: target.terminalPid, bundleId: target.bundleId, projectPath: target.projectPath)
-            }) {
-                cacheFocusedTarget(target, resolvedStableID: target.terminalStableID, cacheKey: cacheKey)
-                return .appOnly
-            }
-        case .activate:
-            if await MainActor.run(body: {
-                ActivateFocuser.focus(pid: target.terminalPid, bundleId: target.bundleId, projectPath: target.projectPath)
-            }) {
-                cacheFocusedTarget(target, resolvedStableID: target.terminalStableID, cacheKey: cacheKey)
-                return .appOnly
-            }
+        guard let handler = TerminalFocusRouteRegistry.handler(for: route),
+              let result = await handler.resolvedFocus(target: target) else {
+            return nil
         }
-
-        return nil
+        guard acceptsResolvedStableID(result.resolvedStableID, target: target, cacheKey: cacheKey) else {
+            recoverCachedIdentityAfterDirectFocusFailure(target: target, cacheKey: cacheKey)
+            return nil
+        }
+        cacheFocusedTarget(target, resolvedStableID: result.resolvedStableID, cacheKey: cacheKey)
+        return result.capability
     }
 
     private func cacheFocusedTarget(
@@ -298,20 +199,25 @@ actor TerminalFocusCoordinator {
         resolvedStableID: String?,
         cacheKey: String
     ) {
-        let finalStableID = resolvedStableID ?? target.terminalStableID
-        cachedTargets[cacheKey] = TerminalFocusTarget(
-            terminalPid: target.terminalPid,
-            bundleId: target.bundleId,
-            tty: target.tty,
-            projectPath: target.projectPath,
-            terminalName: target.terminalName,
-            terminalSocket: target.terminalSocket,
-            terminalWindowID: target.terminalWindowID,
-            terminalTabID: target.terminalTabID,
-            terminalStableID: finalStableID,
-            capability: target.capability,
-            capturedAt: Date()
-        )
+        let cachedTarget = focusIdentityProvider(for: target.bundleId)?
+            .cachedFocusTarget(from: target, resolvedStableID: resolvedStableID)
+            ?? target.withStableTerminalID(
+                resolvedStableID ?? target.terminalStableID,
+                capturedAt: Date()
+            )
+        cachedTargets[cacheKey] = cachedTarget
+    }
+
+    private func recoverCachedIdentityAfterDirectFocusFailure(
+        target: TerminalFocusTarget,
+        cacheKey: String
+    ) {
+        guard let recoveredTarget = focusIdentityProvider(for: target.bundleId)?
+            .focusTargetAfterDirectFocusFailure(target, cachedTarget: cachedTargets[cacheKey]) else {
+            return
+        }
+        cachedTargets[cacheKey] = recoveredTarget
+        DiagnosticLogger.shared.info("Terminal focus cached identity recovered key=\(cacheKey) bundle=\(target.bundleId ?? "?")")
     }
 
     private func resolve(
@@ -325,7 +231,17 @@ actor TerminalFocusCoordinator {
         terminalTabID: String?,
         stableTerminalID: String?
     ) async -> TerminalFocusTarget {
+        let inferredBundleId = TerminalRegistry.bundleId(forTerminalName: terminalName) ?? cachedTargets[cacheKey]?.bundleId
+        let canUseCachedTerminalIdentity = focusIdentityProvider(for: inferredBundleId)?
+            .shouldUseCachedIdentity(
+                requestedWindowID: terminalWindowID,
+                requestedTabID: terminalTabID,
+                requestedStableID: stableTerminalID,
+                cachedTarget: cachedTargets[cacheKey]
+            ) ?? true
+
         if let cached = cachedTargets[cacheKey],
+           canUseCachedTerminalIdentity,
            cached.isUsable(pidKnown: pid != nil),
            !shouldRefreshCachedTarget(
                 cached,
@@ -335,8 +251,6 @@ actor TerminalFocusCoordinator {
            ) {
             return cached
         }
-
-        let inferredBundleId = TerminalAppRegistry.bundleId(forTerminalName: terminalName) ?? cachedTargets[cacheKey]?.bundleId
 
         guard let pid,
               let terminalProcess = await ProcessTreeWalker.findTerminalProcess(startingAt: pid)
@@ -367,12 +281,12 @@ actor TerminalFocusCoordinator {
                     projectPath: projectPath?.nilIfEmpty ?? cached.projectPath,
                     terminalName: terminalName?.nilIfEmpty ?? cached.terminalName,
                     terminalSocket: terminalSocket?.nilIfEmpty ?? cached.terminalSocket,
-                    terminalWindowID: terminalWindowID?.nilIfEmpty ?? cached.terminalWindowID,
-                    terminalTabID: terminalTabID?.nilIfEmpty ?? cached.terminalTabID,
-                    terminalStableID: stableTerminalID?.nilIfEmpty ?? cached.terminalStableID,
+                    terminalWindowID: terminalWindowID?.nilIfEmpty ?? (canUseCachedTerminalIdentity ? cached.terminalWindowID : nil),
+                    terminalTabID: terminalTabID?.nilIfEmpty ?? (canUseCachedTerminalIdentity ? cached.terminalTabID : nil),
+                    terminalStableID: stableTerminalID?.nilIfEmpty ?? (canUseCachedTerminalIdentity ? cached.terminalStableID : nil),
                     capability: cached.capability,
                     capturedAt: Date()
-                )
+                ).withResolvedCapability()
                 cachedTargets[cacheKey] = refreshed
                 return refreshed
             }
@@ -390,10 +304,11 @@ actor TerminalFocusCoordinator {
                     terminalSocket: terminalSocket?.nilIfEmpty,
                     terminalWindowID: terminalWindowID?.nilIfEmpty,
                     terminalTabID: terminalTabID?.nilIfEmpty,
-                    terminalStableID: stableTerminalID?.nilIfEmpty ?? cachedTargets[cacheKey]?.terminalStableID,
-                    capability: .ready,
+                    terminalStableID: stableTerminalID?.nilIfEmpty
+                        ?? (canUseCachedTerminalIdentity ? cachedTargets[cacheKey]?.terminalStableID : nil),
+                    capability: .unresolved,
                     capturedAt: Date()
-                )
+                ).withResolvedCapability()
                 cachedTargets[cacheKey] = inferred
                 return inferred
             }
@@ -425,7 +340,7 @@ actor TerminalFocusCoordinator {
             terminalWindowID: terminalWindowID,
             terminalTabID: terminalTabID,
             stableTerminalID: stableTerminalID,
-            cached: cachedTargets[cacheKey]
+            cached: canUseCachedTerminalIdentity ? cachedTargets[cacheKey] : nil
         )
         cachedTargets[cacheKey] = target
         return target
@@ -442,17 +357,6 @@ actor TerminalFocusCoordinator {
         stableTerminalID: String?,
         cached: TerminalFocusTarget?
     ) -> TerminalFocusTarget {
-        let route = TerminalAppRegistry.route(for: terminalProcess.bundleId)
-        let capability: TerminalFocusCapability
-        switch route {
-        case .appleScript, .cli:
-            capability = (tty == nil && projectPath == nil) ? .appOnly : .ready
-        case .accessibility:
-            capability = AccessibilityFocuser.isTrusted ? .ready : .appOnly
-        case .activate:
-            capability = .appOnly
-        }
-
         return TerminalFocusTarget(
             terminalPid: terminalProcess.pid,
             bundleId: terminalProcess.bundleId,
@@ -463,13 +367,13 @@ actor TerminalFocusCoordinator {
             terminalWindowID: terminalWindowID?.nilIfEmpty ?? cached?.terminalWindowID,
             terminalTabID: terminalTabID?.nilIfEmpty ?? cached?.terminalTabID,
             terminalStableID: stableTerminalID?.nilIfEmpty ?? cached?.terminalStableID,
-            capability: capability,
+            capability: .unresolved,
             capturedAt: Date()
-        )
+        ).withResolvedCapability()
     }
 
     private nonisolated static func inferBundleId(pid: Int32?, terminalName: String?) -> String? {
-        if let bundleId = TerminalAppRegistry.bundleId(forTerminalName: terminalName) {
+        if let bundleId = TerminalRegistry.bundleId(forTerminalName: terminalName) {
             return bundleId
         }
 
@@ -504,7 +408,7 @@ actor TerminalFocusCoordinator {
     }
 
     private nonisolated static func activateApplicationOnMain(pid: Int32?, bundleId: String?, projectPath: String?) -> Bool {
-        if TerminalAppRegistry.isEditorLikeBundle(bundleId),
+        if TerminalRegistry.isEditorLikeBundle(bundleId),
            let projectPath,
            let appURL = bundleId.flatMap({ NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) }) {
             let expanded = (projectPath as NSString).expandingTildeInPath
@@ -651,6 +555,27 @@ actor TerminalFocusCoordinator {
         }
         return result.stdout
     }
+}
+
+private func acceptsResolvedStableID(
+    _ resolvedStableID: String?,
+    target: TerminalFocusTarget,
+    cacheKey: String
+) -> Bool {
+    guard TerminalRegistry.focusIdentityProvider(for: target.bundleId)?
+        .acceptsResolvedStableID(resolvedStableID, for: target) ?? true else {
+        DiagnosticLogger.shared.warning(
+            "Terminal focus resolved stable id mismatch key=\(cacheKey) bundle=\(target.bundleId ?? "?") requested=\(target.terminalStableID ?? "-") resolved=\(resolvedStableID ?? "-")"
+        )
+        return false
+    }
+    return true
+}
+
+private func focusIdentityProvider(
+    for bundleId: String?
+) -> (any TerminalCapability & TerminalFocusIdentityProviding)? {
+    TerminalRegistry.focusIdentityProvider(for: bundleId)
 }
 
 private extension String {

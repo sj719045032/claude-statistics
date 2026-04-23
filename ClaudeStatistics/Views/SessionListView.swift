@@ -169,7 +169,7 @@ struct SessionListView: View {
                                 onNewSession: { viewModel.openNewSession(session) },
                                 onResume: {
                                     viewModel.resumeSession(session)
-                                    if TerminalApp.preferred == .editor {
+                                    if TerminalPreferences.isEditorPreferred {
                                         toastCenter.show(EditorApp.resumeCopiedToastMessage)
                                     }
                                 },
@@ -233,7 +233,7 @@ struct SessionListView: View {
                                     onNewSession: { viewModel.openNewSession(session) },
                                     onResume: {
                                         viewModel.resumeSession(session)
-                                        if TerminalApp.preferred == .editor {
+                                        if TerminalPreferences.isEditorPreferred {
                                             toastCenter.show(EditorApp.resumeCopiedToastMessage)
                                         }
                                     },

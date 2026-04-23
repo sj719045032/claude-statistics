@@ -280,11 +280,13 @@ final class CodexAccountManager: ObservableObject {
             noticeMessage = NSLocalizedString("settings.codexAccounts.addHint", comment: "")
             isAddingAccount = true
 
-            TerminalLauncher.launch(
-                executable: "codex",
-                arguments: ["login"],
-                cwd: NSHomeDirectory(),
-                environment: ["CODEX_HOME": homeURL.path]
+            TerminalRegistry.launch(
+                TerminalLaunchRequest(
+                    executable: "codex",
+                    arguments: ["login"],
+                    cwd: NSHomeDirectory(),
+                    environment: ["CODEX_HOME": homeURL.path]
+                )
             )
 
             addPollingTask?.cancel()

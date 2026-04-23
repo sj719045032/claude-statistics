@@ -798,29 +798,15 @@ final class TranscriptParser {
             }
         }
 
+        // Only surface the assistant's natural-language text. Bare tool_use /
+        // thinking / tool_result entries aren't meaningful as a row preview —
+        // caller walks back further to find the last real text reply.
         guard let items = message.content else { return nil }
         for item in items.reversed() {
-            switch item {
-            case .text(let text):
+            if case .text(let text) = item {
                 let trimmed = text.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmed.isEmpty, !trimmed.hasPrefix("[Request interrupted by user") else { continue }
                 return clampAssistantPreview(trimmed)
-            case .toolResult(let result):
-                guard let text = extractToolResultText(result.content)?
-                    .trimmingCharacters(in: .whitespacesAndNewlines),
-                      !text.isEmpty else { continue }
-                return clampAssistantPreview(text)
-            case .toolUse(let tool):
-                let summary = toolSummaryAndDetail(name: tool.name ?? "Tool", input: tool.input).0
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !summary.isEmpty else { continue }
-                return clampAssistantPreview(summary)
-            case .thinking(let thinking):
-                let text = (thinking.thinking ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !text.isEmpty else { continue }
-                return clampAssistantPreview(text)
-            case .unknown:
-                continue
             }
         }
         return nil
@@ -836,32 +822,11 @@ final class TranscriptParser {
 
         guard let items = message["content"] as? [[String: Any]] else { return nil }
         for item in items.reversed() {
-            switch item["type"] as? String {
-            case "text":
-                let trimmed = (item["text"] as? String ?? "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty, !trimmed.hasPrefix("[Request interrupted by user") else { continue }
-                return clampAssistantPreview(trimmed)
-            case "tool_result":
-                let content = item["content"].map(AnyCodable.init)
-                guard let text = extractToolResultText(content)?
-                    .trimmingCharacters(in: .whitespacesAndNewlines),
-                      !text.isEmpty else { continue }
-                return clampAssistantPreview(text)
-            case "tool_use":
-                let input = item["input"].map(AnyCodable.init)
-                let summary = toolSummaryAndDetail(name: item["name"] as? String ?? "Tool", input: input).0
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !summary.isEmpty else { continue }
-                return clampAssistantPreview(summary)
-            case "thinking":
-                let text = (item["thinking"] as? String ?? "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !text.isEmpty else { continue }
-                return clampAssistantPreview(text)
-            default:
-                continue
-            }
+            guard item["type"] as? String == "text" else { continue }
+            let trimmed = (item["text"] as? String ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, !trimmed.hasPrefix("[Request interrupted by user") else { continue }
+            return clampAssistantPreview(trimmed)
         }
         return nil
     }

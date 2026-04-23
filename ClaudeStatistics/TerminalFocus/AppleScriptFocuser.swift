@@ -299,29 +299,6 @@ enum AppleScriptFocuser {
         stableTerminalID: String?,
         projectPath: String?
     ) -> String {
-        let tabFocusClause: String
-        if let terminalWindowID, let terminalTabID {
-            tabFocusClause = """
-            try
-                set targetWindow to first window whose id is "\(escapeAppleScript(terminalWindowID))"
-                set targetTab to first tab of targetWindow whose id is "\(escapeAppleScript(terminalTabID))"
-                activate targetWindow
-                set terminalRef to focused terminal of targetTab
-                focus terminalRef
-                return "ok|" & (id of terminalRef as text)
-            end try
-            """
-        } else if let terminalWindowID {
-            tabFocusClause = """
-            try
-                activate (first window whose id is "\(escapeAppleScript(terminalWindowID))")
-                return "ok|"
-            end try
-            """
-        } else {
-            tabFocusClause = ""
-        }
-
         let stableIDClause: String
         if let stableTerminalID {
             stableIDClause = """
@@ -336,27 +313,59 @@ enum AppleScriptFocuser {
             stableIDClause = ""
         }
 
+        let workingDirectoryClause: String
+        if stableTerminalID == nil {
+            workingDirectoryClause = """
+            set workingDirText to (working directory of terminalRef as text)
+            if my normalizePath(workingDirText) is in targetPaths then
+                select tab tabRef
+                activate window w
+                focus terminalRef
+                return "ok|" & (id of terminalRef as text)
+            end if
+            """
+        } else {
+            workingDirectoryClause = ""
+        }
+
+        let tabFocusClause: String
+        if stableTerminalID == nil, let terminalWindowID, let terminalTabID {
+            tabFocusClause = """
+            try
+                set targetWindow to first window whose id is "\(escapeAppleScript(terminalWindowID))"
+                set targetTab to first tab of targetWindow whose id is "\(escapeAppleScript(terminalTabID))"
+                activate targetWindow
+                set terminalRef to focused terminal of targetTab
+                focus terminalRef
+                return "ok|" & (id of terminalRef as text)
+            end try
+            """
+        } else if stableTerminalID == nil, projectPath?.nilIfEmpty == nil, let terminalWindowID {
+            tabFocusClause = """
+            try
+                activate (first window whose id is "\(escapeAppleScript(terminalWindowID))")
+                return "ok|"
+            end try
+            """
+        } else {
+            tabFocusClause = ""
+        }
+
         return """
         set targetPaths to \(pathListLiteral(projectPath))
         tell application id "com.mitchellh.ghostty"
             activate
-            \(tabFocusClause)
             repeat with w in windows
                 repeat with tabRef in tabs of w
                     repeat with terminalRef in terminals of tabRef
                         try
                             \(stableIDClause)
-                            set workingDirText to (working directory of terminalRef as text)
-                            if my normalizePath(workingDirText) is in targetPaths then
-                                select tab tabRef
-                                activate window w
-                                focus terminalRef
-                                return "ok|" & (id of terminalRef as text)
-                            end if
+                            \(workingDirectoryClause)
                         end try
                     end repeat
                 end repeat
             end repeat
+            \(tabFocusClause)
         end tell
         return "miss"
 

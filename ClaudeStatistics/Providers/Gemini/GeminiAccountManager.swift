@@ -294,11 +294,13 @@ final class GeminiAccountManager: ObservableObject {
             noticeMessage = NSLocalizedString("settings.geminiAccounts.addHint", comment: "")
             isAddingAccount = true
 
-            TerminalLauncher.launch(
-                executable: "gemini",
-                arguments: [],
-                cwd: homeURL.path,
-                environment: ["HOME": homeURL.path]
+            TerminalRegistry.launch(
+                TerminalLaunchRequest(
+                    executable: "gemini",
+                    arguments: [],
+                    cwd: homeURL.path,
+                    environment: ["HOME": homeURL.path]
+                )
             )
 
             addPollingTask?.cancel()

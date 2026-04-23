@@ -1,15 +1,62 @@
 import Foundation
 
+enum AttentionBridgeAuth {
+    static func socketPath(debug: Bool) -> String {
+        let fileName = debug ? "attention-debug.sock" : "attention.sock"
+        let directory = AppRuntimePaths.ensureRunDirectory() ?? AppRuntimePaths.runDirectory
+        return (directory as NSString).appendingPathComponent(fileName)
+    }
+
+    static func tokenPath(debug: Bool) -> String {
+        let fileName = debug ? "attention-token-debug" : "attention-token"
+        return (AppRuntimePaths.rootDirectory as NSString).appendingPathComponent(fileName)
+    }
+
+    static func ensureToken(debug: Bool) -> String? {
+        let fm = FileManager.default
+        let path = tokenPath(debug: debug)
+
+        if let token = loadToken(debug: debug) {
+            try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path)
+            return token
+        }
+
+        do {
+            guard AppRuntimePaths.ensureRootDirectory() != nil else { return nil }
+            let token = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+            try "\(token)\n".write(toFile: path, atomically: true, encoding: .utf8)
+            try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path)
+            return token
+        } catch {
+            DiagnosticLogger.shared.warning("AttentionBridge token create failed path=\(path) error=\(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    static func loadToken(debug: Bool) -> String? {
+        let path = tokenPath(debug: debug)
+        guard let token = try? String(contentsOfFile: path, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !token.isEmpty else {
+            return nil
+        }
+        return token
+    }
+}
+
 final class AttentionBridge {
     weak var notchCenter: NotchNotificationCenter?
 
     private let socketPath: String
+    private let authToken: String?
     private let socketQueue = DispatchQueue(label: "com.claude-stats.attention-socket")
     private var listenSource: DispatchSourceRead?
     private var serverFd: Int32 = -1
 
     init() {
-        socketPath = "/tmp/claude-stats-attention-\(getuid()).sock"
+        let debug = (Bundle.main.bundleIdentifier ?? "").hasSuffix(".debug")
+        socketPath = AttentionBridgeAuth.socketPath(debug: debug)
+        authToken = AttentionBridgeAuth.ensureToken(debug: debug)
     }
 
     func start() {
@@ -34,6 +81,8 @@ final class AttentionBridge {
     // MARK: - Private
 
     private func startListening() {
+        guard authToken != nil else { return }
+
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { return }
 
@@ -68,10 +117,7 @@ final class AttentionBridge {
                 close(fd); return
             }
         }
-        // Codex hooks can run from helper/sandboxed processes that cannot
-        // connect to a user-only socket. Match Codex Island's permissive
-        // local-hook bridge so provider hooks can reach the app reliably.
-        chmod(socketPath, 0o777)
+        chmod(socketPath, 0o600)
 
         guard listen(fd, 16) == 0 else { close(fd); unlink(socketPath); return }
 
@@ -90,12 +136,21 @@ final class AttentionBridge {
     }
 
     private func handleConnection(_ fd: Int32) {
-        socketQueue.async { [weak self] in
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { close(fd); return }
+            var receiveTimeout = timeval(tv_sec: 2, tv_usec: 0)
+            setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &receiveTimeout, socklen_t(MemoryLayout<timeval>.size))
+
             guard let line = readLine(fd: fd) else { close(fd); return }
             guard let data = line.data(using: .utf8),
                   let msg = try? JSONDecoder().decode(WireMessage.self, from: data) else {
                 close(fd); return
+            }
+
+            guard msg.auth_token == self.authToken else {
+                DiagnosticLogger.shared.warning("Bridge rejected unauthenticated hook message")
+                close(fd)
+                return
             }
 
             let kind: AttentionKind
@@ -171,7 +226,6 @@ final class AttentionBridge {
                 message: msg.message,
                 sessionId: msg.session_id ?? "",
                 projectPath: msg.cwd,
-                transcriptPath: msg.transcript_path,
                 tty: msg.tty,
                 pid: msg.pid.map { Int32($0) },
                 terminalName: msg.terminal_name,
@@ -199,6 +253,7 @@ final class AttentionBridge {
     private func readLine(fd: Int32) -> String? {
         var result = Data()
         var byte = UInt8(0)
+        let maxBytes = 1_048_576
         while true {
             let n = withUnsafeMutableBytes(of: &byte) { ptr in
                 read(fd, ptr.baseAddress, 1)
@@ -206,6 +261,10 @@ final class AttentionBridge {
             if n <= 0 { break }
             if byte == UInt8(ascii: "\n") { break }
             result.append(byte)
+            if result.count > maxBytes {
+                DiagnosticLogger.shared.warning("Bridge rejected oversized hook message bytes=\(result.count)")
+                return nil
+            }
         }
         guard !result.isEmpty else { return nil }
         return String(data: result, encoding: .utf8)
@@ -216,6 +275,7 @@ final class AttentionBridge {
 
 private struct WireMessage: Decodable {
     let v: Int?
+    let auth_token: String?
     let provider: String?
     let event: String
     let status: String?
@@ -229,7 +289,6 @@ private struct WireMessage: Decodable {
     let terminal_window_id: String?
     let terminal_tab_id: String?
     let terminal_surface_id: String?
-    let transcript_path: String?
     let tool_name: String?
     let tool_input: [String: JSONValue]?
     let tool_use_id: String?

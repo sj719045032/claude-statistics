@@ -66,6 +66,7 @@ struct MenuBarView: View {
     @AppStorage("ignoredUpdateVersion") private var ignoredUpdateVersion = ""
     @Namespace private var tabNamespace
     @StateObject private var toastCenter = ToastCenter()
+    @StateObject private var terminalSetupCoordinator = TerminalSetupCoordinator.shared
 
     private var visibleTabs: [AppTab] {
         tabOrder.filter { $0.isAvailable(for: appState.providerCapabilities) }
@@ -106,6 +107,14 @@ struct MenuBarView: View {
                     version: version,
                     onInstall: { updaterService.checkForUpdates() },
                     onDismiss: { ignoredUpdateVersion = version }
+                )
+            }
+
+            if let issue = terminalSetupCoordinator.bannerIssue {
+                TerminalSetupBanner(
+                    issue: issue,
+                    onSetup: { terminalSetupCoordinator.presentBannerIssue() },
+                    onDismiss: { terminalSetupCoordinator.dismissBanner() }
                 )
             }
 
@@ -201,8 +210,17 @@ struct MenuBarView: View {
             }
         }
         .onAppear { ensureSelectedTabIsAvailable() }
+        .onAppear { terminalSetupCoordinator.evaluateStartupHint() }
         .onChange(of: appState.providerKind) { _, _ in
             ensureSelectedTabIsAvailable()
+        }
+        .sheet(item: $terminalSetupCoordinator.presentedIssue, onDismiss: {
+            terminalSetupCoordinator.dismissSheet()
+        }) { issue in
+            TerminalSetupSheetView(
+                issue: issue,
+                onDismiss: { terminalSetupCoordinator.dismissSheet() }
+            )
         }
     }
 
@@ -245,7 +263,7 @@ struct MenuBarView: View {
                 onNewSession: { sessionViewModel.openNewSession(session) },
                 onResume: {
                     sessionViewModel.resumeSession(session)
-                    if TerminalApp.preferred == .editor {
+                    if TerminalPreferences.isEditorPreferred {
                         toastCenter.show(EditorApp.resumeCopiedToastMessage)
                     }
                 },
@@ -275,6 +293,48 @@ struct MenuBarView: View {
     private func openAllProvidersShare() {
         guard let result = appState.buildAllProvidersShareRoleResult() else { return }
         SharePreviewWindowController.show(result: result, source: .allProviders)
+    }
+}
+
+private struct TerminalSetupBanner: View {
+    let issue: TerminalSetupIssue
+    let onSetup: () -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: issue.readiness.state == .notInstalled ? "exclamationmark.circle.fill" : "wrench.and.screwdriver.fill")
+                .foregroundStyle(issue.readiness.state == .notInstalled ? Color.orange : Color.blue)
+                .font(.system(size: 12))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(issue.title)
+                    .font(.system(size: 11, weight: .semibold))
+                Text(issue.selectionSummary)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Button("Set Up") {
+                onSetup()
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+
+            Button("Later") {
+                onDismiss()
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .bottom) { Divider() }
     }
 }
 

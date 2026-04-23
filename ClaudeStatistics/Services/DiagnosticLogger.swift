@@ -36,6 +36,15 @@ final class DiagnosticLogger {
         log(level: "ERROR", message: message)
     }
 
+    /// High-frequency diagnostic noise (card size measurements, preference
+    /// key recomputations, every `reportInteractiveSize` tick, etc.).
+    /// Gated behind `diagnostic.verbose.enabled` so the default runtime
+    /// doesn't build the string on every SwiftUI render pass.
+    func verbose(_ message: @autoclosure () -> String) {
+        guard UserDefaults.standard.bool(forKey: "diagnostic.verbose.enabled") else { return }
+        log(level: "VERBOSE", message: message())
+    }
+
     func parsingError(file: String, line lineNum: Int, error: Error) {
         let fileName = (file as NSString).lastPathComponent
         log(level: "PARSE", message: "[\(fileName):\(lineNum)] \(error.localizedDescription)")
@@ -51,8 +60,17 @@ final class DiagnosticLogger {
         }
     }
 
-    func appLaunched(sessionCount: Int) {
-        log(level: "INFO", message: "App launched — v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"), \(sessionCount) sessions found")
+    func appProcessStarted(pid: Int32, bundleID: String, executablePath: String) {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        log(level: "INFO", message: "App process started — v\(version) pid=\(pid) bundle=\(bundleID) exec=\(executablePath)")
+    }
+
+    func appProcessWillTerminate(pid: Int32, bundleID: String) {
+        log(level: "WARN", message: "App process will terminate — pid=\(pid) bundle=\(bundleID)")
+    }
+
+    func initialScanStarted(provider: String, sessionCount: Int) {
+        log(level: "INFO", message: "Initial scan complete — provider=\(provider) sessions=\(sessionCount)")
     }
 
     func parsePhaseComplete(totalSessions: Int, totalMessages: Int, totalTokens: Int) {

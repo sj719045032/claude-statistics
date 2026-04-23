@@ -16,7 +16,7 @@ enum ActivateFocuser {
             return true
         }
 
-        if TerminalAppRegistry.isEditorLikeBundle(bundleId),
+        if TerminalRegistry.isEditorLikeBundle(bundleId),
            openProject(projectPath, bundleId: bundleId) {
             return true
         }

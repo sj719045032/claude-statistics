@@ -95,7 +95,10 @@ final class SessionDataStore: ObservableObject {
         Task.detached { [weak self] in
             guard let self else { return }
             let scannedSessions = Self.deduplicatedSessions(provider.scanSessions(), provider: providerKind)
-            DiagnosticLogger.shared.appLaunched(sessionCount: scannedSessions.count)
+            DiagnosticLogger.shared.initialScanStarted(
+                provider: providerKind.rawValue,
+                sessionCount: scannedSessions.count
+            )
 
             // Load DB cache and determine which sessions need reparsing
             let cache = db.loadAllCached(provider: providerKind)

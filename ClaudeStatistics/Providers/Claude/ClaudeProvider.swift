@@ -76,21 +76,41 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
     }
 
     func openNewSession(_ session: Session) {
-        TerminalLauncher.launch(executable: "claude", arguments: [], cwd: resolvedProjectPath(for: session))
+        TerminalRegistry.launch(
+            TerminalLaunchRequest(
+                executable: "claude",
+                arguments: [],
+                cwd: resolvedProjectPath(for: session)
+            )
+        )
     }
 
     func resumeSession(_ session: Session) {
-        TerminalLauncher.launch(executable: "claude", arguments: ["--resume", session.externalID], cwd: resolvedProjectPath(for: session))
+        TerminalRegistry.launch(
+            TerminalLaunchRequest(
+                executable: "claude",
+                arguments: ["--resume", session.externalID],
+                cwd: resolvedProjectPath(for: session)
+            )
+        )
     }
 
     func resumeCommand(for session: Session) -> String {
-        TerminalLauncher.buildCommand(cwd: resolvedProjectPath(for: session),
-                                      executable: "claude",
-                                      arguments: ["--resume", session.externalID])
+        TerminalLaunchRequest(
+            executable: "claude",
+            arguments: ["--resume", session.externalID],
+            cwd: resolvedProjectPath(for: session)
+        ).commandInWorkingDirectory
     }
 
     func openNewSession(inDirectory path: String) {
-        TerminalLauncher.launch(executable: "claude", arguments: [], cwd: path)
+        TerminalRegistry.launch(
+            TerminalLaunchRequest(
+                executable: "claude",
+                arguments: [],
+                cwd: path
+            )
+        )
     }
 }
 

@@ -172,8 +172,8 @@ final class NotchWindowController {
 
         let isShrinking = frame.width < window.frame.width || frame.height < window.frame.height
         if isShrinking && display && deferShrink {
-            DiagnosticLogger.shared.info(
-                "Island window defer shrink from=\(Int(window.frame.width))x\(Int(window.frame.height)) to=\(Int(frame.width))x\(Int(frame.height)) delay=\(String(format: "%.2f", deferredShrinkDelay(to: frame)))"
+            DiagnosticLogger.shared.verbose(
+                "Island window defer shrink from=\(Int(self.window.frame.width))x\(Int(self.window.frame.height)) to=\(Int(frame.width))x\(Int(frame.height)) delay=\(String(format: "%.2f", self.deferredShrinkDelay(to: frame)))"
             )
             scheduleDeferredShrink(to: frame, delay: deferredShrinkDelay(to: frame), generation: generation ?? resizeGeneration)
             return
@@ -183,7 +183,7 @@ final class NotchWindowController {
         pendingShrink?.cancel()
         pendingShrink = nil
         if window.frame.integral != frame.integral {
-            DiagnosticLogger.shared.info(
+            DiagnosticLogger.shared.verbose(
                 "Island window set frame to=\(Int(frame.width))x\(Int(frame.height)) shrinking=\(isShrinking) display=\(display)"
             )
             window.setFrame(frame, display: display, animate: false)
@@ -272,7 +272,7 @@ final class NotchWindowController {
             guard let self else { return }
             guard generation == self.resizeGeneration else { return }
             if self.window.frame.integral != frame.integral {
-                DiagnosticLogger.shared.info(
+                DiagnosticLogger.shared.verbose(
                     "Island window apply deferred shrink to=\(Int(frame.width))x\(Int(frame.height))"
                 )
                 self.window.setFrame(frame, display: true, animate: false)

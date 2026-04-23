@@ -147,6 +147,8 @@
 "settings.globalHotKeyRecording" = "请按快捷键...";
 "settings.terminal" = "终端";
 "settings.resumeIn" = "恢复终端";
+"settings.defaultTerminal" = "默认终端";
+"settings.terminalFocus" = "终端定位";
 "settings.chooseEditor" = "编辑器";
 "settings.notFound %@" = "%@（未找到）";
 "settings.pricing" = "定价";
@@ -217,6 +219,7 @@
 "settings.recommended" = "推荐";
 "settings.diagnostics" = "诊断";
 "settings.exportLog" = "打开诊断日志";
+"settings.verboseLogging" = "详细日志（调试用）";
 "settings.exportLogHint" = "反馈问题时请附带此日志。路径：~/.claude/claude-statistics-diagnostic.log";
 "settings.about" = "关于";
 "settings.version" = "版本";
@@ -521,6 +524,8 @@
 "notch.settings.screen.currentMain" = "当前主屏幕";
 "notch.settings.screen.notch" = "内置刘海屏";
 "notch.settings.sound" = "权限请求时播放声音";
+"notch.settings.focusSilence" = "终端在前台时静音";
+"notch.settings.focusSilence.hint" = "关闭后所有事件都会弹出刘海卡片，方便调试。";
 "notch.settings.claudeHooks" = "Claude Code hooks";
 "notch.settings.hooks.installed" = "已安装";
 "notch.settings.hooks.notInstalled" = "未安装";

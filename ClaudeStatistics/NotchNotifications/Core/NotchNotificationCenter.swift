@@ -16,18 +16,14 @@ final class NotchNotificationCenter: ObservableObject {
     private var lastInformationalAtBySession: [String: Date] = [:]
     // Session-scoped "Always allow" rules: keyed by "provider:sessionId:toolName"
     private var autoAllowRules: Set<String> = []
-    // Timestamp of the most recent permission request we silenced due to terminal
-    // focus. Used to detect parallel-tool batches: if another permission arrives
-    // within a short window, we skip silencing and let it pop so the batch
-    // becomes visible in the notch queue.
-    private var lastFocusSilencedAt: Date?
-    private let focusSilenceBatchWindow: TimeInterval = 1.0
-
     func enqueue(_ event: AttentionEvent) {
+        var event = event
         DiagnosticLogger.shared.info(
             "Notch enqueue start kind=\(describeKind(event.kind)) session=\(event.sessionId) toolUseId=\(event.toolUseId ?? "-") currentEvent=\(currentEvent.map { String($0.id.uuidString.prefix(8)) } ?? "nil") queueCount=\(queue.count)"
         )
         activeSessionsTracker?.record(event: event)
+        event = enrichPermissionRequest(event)
+        clearResolvedPermissionRequests(for: event)
         if event.kind.clearsWaitingInput {
             clearWaitingInput(for: event)
         }
@@ -35,7 +31,7 @@ final class NotchNotificationCenter: ObservableObject {
             clearAutoAllowRules(provider: event.provider, sessionId: event.sessionId)
         }
         if event.kind.isSilentTracking {
-            DiagnosticLogger.shared.info("Notch drop: silent-tracking kind")
+            DiagnosticLogger.shared.info("Notch drop: silent-tracking provider=\(event.provider.rawValue) kind=\(describeKind(event.kind)) raw=\(event.rawEventName)")
             event.pending?.resolve(.ask)
             return
         }
@@ -49,63 +45,42 @@ final class NotchNotificationCenter: ObservableObject {
             return
         }
 
-        // Terminal-focus silencing: when the session's tab is already in the
-        // foreground the user can handle the prompt in the terminal itself, so
-        // a single redundant notch isn't useful. We skip this when:
-        //   • the notch is already busy (current/queued events) — more tool
-        //     calls belong in the visible queue, not the terminal one-by-one
-        //   • another permission was just silenced within a short window —
-        //     indicates a parallel-tool batch, so the remaining ones should pop
-        if case .permissionRequest = event.kind,
-           currentEvent == nil, queue.isEmpty,
-           !recentlySilencedBatch(),
-           TerminalFocusCoordinator.isSessionFocused(
-                pid: event.pid,
-                tty: event.tty,
-                terminalName: event.terminalName,
-                stableTerminalID: event.terminalStableID
-           ) {
-            DiagnosticLogger.shared.info("Notch drop: permission focus-silenced (first in batch)")
-            lastFocusSilencedAt = Date()
-            event.pending?.resolve(.ask)
-            return
-        }
-
-        // For non-permission user-visible events (waitingInput, taskDone,
-        // taskFailed, sessionStart), keep the original simple rule: if the
-        // tab is focused, skip — no queueing expectation here.
-        if case .permissionRequest = event.kind {
-            // handled above
-        } else if currentEvent == nil, queue.isEmpty,
-                  TerminalFocusCoordinator.isSessionFocused(
-                     pid: event.pid,
-                     tty: event.tty,
-                     terminalName: event.terminalName,
-                     stableTerminalID: event.terminalStableID
-                  ) {
+        // If the originating terminal surface is already focused, the user can
+        // handle or read the event in-place. Keep the notch quiet even if a
+        // permission batch or another card is already in flight.
+        if isFocusSilenceEnabled(), isSessionFocused(for: event) {
+            let ctx = activeSessionsTracker?.focusContext(for: event)
+            DiagnosticLogger.shared.info(
+                "Notch drop: terminal focus-silenced provider=\(event.provider.rawValue) kind=\(describeKind(event.kind)) terminal=\(ctx?.terminalName ?? event.terminalName ?? "-") tty=\(ctx?.tty ?? event.tty ?? "-") pid=\(ctx?.pid.map(String.init) ?? event.pid.map(String.init) ?? "-")"
+            )
             event.pending?.resolve(.ask)
             return
         }
 
         // 0. Respect user's event filters
         guard isEventKindEnabled(event.kind) else {
+            DiagnosticLogger.shared.info("Notch drop: disabled-by-filter provider=\(event.provider.rawValue) kind=\(describeKind(event.kind))")
             event.pending?.resolve(.ask)  // hook gets a pass-through decision
             return
         }
 
         if shouldSuppressInformationalEvent(event) {
+            DiagnosticLogger.shared.info("Notch drop: suppress-informational provider=\(event.provider.rawValue) kind=\(describeKind(event.kind))")
             event.pending?.resolve(.ask)
             return
         }
 
-        // 1. Dedup: if same toolUseId exists (in current or queue), resolve old as .deny.
-        // Skip when toolUseId is empty — Claude Code's PermissionRequest payload
-        // doesn't include one, and blanks would collide across unrelated events,
-        // silently denying the one already visible.
+        // 1. Dedup permission requests by toolUseId.
+        // Keep the first in-flight request and let later duplicates fall through
+        // to the CLI's native behavior. Replacing the visible one with `.deny`
+        // is too aggressive: some CLIs emit the same approval more than once,
+        // and denying the older socket can reject the real prompt before the
+        // user has a chance to click Allow.
         if case .permissionRequest(_, _, let toolUseId) = event.kind, !toolUseId.isEmpty {
             if let existingId = pendingByToolUseId[toolUseId] {
-                DiagnosticLogger.shared.warning("Notch dedup: same toolUseId=\(toolUseId.prefix(8)) replacing existing=\(existingId.uuidString.prefix(8))")
-                removeDuplicateEvent(existingId, resolution: .deny)
+                DiagnosticLogger.shared.warning("Notch dedup: same toolUseId=\(toolUseId.prefix(8)) keeping existing=\(existingId.uuidString.prefix(8))")
+                event.pending?.resolve(.ask)
+                return
             }
             pendingByToolUseId[toolUseId] = event.id
         }
@@ -160,6 +135,7 @@ final class NotchNotificationCenter: ObservableObject {
     }
 
     func decide(id: UUID, decision: Decision) {
+        DiagnosticLogger.shared.info("Notch decide id=\(id.uuidString.prefix(8)) decision=\(decision.rawValue) current=\(currentEvent.map { String($0.id.uuidString.prefix(8)) } ?? "nil") queueCount=\(queue.count)")
         if currentEvent?.id == id {
             noteDismissed(currentEvent)
             currentEvent?.pending?.resolve(decision)
@@ -251,9 +227,23 @@ final class NotchNotificationCenter: ObservableObject {
         autoAllowRules = autoAllowRules.filter { !$0.hasPrefix(prefix) }
     }
 
-    private func recentlySilencedBatch() -> Bool {
-        guard let last = lastFocusSilencedAt else { return false }
-        return Date().timeIntervalSince(last) < focusSilenceBatchWindow
+    // Default-on. Users can flip it off in Settings to force every event to
+    // surface, useful for debugging when the notch window is hidden but the
+    // user can't tell whether it ever fired.
+    private func isFocusSilenceEnabled() -> Bool {
+        let d = UserDefaults.standard
+        return d.object(forKey: "notch.focusSilence.enabled") == nil
+            || d.bool(forKey: "notch.focusSilence.enabled")
+    }
+
+    private func isSessionFocused(for event: AttentionEvent) -> Bool {
+        let focusContext = activeSessionsTracker?.focusContext(for: event)
+        return TerminalFocusCoordinator.isSessionFocused(
+            pid: focusContext?.pid ?? event.pid,
+            tty: focusContext?.tty ?? event.tty,
+            terminalName: focusContext?.terminalName ?? event.terminalName,
+            stableTerminalID: focusContext?.terminalStableID ?? event.terminalStableID
+        )
     }
 
     private func describeKind(_ kind: AttentionKind) -> String {
@@ -343,7 +333,11 @@ final class NotchNotificationCenter: ObservableObject {
     }
 
     private func noteDismissed(_ event: AttentionEvent?) {
-        guard let event, let key = informationalSessionKey(for: event) else { return }
+        guard let event else { return }
+        if case .permissionRequest(_, _, let toolUseId) = event.kind, !toolUseId.isEmpty {
+            pendingByToolUseId.removeValue(forKey: toolUseId)
+        }
+        guard let key = informationalSessionKey(for: event) else { return }
         if event.kind.isWaitingInput {
             displayedWaitingSessionKeys.remove(key)
         }
@@ -377,6 +371,75 @@ final class NotchNotificationCenter: ObservableObject {
     private func informationalSessionKey(for event: AttentionEvent) -> String? {
         guard !event.sessionId.isEmpty else { return nil }
         return "\(event.provider.rawValue):\(event.sessionId)"
+    }
+
+    private func enrichPermissionRequest(_ event: AttentionEvent) -> AttentionEvent {
+        guard case .permissionRequest = event.kind,
+              (event.toolUseId ?? "").isEmpty,
+              let resolvedToolUseId = activeSessionsTracker?.approvalToolUseId(
+                provider: event.provider,
+                sessionId: event.sessionId
+              ) else {
+            return event
+        }
+
+        let enriched = event.withResolvedPermissionToolUseId(resolvedToolUseId)
+        if enriched.toolUseId != event.toolUseId {
+            DiagnosticLogger.shared.info(
+                "Notch permission enriched session=\(event.sessionId) tool=\(event.toolName ?? "-") toolUseId=\(resolvedToolUseId)"
+            )
+        }
+        return enriched
+    }
+
+    private func clearResolvedPermissionRequests(for event: AttentionEvent) {
+        guard event.rawEventName == "PostToolUse"
+            || event.rawEventName == "PostToolUseFailure"
+            || event.rawEventName == "Stop"
+            || event.rawEventName == "StopFailure"
+            || event.rawEventName == "SessionEnd" else {
+            return
+        }
+
+        if let current = currentEvent, shouldClearPermission(current, becauseOf: event) {
+            DiagnosticLogger.shared.info(
+                "Notch stale permission cleared current session=\(current.sessionId) trigger=\(event.rawEventName) toolUseId=\(event.toolUseId ?? "-")"
+            )
+            removeDuplicateEvent(current.id, resolution: .ask)
+        }
+
+        let staleIDs = queue
+            .filter { shouldClearPermission($0, becauseOf: event) }
+            .map(\.id)
+        for id in staleIDs {
+            DiagnosticLogger.shared.info(
+                "Notch stale permission cleared queued trigger=\(event.rawEventName) toolUseId=\(event.toolUseId ?? "-")"
+            )
+            removeDuplicateEvent(id, resolution: .ask)
+        }
+    }
+
+    private func shouldClearPermission(_ candidate: AttentionEvent, becauseOf trigger: AttentionEvent) -> Bool {
+        guard case .permissionRequest(let permissionTool, _, let permissionToolUseId) = candidate.kind else {
+            return false
+        }
+        guard candidate.provider == trigger.provider,
+              candidate.sessionId == trigger.sessionId else {
+            return false
+        }
+
+        if trigger.rawEventName == "Stop" || trigger.rawEventName == "StopFailure" || trigger.rawEventName == "SessionEnd" {
+            return true
+        }
+
+        let triggerToolUseId = trigger.toolUseId?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedTriggerToolUseId = (triggerToolUseId?.isEmpty == false) ? triggerToolUseId : nil
+        if let normalizedTriggerToolUseId, !permissionToolUseId.isEmpty {
+            return permissionToolUseId == normalizedTriggerToolUseId
+        }
+
+        guard let triggerTool = trigger.toolName?.lowercased() else { return false }
+        return permissionTool.lowercased() == triggerTool
     }
 }
 

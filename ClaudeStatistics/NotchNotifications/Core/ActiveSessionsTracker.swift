@@ -27,9 +27,10 @@ final class ActiveSessionsTracker: ObservableObject {
     @Published private(set) var sessions: [ActiveSession] = []
     @Published private(set) var totalCount: Int = 0
 
-    // Active sessions should be driven by live hook traffic, not transcript mtimes.
-    // Keep a modest window so closed terminals fall out quickly when Claude doesn't
-    // emit SessionEnd (for example if the shell/window is closed abruptly).
+    // Grace window driven by live hook traffic. Within this window a session
+    // stays listed even if we can't prove the pid/tty are still alive. Past it,
+    // we fall back to a pid+terminal liveness check so idle sessions stay as
+    // long as the Claude Code process and terminal tab are still around.
     var activeWindow: TimeInterval = 300
 
     // Safety cap to avoid pathological growth. The idle peek can now expand
@@ -37,19 +38,20 @@ final class ActiveSessionsTracker: ObservableObject {
     // than the default 3-row preview.
     var maxItems: Int = 100
 
-    private let loader: () -> [ActiveSession]
     private var timer: Timer?
-    private var codexLivenessTask: Task<Void, Never>?
+    private var livenessTask: Task<Void, Never>?
     private var runtimeByKey: [String: RuntimeSession] = [:]
-    // Sessions evicted by same-tab displacement — blocks the loader (which
-    // scans rollout files and has no terminal identity) from reviving them
-    // back into the merged result for one activeWindow.
+    private var pendingPersistTask: DispatchWorkItem?
+    private static let persistQueue = DispatchQueue(label: "com.claude-statistics.runtime-persist", qos: .utility)
+    // Sessions evicted by same-tab displacement stay hidden for one activeWindow
+    // so stale persisted runtime cannot briefly reappear after a tab switches CLIs.
     private var displacedSessionIds: [String: Date] = [:]
 
-    init(loader: @escaping () -> [ActiveSession]) {
-        self.loader = loader
-        self.runtimeByKey = Self.loadPersistedRuntime()
-            .mapValues { Self.sanitized($0) }
+    init() {
+        self.runtimeByKey = Self.sanitizedGhosttyTerminalCollisions(
+            Self.loadPersistedRuntime()
+                .mapValues { Self.sanitized($0) }
+        )
     }
 
     func start(interval: TimeInterval = 15) {
@@ -58,26 +60,48 @@ final class ActiveSessionsTracker: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
         }
-        codexLivenessTask?.cancel()
-        codexLivenessTask = Task { [weak self] in
-            await self?.monitorCodexProcessLiveness()
+        livenessTask?.cancel()
+        livenessTask = Task { [weak self] in
+            await self?.monitorProcessLiveness()
         }
     }
 
     func stop() {
         timer?.invalidate()
         timer = nil
-        codexLivenessTask?.cancel()
-        codexLivenessTask = nil
+        livenessTask?.cancel()
+        livenessTask = nil
+        flushPersistRuntime()
     }
 
-    // Codex has no SessionEnd hook, so we poll pids directly. Claude relies on
-    // the SessionEnd event + normal refresh, no extra polling needed.
-    private func monitorCodexProcessLiveness() async {
+    // SessionEnd only fires on clean `/exit` or Ctrl+D. Closed tabs, Ctrl+C,
+    // crashes, Ctrl+Z, and Ctrl+Z-then-close all bypass it. Poll pids directly
+    // so any provider drops off within ~2s instead of waiting for the 15s
+    // refresh. Stopped (Ctrl+Z) processes are treated as gone — user typed
+    // Ctrl+Z intending to leave; if they `fg` back, SessionStart reappears.
+    private func monitorProcessLiveness() async {
         while !Task.isCancelled {
-            pruneDeadCodexSessions()
+            pruneInactiveSessions()
             try? await Task.sleep(nanoseconds: 2_000_000_000)
         }
+    }
+
+    private func pruneInactiveSessions() {
+        let now = Date()
+        let cutoff = now.addingTimeInterval(-activeWindow)
+        let filtered = Self.sanitizedGhosttyTerminalCollisions(
+            runtimeByKey
+                .filter { shouldKeep(runtime: $0.value, cutoff: cutoff, now: now) }
+                .mapValues { Self.sanitized($0) }
+        )
+
+        guard filtered.count != runtimeByKey.count || Set(filtered.keys) != Set(runtimeByKey.keys) else {
+            return
+        }
+
+        runtimeByKey = filtered
+        persistRuntime()
+        refresh()
     }
 
     /// Remove every runtime entry for the given provider. Called when the user
@@ -88,19 +112,6 @@ final class ActiveSessionsTracker: ObservableObject {
         }
         guard !keysToRemove.isEmpty else { return }
         for key in keysToRemove { runtimeByKey.removeValue(forKey: key) }
-        persistRuntime()
-        refresh()
-    }
-
-    private func pruneDeadCodexSessions() {
-        let deadKeys = runtimeByKey.compactMap { key, runtime -> String? in
-            guard runtime.provider == .codex,
-                  let pid = runtime.pid, pid > 0,
-                  !Self.isProcessAlive(pid) else { return nil }
-            return key
-        }
-        guard !deadKeys.isEmpty else { return }
-        for key in deadKeys { runtimeByKey.removeValue(forKey: key) }
         persistRuntime()
         refresh()
     }
@@ -172,13 +183,25 @@ final class ActiveSessionsTracker: ObservableObject {
             runtime.latestPreview = livePreview
             runtime.latestPreviewAt = event.receivedAt
         }
-        runtime.tty = event.tty?.nilIfEmpty ?? runtime.tty
+        let incomingTTY = event.tty?.nilIfEmpty
+        let incomingTerminalName = event.terminalName?.nilIfEmpty ?? runtime.terminalName
+        let shouldAcceptTerminalIdentity = shouldAcceptTerminalIdentity(
+            forKey: key,
+            terminalName: incomingTerminalName,
+            incomingTTY: incomingTTY,
+            incomingTabID: event.terminalTabID?.nilIfEmpty,
+            incomingStableID: event.terminalStableID?.nilIfEmpty
+        )
+
+        runtime.tty = incomingTTY ?? runtime.tty
         runtime.pid = event.pid ?? runtime.pid
-        runtime.terminalName = event.terminalName?.nilIfEmpty ?? runtime.terminalName
+        runtime.terminalName = incomingTerminalName
         runtime.terminalSocket = event.terminalSocket?.nilIfEmpty ?? runtime.terminalSocket
-        runtime.terminalWindowID = event.terminalWindowID?.nilIfEmpty ?? runtime.terminalWindowID
-        runtime.terminalTabID = event.terminalTabID?.nilIfEmpty ?? runtime.terminalTabID
-        runtime.terminalStableID = event.terminalStableID ?? runtime.terminalStableID
+        if shouldAcceptTerminalIdentity {
+            runtime.terminalWindowID = event.terminalWindowID?.nilIfEmpty ?? runtime.terminalWindowID
+            runtime.terminalTabID = event.terminalTabID?.nilIfEmpty ?? runtime.terminalTabID
+            runtime.terminalStableID = event.terminalStableID?.nilIfEmpty ?? runtime.terminalStableID
+        }
         runtime.lastActivityAt = max(runtime.lastActivityAt, event.receivedAt)
         runtimeByKey[key] = Self.sanitized(runtime)
         persistRuntime()
@@ -193,41 +216,13 @@ final class ActiveSessionsTracker: ObservableObject {
             schedulePostStopExitCheck(key: key, pid: pid)
         }
 
-        // For user-visible "please look at me" events, Claude Code's hook payload
-        // has no meaningful `message` (Stop is empty, Notification is a generic
-        // "is waiting for input"). The interesting content lives in the JSONL
-        // transcript. Kick off a quick async re-parse right now so the notch
-        // card doesn't have to wait 15 s for the next polling cycle to pick up
-        // the latest assistant reply.
-        if shouldRefreshPreview(for: event.kind, rawEventName: event.rawEventName),
-           let path = event.transcriptPath, !path.isEmpty {
-            let provider = event.provider
-            let sid = event.sessionId
-            let rawEventName = event.rawEventName
-            Task.detached(priority: .userInitiated) { [weak self] in
-                guard let preview = Self.extractFreshPreview(at: path) else { return }
-                await MainActor.run { [weak self] in
-                    self?.applyFreshPreview(preview, provider: provider, sessionId: sid)
-                }
-
-                switch rawEventName {
-                case "PostToolUse", "PostToolUseFailure", "SubagentStop", "PostCompact", "AfterModel":
-                    try? await Task.sleep(nanoseconds: 450_000_000)
-                    guard let delayedPreview = Self.extractFreshPreview(at: path) else { return }
-                    await MainActor.run { [weak self] in
-                        self?.applyFreshPreview(delayedPreview, provider: provider, sessionId: sid)
-                    }
-                default:
-                    break
-                }
-            }
-        }
     }
 
     private func displacePriorSessionsInSameTab(excludingKey newKey: String, event: AttentionEvent) {
         let tty = event.tty?.nilIfEmpty
         let tabID = event.terminalTabID?.nilIfEmpty
         let stableID = event.terminalStableID?.nilIfEmpty
+        let isGhostty = TerminalRegistry.bundleId(forTerminalName: event.terminalName) == "com.mitchellh.ghostty"
         // Need at least one terminal identity to match on, otherwise we'd evict
         // unrelated sessions across different tabs.
         guard tty != nil || tabID != nil || stableID != nil else { return }
@@ -235,8 +230,15 @@ final class ActiveSessionsTracker: ObservableObject {
         let staleEntries = runtimeByKey.compactMap { key, runtime -> (String, String)? in
             guard key != newKey else { return nil }
             if let tty, runtime.tty == tty { return (key, runtime.sessionId) }
-            if let tabID, runtime.terminalTabID == tabID { return (key, runtime.sessionId) }
-            if let stableID, runtime.terminalStableID == stableID { return (key, runtime.sessionId) }
+            if let stableID, runtime.terminalStableID == stableID {
+                if isGhostty, let eventTTY = tty, let runtimeTTY = runtime.tty, runtimeTTY != eventTTY {
+                    return nil
+                }
+                return (key, runtime.sessionId)
+            }
+            if !isGhostty, let tabID, runtime.terminalTabID == tabID {
+                return (key, runtime.sessionId)
+            }
             return nil
         }
         let now = Date()
@@ -244,6 +246,43 @@ final class ActiveSessionsTracker: ObservableObject {
             runtimeByKey.removeValue(forKey: key)
             displacedSessionIds[sessionId] = now
         }
+    }
+
+    private func shouldAcceptTerminalIdentity(
+        forKey key: String,
+        terminalName: String?,
+        incomingTTY: String?,
+        incomingTabID: String?,
+        incomingStableID: String?
+    ) -> Bool {
+        guard TerminalRegistry.bundleId(forTerminalName: terminalName) == "com.mitchellh.ghostty" else {
+            return true
+        }
+        guard incomingStableID != nil || incomingTabID != nil else { return true }
+        guard let incomingTTY else { return true }
+
+        for (otherKey, runtime) in runtimeByKey where otherKey != key {
+            guard let runtimeTTY = runtime.tty, runtimeTTY != incomingTTY else { continue }
+
+            if let incomingStableID,
+               runtime.terminalStableID == incomingStableID {
+                DiagnosticLogger.shared.warning(
+                    "Ignored Ghostty terminal id collision key=\(key) stableID=\(incomingStableID) incomingTTY=\(incomingTTY) existingTTY=\(runtimeTTY)"
+                )
+                return false
+            }
+
+            if incomingStableID == nil,
+               let incomingTabID,
+               runtime.terminalTabID == incomingTabID {
+                DiagnosticLogger.shared.warning(
+                    "Ignored Ghostty tab id collision key=\(key) tabID=\(incomingTabID) incomingTTY=\(incomingTTY) existingTTY=\(runtimeTTY)"
+                )
+                return false
+            }
+        }
+
+        return true
     }
 
     private func schedulePostStopExitCheck(key: String, pid: Int32) {
@@ -262,85 +301,21 @@ final class ActiveSessionsTracker: ObservableObject {
         }
     }
 
-    private func shouldRefreshPreview(for kind: AttentionKind, rawEventName: String) -> Bool {
-        switch kind {
-        case .permissionRequest:
-            return true
-        case .waitingInput, .taskDone, .taskFailed:
-            return true
-        case .activityPulse:
-            switch rawEventName {
-            case "PostToolUse", "PostToolUseFailure", "SubagentStop", "PostCompact", "AfterModel":
-                return true
-            default:
-                return false
-            }
-        default:
-            return false
-        }
-    }
-
-    private func applyFreshPreview(_ preview: String, provider: ProviderKind, sessionId: String) {
-        let key = Self.key(provider: provider, sessionId: sessionId)
-        guard var runtime = runtimeByKey[key] else { return }
-        let trimmed = preview.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, trimmed != runtime.latestPreview else { return }
-        runtime.latestPreview = trimmed
-        runtime.latestPreviewAt = Date()
-        runtimeByKey[key] = Self.sanitized(runtime)
-        persistRuntime()
-        refresh()
-    }
-
-    nonisolated private static func extractFreshPreview(at path: String) -> String? {
-        switch detectProvider(for: path) {
-        case .claude:
-            return TranscriptParser.shared.parseSessionQuick(at: path).lastOutputPreview
-        case .codex:
-            return CodexTranscriptParser.shared.parseSessionQuick(at: path).lastOutputPreview
-        case .gemini:
-            return GeminiTranscriptParser.shared.parseSessionQuick(at: path).lastOutputPreview
-        case .unknown:
-            return nil
-        }
-    }
-
-    private enum ProviderHint { case claude, codex, gemini, unknown }
-
-    nonisolated private static func detectProvider(for path: String) -> ProviderHint {
-        if path.contains("/.claude/") { return .claude }
-        if path.contains("/.codex/")  { return .codex }
-        if path.contains("/.gemini/") { return .gemini }
-        return .unknown
-    }
-
     func refresh() {
         let now = Date()
         let cutoff = now.addingTimeInterval(-activeWindow)
-        runtimeByKey = runtimeByKey
+        runtimeByKey = Self.sanitizedGhosttyTerminalCollisions(runtimeByKey
             .filter { shouldKeep(runtime: $0.value, cutoff: cutoff, now: now) }
-            .mapValues { Self.sanitized($0) }
+            .mapValues { Self.sanitized($0) })
         persistRuntime()
 
         displacedSessionIds = displacedSessionIds.filter { now.timeIntervalSince($0.value) < activeWindow }
 
-        let loaderSessions = loader()
-            .filter { !displacedSessionIds.keys.contains($0.sessionId) }
-            .filter { shouldKeep(session: $0, cutoff: cutoff, now: now) }
-        let loaderByKey = Dictionary(uniqueKeysWithValues: loaderSessions.map { ($0.focusKey, $0) })
-
         var merged: [String: ActiveSession] = [:]
-        for session in loaderSessions {
-            merged[session.focusKey] = session
-        }
-
         for runtime in runtimeByKey.values {
             let key = Self.key(provider: runtime.provider, sessionId: runtime.sessionId)
-            if let base = loaderByKey[key] {
-                merged[key] = base.merging(runtime)
-            } else {
-                merged[key] = runtime.activeSession
-            }
+            guard !displacedSessionIds.keys.contains(runtime.sessionId) else { continue }
+            merged[key] = runtime.activeSession
         }
 
         let fresh = Array(merged.values)
@@ -355,24 +330,12 @@ final class ActiveSessionsTracker: ObservableObject {
     }
 
     private func shouldKeep(runtime: RuntimeSession, cutoff: Date, now: Date) -> Bool {
-        shouldKeepSessionLike(
+        return shouldKeepSessionLike(
             provider: runtime.provider,
             lastActivityAt: runtime.lastActivityAt,
             pid: runtime.pid,
             tty: runtime.tty,
             terminalSocket: runtime.terminalSocket,
-            cutoff: cutoff,
-            now: now
-        )
-    }
-
-    private func shouldKeep(session: ActiveSession, cutoff: Date, now: Date) -> Bool {
-        shouldKeepSessionLike(
-            provider: session.provider,
-            lastActivityAt: session.lastActivityAt,
-            pid: session.pid,
-            tty: session.tty,
-            terminalSocket: session.terminalSocket,
             cutoff: cutoff,
             now: now
         )
@@ -387,8 +350,15 @@ final class ActiveSessionsTracker: ObservableObject {
         cutoff: Date,
         now: Date
     ) -> Bool {
-        if let pid, pid > 0, now.timeIntervalSince(lastActivityAt) > 10, !Self.isProcessAlive(pid) {
-            return false
+        if let pid, pid > 0 {
+            if now.timeIntervalSince(lastActivityAt) > 10, !Self.isProcessAlive(pid) {
+                return false
+            }
+            // Ctrl+Z suspends the CLI. The pid stays but the process is frozen —
+            // treat it as gone. `fg` will re-add it via SessionStart if needed.
+            if Self.isProcessStopped(pid) {
+                return false
+            }
         }
         if lastActivityAt > cutoff {
             return true
@@ -469,11 +439,34 @@ final class ActiveSessionsTracker: ObservableObject {
         return nil
     }
 
+    func approvalToolUseId(provider: ProviderKind, sessionId: String) -> String? {
+        let key = Self.key(provider: provider, sessionId: sessionId)
+        return runtimeByKey[key]?.approvalToolUseId?.nilIfEmpty
+            ?? runtimeByKey[key]?.currentToolUseId?.nilIfEmpty
+    }
+
     private static func key(provider: ProviderKind, sessionId: String) -> String {
         "\(provider.rawValue):\(sessionId)"
     }
 
     private func persistRuntime() {
+        // Debounce: hook events fire 5-10x per Claude turn and each one
+        // touched off a synchronous JSONEncoder + atomic file write on the
+        // MainActor, which made pointer/click interactions stutter during
+        // active sessions. Coalesce into one write every 400ms on a
+        // background queue.
+        let snapshot = runtimeByKey
+        pendingPersistTask?.cancel()
+        let task = DispatchWorkItem {
+            Self.persistRuntime(snapshot)
+        }
+        pendingPersistTask = task
+        Self.persistQueue.asyncAfter(deadline: .now() + 0.4, execute: task)
+    }
+
+    private func flushPersistRuntime() {
+        pendingPersistTask?.cancel()
+        pendingPersistTask = nil
         Self.persistRuntime(runtimeByKey)
     }
 
@@ -507,6 +500,42 @@ final class ActiveSessionsTracker: ObservableObject {
             copy.approvalToolUseId = nil
         }
         return copy
+    }
+
+    private static func sanitizedGhosttyTerminalCollisions(
+        _ runtimes: [String: RuntimeSession]
+    ) -> [String: RuntimeSession] {
+        var result = runtimes
+        let ghosttyEntries = runtimes.compactMap { key, runtime -> (key: String, runtime: RuntimeSession)? in
+            guard TerminalRegistry.bundleId(forTerminalName: runtime.terminalName) == "com.mitchellh.ghostty",
+                  runtime.terminalStableID?.nilIfEmpty != nil,
+                  runtime.tty?.nilIfEmpty != nil else {
+                return nil
+            }
+            return (key, runtime)
+        }
+
+        let grouped = Dictionary(grouping: ghosttyEntries) { $0.runtime.terminalStableID ?? "" }
+        for (stableID, entries) in grouped where entries.count > 1 {
+            let distinctTTYs = Set(entries.compactMap { $0.runtime.tty?.nilIfEmpty })
+            guard distinctTTYs.count > 1 else { continue }
+
+            let keepKey = entries
+                .max { $0.runtime.lastActivityAt < $1.runtime.lastActivityAt }?
+                .key
+            for entry in entries where entry.key != keepKey {
+                guard var runtime = result[entry.key] else { continue }
+                runtime.terminalWindowID = nil
+                runtime.terminalTabID = nil
+                runtime.terminalStableID = nil
+                result[entry.key] = runtime
+                DiagnosticLogger.shared.warning(
+                    "Cleared ambiguous Ghostty terminal id key=\(entry.key) stableID=\(stableID) tty=\(entry.runtime.tty ?? "-")"
+                )
+            }
+        }
+
+        return result
     }
 
     /// Update fields tracking what tool is currently active in this session
@@ -761,6 +790,17 @@ final class ActiveSessionsTracker: ObservableObject {
         return errno == EPERM
     }
 
+    // Detect Ctrl+Z-suspended processes via libproc. SSTOP=4 comes from
+    // <sys/proc.h>; PROC_PIDT_SHORTBSDINFO=13 from <sys/proc_info.h>.
+    // Returns false on any lookup failure (don't evict on unknown state).
+    private static func isProcessStopped(_ pid: Int32) -> Bool {
+        var info = proc_bsdshortinfo()
+        let size = Int32(MemoryLayout<proc_bsdshortinfo>.stride)
+        let bytes = proc_pidinfo(pid, 13, 0, &info, size)
+        guard bytes > 0 else { return false }
+        return info.pbsi_status == 4
+    }
+
     private static func isTerminalContextAlive(tty: String?, terminalSocket: String?) -> Bool {
         let fileManager = FileManager.default
         if let tty, !tty.isEmpty {
@@ -855,84 +895,6 @@ private struct RuntimeSession: Codable {
             backgroundShellCount: backgroundShellCount,
             activeSubagentCount: activeSubagentCount
         )
-    }
-}
-
-private extension ActiveSession {
-    func merging(_ runtime: RuntimeSession?) -> ActiveSession {
-        guard let runtime else { return self }
-        let mergedPrompt = Self.newestText(
-            runtimeText: runtime.latestPrompt,
-            runtimeAt: runtime.latestPromptAt,
-            baseText: latestPrompt,
-            baseAt: latestPromptAt
-        )
-        let mergedPreview = Self.newestText(
-            runtimeText: runtime.latestPreview,
-            runtimeAt: runtime.latestPreviewAt,
-            baseText: latestPreview,
-            baseAt: latestPreviewAt
-        )
-        let mergedToolOutput = Self.newestText(
-            runtimeText: runtime.latestToolOutput,
-            runtimeAt: runtime.latestToolOutputAt,
-            baseText: latestToolOutput,
-            baseAt: latestToolOutputAt
-        )
-
-        return ActiveSession(
-            id: id,
-            sessionId: sessionId,
-            provider: provider,
-            projectName: projectName,
-            projectPath: projectPath ?? runtime.projectPath,
-            currentActivity: runtime.currentActivity ?? currentActivity,
-            latestPrompt: mergedPrompt.text,
-            latestPromptAt: mergedPrompt.at,
-            latestPreview: mergedPreview.text,
-            latestPreviewAt: mergedPreview.at,
-            lastActivityAt: max(lastActivityAt, runtime.lastActivityAt),
-            tty: runtime.tty ?? tty,
-            pid: runtime.pid ?? pid,
-            terminalName: runtime.terminalName ?? terminalName,
-            terminalSocket: runtime.terminalSocket ?? terminalSocket,
-            terminalWindowID: runtime.terminalWindowID ?? terminalWindowID,
-            terminalTabID: runtime.terminalTabID ?? terminalTabID,
-            terminalStableID: runtime.terminalStableID ?? terminalStableID,
-            status: runtime.status,
-            latestToolOutput: mergedToolOutput.text,
-            latestToolOutputAt: mergedToolOutput.at,
-            latestToolOutputTool: runtime.latestToolOutputTool ?? latestToolOutputTool,
-            currentToolName: runtime.currentToolName ?? currentToolName,
-            currentToolDetail: runtime.currentToolDetail ?? currentToolDetail,
-            currentToolStartedAt: runtime.currentToolStartedAt ?? currentToolStartedAt,
-            approvalToolName: runtime.approvalToolName ?? approvalToolName,
-            approvalToolDetail: runtime.approvalToolDetail ?? approvalToolDetail,
-            approvalStartedAt: runtime.approvalStartedAt ?? approvalStartedAt,
-            approvalToolUseId: runtime.approvalToolUseId ?? approvalToolUseId,
-            backgroundShellCount: max(runtime.backgroundShellCount, backgroundShellCount),
-            activeSubagentCount: max(runtime.activeSubagentCount, activeSubagentCount)
-        )
-    }
-
-    private static func newestText(
-        runtimeText: String?,
-        runtimeAt: Date?,
-        baseText: String?,
-        baseAt: Date?
-    ) -> (text: String?, at: Date?) {
-        guard runtimeText != nil || baseText != nil else { return (nil, nil) }
-
-        switch (runtimeAt, baseAt) {
-        case let (r?, b?) where b > r:
-            return (baseText ?? runtimeText, b)
-        case let (r?, _):
-            return (runtimeText ?? baseText, r)
-        case (nil, let b?):
-            return (baseText ?? runtimeText, b)
-        case (nil, nil):
-            return (runtimeText ?? baseText, nil)
-        }
     }
 }
 

@@ -8,6 +8,10 @@ bash scripts/run-debug.sh
 
 This script handles everything: kills old instances, cleans stale DerivedData builds, builds debug, re-registers with Launch Services, and launches by full path.
 
+It also tries to provision a local self-signed code-signing identity named
+`Claude Statistics Debug Code Signing` via `scripts/ensure-debug-codesign.sh`
+when missing, so the Debug app can keep a stable TCC identity across rebuilds.
+
 **IMPORTANT:** Always use this script to build and run. Do NOT use `open -a` or build to default DerivedData — multiple registered `.app` bundles with the same bundle ID cause Launch Services conflicts and the app won't appear in the menu bar.
 
 **IMPORTANT:** Only use `/tmp/claude-stats-build` as the derivedDataPath for debug builds. Never use the default Xcode DerivedData path. If conflicts occur, clean up with:

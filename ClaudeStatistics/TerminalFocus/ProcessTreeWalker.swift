@@ -90,7 +90,7 @@ enum ProcessTreeWalker {
             chain.compactMap { info in
                 let pid = pid_t(info.pid)
                 guard let bundleId = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier,
-                      TerminalAppRegistry.isTerminalLikeBundle(bundleId) else {
+                      TerminalRegistry.isTerminalLikeBundle(bundleId) else {
                     return nil
                 }
                 return (pid, bundleId)
@@ -108,7 +108,7 @@ enum ProcessTreeWalker {
         let bundledCandidates: [(pid: pid_t, bundleId: String)] = chain.compactMap { info in
             let pid = pid_t(info.pid)
             guard let bundleId = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier,
-                  TerminalAppRegistry.isTerminalLikeBundle(bundleId) else {
+                  TerminalRegistry.isTerminalLikeBundle(bundleId) else {
                 return nil
             }
             return (pid, bundleId)
@@ -130,8 +130,8 @@ enum ProcessTreeWalker {
 
     private static func bestNameFallback(in chain: [ProcessInfo]) -> TerminalProcess? {
         for info in chain.reversed() {
-            if let inferredBundleId = TerminalAppRegistry.bundleId(forProcessName: info.command),
-               TerminalAppRegistry.isTerminalLikeBundle(inferredBundleId) {
+            if let inferredBundleId = TerminalRegistry.bundleId(forProcessName: info.command),
+               TerminalRegistry.isTerminalLikeBundle(inferredBundleId) {
                 return TerminalProcess(pid: pid_t(info.pid), bundleId: inferredBundleId)
             }
         }
@@ -187,15 +187,28 @@ struct TerminalProcessRunResult {
 }
 
 enum TerminalProcessRunner {
-    static func run(executable: String, arguments: [String]) -> TerminalProcessRunResult? {
+    static func run(
+        executable: String,
+        arguments: [String],
+        environment: [String: String]? = nil,
+        timeout: TimeInterval = 2.0
+    ) -> TerminalProcessRunResult? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
+        if let environment {
+            process.environment = Foundation.ProcessInfo.processInfo.environment.merging(environment) { _, new in new }
+        }
 
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
+
+        let termination = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in
+            termination.signal()
+        }
 
         do {
             try process.run()
@@ -226,7 +239,19 @@ enum TerminalProcessRunner {
             group.leave()
         }
 
-        process.waitUntilExit()
+        if termination.wait(timeout: .now() + timeout) == .timedOut {
+            DiagnosticLogger.shared.warning(
+                "Terminal process timed out executable=\(executable) args=\(arguments.joined(separator: " ")) timeout=\(timeout)"
+            )
+            process.terminate()
+            if termination.wait(timeout: .now() + 0.5) == .timedOut {
+                kill(process.processIdentifier, SIGKILL)
+                _ = termination.wait(timeout: .now() + 0.5)
+            }
+            _ = group.wait(timeout: .now() + 0.5)
+            return nil
+        }
+
         group.wait()
 
         return TerminalProcessRunResult(

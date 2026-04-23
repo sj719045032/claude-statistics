@@ -4,7 +4,7 @@ struct GeminiHookInstaller: HookInstalling {
     let provider: ProviderKind = .gemini
 
     private static let scriptName = "claude-stats-gemini-hook"
-    private static let managedMarker = "claude-stats-gemini-hook.py"
+    private static let managedMarkers = ["claude-stats-gemini-hook.py", "--claude-stats-hook-provider"]
 
     private let supportedHookEvents = [
         "BeforeAgent",
@@ -37,11 +37,10 @@ struct GeminiHookInstaller: HookInstalling {
     }
 
     private var commandPath: String {
-        scriptPath
+        HookInstallerUtils.currentHookCommand(provider: provider)
     }
 
     var isInstalled: Bool {
-        guard FileManager.default.fileExists(atPath: scriptPath) else { return false }
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: settingsPath)),
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let hooks = root["hooks"] as? [String: Any] else {
@@ -62,10 +61,6 @@ struct GeminiHookInstaller: HookInstalling {
     }
 
     func install() async throws -> HookInstallResult {
-        guard HookInstallerUtils.python3Available() else {
-            return .python3Missing
-        }
-
         let snapshots = [
             FileSnapshot.capture(at: settingsPath),
             FileSnapshot.capture(at: scriptPath),
@@ -90,7 +85,7 @@ struct GeminiHookInstaller: HookInstalling {
 
             root["hooks"] = hooks
             try writeSettingsJSON(root)
-            try HookInstallerUtils.installScript(bundleResourceName: Self.scriptName, destinationDir: hooksDir)
+            HookInstallerUtils.removeScript(at: scriptPath)
         } catch {
             for snapshot in snapshots {
                 try? snapshot.restore()
@@ -180,6 +175,6 @@ struct GeminiHookInstaller: HookInstalling {
     }
 
     private static func isManagedCommand(_ command: String) -> Bool {
-        command.contains(managedMarker)
+        managedMarkers.contains { command.contains($0) }
     }
 }

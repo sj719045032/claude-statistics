@@ -111,7 +111,12 @@ struct WaitingInputCard: View {
                         )
                 }
                 .frame(height: min(max(previewInnerHeight, 0), maxPreviewScroll))
-                .onPreferenceChange(NotchPreviewContentHeightKey.self) { previewInnerHeight = $0 }
+                .onPreferenceChange(NotchPreviewContentHeightKey.self) { h in
+                    previewInnerHeight = h
+                    DiagnosticLogger.shared.verbose(
+                        "Card preview measure kind=\(event.rawEventName) previewLen=\(previewLine?.count ?? 0) innerH=\(Int(h)) cap=\(Int(maxPreviewScroll))"
+                    )
+                }
             }
         } bottomLeading: {
             if let autoDismissCountdownText {

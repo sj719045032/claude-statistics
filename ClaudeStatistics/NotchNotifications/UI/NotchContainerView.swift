@@ -564,7 +564,13 @@ struct NotchContainerView: View {
     }
 
     private func expandedContentBottomPadding(event: AttentionEvent?) -> CGFloat {
-        event == nil ? 4 : 14
+        if event != nil {
+            return 14
+        }
+        // Match horizontal padding (18) when there's no toggle so short lists
+        // (1-3 rows) look balanced. With toggle, the toggle row carries its
+        // own spacing so the outer padding can stay tight.
+        return idlePeekShowsToggle ? 4 : 18
     }
 
     private func collapsedRevealHeight(hasNotch: Bool) -> CGFloat {
@@ -629,8 +635,8 @@ struct NotchContainerView: View {
             return
         }
         lastReportedInteractiveSize = normalized
-        DiagnosticLogger.shared.info(
-            "Island report size w=\(Int(normalized.width)) h=\(Int(normalized.height)) event=\(event?.rawEventName ?? "nil") expanded=\(expanded) override=\(expandedOverride.map(String.init(describing:)) ?? "nil") hovering=\(effectiveHovering) state=\(String(describing: machine.state))"
+        DiagnosticLogger.shared.verbose(
+            "Island report size w=\(Int(normalized.width)) h=\(Int(normalized.height)) event=\(event?.rawEventName ?? "nil") expanded=\(expanded) override=\(expandedOverride.map(String.init(describing:)) ?? "nil") hovering=\(self.effectiveHovering) state=\(String(describing: self.machine.state))"
         )
 
         let callback = onInteractiveSizeChange
@@ -643,8 +649,12 @@ struct NotchContainerView: View {
 
     private func handleCardIntrinsicHeightChange(_ height: CGFloat) {
         guard height > 0, abs(height - measuredCardHeight) > 0.5 else { return }
+        let previous = measuredCardHeight
         measuredCardHeight = height
         lastCardHeightChangeAt = Date()
+        DiagnosticLogger.shared.verbose(
+            "Card intrinsic h=\(Int(height)) prev=\(Int(previous)) event=\(self.notchCenter.currentEvent?.rawEventName ?? "nil") hovering=\(self.effectiveHovering) state=\(String(describing: self.machine.state))"
+        )
         reportInteractiveSize()
     }
 
@@ -783,8 +793,8 @@ struct NotchContainerView: View {
     }
 
     private func setNotchHovering(_ hovering: Bool) {
-        DiagnosticLogger.shared.info(
-            "Island notch hover=\(hovering) suppressed=\(hoverReentrySuppressed) event=\(notchCenter.currentEvent?.rawEventName ?? "nil") state=\(String(describing: machine.state))"
+        DiagnosticLogger.shared.verbose(
+            "Island notch hover=\(hovering) suppressed=\(self.hoverReentrySuppressed) event=\(self.notchCenter.currentEvent?.rawEventName ?? "nil") state=\(String(describing: self.machine.state))"
         )
         if hovering {
             guard !isIdleCloseCommitted else { return }
@@ -814,8 +824,8 @@ struct NotchContainerView: View {
 
     private func setIslandHovering(_ hovering: Bool) {
         guard hoveringIsland != hovering else { return }
-        DiagnosticLogger.shared.info(
-            "Island body hover=\(hovering) suppressed=\(hoverReentrySuppressed) event=\(notchCenter.currentEvent?.rawEventName ?? "nil") state=\(String(describing: machine.state))"
+        DiagnosticLogger.shared.verbose(
+            "Island body hover=\(hovering) suppressed=\(self.hoverReentrySuppressed) event=\(self.notchCenter.currentEvent?.rawEventName ?? "nil") state=\(String(describing: self.machine.state))"
         )
         if hovering {
             guard !isIdleCloseCommitted else { return }

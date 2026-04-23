@@ -12,15 +12,22 @@ struct SettingsView: View {
     let provider: any SessionProvider
     @AppStorage("autoRefreshEnabled") private var autoRefreshEnabled = true
     @AppStorage("refreshInterval") private var refreshInterval = 300.0
-    @AppStorage("preferredTerminal") private var preferredTerminal = "Auto"
+    @AppStorage(TerminalPreferences.preferredTerminalKey) private var preferredTerminal = TerminalPreferences.autoOptionID
     @AppStorage("preferredEditor") private var preferredEditor = "VSCode"
     @AppStorage("appLanguage") private var appLanguage = "auto"
     @AppStorage("fontScale") private var fontScale = 1.0
     @AppStorage("customInterval") private var customInterval = false
+    @AppStorage("diagnostic.verbose.enabled") private var verboseLogging = false
+    // Developer tools unlocked by tapping the app name 7 times in the About
+    // section. Ephemeral (@State) — each app restart re-locks so the
+    // verbose-logging toggle can't get forgotten in the "on" state silently.
+    @State private var developerTapCount: Int = 0
+    @State private var showDeveloperTools: Bool = false
     @State private var customMinutes = ""
     @State private var showPricing = false
     @State private var showNotchSettings = false
     @State private var showKeyboardShortcuts = false
+    @State private var showTerminalFocusSettings = false
     @State private var hasToken: Bool?
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var isTabOrderExpanded = false
@@ -35,6 +42,11 @@ struct SettingsView: View {
                 NotchNotificationsDetailView(provider: provider.kind, onBack: { showNotchSettings = false })
             } else if showKeyboardShortcuts {
                 KeyboardShortcutsSettingsView(onBack: { showKeyboardShortcuts = false })
+            } else if showTerminalFocusSettings {
+                TerminalFocusSettingsView(
+                    preferredOptionID: preferredTerminal,
+                    onBack: { showTerminalFocusSettings = false }
+                )
             } else {
                 settingsContent
             }
@@ -75,6 +87,7 @@ struct SettingsView: View {
             }
 
             generalSection
+            terminalSection
 
             // About + Diagnostics
             Section("settings.about") {
@@ -82,6 +95,17 @@ struct SettingsView: View {
                     SettingsRowIcon(name: "info.circle")
                     Text("app.name")
                         .font(.system(size: 12, weight: .medium))
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            // 7 taps on the app name unlocks the developer
+                            // toggles below (verbose logging, etc.). Ephemeral
+                            // state — relocks on next launch.
+                            developerTapCount += 1
+                            if developerTapCount >= 7 {
+                                showDeveloperTools = true
+                                NSSound.beep()
+                            }
+                        }
                     Spacer()
                     Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "–")
                         .font(.system(size: 12))
@@ -172,6 +196,13 @@ struct SettingsView: View {
                     }
                 }
                 .buttonStyle(.plain)
+
+                if showDeveloperTools {
+                    Toggle(isOn: $verboseLogging) {
+                        Label("settings.verboseLogging", systemImage: "text.magnifyingglass")
+                            .labelStyle(SettingsRowLabelStyle())
+                    }
+                }
             }
         }
         .formStyle(.grouped)
@@ -341,40 +372,6 @@ struct SettingsView: View {
         Section("settings.general") {
             if provider.kind == .claude {
                 ClaudeAccountSourcePickerRow()
-            }
-
-            Picker(selection: $preferredTerminal) {
-                ForEach(TerminalApp.allCases) { app in
-                    if app != .auto && !app.isInstalled {
-                        Text("settings.notFound \(app.rawValue)")
-                            .tag(app.rawValue)
-                    } else {
-                        Text(app.rawValue)
-                            .tag(app.rawValue)
-                    }
-                }
-            } label: {
-                Label("settings.resumeIn", systemImage: "terminal")
-                    .labelStyle(SettingsRowLabelStyle())
-            }
-            .pickerStyle(.menu)
-
-            if preferredTerminal == "Editor" {
-                Picker(selection: $preferredEditor) {
-                    ForEach(EditorApp.allCases) { app in
-                        if !app.isInstalled {
-                            Text("settings.notFound \(app.rawValue)")
-                                .tag(app.rawValue)
-                        } else {
-                            Text(app.rawValue)
-                                .tag(app.rawValue)
-                        }
-                    }
-                } label: {
-                    Label("settings.chooseEditor", systemImage: "doc.text")
-                        .labelStyle(SettingsRowLabelStyle())
-                }
-                .pickerStyle(.menu)
             }
 
             Toggle(isOn: $launchAtLogin) {
@@ -564,6 +561,66 @@ struct SettingsView: View {
         }
     }
 
+    @ViewBuilder
+    private var terminalSection: some View {
+        Section("settings.terminal") {
+            Picker(selection: $preferredTerminal) {
+                ForEach(TerminalRegistry.readinessOptions) { option in
+                    if option.id != TerminalPreferences.autoOptionID && !option.isInstalled {
+                        Text("settings.notFound \(option.title)")
+                            .tag(option.id)
+                    } else {
+                        Text(option.title)
+                            .tag(option.id)
+                    }
+                }
+            } label: {
+                Label("settings.defaultTerminal", systemImage: "terminal")
+                    .labelStyle(SettingsRowLabelStyle())
+            }
+            .pickerStyle(.menu)
+            .onChange(of: preferredTerminal) { _, _ in
+                TerminalSetupCoordinator.shared.refreshBanner()
+            }
+
+            Button(action: { showTerminalFocusSettings = true }) {
+                HStack {
+                    Label("settings.terminalFocus", systemImage: "scope")
+                        .labelStyle(SettingsRowLabelStyle())
+                    Spacer()
+                    Text(selectedTerminalBadgeTitle)
+                        .font(.system(size: 12))
+                        .foregroundStyle(selectedTerminalBadgeColor)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .buttonStyle(.plain)
+
+            if TerminalPreferences.isEditorPreferred(rawValue: preferredTerminal) {
+                Picker(selection: $preferredEditor) {
+                    ForEach(EditorApp.allCases) { app in
+                        if !app.isInstalled {
+                            Text("settings.notFound \(app.rawValue)")
+                                .tag(app.rawValue)
+                        } else {
+                            Text(app.rawValue)
+                                .tag(app.rawValue)
+                        }
+                    }
+                } label: {
+                    Label("settings.chooseEditor", systemImage: "doc.text")
+                        .labelStyle(SettingsRowLabelStyle())
+                }
+                .pickerStyle(.menu)
+                .onChange(of: preferredEditor) { _, _ in
+                    TerminalSetupCoordinator.shared.refreshBanner()
+                }
+            }
+        }
+    }
+
     private var refreshIntervalSummary: String {
         let minutes = Int(refreshInterval / 60)
         return "\(minutes) min"
@@ -620,6 +677,39 @@ struct SettingsView: View {
         refreshInterval = Double(minutes * 60)
         usageViewModel.autoRefreshInterval = refreshInterval
         usageViewModel.startAutoRefresh()
+    }
+
+    private var selectedTerminalBadgeTitle: String {
+        switch currentTerminalReadiness?.state {
+        case .ready:
+            return "Ready"
+        case .needsSetup:
+            return "Set Up"
+        case .notInstalled:
+            return "Unavailable"
+        case .none:
+            return "Check"
+        }
+    }
+
+    private var selectedTerminalBadgeColor: Color {
+        switch currentTerminalReadiness?.state {
+        case .ready:
+            return .green
+        case .needsSetup:
+            return .orange
+        case .notInstalled:
+            return .secondary
+        case .none:
+            return .secondary
+        }
+    }
+
+    private var currentTerminalReadiness: TerminalReadiness? {
+        if preferredTerminal == TerminalPreferences.autoOptionID {
+            return TerminalRegistry.preferredReadiness(preferredOptionID: preferredTerminal)
+        }
+        return TerminalRegistry.readiness(forOptionID: preferredTerminal)
     }
 
 }
@@ -823,6 +913,250 @@ private struct KeyboardShortcutsSettingsView: View {
             }
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
+        }
+    }
+}
+
+private struct TerminalFocusSettingsView: View {
+    let preferredOptionID: String
+    let onBack: () -> Void
+    @State private var terminalReadiness = TerminalReadiness(
+        installation: .notInstalled,
+        unmetRequirements: [.appInstalled],
+        actions: []
+    )
+    @State private var setupMessage: String?
+
+    private var setupProvider: (any TerminalCapability & TerminalSetupProviding)? {
+        TerminalRegistry.effectiveSetupProvider(for: preferredOptionID)
+    }
+
+    private var effectiveCapability: (any TerminalCapability)? {
+        TerminalRegistry.effectiveCapability(for: preferredOptionID)
+    }
+
+    private var requestedDisplayName: String {
+        if preferredOptionID == TerminalPreferences.autoOptionID {
+            return "Auto"
+        }
+        return TerminalPreferences.option(for: preferredOptionID)?.title ?? preferredOptionID
+    }
+
+    private var effectiveDisplayName: String {
+        TerminalRegistry.effectiveDisplayName(for: preferredOptionID)
+    }
+
+    private var titleText: String {
+        preferredOptionID == TerminalPreferences.autoOptionID ? "Terminal Focus" : effectiveDisplayName
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Button(action: onBack) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chevron.left")
+                        Text("settings.back")
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Text(titleText)
+                    .font(.system(size: 13, weight: .semibold))
+
+                Spacer().frame(width: 60)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            Form {
+                Section(preferredOptionID == TerminalPreferences.autoOptionID ? "Current Terminal" : effectiveDisplayName) {
+                    HStack(alignment: .top, spacing: 10) {
+                        SettingsRowIcon(name: terminalReadiness.isReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .foregroundStyle(terminalReadiness.isReady ? Color.green : Color.orange)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(terminalReadiness.summary)
+                                .font(.system(size: 12, weight: .medium))
+                            Text(selectionSummary)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                            if let detail = setupProvider?.setupConfigURL?.path {
+                                Text(detail)
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                            if let setupMessage {
+                                Text(setupMessage)
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                    }
+
+                    if !terminalReadiness.unmetRequirements.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(terminalReadiness.unmetRequirements) { requirement in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Image(systemName: "minus")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundStyle(.secondary)
+                                        .padding(.top, 4)
+                                    Text(requirement.title)
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+
+                    HStack(spacing: 8) {
+                        ForEach(primaryActions) { action in
+                            if action.kind == .runAutomaticFix {
+                                Button(action.title) {
+                                    run(action)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            } else {
+                                Button(action.title) {
+                                    run(action)
+                                }
+                                .buttonStyle(.plain)
+                                .controlSize(.small)
+                            }
+                        }
+
+                        Button("Refresh") {
+                            refreshStatus()
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11))
+
+                        Spacer()
+                    }
+                }
+
+                Section("Behavior") {
+                    if supportsPreciseFocus {
+                        FocusBehaviorRow(
+                            iconName: "scope",
+                            title: "Precise focus",
+                            detail: preciseFocusDetail
+                        )
+                    }
+                    FocusBehaviorRow(
+                        iconName: "arrow.uturn.right",
+                        title: "Fallback",
+                        detail: fallbackDetail
+                    )
+                    if let provider = setupProvider {
+                        FocusBehaviorRow(
+                            iconName: "slider.horizontal.3",
+                            title: provider.setupTitle,
+                            detail: provider.setupStatus().summary
+                        )
+                    }
+                }
+            }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+        }
+        .onAppear(perform: refreshStatus)
+    }
+
+    private var selectionSummary: String {
+        if preferredOptionID == TerminalPreferences.autoOptionID {
+            return "Auto currently uses \(effectiveDisplayName)."
+        }
+        return "Selected in Settings: \(requestedDisplayName)."
+    }
+
+    private var primaryActions: [TerminalSetupAction] {
+        let actions = terminalReadiness.actions
+        let filtered = actions.filter { action in
+            action.kind == .runAutomaticFix
+                || action.kind == .openConfigFile
+                || action.kind == .openApp
+        }
+        return filtered.isEmpty ? actions : filtered
+    }
+
+    private var supportsPreciseFocus: Bool {
+        effectiveCapability is any TerminalDirectFocusing
+    }
+
+    private var preciseFocusDetail: String {
+        switch effectiveCapability?.route {
+        case .cli(.kitty):
+            return "Uses Kitty remote control and terminal-native IDs when available."
+        case .cli(.wezterm):
+            return "Uses WezTerm CLI pane activation when terminal identifiers are available."
+        case .appleScript:
+            return "Uses AppleScript with terminal-native IDs and session locators when available."
+        case .accessibility:
+            return "Uses Accessibility APIs to reach the matching terminal instance."
+        case .activate, .none:
+            return "Precise focus is not available for this selection."
+        }
+    }
+
+    private var fallbackDetail: String {
+        switch effectiveCapability?.route {
+        case .cli, .appleScript, .accessibility:
+            return "When precise focus misses, the app activates the terminal instead of failing silently."
+        case .activate:
+            return "This selection activates the app or editor window, but cannot jump to a specific tab."
+        case .none:
+            return "This selection is not ready yet."
+        }
+    }
+
+    private func run(_ action: TerminalSetupAction) {
+        do {
+            let outcome = try action.perform()
+            setupMessage = outcome.message
+        } catch {
+            setupMessage = "Failed to complete Kitty setup: \(error.localizedDescription)"
+        }
+        refreshStatus()
+        TerminalSetupCoordinator.shared.refreshAfterSetupAction()
+    }
+
+    private func refreshStatus() {
+        if preferredOptionID == TerminalPreferences.autoOptionID {
+            terminalReadiness = TerminalRegistry.preferredReadiness(preferredOptionID: preferredOptionID)
+                ?? TerminalReadiness(installation: .notInstalled, unmetRequirements: [.appInstalled], actions: [])
+        } else {
+            terminalReadiness = TerminalRegistry.readiness(forOptionID: preferredOptionID)
+                ?? TerminalReadiness(installation: .notInstalled, unmetRequirements: [.appInstalled], actions: [])
+        }
+        TerminalSetupCoordinator.shared.refreshBanner()
+    }
+}
+
+private struct FocusBehaviorRow: View {
+    let iconName: String
+    let title: String
+    let detail: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            SettingsRowIcon(name: iconName)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 12, weight: .medium))
+                Text(detail)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
         }
     }
 }
@@ -1649,17 +1983,12 @@ struct NotchNotificationsSection: View {
     let provider: ProviderKind
     let onOpenDetail: () -> Void
 
-    @AppStorage(NotchPreferences.claudeKey) private var claudeEnabled: Bool = true
-    @AppStorage(NotchPreferences.codexKey)  private var codexEnabled:  Bool = true
-    @AppStorage(NotchPreferences.geminiKey) private var geminiEnabled: Bool = true
+    @State private var preferencesRevision = 0
     @State private var isHovered = false
 
     private var isEnabled: Bool {
-        switch provider {
-        case .claude: return claudeEnabled
-        case .codex:  return codexEnabled
-        case .gemini: return geminiEnabled
-        }
+        let _ = preferencesRevision
+        return NotchPreferences.isEnabled(provider)
     }
 
     private var available: Bool {
@@ -1670,12 +1999,8 @@ struct NotchNotificationsSection: View {
         Binding(
             get: { isEnabled },
             set: { newValue in
-                switch provider {
-                case .claude: claudeEnabled = newValue
-                case .codex:  codexEnabled  = newValue
-                case .gemini: geminiEnabled = newValue
-                }
                 NotchPreferences.setEnabled(newValue, for: provider)
+                preferencesRevision += 1
             }
         )
     }
@@ -1743,44 +2068,37 @@ private struct NotchNotificationsDetailView: View {
     let provider: ProviderKind
     let onBack: () -> Void
 
-    @AppStorage(NotchPreferences.claudeKey) private var claudeEnabled: Bool = true
-    @AppStorage(NotchPreferences.codexKey)  private var codexEnabled:  Bool = true
-    @AppStorage(NotchPreferences.geminiKey) private var geminiEnabled: Bool = true
     @AppStorage("notch.sound.enabled") private var soundEnabled: Bool = true
-    @AppStorage(NotchEventKind.permission.defaultsKey)   private var permissionEnabled: Bool = true
-    @AppStorage(NotchEventKind.waitingInput.defaultsKey) private var waitingInputEnabled: Bool = true
-    @AppStorage(NotchEventKind.taskDone.defaultsKey)     private var taskDoneEnabled: Bool = true
-    @AppStorage(NotchEventKind.taskFailed.defaultsKey)   private var taskFailedEnabled: Bool = true
+    @AppStorage("notch.focusSilence.enabled") private var focusSilenceEnabled: Bool = true
+    @State private var preferencesRevision = 0
 
     private var isProviderEnabled: Bool {
-        switch provider {
-        case .claude: return claudeEnabled
-        case .codex:  return codexEnabled
-        case .gemini: return geminiEnabled
-        }
+        let _ = preferencesRevision
+        return NotchPreferences.isEnabled(provider)
     }
 
     private var masterBinding: Binding<Bool> {
         Binding(
             get: { isProviderEnabled },
             set: { newValue in
-                switch provider {
-                case .claude: claudeEnabled = newValue
-                case .codex:  codexEnabled  = newValue
-                case .gemini: geminiEnabled = newValue
-                }
                 NotchPreferences.setEnabled(newValue, for: provider)
+                preferencesRevision += 1
             }
         )
     }
 
     private func eventBinding(for kind: NotchEventKind) -> Binding<Bool> {
-        switch kind {
-        case .permission:   return $permissionEnabled
-        case .waitingInput: return $waitingInputEnabled
-        case .taskDone:     return $taskDoneEnabled
-        case .taskFailed:   return $taskFailedEnabled
-        }
+        Binding(
+            get: {
+                let _ = preferencesRevision
+                let defaults = UserDefaults.standard
+                return defaults.object(forKey: kind.defaultsKey) == nil || defaults.bool(forKey: kind.defaultsKey)
+            },
+            set: { newValue in
+                UserDefaults.standard.set(newValue, forKey: kind.defaultsKey)
+                preferencesRevision += 1
+            }
+        )
     }
 
     var body: some View {
@@ -1825,6 +2143,20 @@ private struct NotchNotificationsDetailView: View {
                     }
                     .disabled(!isProviderEnabled)
 
+                    HStack(spacing: 10) {
+                        SettingsRowIcon(name: "eye.slash")
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("notch.settings.focusSilence")
+                                .font(.system(size: 12, weight: .medium))
+                            Text("notch.settings.focusSilence.hint")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Toggle("", isOn: $focusSilenceEnabled).labelsHidden()
+                    }
+                    .disabled(!isProviderEnabled)
+
                     if isProviderEnabled {
                         NotchScreenPickerRow()
                     }
@@ -1849,11 +2181,7 @@ private struct NotchNotificationsDetailView: View {
     }
 
     private var providerTitle: String {
-        switch provider {
-        case .claude: return LanguageManager.localizedString("notch.settings.provider.claude")
-        case .codex:  return LanguageManager.localizedString("notch.settings.provider.codex")
-        case .gemini: return LanguageManager.localizedString("notch.settings.provider.gemini")
-        }
+        ProviderRegistry.provider(for: provider).displayName
     }
 
     private func eventToggleRow(icon: String, titleKey: String, binding: Binding<Bool>) -> some View {

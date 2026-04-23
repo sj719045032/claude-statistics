@@ -2,6 +2,12 @@ import Foundation
 
 enum ToolActivityFormatter {
     static func operationSummary(tool: String, input: [String: JSONValue]) -> String? {
+        if tool.lowercased() == "bash",
+           let command = preferredText(in: input, keys: ["command"]),
+           let summary = shellCommandSummary(command) {
+            return truncate(summary.operation, limit: 180)
+        }
+
         for key in operationPreferredKeys(for: tool) {
             if let value = input[key], let rendered = render(value), !rendered.isEmpty {
                 return truncate(rendered, limit: 180)
@@ -177,6 +183,10 @@ enum ToolActivityFormatter {
             return "Writing…"
 
         case "bash":
+            if let command = preferredText(in: input, keys: ["command"]),
+               let summary = shellCommandSummary(command) {
+                return truncate(summary.running, limit: 140)
+            }
             if let description = preferredText(in: input, keys: ["description"]), !description.isEmpty {
                 return truncate(description, limit: 140)
             }
@@ -226,6 +236,378 @@ enum ToolActivityFormatter {
         }
     }
 
+    private struct ShellCommandSummary {
+        let operation: String
+        let running: String
+    }
+
+    private static func shellCommandSummary(_ rawCommand: String, depth: Int = 0) -> ShellCommandSummary? {
+        guard depth < 3 else { return nil }
+
+        let command = meaningfulShellSegment(rawCommand)
+        var tokens = normalizedShellTokens(command)
+        guard !tokens.isEmpty else { return nil }
+
+        let executable = executableName(tokens[0])
+        if ["bash", "sh", "zsh"].contains(executable),
+           let commandIndex = shellInlineCommandIndex(in: tokens),
+           tokens.indices.contains(commandIndex + 1) {
+            return shellCommandSummary(tokens[commandIndex + 1], depth: depth + 1)
+        }
+
+        tokens = normalizedShellTokens(command)
+        guard let root = tokens.first.map(executableName) else { return nil }
+        let lowerCommand = command.lowercased()
+
+        switch root {
+        case "xcodebuild":
+            if let scheme = optionValue(after: "-scheme", in: tokens) {
+                return makeCommandSummary(
+                    operation: lowerCommand.contains(" test") ? "Testing \(scheme)" : "Building \(scheme)"
+                )
+            }
+            return makeCommandSummary(operation: lowerCommand.contains(" test") ? "Running Xcode tests" : "Building with Xcode")
+
+        case "rg", "ripgrep":
+            if let pattern = searchPattern(in: tokens.dropFirst()) {
+                return makeCommandSummary(operation: "Searching: \(pattern)")
+            }
+            return makeCommandSummary(operation: "Searching the workspace")
+
+        case "grep":
+            if let pattern = searchPattern(in: tokens.dropFirst()) {
+                return makeCommandSummary(operation: "Searching: \(pattern)")
+            }
+            return makeCommandSummary(operation: "Searching files")
+
+        case "find":
+            if let pattern = optionValue(afterAnyOf: ["-name", "-iname"], in: tokens) {
+                return makeCommandSummary(operation: "Finding \(filePatternDescription(pattern))")
+            }
+            return makeCommandSummary(operation: "Finding files")
+
+        case "sed", "nl", "cat", "head", "tail", "less", "more":
+            if let path = firstPathToken(in: tokens.dropFirst()) {
+                return makeCommandSummary(operation: "Reading \(lastPathComponent(path))")
+            }
+            return makeCommandSummary(operation: "Reading output")
+
+        case "ls":
+            if let path = firstPathToken(in: tokens.dropFirst()) {
+                return makeCommandSummary(operation: "Listing \(lastPathComponent(path))")
+            }
+            return makeCommandSummary(operation: "Listing files")
+
+        case "git":
+            return gitCommandSummary(tokens: tokens)
+
+        case "go":
+            return buildToolSummary(name: "Go", tokens: tokens)
+
+        case "swift":
+            return buildToolSummary(name: "Swift", tokens: tokens)
+
+        case "npm", "pnpm", "yarn":
+            return packageCommandSummary(manager: root, tokens: tokens)
+
+        case "make":
+            let target = tokens.dropFirst().first { !$0.hasPrefix("-") }
+            return makeCommandSummary(operation: target.map { "Running make \($0)" } ?? "Running make")
+
+        case "docker":
+            return dockerCommandSummary(tokens: tokens)
+
+        case "curl":
+            if let url = tokens.first(where: { $0.hasPrefix("http://") || $0.hasPrefix("https://") }) {
+                return makeCommandSummary(operation: "Fetching \(url)")
+            }
+            return makeCommandSummary(operation: "Fetching remote data")
+
+        case "date":
+            return makeCommandSummary(operation: "Checking the time")
+
+        case "sleep":
+            return makeCommandSummary(operation: "Waiting")
+
+        case "python", "python3", "node", "ruby", "perl":
+            if let script = firstPathToken(in: tokens.dropFirst()) {
+                return makeCommandSummary(operation: "Running \(lastPathComponent(script))")
+            }
+            return makeCommandSummary(operation: "Running \(root)")
+
+        case "bash", "sh", "zsh":
+            if let script = firstPathToken(in: tokens.dropFirst()) {
+                return makeCommandSummary(operation: "Running \(lastPathComponent(script))")
+            }
+            return makeCommandSummary(operation: "Running shell command")
+
+        default:
+            return nil
+        }
+    }
+
+    private static func makeCommandSummary(operation: String) -> ShellCommandSummary {
+        ShellCommandSummary(operation: operation, running: "\(operation)…")
+    }
+
+    private static func meaningfulShellSegment(_ rawCommand: String) -> String {
+        let collapsed = rawCommand
+            .replacingOccurrences(of: "\n", with: " ")
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let segments = collapsed
+            .components(separatedBy: " && ")
+            .flatMap { $0.components(separatedBy: ";") }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+        for segment in segments where !segment.isEmpty {
+            let lower = segment.lowercased()
+            if lower.hasPrefix("cd ")
+                || lower.hasPrefix("export ")
+                || lower.hasPrefix("source ")
+                || lower.hasPrefix("set ") {
+                continue
+            }
+            return segment
+        }
+
+        return collapsed
+    }
+
+    private static func normalizedShellTokens(_ command: String) -> [String] {
+        var tokens = shellTokens(command)
+        if executableName(tokens.first ?? "") == "env" {
+            tokens.removeFirst()
+        }
+        while let first = tokens.first,
+              first.contains("="),
+              !first.hasPrefix("-"),
+              first.first?.isLetter == true {
+            tokens.removeFirst()
+        }
+        while let first = tokens.first, executableName(first) == "command" {
+            tokens.removeFirst()
+        }
+        return tokens
+    }
+
+    private static func shellTokens(_ command: String) -> [String] {
+        var tokens: [String] = []
+        var current = ""
+        var quote: Character?
+
+        for char in command {
+            if let activeQuote = quote {
+                if char == activeQuote {
+                    quote = nil
+                } else {
+                    current.append(char)
+                }
+                continue
+            }
+
+            if char == "\"" || char == "'" {
+                quote = char
+                continue
+            }
+
+            if char.isWhitespace {
+                if !current.isEmpty {
+                    tokens.append(current)
+                    current = ""
+                }
+                continue
+            }
+
+            current.append(char)
+        }
+
+        if !current.isEmpty {
+            tokens.append(current)
+        }
+        return tokens
+    }
+
+    private static func executableName(_ token: String) -> String {
+        (token as NSString).lastPathComponent.lowercased()
+    }
+
+    private static func shellInlineCommandIndex(in tokens: [String]) -> Int? {
+        tokens.firstIndex(where: { $0 == "-c" || $0 == "-lc" || $0 == "-ic" })
+    }
+
+    private static func searchPattern<S: Sequence>(in tokenSequence: S) -> String? where S.Element == String {
+        let tokens = Array(tokenSequence)
+        var index = 0
+        while index < tokens.count {
+            let token = tokens[index]
+            if token == "|" { break }
+            if token.hasPrefix("-") {
+                if optionTakesValue(token), index + 1 < tokens.count {
+                    index += 2
+                } else {
+                    index += 1
+                }
+                continue
+            }
+            if looksLikePath(token) {
+                index += 1
+                continue
+            }
+            return truncate(token, limit: 80)
+        }
+        return nil
+    }
+
+    private static func firstPathToken<S: Sequence>(in tokenSequence: S) -> String? where S.Element == String {
+        let tokens = Array(tokenSequence)
+        var index = 0
+        while index < tokens.count {
+            let token = tokens[index]
+            if token == "|" { break }
+            if token.hasPrefix("-") {
+                index += optionTakesValue(token) && index + 1 < tokens.count ? 2 : 1
+                continue
+            }
+            let cleaned = cleanedShellToken(token)
+            if looksLikePath(cleaned) {
+                return cleaned
+            }
+            index += 1
+        }
+        return nil
+    }
+
+    private static func optionValue(after option: String, in tokens: [String]) -> String? {
+        guard let index = tokens.firstIndex(of: option), tokens.indices.contains(index + 1) else {
+            return nil
+        }
+        return cleanedShellToken(tokens[index + 1])
+    }
+
+    private static func optionValue(afterAnyOf options: [String], in tokens: [String]) -> String? {
+        for option in options {
+            if let value = optionValue(after: option, in: tokens) {
+                return value
+            }
+        }
+        return nil
+    }
+
+    private static func optionTakesValue(_ token: String) -> Bool {
+        [
+            "-e", "--regexp",
+            "-f", "--file",
+            "-m", "--max-count",
+            "-A", "-B", "-C",
+            "-n", "--lines",
+            "-d", "--data",
+            "-H", "--header",
+            "-o", "--output",
+            "-name", "-iname",
+            "-maxdepth", "-mindepth",
+            "-scheme", "-project", "-workspace", "-destination",
+        ].contains(token)
+    }
+
+    private static func looksLikePath(_ token: String) -> Bool {
+        let cleaned = cleanedShellToken(token)
+        guard !cleaned.isEmpty,
+              !cleaned.hasPrefix("-"),
+              !cleaned.contains("://"),
+              !cleaned.contains("=") else {
+            return false
+        }
+
+        if cleaned == "." || cleaned == ".." || cleaned.hasPrefix("/") || cleaned.hasPrefix("~/") {
+            return true
+        }
+        if cleaned.contains("/") {
+            return true
+        }
+
+        let ext = (cleaned as NSString).pathExtension
+        return !ext.isEmpty && ext.count <= 8
+    }
+
+    private static func cleanedShellToken(_ token: String) -> String {
+        token.trimmingCharacters(in: CharacterSet(charactersIn: "\"'`"))
+            .trimmingCharacters(in: CharacterSet(charactersIn: ","))
+    }
+
+    private static func filePatternDescription(_ pattern: String) -> String {
+        let cleaned = cleanedShellToken(pattern)
+            .replacingOccurrences(of: "*.", with: "")
+            .replacingOccurrences(of: "*", with: "")
+        guard !cleaned.isEmpty else { return "files" }
+        switch cleaned.lowercased() {
+        case "swift": return "Swift files"
+        case "sh", "bash", "zsh": return "shell scripts"
+        case "json": return "JSON files"
+        case "md", "markdown": return "Markdown files"
+        default: return "\(cleaned) files"
+        }
+    }
+
+    private static func gitCommandSummary(tokens: [String]) -> ShellCommandSummary {
+        let subcommand = tokens.dropFirst().first { !$0.hasPrefix("-") }?.lowercased()
+        switch subcommand {
+        case "status": return makeCommandSummary(operation: "Checking git status")
+        case "diff": return makeCommandSummary(operation: "Reviewing git diff")
+        case "show": return makeCommandSummary(operation: "Inspecting git commit")
+        case "log": return makeCommandSummary(operation: "Reading git history")
+        case "add": return makeCommandSummary(operation: "Staging changes")
+        case "commit": return makeCommandSummary(operation: "Committing changes")
+        case "push": return makeCommandSummary(operation: "Pushing changes")
+        case "pull": return makeCommandSummary(operation: "Pulling changes")
+        case "fetch": return makeCommandSummary(operation: "Fetching git updates")
+        case "checkout", "switch": return makeCommandSummary(operation: "Switching git branch")
+        default: return makeCommandSummary(operation: "Running git")
+        }
+    }
+
+    private static func buildToolSummary(name: String, tokens: [String]) -> ShellCommandSummary {
+        let subcommand = tokens.dropFirst().first { !$0.hasPrefix("-") }?.lowercased()
+        switch subcommand {
+        case "test": return makeCommandSummary(operation: "Running \(name) tests")
+        case "build": return makeCommandSummary(operation: "Building with \(name)")
+        case "run": return makeCommandSummary(operation: "Running \(name)")
+        case "mod": return makeCommandSummary(operation: "Updating Go modules")
+        default: return makeCommandSummary(operation: "Running \(name)")
+        }
+    }
+
+    private static func packageCommandSummary(manager: String, tokens: [String]) -> ShellCommandSummary {
+        let subcommand = tokens.dropFirst().first { !$0.hasPrefix("-") }?.lowercased()
+        switch subcommand {
+        case "install", "i": return makeCommandSummary(operation: "Installing packages")
+        case "test": return makeCommandSummary(operation: "Running package tests")
+        case "build": return makeCommandSummary(operation: "Building package")
+        case "dev", "start": return makeCommandSummary(operation: "Starting dev server")
+        case "run":
+            let script = tokens.dropFirst(2).first { !$0.hasPrefix("-") }
+            return makeCommandSummary(operation: script.map { "Running \($0)" } ?? "Running package script")
+        default: return makeCommandSummary(operation: "Running \(manager)")
+        }
+    }
+
+    private static func dockerCommandSummary(tokens: [String]) -> ShellCommandSummary {
+        let subcommand = tokens.dropFirst().first { !$0.hasPrefix("-") }?.lowercased()
+        switch subcommand {
+        case "ps": return makeCommandSummary(operation: "Checking containers")
+        case "logs": return makeCommandSummary(operation: "Reading container logs")
+        case "exec": return makeCommandSummary(operation: "Running command in container")
+        case "build": return makeCommandSummary(operation: "Building Docker image")
+        case "run": return makeCommandSummary(operation: "Running Docker container")
+        case "pull": return makeCommandSummary(operation: "Pulling Docker image")
+        case "push": return makeCommandSummary(operation: "Pushing Docker image")
+        case "inspect": return makeCommandSummary(operation: "Inspecting container")
+        default: return makeCommandSummary(operation: "Running Docker")
+        }
+    }
+
     private static func fallbackProcessingText(for provider: ProviderKind) -> String {
         switch provider {
         case .claude:
@@ -255,7 +637,7 @@ enum ToolActivityFormatter {
     private static func operationPreferredKeys(for tool: String) -> [String] {
         switch tool.lowercased() {
         case "bash":
-            return ["command", "description"]
+            return ["description", "command"]
         case "read", "write", "edit", "multiedit":
             return ["file_path", "path", "description", "prompt"]
         case "grep", "glob":

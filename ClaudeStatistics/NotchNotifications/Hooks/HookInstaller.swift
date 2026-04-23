@@ -3,7 +3,6 @@ import Foundation
 // Result of a hook install/uninstall operation
 enum HookInstallResult {
     case success
-    case python3Missing
     case confirmationDenied
     case failure(Error)
 }
@@ -55,24 +54,52 @@ protocol HookInstalling {
 
 // Shared utilities for all HookInstaller implementations
 enum HookInstallerUtils {
-    static func python3Available() -> Bool {
-        let result = runCommand("/usr/bin/which", args: ["python3"])
-        return result != nil && !result!.isEmpty
+    static func shellQuoted(_ value: String) -> String {
+        "'\(value.replacingOccurrences(of: "'", with: "'\\''"))'"
     }
 
-    // Copy hook script from app bundle to destination, chmod 0755
-    static func installScript(bundleResourceName: String, destinationDir: String) throws {
+    static func managedHookExecutablePath() -> String {
+        let bundleID = Bundle.main.bundleIdentifier ?? ""
+        let executableName = bundleID.hasSuffix(".debug") ? "claude-stats-hook-debug" : "claude-stats-hook"
+        return (AppRuntimePaths.binDirectory as NSString).appendingPathComponent(executableName)
+    }
+
+    @discardableResult
+    static func ensureManagedHookExecutableLink() -> String? {
+        guard let executablePath = Bundle.main.executablePath ?? ProcessInfo.processInfo.arguments.first,
+              !executablePath.isEmpty else {
+            return nil
+        }
+
         let fm = FileManager.default
-        guard let bundleURL = Bundle.main.url(forResource: bundleResourceName, withExtension: "py") else {
-            throw HookError.scriptNotInBundle(bundleResourceName)
+        let linkPath = managedHookExecutablePath()
+        guard AppRuntimePaths.ensureBinDirectory() != nil else { return nil }
+
+        do {
+            var shouldReplace = true
+            if let destination = try? fm.destinationOfSymbolicLink(atPath: linkPath), destination == executablePath {
+                shouldReplace = false
+            }
+
+            if shouldReplace {
+                if fm.fileExists(atPath: linkPath) || (try? fm.destinationOfSymbolicLink(atPath: linkPath)) != nil {
+                    try? fm.removeItem(atPath: linkPath)
+                }
+                try fm.createSymbolicLink(atPath: linkPath, withDestinationPath: executablePath)
+            }
+
+            return linkPath
+        } catch {
+            return nil
         }
-        try fm.createDirectory(atPath: destinationDir, withIntermediateDirectories: true)
-        let dest = (destinationDir as NSString).appendingPathComponent("\(bundleResourceName).py")
-        if fm.fileExists(atPath: dest) {
-            try fm.removeItem(atPath: dest)
-        }
-        try fm.copyItem(at: bundleURL, to: URL(fileURLWithPath: dest))
-        try fm.setAttributes([.posixPermissions: Int16(0o755)], ofItemAtPath: dest)
+    }
+
+    static func currentHookCommand(provider: ProviderKind) -> String {
+        let executablePath = ensureManagedHookExecutableLink()
+            ?? Bundle.main.executablePath
+            ?? ProcessInfo.processInfo.arguments.first
+            ?? ""
+        return "\(shellQuoted(executablePath)) --claude-stats-hook-provider \(provider.rawValue)"
     }
 
     static func removeScript(at path: String) {
@@ -80,17 +107,16 @@ enum HookInstallerUtils {
     }
 
     @discardableResult
-    static func runCommand(_ executable: String, args: [String]) -> String? {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: executable)
-        task.arguments = args
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = Pipe()
-        guard (try? task.run()) != nil else { return nil }
-        task.waitUntilExit()
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+    static func runCommand(_ executable: String, args: [String], timeout: TimeInterval = 2.0) -> String? {
+        guard let result = TerminalProcessRunner.run(
+            executable: executable,
+            arguments: args,
+            timeout: timeout
+        ),
+        result.terminationStatus == 0 else {
+            return nil
+        }
+        return result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     // Run a shell command through the user's login shell so ~/.zshrc / ~/.zprofile /
@@ -98,21 +124,19 @@ enum HookInstallerUtils {
     // live in ~/.local/bin, /opt/homebrew/bin, nvm, etc. — paths absent from the
     // app bundle's default process PATH.
     @discardableResult
-    static func runLoginShell(_ command: String) -> String? {
+    static func runLoginShell(_ command: String, timeout: TimeInterval = 3.0) -> String? {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        return runCommand(shell, args: ["-lc", command])
+        return runCommand(shell, args: ["-lc", command], timeout: timeout)
     }
 }
 
 enum HookError: LocalizedError {
-    case scriptNotInBundle(String)
     case settingsNotFound
     case jsonParseError
     case writeError(Error)
 
     var errorDescription: String? {
         switch self {
-        case .scriptNotInBundle(let name): return "Hook script not found in bundle: \(name)"
         case .settingsNotFound: return "Settings file not found"
         case .jsonParseError: return "Failed to parse settings JSON"
         case .writeError(let e): return "Failed to write settings: \(e.localizedDescription)"

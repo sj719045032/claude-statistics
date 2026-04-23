@@ -93,7 +93,6 @@ struct AttentionEvent: Identifiable, Equatable {
     let message: String?
     let sessionId: String
     let projectPath: String?
-    let transcriptPath: String?
     let tty: String?
     let pid: Int32?
     let terminalName: String?
@@ -111,6 +110,38 @@ struct AttentionEvent: Identifiable, Equatable {
 }
 
 extension AttentionEvent {
+    func withResolvedPermissionToolUseId(_ resolvedToolUseId: String) -> AttentionEvent {
+        guard case .permissionRequest(let tool, let input, let currentToolUseId) = kind,
+              currentToolUseId.isEmpty,
+              !resolvedToolUseId.isEmpty else {
+            return self
+        }
+
+        return AttentionEvent(
+            id: id,
+            provider: provider,
+            rawEventName: rawEventName,
+            notificationType: notificationType,
+            toolName: toolName,
+            toolInput: toolInput,
+            toolUseId: resolvedToolUseId,
+            toolResponse: toolResponse,
+            message: message,
+            sessionId: sessionId,
+            projectPath: projectPath,
+            tty: tty,
+            pid: pid,
+            terminalName: terminalName,
+            terminalSocket: terminalSocket,
+            terminalWindowID: terminalWindowID,
+            terminalTabID: terminalTabID,
+            terminalStableID: terminalStableID,
+            receivedAt: receivedAt,
+            kind: .permissionRequest(tool: tool, input: input, toolUseId: resolvedToolUseId),
+            pending: pending
+        )
+    }
+
     var livePrompt: String? {
         guard rawEventName == "UserPromptSubmit" else { return nil }
         return Self.normalizePreview(message)

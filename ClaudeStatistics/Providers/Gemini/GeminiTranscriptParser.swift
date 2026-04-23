@@ -492,18 +492,27 @@ final class GeminiTranscriptParser {
     }
 
     private func normalizedToolName(_ toolCall: GeminiToolCall) -> String {
-        if let displayName = toolCall.displayName {
-            return displayName
-        }
-
         switch toolCall.name {
+        case "run_shell_command":
+            return "bash"
         case "grep_search":
-            return "SearchText"
+            return "grep"
         case "read_file":
-            return "ReadFile"
+            return "read"
+        case "write_file":
+            return "write"
         case "glob":
-            return "FindFiles"
+            return "glob"
+        case "replace":
+            return "edit"
+        case "web_fetch":
+            return "fetch"
+        case "web_search", "google_web_search":
+            return "websearch"
         default:
+            if let displayName = toolCall.displayName {
+                return displayName
+            }
             return toolCall.name
         }
     }

@@ -1,0 +1,244 @@
+import AppKit
+import Foundation
+
+enum TerminalCapabilityCategory {
+    case terminal
+    case editor
+}
+
+/// How precisely this terminal can focus a specific session's tab/pane when
+/// the user clicks "Return to terminal" from the notch.
+enum TerminalTabFocusPrecision {
+    /// Deterministic: we always land on the exact tab/pane for the session.
+    case exact
+    /// Usually works but can fail — e.g. Ghostty when session ids expire
+    /// after an app restart, or split panes where multiple panes live in
+    /// the same tab.
+    case bestEffort
+    /// Only raises the app to the foreground; the user still has to pick
+    /// the right tab manually (e.g. Warp's closed automation surface,
+    /// Alacritty's accessibility-only path with identical titles).
+    case appOnly
+}
+
+protocol TerminalCapability {
+    var optionID: String? { get }
+    var category: TerminalCapabilityCategory { get }
+    var displayName: String { get }
+    var bundleIdentifiers: Set<String> { get }
+    var terminalNameAliases: Set<String> { get }
+    var processNameHints: Set<String> { get }
+    var route: TerminalFocusRoute { get }
+    var isInstalled: Bool { get }
+    var tabFocusPrecision: TerminalTabFocusPrecision { get }
+    /// Lower values are preferred by Auto launch mode. `nil` means the
+    /// capability is never selected automatically.
+    var autoLaunchPriority: Int? { get }
+}
+
+extension TerminalCapability {
+    // Default to the weakest guarantee. Capabilities that can do better
+    // override this.
+    var tabFocusPrecision: TerminalTabFocusPrecision { .appOnly }
+    var autoLaunchPriority: Int? { nil }
+}
+
+protocol TerminalLaunching {
+    func launch(_ request: TerminalLaunchRequest)
+}
+
+protocol TerminalFocusing {
+    func contains(_ target: TerminalFocusTarget) -> Bool
+    func focus(_ target: TerminalFocusTarget) -> Bool
+}
+
+protocol TerminalFocusCapabilityProviding {
+    func focusCapability(for target: TerminalFocusTarget) -> TerminalFocusCapability
+}
+
+protocol TerminalDirectFocusing {
+    func directFocus(_ target: TerminalFocusTarget) async -> TerminalFocusExecutionResult?
+}
+
+protocol TerminalFocusIdentityProviding {
+    func shouldUseCachedIdentity(
+        requestedWindowID: String?,
+        requestedTabID: String?,
+        requestedStableID: String?,
+        cachedTarget: TerminalFocusTarget?
+    ) -> Bool
+
+    func cachedFocusTarget(
+        from target: TerminalFocusTarget,
+        resolvedStableID: String?
+    ) -> TerminalFocusTarget
+
+    func focusTargetAfterDirectFocusFailure(
+        _ target: TerminalFocusTarget,
+        cachedTarget: TerminalFocusTarget?
+    ) -> TerminalFocusTarget?
+
+    func acceptsResolvedStableID(
+        _ resolvedStableID: String?,
+        for target: TerminalFocusTarget
+    ) -> Bool
+}
+
+protocol TerminalReadinessProviding {
+    func installationStatus() -> TerminalInstallationStatus
+    func setupRequirements() -> [TerminalRequirement]
+    func setupActions() -> [TerminalSetupAction]
+}
+
+protocol TerminalSetupProviding {
+    var setupTitle: String { get }
+    var setupActionTitle: String { get }
+    var setupConfigURL: URL? { get }
+    func setupStatus() -> TerminalSetupStatus
+    func ensureSetup() throws -> TerminalSetupResult
+}
+
+struct TerminalSetupStatus: Equatable {
+    let isReady: Bool
+    let isAvailable: Bool
+    let summary: String
+    let detail: String?
+}
+
+struct TerminalSetupResult: Equatable {
+    let changed: Bool
+    let message: String
+    let backupURL: URL?
+}
+
+extension TerminalReadinessProviding {
+    func readiness() -> TerminalReadiness {
+        TerminalReadiness(
+            installation: installationStatus(),
+            unmetRequirements: setupRequirements(),
+            actions: setupActions()
+        )
+    }
+}
+
+extension TerminalFocusIdentityProviding {
+    func shouldUseCachedIdentity(
+        requestedWindowID: String?,
+        requestedTabID: String?,
+        requestedStableID: String?,
+        cachedTarget: TerminalFocusTarget?
+    ) -> Bool {
+        true
+    }
+
+    func cachedFocusTarget(
+        from target: TerminalFocusTarget,
+        resolvedStableID: String?
+    ) -> TerminalFocusTarget {
+        target.withStableTerminalID(
+            resolvedStableID ?? target.terminalStableID,
+            capturedAt: Date()
+        )
+    }
+
+    func focusTargetAfterDirectFocusFailure(
+        _ target: TerminalFocusTarget,
+        cachedTarget: TerminalFocusTarget?
+    ) -> TerminalFocusTarget? {
+        nil
+    }
+
+    func acceptsResolvedStableID(
+        _ resolvedStableID: String?,
+        for target: TerminalFocusTarget
+    ) -> Bool {
+        true
+    }
+}
+
+extension TerminalCapability {
+    var primaryBundleIdentifier: String? {
+        bundleIdentifiers.sorted().first
+    }
+
+    var installedStatus: TerminalInstallationStatus {
+        isInstalled ? .installed : .notInstalled
+    }
+
+    func readiness() -> TerminalReadiness {
+        if let readinessProvider = self as? any TerminalReadinessProviding {
+            return readinessProvider.readiness()
+        }
+
+        let installation: TerminalInstallationStatus = isInstalled ? .installed : .notInstalled
+        let requirements: [TerminalRequirement] = installation == .installed ? [] : [.appInstalled]
+        return TerminalReadiness(
+            installation: installation,
+            unmetRequirements: requirements,
+            actions: []
+        )
+    }
+
+    func defaultInstallationRequirements() -> [TerminalRequirement] {
+        isInstalled ? [] : [.appInstalled]
+    }
+
+    func openPrimaryAppAction(
+        id: String? = nil,
+        title: String? = nil
+    ) -> TerminalSetupAction? {
+        guard let bundleId = bundleIdentifiers
+            .sorted()
+            .first(where: { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) != nil })
+                ?? primaryBundleIdentifier,
+              let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) else {
+            return nil
+        }
+
+        return TerminalSetupAction(
+            id: id ?? "open.\(displayName.lowercased())",
+            title: title ?? "Open \(displayName)",
+            kind: .openApp,
+            perform: {
+                let configuration = NSWorkspace.OpenConfiguration()
+                configuration.activates = true
+                NSWorkspace.shared.openApplication(at: appURL, configuration: configuration)
+                return .none
+            }
+        )
+    }
+
+    func matchesTerminalName(_ terminalName: String?) -> Bool {
+        guard let normalized = terminalName?.terminalRegistryNormalizedName,
+              !normalized.isEmpty else {
+            return false
+        }
+        return terminalNameAliases.contains(normalized)
+    }
+
+    func matchesProcessName(_ processName: String?) -> Bool {
+        guard let normalized = processName?
+            .split(separator: "/")
+            .last?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased(),
+              !normalized.isEmpty else {
+            return false
+        }
+
+        return processNameHints.contains { hint in
+            normalized == hint || normalized.contains(hint)
+        }
+    }
+
+    func ownsBundleIdentifier(_ bundleIdentifier: String?) -> Bool {
+        guard let bundleIdentifier else { return false }
+        return bundleIdentifiers.contains(bundleIdentifier)
+    }
+}
+
+extension String {
+    var terminalRegistryNormalizedName: String {
+        trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+}

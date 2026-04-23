@@ -31,9 +31,66 @@ struct TerminalFocusTarget: Equatable, Sendable {
         }
         return age < (hasStableLocator ? 1800 : 30)
     }
+
+    func withStableTerminalID(
+        _ stableTerminalID: String?,
+        capturedAt: Date = Date()
+    ) -> TerminalFocusTarget {
+        TerminalFocusTarget(
+            terminalPid: terminalPid,
+            bundleId: bundleId,
+            tty: tty,
+            projectPath: projectPath,
+            terminalName: terminalName,
+            terminalSocket: terminalSocket,
+            terminalWindowID: terminalWindowID,
+            terminalTabID: terminalTabID,
+            terminalStableID: terminalStableID,
+            capability: capability,
+            capturedAt: capturedAt
+        )
+    }
+
+    func clearingTerminalIdentity(
+        capturedAt: Date = Date()
+    ) -> TerminalFocusTarget {
+        TerminalFocusTarget(
+            terminalPid: terminalPid,
+            bundleId: bundleId,
+            tty: tty,
+            projectPath: projectPath,
+            terminalName: terminalName,
+            terminalSocket: terminalSocket,
+            terminalWindowID: nil,
+            terminalTabID: nil,
+            terminalStableID: nil,
+            capability: capability,
+            capturedAt: capturedAt
+        )
+    }
 }
 
 struct TerminalProcess: Equatable, Sendable {
     let pid: pid_t
     let bundleId: String?
+}
+
+extension TerminalFocusTarget {
+    func withResolvedCapability() -> TerminalFocusTarget {
+        let resolvedCapability = TerminalFocusRouteRegistry.handler(for: self)?
+            .capability(for: self) ?? capability
+        return TerminalFocusTarget(
+            terminalPid: terminalPid,
+            bundleId: bundleId,
+            tty: tty,
+            projectPath: projectPath,
+            terminalName: terminalName,
+            terminalSocket: terminalSocket,
+            terminalWindowID: terminalWindowID,
+            terminalTabID: terminalTabID,
+            terminalStableID: terminalStableID,
+            capability: resolvedCapability,
+            capturedAt: capturedAt
+        )
+    }
 }

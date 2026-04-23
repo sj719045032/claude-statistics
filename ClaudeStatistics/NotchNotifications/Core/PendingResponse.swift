@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 final class PendingResponse: Equatable {
@@ -10,6 +11,9 @@ final class PendingResponse: Equatable {
     init(fd: Int32, timeoutMs: Int) {
         self.fd = fd
         self.timeoutAt = Date(timeIntervalSinceNow: TimeInterval(timeoutMs) / 1000.0)
+
+        var noSigPipe: Int32 = 1
+        setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, socklen_t(MemoryLayout<Int32>.size))
     }
 
     func resolve(_ decision: Decision) {
@@ -22,8 +26,22 @@ final class PendingResponse: Equatable {
         let payload = "{\"v\":1,\"decision\":\"\(decision.rawValue)\"}\n"
         writeQueue.async {
             guard let data = payload.data(using: .utf8) else { close(capturedFd); return }
-            data.withUnsafeBytes { ptr in
-                _ = write(capturedFd, ptr.baseAddress, ptr.count)
+            let wroteAllBytes = data.withUnsafeBytes { ptr -> Bool in
+                guard let baseAddress = ptr.baseAddress else { return false }
+                let written = write(capturedFd, baseAddress, ptr.count)
+                if written < 0 {
+                    let code = errno
+                    DiagnosticLogger.shared.warning(
+                        "PendingResponse write failed fd=\(capturedFd) errno=\(code) decision=\(decision.rawValue)"
+                    )
+                    return false
+                }
+                return written == ptr.count
+            }
+            if !wroteAllBytes {
+                DiagnosticLogger.shared.warning(
+                    "PendingResponse write incomplete fd=\(capturedFd) decision=\(decision.rawValue)"
+                )
             }
             close(capturedFd)
         }

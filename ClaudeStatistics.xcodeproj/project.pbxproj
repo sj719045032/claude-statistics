@@ -9,10 +9,12 @@
 /* Begin PBXBuildFile section */
 		01686B843F57F415D991361F /* TranscriptDisplayMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 630E94D819F3948CF3D57365 /* TranscriptDisplayMessage.swift */; };
 		0403F7B265465E6743499C52 /* TranscriptParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = E59B402C6902996368A65A6F /* TranscriptParser.swift */; };
+		0508E2412893BA974CD32DAD /* GhosttyTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89661CA17E93D43C4B68FC23 /* GhosttyTerminalCapability.swift */; };
 		08EAA341478D88DCA10B74EE /* ClaudeManagedAccountStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA847F7AAA8B25206BA33E25 /* ClaudeManagedAccountStore.swift */; };
 		09979C26D757D52202ED250D /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AF9820A8A06DCCE5C35C294 /* Theme.swift */; };
 		0BD1DED6EC1DFF9326A1CAE5 /* ProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1850A208EA7AE5CDF9896207 /* ProfileViewModel.swift */; };
 		0C7549CCF06B1A0728B91FB2 /* CodexUsageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC3A33B6B13FE8262C5C6281 /* CodexUsageService.swift */; };
+		0DE603B43CE5C46E0A3E53ED /* TerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66851A558CEC1E024AAC87E6 /* TerminalCapability.swift */; };
 		12D7CA772BC61D1A326BA9DA /* ProviderSessionDisplayFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8132C4E4069A5B948316CCF6 /* ProviderSessionDisplayFormatter.swift */; };
 		1835A993B30EC7AE040F7829 /* SessionScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54DA495D7C6105F8AD37FD7D /* SessionScanner.swift */; };
 		19BCF9602F4555F5E007C0EA /* ShareCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9D13F949F9557AC75AAC3B1 /* ShareCardView.swift */; };
@@ -20,7 +22,12 @@
 		1B488E45E75E65B8C90BD746 /* ClaudeOAuthLoginSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C3351516C414AC7F51400E /* ClaudeOAuthLoginSheet.swift */; };
 		1D84A21259B5673F6ABDFCC1 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36F9BBB23CB057720EA99A7B /* Session.swift */; };
 		1DD56466FA2EB5FEF570FF9B /* ProjectAnalyticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E61FA41EAFBAE59342A3A526 /* ProjectAnalyticsView.swift */; };
+		1EC241EE092A30A2D08C2328 /* CodexHookNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 144DFB7A5B248A8375CDA9EE /* CodexHookNormalizer.swift */; };
+		2358E4D59FFEFE0FCAFE1042 /* TerminalSetupSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17F2AED2ECC53E6BF8F6A40D /* TerminalSetupSheetView.swift */; };
+		2412DFF76D3D61785F48C91B /* AppleTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61361192CBF13D3D64E6E20A /* AppleTerminalCapability.swift */; };
 		278FAA854F5697F99EB34F5A /* GeminiPricingFetchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 398009672C963C1E8B72A03E /* GeminiPricingFetchService.swift */; };
+		28BC2444287AB7D7A32B68A3 /* TerminalReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD9EAD578F58BF668BBBFC13 /* TerminalReadiness.swift */; };
+		2EB570758BE9F11F6E15AE78 /* TerminalSetupCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 808F166AA1B5F781858856E1 /* TerminalSetupCoordinator.swift */; };
 		3055EFB90B07E9A7824E77EB /* CodexStatusLineInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = C069BA3F5161E12CD1295E1B /* CodexStatusLineInstaller.swift */; };
 		34A9401E132F4ABEA53988D7 /* ProviderKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF5BCA9439BEAF2D53992A0 /* ProviderKind.swift */; };
 		3984119891F7BF33DEFA170B /* CodexAccountManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 684978AF102DA512FCD3D129 /* CodexAccountManager.swift */; };
@@ -32,19 +39,23 @@
 		3F7B6FCC8858E6DEECB776A0 /* SessionDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D5BA98DFF322E54A1E5B1F2 /* SessionDataStore.swift */; };
 		424369442B1C850D63CBB8C4 /* CodexProviderAccountCardSupplement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A478AE0DFDC6ACA6A24199 /* CodexProviderAccountCardSupplement.swift */; };
 		425E1709E0DB410412C38880 /* ShareRole.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E1858F23256C6FEBB750A08 /* ShareRole.swift */; };
+		435C5E5C30F6B2F28851BDDA /* HookCLI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027CDBE36D6D9439DB32C0AE /* HookCLI.swift */; };
 		437AC945F5CE5337ED23DF9A /* AllTimeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99EA37388B7B02AEDF9C7A78 /* AllTimeView.swift */; };
 		43F77DC1A91245709B224E22 /* SessionProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 993CBC30E02D8B4126EE22D5 /* SessionProvider.swift */; };
 		44E7A09BC65C965BF8866C76 /* ShareRoleEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C96479A32A5A1C4D1A624B /* ShareRoleEngine.swift */; };
 		45389ED6B2BB7C7A180BE038 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 0065997B44AE9D9948026A26 /* Sparkle */; };
 		45713102A127B294274B48AB /* PricingFetchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93CE07D7E98CD2B87F87C0E0 /* PricingFetchService.swift */; };
+		46DAF4D49E051526F8F5AC55 /* EditorTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08D0262FC6126091E6321EE0 /* EditorTerminalCapability.swift */; };
 		4734910CD82A2F831E344A1C /* ActivateFocuser.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD33F591AEEB93C40913AC8F /* ActivateFocuser.swift */; };
 		480C7AC744109467B48A6A47 /* ClaudeProviderAccountCardAccessory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669DD3F7CA0ACD5A8FFF69A3 /* ClaudeProviderAccountCardAccessory.swift */; };
 		4841EE61F68CFF9A626C33CB /* NotchPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B6504163929CC0E60E99B3E /* NotchPreferences.swift */; };
 		4A69484840B48CDE187957E0 /* AutoRefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAAFBA5B9EEDC2BB22BAF700 /* AutoRefreshCoordinator.swift */; };
+		4CE3642E43CC24EF1EECFF65 /* WezTermTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9B269891E67AA3FB9D53E64 /* WezTermTerminalCapability.swift */; };
 		4E4BEF51FB660CE04D41338F /* IndependentClaudeAccountViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEEBABA82636376B36824D8 /* IndependentClaudeAccountViewModel.swift */; };
 		4F1FBB58C850CD3E947CA886 /* NotchStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3B518873560CAC7DE5DE5B /* NotchStateMachine.swift */; };
 		5349F8DCA8E3C9A2C61A67D6 /* GeminiUsageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D75041CC7940EEFCCEE54FA /* GeminiUsageService.swift */; };
 		552244856F222EE6F9AFE7DA /* DiagnosticLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B466FB316C76AB0C39E12E7B /* DiagnosticLogger.swift */; };
+		5568C0075035BD96EDA854B5 /* TerminalCLICommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F483343402849CE44F4F47C /* TerminalCLICommand.swift */; };
 		55DE2FD77D568E40AE4C239B /* CodexProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF8FD132C6328D09C336FB9 /* CodexProvider.swift */; };
 		56242266D3D70E01E2A22FCA /* TerminalFocusTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10E8B731850ABEECA18B111F /* TerminalFocusTarget.swift */; };
 		58108CACA592BE955CCE7191 /* GeminiTranscriptParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 488C2018A8681C6E971CF6A8 /* GeminiTranscriptParser.swift */; };
@@ -54,37 +65,39 @@
 		59FB58B0D4D4298AF8A3A1A6 /* AggregateStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EDF09CC0594DB9C35748FF4 /* AggregateStats.swift */; };
 		5B8F2BC01D7A4526CD0AEAA4 /* TranscriptEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42AB2ACAC763533BC9654BE5 /* TranscriptEntry.swift */; };
 		5BB6284456AC6029BBF8DE0D /* UsageHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E476D9F870BCC0644BC74FD3 /* UsageHistoryStore.swift */; };
-		644030D25918FCACE332487C /* claude-stats-codex-hook.py in Resources */ = {isa = PBXBuildFile; fileRef = 0D0BDBFC8C3D56F9CF4EC424 /* claude-stats-codex-hook.py */; };
 		663E5EC2269BC72FDE27ADB5 /* WaitingInputCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8E853418A761D4E7EE20D9A /* WaitingInputCard.swift */; };
 		686EC93B311494291E5BCE75 /* StatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E1B839DD5F15A6A55AE3727 /* StatisticsView.swift */; };
 		69EF6003B2821815ABF527BF /* SessionQuickStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9BE6119BE603D9EB8BB22C7 /* SessionQuickStats.swift */; };
 		6BA90267FC02621878E80D2A /* TrendChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEDC6DF1C15355DC5AE2FCF9 /* TrendChartView.swift */; };
 		6CB9AC028D3C2D548F717E01 /* NotchContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAB0C3E8C901FF061718EB35 /* NotchContainerView.swift */; };
+		6D56C0EAAF4175166391D7EA /* KittyFocuser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 387E20F7F962C004AD38B92C /* KittyFocuser.swift */; };
 		6E50954F02E729F9586DC3E4 /* HookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 711926C1469F96FC6CF23888 /* HookInstaller.swift */; };
+		70DE2014995D643A72C0A9D0 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15809DA1BE38EFE9D002FB73 /* main.swift */; };
 		7674AC8643AF2C6126880D3C /* TranscriptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73D3015C65881224ECFCC5BB /* TranscriptView.swift */; };
 		782C13B8933AD2748F655738 /* CodexTranscriptParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C9349BA491065487D09AA0 /* CodexTranscriptParser.swift */; };
-		7A994BF22E18433CA8216D90 /* CLIFocuser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74CD69B67303EBB89689A420 /* CLIFocuser.swift */; };
+		7843151598D9561667E57EF3 /* TerminalRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A337A8A5F00CF27D753FA581 /* TerminalRegistry.swift */; };
+		78EA265074EEB931AB16B1AF /* GeminiHookNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18ABF65F6A4D53F6441FB50C /* GeminiHookNormalizer.swift */; };
 		7CD9C8820D5C77BDC5DE0E35 /* PendingResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A3701AFF5252558AFDD027 /* PendingResponse.swift */; };
-		7FEDE160B6E6484B272C2078 /* TerminalLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA42F7AC4BB41556CDC7EFCC /* TerminalLauncher.swift */; };
 		7FF6E85B58542CC7284AA3D0 /* ToolActivityFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D74BEFC175DFC5CD3999DBE1 /* ToolActivityFormatter.swift */; };
 		8085DD6DBD24695A898B8A4B /* TerminalFocusCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A51BA7586FEEB898B1FE9ED8 /* TerminalFocusCoordinator.swift */; };
+		811F6A7F43B2B7E7B0588324 /* ClaudeHookNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0C7C98F9FB93519DCD7D594 /* ClaudeHookNormalizer.swift */; };
 		831EA76C2D78A3EB01923445 /* UsageTrendChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8897EC95FCBE7A6D1A915AC7 /* UsageTrendChartView.swift */; };
-		838FCA756362110C51200C63 /* claude-stats-codex-hook.cpython-314.pyc in Resources */ = {isa = PBXBuildFile; fileRef = F520C1F9882F0227EED8B249 /* claude-stats-codex-hook.cpython-314.pyc */; };
 		8432063CFEAF9CF37D840A71 /* ProviderSettingsSectionProviding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1B35CE39EF2CA012E3BAC2 /* ProviderSettingsSectionProviding.swift */; };
 		8446541DF0CE23D10CA93E2D /* IndependentClaudeCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 768B90604779E18157A73FBB /* IndependentClaudeCredentialStore.swift */; };
 		861A6FDE8151A6DF1D571793 /* TimeFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15FB669CCF4C2F10D4550624 /* TimeFormatter.swift */; };
+		871E27060B953A2929FB1580 /* TerminalFocusRouteHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10FC057E644E62D0BE8CD70 /* TerminalFocusRouteHandler.swift */; };
 		887B628E7C964D59454E184C /* ProcessTreeWalker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A32D01DDF055A652F2C104D /* ProcessTreeWalker.swift */; };
+		8A47113825B15370391C1135 /* TerminalFocusRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ADE3FEF920338C79B20E30F /* TerminalFocusRoute.swift */; };
 		8A89E3E017EAC054C8AA6B8F /* GeminiStatusLineInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A898F5BCC7044CA037D185 /* GeminiStatusLineInstaller.swift */; };
 		8D240F8C55163EE6DD3DAC08 /* SearchUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EBE034854D1539811ED0D5F /* SearchUtils.swift */; };
 		8F439312E3BFA84853019A27 /* ProviderBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 736108D4DB88CF8CCD52C603 /* ProviderBadge.swift */; };
-		8F443361DE985875804EBA32 /* claude-stats-claude-hook.py in Resources */ = {isa = PBXBuildFile; fileRef = 6B109A7C2DB3ADB19D78966B /* claude-stats-claude-hook.py */; };
 		9316665886245686434A4BF4 /* IndependentClaudeAccountManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0CA06E1C8046BE97A74F7C3 /* IndependentClaudeAccountManager.swift */; };
 		959A2084C81A5FE36AFCC670 /* NotchSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EF6E6F221BAB61E42710F8B /* NotchSoundPlayer.swift */; };
 		9903B18A767F040AC0460163 /* NotchShape.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC9BD5962BFEFCCDDF29DF3 /* NotchShape.swift */; };
 		9AFE3E47D4CFC2E7914785E6 /* NotchWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 794FE41C25EE65B8F23019F7 /* NotchWindow.swift */; };
 		9BE83C21285426ACBCAE6024 /* SessionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF9A88BAC1F779F77E517EB /* SessionListView.swift */; };
 		9C5D211F3293A0DCD5005A50 /* AccessibilityFocuser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B84A6ED09B77E2974C0629A /* AccessibilityFocuser.swift */; };
-		9FE55FBB56F3BE1F3B1592D9 /* TerminalAppRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F6FDF2AF5F2DDF7856E7CF0 /* TerminalAppRegistry.swift */; };
+		A134E80F31ECEE35EA36D455 /* TerminalAppleScriptRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F24500B4C9F3F375B97402 /* TerminalAppleScriptRunner.swift */; };
 		A2F1B0B01CE980A41F32D377 /* ActiveSessionsTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1E190E276266D2300756D4 /* ActiveSessionsTracker.swift */; };
 		A5B9E8F4EA41FC8313BF3228 /* ClaudeHookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9503F292FA4FB52DDDF97355 /* ClaudeHookInstaller.swift */; };
 		A63890A01AF570ADBA7E4E11 /* AttentionEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F675DD2E08BB0AC4ADBB101 /* AttentionEvent.swift */; };
@@ -92,35 +105,42 @@
 		AC04F7B90669B03A4D8B3551 /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6749A9BF125AC2A04C7043D5 /* DatabaseService.swift */; };
 		AC5082113B4136915E426299 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 2710C957B5C3CF8708B02CC6 /* Localizable.strings */; };
 		AFE5B13BCD7D98DD27DF6EA0 /* GeminiProviderAccountCardAccessory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BD468B7884551FA250E5E0C /* GeminiProviderAccountCardAccessory.swift */; };
-		AFE91B8255370F07556D8778 /* claude-stats-claude-hook.cpython-314.pyc in Resources */ = {isa = PBXBuildFile; fileRef = 345FF2ABD185F9E5798BBE5B /* claude-stats-claude-hook.cpython-314.pyc */; };
 		B04844AD3BA910295978D241 /* StatusBarPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5486873DBEC29739725E366 /* StatusBarPanel.swift */; };
+		B0B1B4026A01E4A28C24922D /* KittyFocusSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E337F442CEE88957F93C95B2 /* KittyFocusSetup.swift */; };
 		B308C8501282F4C35D073282 /* GeminiHookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 623F6F9C65341AB301CF1B20 /* GeminiHookInstaller.swift */; };
+		B671E1405611DE6D70BE23EB /* KittyTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86B78596315756EA65E43D80 /* KittyTerminalCapability.swift */; };
 		B872C0AE8B54239EEA84509E /* ClaudeAccountModeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD2C72B18AE30277C693576A /* ClaudeAccountModeController.swift */; };
 		BB9902B8A5E35FB7C78F63F0 /* SharePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52FF7E2030D328036A1F8F6D /* SharePreviewView.swift */; };
 		BC65FB4B58BE9FD0EBB88C70 /* AppleScriptFocuser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 645A6AB9436D7D2577DAE9D8 /* AppleScriptFocuser.swift */; };
 		BC876DE9A69A88B6272F0842 /* TrendDataPoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CA29EE31F9DA05A4CB0442F /* TrendDataPoint.swift */; };
+		BE4FDED4356AA89774DF4B8A /* TerminalPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7D5709A13CDC7751084AAF /* TerminalPreferences.swift */; };
+		BF1EFAB27138847B92339836 /* AppRuntimePaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA072464D4CA170B290FA84E /* AppRuntimePaths.swift */; };
 		C096DD401EB0F2A1E31EFFB9 /* GeminiProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6470B331BB31EF4AE6E5CF51 /* GeminiProvider.swift */; };
 		C1946155BDD0D0ABEB98F6B5 /* TelemetryDeck in Frameworks */ = {isa = PBXBuildFile; productRef = 0978977B964239E918826F41 /* TelemetryDeck */; };
+		C37EC946871256BDC3D2370C /* AlacrittyTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E2079B7A7714C7BC618C2A /* AlacrittyTerminalCapability.swift */; };
 		C48BDE19A5E58235BAB61F51 /* UsageViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5306E49F4AF08425229312F0 /* UsageViewModel.swift */; };
 		CD199764729FDA8146948C4C /* ShareImageExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C220944581C7418B7B1797F3 /* ShareImageExporter.swift */; };
 		D06D7B513EFFD60742C93431 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B5C4223D247CA4D681A19D53 /* Assets.xcassets */; };
+		D1F0E7D54D71FD6B3F073609 /* ExternalTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7538BF07592B7D765AF1C22 /* ExternalTerminalCapability.swift */; };
 		D64171EFA61052FC0A315681 /* SessionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B71B5593D63536AB462D70 /* SessionViewModel.swift */; };
 		D7035463E2541293F55B654D /* ClaudePKCE.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDE6D238094644B3E5ECD8C9 /* ClaudePKCE.swift */; };
 		D73C2A7290E0250F8B50A372 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3374C538E77CED126DE3016 /* StatusBarController.swift */; };
 		D99027587C25DA018DE94928 /* ActiveSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E023CB9F472AC7C93777B50 /* ActiveSession.swift */; };
 		DD7C095838B9FA06B94D9DFA /* GeminiAccountManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8938B8C0465ECC95BC0D9BAF /* GeminiAccountManager.swift */; };
+		DE0235CC9D9671CEA84DB392 /* WarpTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9106D93553358D8AFE4C3EE6 /* WarpTerminalCapability.swift */; };
 		DFB7E8400551BE83B025A6A4 /* ShareMetricsBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F0F61EEF95C517CC0B363C3 /* ShareMetricsBuilder.swift */; };
 		E04B621B671D090DB9155348 /* LanguageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1519B833F38D44123500B58 /* LanguageManager.swift */; };
 		E19C7F4107E38E4F014A9A27 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 7803032F49F6D004A094939E /* libsqlite3.tbd */; };
 		E26C6870A1E9540BCA9E7045 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 011E707E6F2F284A99ECF925 /* SettingsView.swift */; };
-		E41DA201187014D384578ABF /* claude-stats-gemini-hook.py in Resources */ = {isa = PBXBuildFile; fileRef = E03ECD659B4EF90B3210E459 /* claude-stats-gemini-hook.py */; };
 		E45AD6199CAB1661300675D6 /* SessionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0415091A24EBCDA6840A49 /* SessionDetailView.swift */; };
 		E58B6A3A03084C0705C450F5 /* ProviderRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AE7C2A2D6731BCD2D826C90 /* ProviderRegistry.swift */; };
 		E7675692CADA29176784FA9D /* GhosttyInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 193523F08B5073E042F772E1 /* GhosttyInspector.swift */; };
 		E8E2CDA7C4ACA1ADAF4CB0BB /* CodexHookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = E77D7C8475F613B82BA40646 /* CodexHookInstaller.swift */; };
 		EC17520544A6FEEA8B3F3430 /* ClaudeProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AA9035C5B842200A3C1F84E /* ClaudeProvider.swift */; };
+		EEF6531B07DC743CB520C909 /* ITermTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4387E440942DCAE1B61C97F /* ITermTerminalCapability.swift */; };
 		F033B4012C3FDB70B0DA893D /* ClaudeOAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E2B51B9EC984248C05583D1 /* ClaudeOAuthClient.swift */; };
 		F26A77813CEED46677E6F756 /* StatusLineInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF2A749714584E4976171E9D /* StatusLineInstaller.swift */; };
+		F2DB839C76264FE914DC1B28 /* TerminalLaunchRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = F807CA9217105B9A2E3C11F1 /* TerminalLaunchRequest.swift */; };
 		F324566F7B85AFF3C7E1EEAC /* CalendarHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1390435247ECA654A169EB3C /* CalendarHeatmap.swift */; };
 		F3272760285AF18F519D8E80 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41054FA7DE043B7E25B4A88E /* MenuBarView.swift */; };
 		F34E915FE87F63D8BB7181BD /* ClaudeAccountManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C931907E9B4996736E4A7373 /* ClaudeAccountManager.swift */; };
@@ -137,18 +157,23 @@
 
 /* Begin PBXFileReference section */
 		011E707E6F2F284A99ECF925 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		027CDBE36D6D9439DB32C0AE /* HookCLI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookCLI.swift; sourceTree = "<group>"; };
 		03DF8D6D8A1022EF2721BE82 /* NotchNotificationCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchNotificationCenter.swift; sourceTree = "<group>"; };
 		044319D72CE45477BDDCBE97 /* AttentionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionBridge.swift; sourceTree = "<group>"; };
+		08D0262FC6126091E6321EE0 /* EditorTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorTerminalCapability.swift; sourceTree = "<group>"; };
 		0A1B35CE39EF2CA012E3BAC2 /* ProviderSettingsSectionProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderSettingsSectionProviding.swift; sourceTree = "<group>"; };
 		0AF9820A8A06DCCE5C35C294 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		0B6504163929CC0E60E99B3E /* NotchPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchPreferences.swift; sourceTree = "<group>"; };
 		0B84A6ED09B77E2974C0629A /* AccessibilityFocuser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityFocuser.swift; sourceTree = "<group>"; };
 		0C1E190E276266D2300756D4 /* ActiveSessionsTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveSessionsTracker.swift; sourceTree = "<group>"; };
-		0D0BDBFC8C3D56F9CF4EC424 /* claude-stats-codex-hook.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = "claude-stats-codex-hook.py"; sourceTree = "<group>"; };
 		10E8B731850ABEECA18B111F /* TerminalFocusTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalFocusTarget.swift; sourceTree = "<group>"; };
 		1390435247ECA654A169EB3C /* CalendarHeatmap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarHeatmap.swift; sourceTree = "<group>"; };
+		144DFB7A5B248A8375CDA9EE /* CodexHookNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexHookNormalizer.swift; sourceTree = "<group>"; };
+		15809DA1BE38EFE9D002FB73 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		15FB669CCF4C2F10D4550624 /* TimeFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeFormatter.swift; sourceTree = "<group>"; };
+		17F2AED2ECC53E6BF8F6A40D /* TerminalSetupSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSetupSheetView.swift; sourceTree = "<group>"; };
 		1850A208EA7AE5CDF9896207 /* ProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileViewModel.swift; sourceTree = "<group>"; };
+		18ABF65F6A4D53F6441FB50C /* GeminiHookNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiHookNormalizer.swift; sourceTree = "<group>"; };
 		193523F08B5073E042F772E1 /* GhosttyInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyInspector.swift; sourceTree = "<group>"; };
 		1EBE034854D1539811ED0D5F /* SearchUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchUtils.swift; sourceTree = "<group>"; };
 		24A2B4F377370E1969E00AD7 /* SharePreviewWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharePreviewWindowController.swift; sourceTree = "<group>"; };
@@ -156,22 +181,22 @@
 		2E023CB9F472AC7C93777B50 /* ActiveSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveSession.swift; sourceTree = "<group>"; };
 		2EDF09CC0594DB9C35748FF4 /* AggregateStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AggregateStats.swift; sourceTree = "<group>"; };
 		32FE333B9AD0368698B9A39F /* UsageAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageAPIService.swift; sourceTree = "<group>"; };
-		345FF2ABD185F9E5798BBE5B /* claude-stats-claude-hook.cpython-314.pyc */ = {isa = PBXFileReference; path = "claude-stats-claude-hook.cpython-314.pyc"; sourceTree = "<group>"; };
 		3511F107E29217FB16567AF9 /* UsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageView.swift; sourceTree = "<group>"; };
 		35EC230BC5F1EF207A984D87 /* FSEventsWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FSEventsWatcher.swift; sourceTree = "<group>"; };
 		36F9BBB23CB057720EA99A7B /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
 		370D33AC086199C95EC1E2CD /* UsageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageData.swift; sourceTree = "<group>"; };
+		387E20F7F962C004AD38B92C /* KittyFocuser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KittyFocuser.swift; sourceTree = "<group>"; };
 		398009672C963C1E8B72A03E /* GeminiPricingFetchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiPricingFetchService.swift; sourceTree = "<group>"; };
 		3D5BA98DFF322E54A1E5B1F2 /* SessionDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDataStore.swift; sourceTree = "<group>"; };
 		3DC9BD5962BFEFCCDDF29DF3 /* NotchShape.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchShape.swift; sourceTree = "<group>"; };
 		3E2B51B9EC984248C05583D1 /* ClaudeOAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeOAuthClient.swift; sourceTree = "<group>"; };
 		3EF6E6F221BAB61E42710F8B /* NotchSoundPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchSoundPlayer.swift; sourceTree = "<group>"; };
-		3F6FDF2AF5F2DDF7856E7CF0 /* TerminalAppRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalAppRegistry.swift; sourceTree = "<group>"; };
 		40D1CDF1FEEF8397DDFDBBDC /* ClaudeAccountSourcePickerRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeAccountSourcePickerRow.swift; sourceTree = "<group>"; };
 		41054FA7DE043B7E25B4A88E /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		42AB2ACAC763533BC9654BE5 /* TranscriptEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptEntry.swift; sourceTree = "<group>"; };
 		488C2018A8681C6E971CF6A8 /* GeminiTranscriptParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiTranscriptParser.swift; sourceTree = "<group>"; };
 		49C9349BA491065487D09AA0 /* CodexTranscriptParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexTranscriptParser.swift; sourceTree = "<group>"; };
+		4ADE3FEF920338C79B20E30F /* TerminalFocusRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalFocusRoute.swift; sourceTree = "<group>"; };
 		4E1858F23256C6FEBB750A08 /* ShareRole.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRole.swift; sourceTree = "<group>"; };
 		52FF7E2030D328036A1F8F6D /* SharePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharePreviewView.swift; sourceTree = "<group>"; };
 		5306E49F4AF08425229312F0 /* UsageViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageViewModel.swift; sourceTree = "<group>"; };
@@ -180,18 +205,20 @@
 		5B4066C394B5E23322D32189 /* GlobalHotKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotKeyManager.swift; sourceTree = "<group>"; };
 		5BD468B7884551FA250E5E0C /* GeminiProviderAccountCardAccessory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiProviderAccountCardAccessory.swift; sourceTree = "<group>"; };
 		5CA29EE31F9DA05A4CB0442F /* TrendDataPoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendDataPoint.swift; sourceTree = "<group>"; };
+		5F483343402849CE44F4F47C /* TerminalCLICommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalCLICommand.swift; sourceTree = "<group>"; };
 		609271D9D2750E6DBBCFFAC5 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		61361192CBF13D3D64E6E20A /* AppleTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleTerminalCapability.swift; sourceTree = "<group>"; };
 		623F6F9C65341AB301CF1B20 /* GeminiHookInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiHookInstaller.swift; sourceTree = "<group>"; };
 		630E94D819F3948CF3D57365 /* TranscriptDisplayMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptDisplayMessage.swift; sourceTree = "<group>"; };
 		645A6AB9436D7D2577DAE9D8 /* AppleScriptFocuser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleScriptFocuser.swift; sourceTree = "<group>"; };
 		6470B331BB31EF4AE6E5CF51 /* GeminiProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiProvider.swift; sourceTree = "<group>"; };
+		66851A558CEC1E024AAC87E6 /* TerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalCapability.swift; sourceTree = "<group>"; };
 		669DD3F7CA0ACD5A8FFF69A3 /* ClaudeProviderAccountCardAccessory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeProviderAccountCardAccessory.swift; sourceTree = "<group>"; };
 		6749A9BF125AC2A04C7043D5 /* DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
 		68083922F93D555879FAD90B /* ClaudeStatisticsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatisticsApp.swift; sourceTree = "<group>"; };
 		684978AF102DA512FCD3D129 /* CodexAccountManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexAccountManager.swift; sourceTree = "<group>"; };
 		6A32D01DDF055A652F2C104D /* ProcessTreeWalker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessTreeWalker.swift; sourceTree = "<group>"; };
 		6AE7C2A2D6731BCD2D826C90 /* ProviderRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderRegistry.swift; sourceTree = "<group>"; };
-		6B109A7C2DB3ADB19D78966B /* claude-stats-claude-hook.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = "claude-stats-claude-hook.py"; sourceTree = "<group>"; };
 		6E1B839DD5F15A6A55AE3727 /* StatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsView.swift; sourceTree = "<group>"; };
 		6F0F61EEF95C517CC0B363C3 /* ShareMetricsBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareMetricsBuilder.swift; sourceTree = "<group>"; };
 		6F3B518873560CAC7DE5DE5B /* NotchStateMachine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchStateMachine.swift; sourceTree = "<group>"; };
@@ -200,26 +227,35 @@
 		71A478AE0DFDC6ACA6A24199 /* CodexProviderAccountCardSupplement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexProviderAccountCardSupplement.swift; sourceTree = "<group>"; };
 		736108D4DB88CF8CCD52C603 /* ProviderBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderBadge.swift; sourceTree = "<group>"; };
 		73D3015C65881224ECFCC5BB /* TranscriptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptView.swift; sourceTree = "<group>"; };
-		74CD69B67303EBB89689A420 /* CLIFocuser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIFocuser.swift; sourceTree = "<group>"; };
 		768B90604779E18157A73FBB /* IndependentClaudeCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndependentClaudeCredentialStore.swift; sourceTree = "<group>"; };
 		77339C38F26D780CFD6D03EB /* ClaudeStatistics.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClaudeStatistics.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7803032F49F6D004A094939E /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		794FE41C25EE65B8F23019F7 /* NotchWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchWindow.swift; sourceTree = "<group>"; };
 		7AA9035C5B842200A3C1F84E /* ClaudeProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeProvider.swift; sourceTree = "<group>"; };
 		7F675DD2E08BB0AC4ADBB101 /* AttentionEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionEvent.swift; sourceTree = "<group>"; };
+		808F166AA1B5F781858856E1 /* TerminalSetupCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSetupCoordinator.swift; sourceTree = "<group>"; };
 		8132C4E4069A5B948316CCF6 /* ProviderSessionDisplayFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderSessionDisplayFormatter.swift; sourceTree = "<group>"; };
+		86B78596315756EA65E43D80 /* KittyTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KittyTerminalCapability.swift; sourceTree = "<group>"; };
 		86DF62498CA52D57F92CB797 /* ClaudeOAuthCallbackServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeOAuthCallbackServer.swift; sourceTree = "<group>"; };
 		872985FBB1CB099BD6D4B01E /* CodexSessionScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexSessionScanner.swift; sourceTree = "<group>"; };
 		8897EC95FCBE7A6D1A915AC7 /* UsageTrendChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageTrendChartView.swift; sourceTree = "<group>"; };
 		8938B8C0465ECC95BC0D9BAF /* GeminiAccountManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiAccountManager.swift; sourceTree = "<group>"; };
+		89661CA17E93D43C4B68FC23 /* GhosttyTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyTerminalCapability.swift; sourceTree = "<group>"; };
+		9106D93553358D8AFE4C3EE6 /* WarpTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WarpTerminalCapability.swift; sourceTree = "<group>"; };
 		93CE07D7E98CD2B87F87C0E0 /* PricingFetchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PricingFetchService.swift; sourceTree = "<group>"; };
 		9503F292FA4FB52DDDF97355 /* ClaudeHookInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHookInstaller.swift; sourceTree = "<group>"; };
 		96A67BCB46008F2465867BD4 /* NotchWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchWindowController.swift; sourceTree = "<group>"; };
 		993CBC30E02D8B4126EE22D5 /* SessionProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionProvider.swift; sourceTree = "<group>"; };
 		99EA37388B7B02AEDF9C7A78 /* AllTimeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllTimeView.swift; sourceTree = "<group>"; };
+		A0C7C98F9FB93519DCD7D594 /* ClaudeHookNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHookNormalizer.swift; sourceTree = "<group>"; };
+		A337A8A5F00CF27D753FA581 /* TerminalRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalRegistry.swift; sourceTree = "<group>"; };
 		A51BA7586FEEB898B1FE9ED8 /* TerminalFocusCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalFocusCoordinator.swift; sourceTree = "<group>"; };
+		A5E2079B7A7714C7BC618C2A /* AlacrittyTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlacrittyTerminalCapability.swift; sourceTree = "<group>"; };
+		A7538BF07592B7D765AF1C22 /* ExternalTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalTerminalCapability.swift; sourceTree = "<group>"; };
 		A776ADBF033757E89353F9E2 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		A7C96479A32A5A1C4D1A624B /* ShareRoleEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRoleEngine.swift; sourceTree = "<group>"; };
+		AD9EAD578F58BF668BBBFC13 /* TerminalReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalReadiness.swift; sourceTree = "<group>"; };
+		B2F24500B4C9F3F375B97402 /* TerminalAppleScriptRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalAppleScriptRunner.swift; sourceTree = "<group>"; };
 		B466FB316C76AB0C39E12E7B /* DiagnosticLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogger.swift; sourceTree = "<group>"; };
 		B5C4223D247CA4D681A19D53 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B7AD5E89B648F5018E34233A /* UpdaterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdaterService.swift; sourceTree = "<group>"; };
@@ -231,6 +267,8 @@
 		C3374C538E77CED126DE3016 /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
 		C451931F7085A7A4324697E9 /* .cs-launch */ = {isa = PBXFileReference; path = ".cs-launch"; sourceTree = "<group>"; };
 		C931907E9B4996736E4A7373 /* ClaudeAccountManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeAccountManager.swift; sourceTree = "<group>"; };
+		C9B269891E67AA3FB9D53E64 /* WezTermTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WezTermTerminalCapability.swift; sourceTree = "<group>"; };
+		CA7D5709A13CDC7751084AAF /* TerminalPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPreferences.swift; sourceTree = "<group>"; };
 		CAF9A88BAC1F779F77E517EB /* SessionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListView.swift; sourceTree = "<group>"; };
 		CCF8FD132C6328D09C336FB9 /* CodexProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexProvider.swift; sourceTree = "<group>"; };
 		CD0415091A24EBCDA6840A49 /* SessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetailView.swift; sourceTree = "<group>"; };
@@ -240,10 +278,11 @@
 		D1519B833F38D44123500B58 /* LanguageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageManager.swift; sourceTree = "<group>"; };
 		D74BEFC175DFC5CD3999DBE1 /* ToolActivityFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolActivityFormatter.swift; sourceTree = "<group>"; };
 		D9D13F949F9557AC75AAC3B1 /* ShareCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardView.swift; sourceTree = "<group>"; };
+		DA072464D4CA170B290FA84E /* AppRuntimePaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRuntimePaths.swift; sourceTree = "<group>"; };
 		DA847F7AAA8B25206BA33E25 /* ClaudeManagedAccountStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeManagedAccountStore.swift; sourceTree = "<group>"; };
 		DC3A33B6B13FE8262C5C6281 /* CodexUsageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsageService.swift; sourceTree = "<group>"; };
 		DD33F591AEEB93C40913AC8F /* ActivateFocuser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivateFocuser.swift; sourceTree = "<group>"; };
-		E03ECD659B4EF90B3210E459 /* claude-stats-gemini-hook.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = "claude-stats-gemini-hook.py"; sourceTree = "<group>"; };
+		E337F442CEE88957F93C95B2 /* KittyFocusSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KittyFocusSetup.swift; sourceTree = "<group>"; };
 		E3E1273546BE9434362C72E0 /* ClaudeStatistics.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ClaudeStatistics.entitlements; sourceTree = "<group>"; };
 		E476D9F870BCC0644BC74FD3 /* UsageHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageHistoryStore.swift; sourceTree = "<group>"; };
 		E59B402C6902996368A65A6F /* TranscriptParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptParser.swift; sourceTree = "<group>"; };
@@ -255,11 +294,12 @@
 		EDE6D238094644B3E5ECD8C9 /* ClaudePKCE.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudePKCE.swift; sourceTree = "<group>"; };
 		EEDC6DF1C15355DC5AE2FCF9 /* TrendChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendChartView.swift; sourceTree = "<group>"; };
 		EFDF211CE0556F7AFC14399A /* GeminiSessionScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiSessionScanner.swift; sourceTree = "<group>"; };
+		F10FC057E644E62D0BE8CD70 /* TerminalFocusRouteHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalFocusRouteHandler.swift; sourceTree = "<group>"; };
 		F1A3701AFF5252558AFDD027 /* PendingResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingResponse.swift; sourceTree = "<group>"; };
-		F520C1F9882F0227EED8B249 /* claude-stats-codex-hook.cpython-314.pyc */ = {isa = PBXFileReference; path = "claude-stats-codex-hook.cpython-314.pyc"; sourceTree = "<group>"; };
+		F4387E440942DCAE1B61C97F /* ITermTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ITermTerminalCapability.swift; sourceTree = "<group>"; };
 		F5486873DBEC29739725E366 /* StatusBarPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarPanel.swift; sourceTree = "<group>"; };
+		F807CA9217105B9A2E3C11F1 /* TerminalLaunchRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalLaunchRequest.swift; sourceTree = "<group>"; };
 		F9BE6119BE603D9EB8BB22C7 /* SessionQuickStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionQuickStats.swift; sourceTree = "<group>"; };
-		FA42F7AC4BB41556CDC7EFCC /* TerminalLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalLauncher.swift; sourceTree = "<group>"; };
 		FA8B62A57C9E8AD16345458A /* ShareMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareMetrics.swift; sourceTree = "<group>"; };
 		FAAFBA5B9EEDC2BB22BAF700 /* AutoRefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoRefreshCoordinator.swift; sourceTree = "<group>"; };
 		FF2A749714584E4976171E9D /* StatusLineInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusLineInstaller.swift; sourceTree = "<group>"; };
@@ -295,6 +335,7 @@
 				C931907E9B4996736E4A7373 /* ClaudeAccountManager.swift */,
 				BD2C72B18AE30277C693576A /* ClaudeAccountModeController.swift */,
 				40D1CDF1FEEF8397DDFDBBDC /* ClaudeAccountSourcePickerRow.swift */,
+				A0C7C98F9FB93519DCD7D594 /* ClaudeHookNormalizer.swift */,
 				DA847F7AAA8B25206BA33E25 /* ClaudeManagedAccountStore.swift */,
 				86DF62498CA52D57F92CB797 /* ClaudeOAuthCallbackServer.swift */,
 				3E2B51B9EC984248C05583D1 /* ClaudeOAuthClient.swift */,
@@ -325,13 +366,13 @@
 		23BF9034C5BAB628D0B18D2A /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				DA072464D4CA170B290FA84E /* AppRuntimePaths.swift */,
 				FAAFBA5B9EEDC2BB22BAF700 /* AutoRefreshCoordinator.swift */,
 				5B4066C394B5E23322D32189 /* GlobalHotKeyManager.swift */,
 				D1519B833F38D44123500B58 /* LanguageManager.swift */,
 				1EBE034854D1539811ED0D5F /* SearchUtils.swift */,
 				C220944581C7418B7B1797F3 /* ShareImageExporter.swift */,
 				24A2B4F377370E1969E00AD7 /* SharePreviewWindowController.swift */,
-				FA42F7AC4BB41556CDC7EFCC /* TerminalLauncher.swift */,
 				15FB669CCF4C2F10D4550624 /* TimeFormatter.swift */,
 			);
 			path = Utilities;
@@ -358,11 +399,13 @@
 				C451931F7085A7A4324697E9 /* .cs-launch */,
 				B5C4223D247CA4D681A19D53 /* Assets.xcassets */,
 				CC48F81473E62C269C6F830D /* App */,
+				9BC555BEDA9481C1C8E54D70 /* HookCLI */,
 				E35EDCF6E9274048C5840F07 /* Models */,
 				4B9D78F9EA8D76B30ABAE3A0 /* NotchNotifications */,
 				926902BA5B36203AE5F72598 /* Providers */,
 				417E2F5036800DE2EB2376A4 /* Resources */,
 				23FF6F758EC531D3457CE044 /* Services */,
+				3485B0A08F03E2A1488C1439 /* Terminal */,
 				B5DBBD15EE94A5A3DFC17A5C /* TerminalFocus */,
 				23BF9034C5BAB628D0B18D2A /* Utilities */,
 				630E776A88A7FDCBD895C84A /* ViewModels */,
@@ -388,10 +431,26 @@
 			path = Core;
 			sourceTree = "<group>";
 		};
+		3485B0A08F03E2A1488C1439 /* Terminal */ = {
+			isa = PBXGroup;
+			children = (
+				B2F24500B4C9F3F375B97402 /* TerminalAppleScriptRunner.swift */,
+				66851A558CEC1E024AAC87E6 /* TerminalCapability.swift */,
+				F807CA9217105B9A2E3C11F1 /* TerminalLaunchRequest.swift */,
+				CA7D5709A13CDC7751084AAF /* TerminalPreferences.swift */,
+				AD9EAD578F58BF668BBBFC13 /* TerminalReadiness.swift */,
+				A337A8A5F00CF27D753FA581 /* TerminalRegistry.swift */,
+				808F166AA1B5F781858856E1 /* TerminalSetupCoordinator.swift */,
+				62699901DDA713E91E341575 /* Capabilities */,
+			);
+			path = Terminal;
+			sourceTree = "<group>";
+		};
 		379E0A3E8B7BFDFDB44A5779 /* Gemini */ = {
 			isa = PBXGroup;
 			children = (
 				8938B8C0465ECC95BC0D9BAF /* GeminiAccountManager.swift */,
+				18ABF65F6A4D53F6441FB50C /* GeminiHookNormalizer.swift */,
 				398009672C963C1E8B72A03E /* GeminiPricingFetchService.swift */,
 				6470B331BB31EF4AE6E5CF51 /* GeminiProvider.swift */,
 				5BD468B7884551FA250E5E0C /* GeminiProviderAccountCardAccessory.swift */,
@@ -431,6 +490,22 @@
 				6FA36329D6370C7A093FC4F3 /* UI */,
 			);
 			path = NotchNotifications;
+			sourceTree = "<group>";
+		};
+		62699901DDA713E91E341575 /* Capabilities */ = {
+			isa = PBXGroup;
+			children = (
+				A5E2079B7A7714C7BC618C2A /* AlacrittyTerminalCapability.swift */,
+				61361192CBF13D3D64E6E20A /* AppleTerminalCapability.swift */,
+				08D0262FC6126091E6321EE0 /* EditorTerminalCapability.swift */,
+				A7538BF07592B7D765AF1C22 /* ExternalTerminalCapability.swift */,
+				89661CA17E93D43C4B68FC23 /* GhosttyTerminalCapability.swift */,
+				F4387E440942DCAE1B61C97F /* ITermTerminalCapability.swift */,
+				86B78596315756EA65E43D80 /* KittyTerminalCapability.swift */,
+				9106D93553358D8AFE4C3EE6 /* WarpTerminalCapability.swift */,
+				C9B269891E67AA3FB9D53E64 /* WezTermTerminalCapability.swift */,
+			);
+			path = Capabilities;
 			sourceTree = "<group>";
 		};
 		630E776A88A7FDCBD895C84A /* ViewModels */ = {
@@ -489,10 +564,19 @@
 			path = Providers;
 			sourceTree = "<group>";
 		};
+		9BC555BEDA9481C1C8E54D70 /* HookCLI */ = {
+			isa = PBXGroup;
+			children = (
+				027CDBE36D6D9439DB32C0AE /* HookCLI.swift */,
+			);
+			path = HookCLI;
+			sourceTree = "<group>";
+		};
 		A3F2E080F40C81B07741252D /* Codex */ = {
 			isa = PBXGroup;
 			children = (
 				684978AF102DA512FCD3D129 /* CodexAccountManager.swift */,
+				144DFB7A5B248A8375CDA9EE /* CodexHookNormalizer.swift */,
 				CCF8FD132C6328D09C336FB9 /* CodexProvider.swift */,
 				71A478AE0DFDC6ACA6A24199 /* CodexProviderAccountCardSupplement.swift */,
 				872985FBB1CB099BD6D4B01E /* CodexSessionScanner.swift */,
@@ -509,11 +593,14 @@
 				0B84A6ED09B77E2974C0629A /* AccessibilityFocuser.swift */,
 				DD33F591AEEB93C40913AC8F /* ActivateFocuser.swift */,
 				645A6AB9436D7D2577DAE9D8 /* AppleScriptFocuser.swift */,
-				74CD69B67303EBB89689A420 /* CLIFocuser.swift */,
 				193523F08B5073E042F772E1 /* GhosttyInspector.swift */,
+				387E20F7F962C004AD38B92C /* KittyFocuser.swift */,
+				E337F442CEE88957F93C95B2 /* KittyFocusSetup.swift */,
 				6A32D01DDF055A652F2C104D /* ProcessTreeWalker.swift */,
-				3F6FDF2AF5F2DDF7856E7CF0 /* TerminalAppRegistry.swift */,
+				5F483343402849CE44F4F47C /* TerminalCLICommand.swift */,
 				A51BA7586FEEB898B1FE9ED8 /* TerminalFocusCoordinator.swift */,
+				4ADE3FEF920338C79B20E30F /* TerminalFocusRoute.swift */,
+				F10FC057E644E62D0BE8CD70 /* TerminalFocusRouteHandler.swift */,
 				10E8B731850ABEECA18B111F /* TerminalFocusTarget.swift */,
 			);
 			path = TerminalFocus;
@@ -525,28 +612,16 @@
 				E3E1273546BE9434362C72E0 /* ClaudeStatistics.entitlements */,
 				68083922F93D555879FAD90B /* ClaudeStatisticsApp.swift */,
 				BF23C58F1F4E3E5605623ECE /* Info.plist */,
+				15809DA1BE38EFE9D002FB73 /* main.swift */,
 				C3374C538E77CED126DE3016 /* StatusBarController.swift */,
 				F5486873DBEC29739725E366 /* StatusBarPanel.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
 		};
-		D5361E69DC03D82DB5A3542B /* __pycache__ */ = {
-			isa = PBXGroup;
-			children = (
-				345FF2ABD185F9E5798BBE5B /* claude-stats-claude-hook.cpython-314.pyc */,
-				F520C1F9882F0227EED8B249 /* claude-stats-codex-hook.cpython-314.pyc */,
-			);
-			path = __pycache__;
-			sourceTree = "<group>";
-		};
 		D6EAABFC987FAD06F9612E16 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				6B109A7C2DB3ADB19D78966B /* claude-stats-claude-hook.py */,
-				0D0BDBFC8C3D56F9CF4EC424 /* claude-stats-codex-hook.py */,
-				E03ECD659B4EF90B3210E459 /* claude-stats-gemini-hook.py */,
-				D5361E69DC03D82DB5A3542B /* __pycache__ */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -581,6 +656,7 @@
 				D9D13F949F9557AC75AAC3B1 /* ShareCardView.swift */,
 				52FF7E2030D328036A1F8F6D /* SharePreviewView.swift */,
 				6E1B839DD5F15A6A55AE3727 /* StatisticsView.swift */,
+				17F2AED2ECC53E6BF8F6A40D /* TerminalSetupSheetView.swift */,
 				0AF9820A8A06DCCE5C35C294 /* Theme.swift */,
 				73D3015C65881224ECFCC5BB /* TranscriptView.swift */,
 				EEDC6DF1C15355DC5AE2FCF9 /* TrendChartView.swift */,
@@ -661,11 +737,6 @@
 			files = (
 				D06D7B513EFFD60742C93431 /* Assets.xcassets in Resources */,
 				AC5082113B4136915E426299 /* Localizable.strings in Resources */,
-				AFE91B8255370F07556D8778 /* claude-stats-claude-hook.cpython-314.pyc in Resources */,
-				8F443361DE985875804EBA32 /* claude-stats-claude-hook.py in Resources */,
-				838FCA756362110C51200C63 /* claude-stats-codex-hook.cpython-314.pyc in Resources */,
-				644030D25918FCACE332487C /* claude-stats-codex-hook.py in Resources */,
-				E41DA201187014D384578ABF /* claude-stats-gemini-hook.py in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -681,17 +752,20 @@
 				D99027587C25DA018DE94928 /* ActiveSession.swift in Sources */,
 				A2F1B0B01CE980A41F32D377 /* ActiveSessionsTracker.swift in Sources */,
 				59FB58B0D4D4298AF8A3A1A6 /* AggregateStats.swift in Sources */,
+				C37EC946871256BDC3D2370C /* AlacrittyTerminalCapability.swift in Sources */,
 				437AC945F5CE5337ED23DF9A /* AllTimeView.swift in Sources */,
+				BF1EFAB27138847B92339836 /* AppRuntimePaths.swift in Sources */,
 				BC65FB4B58BE9FD0EBB88C70 /* AppleScriptFocuser.swift in Sources */,
+				2412DFF76D3D61785F48C91B /* AppleTerminalCapability.swift in Sources */,
 				FF97501E49AA0A80727611F2 /* AttentionBridge.swift in Sources */,
 				A63890A01AF570ADBA7E4E11 /* AttentionEvent.swift in Sources */,
 				4A69484840B48CDE187957E0 /* AutoRefreshCoordinator.swift in Sources */,
-				7A994BF22E18433CA8216D90 /* CLIFocuser.swift in Sources */,
 				F324566F7B85AFF3C7E1EEAC /* CalendarHeatmap.swift in Sources */,
 				F34E915FE87F63D8BB7181BD /* ClaudeAccountManager.swift in Sources */,
 				B872C0AE8B54239EEA84509E /* ClaudeAccountModeController.swift in Sources */,
 				FE5ADEDB9BFDB937666A3163 /* ClaudeAccountSourcePickerRow.swift in Sources */,
 				A5B9E8F4EA41FC8313BF3228 /* ClaudeHookInstaller.swift in Sources */,
+				811F6A7F43B2B7E7B0588324 /* ClaudeHookNormalizer.swift in Sources */,
 				08EAA341478D88DCA10B74EE /* ClaudeManagedAccountStore.swift in Sources */,
 				1A2595CC75D0C5C9E079B80B /* ClaudeOAuthCallbackServer.swift in Sources */,
 				F033B4012C3FDB70B0DA893D /* ClaudeOAuthClient.swift in Sources */,
@@ -702,6 +776,7 @@
 				FEFC2968DA07D06063D40E24 /* ClaudeStatisticsApp.swift in Sources */,
 				3984119891F7BF33DEFA170B /* CodexAccountManager.swift in Sources */,
 				E8E2CDA7C4ACA1ADAF4CB0BB /* CodexHookInstaller.swift in Sources */,
+				1EC241EE092A30A2D08C2328 /* CodexHookNormalizer.swift in Sources */,
 				55DE2FD77D568E40AE4C239B /* CodexProvider.swift in Sources */,
 				424369442B1C850D63CBB8C4 /* CodexProviderAccountCardSupplement.swift in Sources */,
 				FD14DC1AD66B5C54FED7B078 /* CodexSessionScanner.swift in Sources */,
@@ -711,9 +786,12 @@
 				58C1BB54AF46F2D4E1C5DAAB /* CredentialService.swift in Sources */,
 				AC04F7B90669B03A4D8B3551 /* DatabaseService.swift in Sources */,
 				552244856F222EE6F9AFE7DA /* DiagnosticLogger.swift in Sources */,
+				46DAF4D49E051526F8F5AC55 /* EditorTerminalCapability.swift in Sources */,
+				D1F0E7D54D71FD6B3F073609 /* ExternalTerminalCapability.swift in Sources */,
 				FA20F885511C5F92715056F9 /* FSEventsWatcher.swift in Sources */,
 				DD7C095838B9FA06B94D9DFA /* GeminiAccountManager.swift in Sources */,
 				B308C8501282F4C35D073282 /* GeminiHookInstaller.swift in Sources */,
+				78EA265074EEB931AB16B1AF /* GeminiHookNormalizer.swift in Sources */,
 				278FAA854F5697F99EB34F5A /* GeminiPricingFetchService.swift in Sources */,
 				C096DD401EB0F2A1E31EFFB9 /* GeminiProvider.swift in Sources */,
 				AFE5B13BCD7D98DD27DF6EA0 /* GeminiProviderAccountCardAccessory.swift in Sources */,
@@ -722,11 +800,17 @@
 				58108CACA592BE955CCE7191 /* GeminiTranscriptParser.swift in Sources */,
 				5349F8DCA8E3C9A2C61A67D6 /* GeminiUsageService.swift in Sources */,
 				E7675692CADA29176784FA9D /* GhosttyInspector.swift in Sources */,
+				0508E2412893BA974CD32DAD /* GhosttyTerminalCapability.swift in Sources */,
 				3EB9F1EB0E5CCFFEB816D80D /* GlobalHotKeyManager.swift in Sources */,
+				435C5E5C30F6B2F28851BDDA /* HookCLI.swift in Sources */,
 				6E50954F02E729F9586DC3E4 /* HookInstaller.swift in Sources */,
+				EEF6531B07DC743CB520C909 /* ITermTerminalCapability.swift in Sources */,
 				9316665886245686434A4BF4 /* IndependentClaudeAccountManager.swift in Sources */,
 				4E4BEF51FB660CE04D41338F /* IndependentClaudeAccountViewModel.swift in Sources */,
 				8446541DF0CE23D10CA93E2D /* IndependentClaudeCredentialStore.swift in Sources */,
+				B0B1B4026A01E4A28C24922D /* KittyFocusSetup.swift in Sources */,
+				6D56C0EAAF4175166391D7EA /* KittyFocuser.swift in Sources */,
+				B671E1405611DE6D70BE23EB /* KittyTerminalCapability.swift in Sources */,
 				E04B621B671D090DB9155348 /* LanguageManager.swift in Sources */,
 				F3272760285AF18F519D8E80 /* MenuBarView.swift in Sources */,
 				6CB9AC028D3C2D548F717E01 /* NotchContainerView.swift in Sources */,
@@ -770,10 +854,19 @@
 				D73C2A7290E0250F8B50A372 /* StatusBarController.swift in Sources */,
 				B04844AD3BA910295978D241 /* StatusBarPanel.swift in Sources */,
 				F26A77813CEED46677E6F756 /* StatusLineInstaller.swift in Sources */,
-				9FE55FBB56F3BE1F3B1592D9 /* TerminalAppRegistry.swift in Sources */,
+				A134E80F31ECEE35EA36D455 /* TerminalAppleScriptRunner.swift in Sources */,
+				5568C0075035BD96EDA854B5 /* TerminalCLICommand.swift in Sources */,
+				0DE603B43CE5C46E0A3E53ED /* TerminalCapability.swift in Sources */,
 				8085DD6DBD24695A898B8A4B /* TerminalFocusCoordinator.swift in Sources */,
+				8A47113825B15370391C1135 /* TerminalFocusRoute.swift in Sources */,
+				871E27060B953A2929FB1580 /* TerminalFocusRouteHandler.swift in Sources */,
 				56242266D3D70E01E2A22FCA /* TerminalFocusTarget.swift in Sources */,
-				7FEDE160B6E6484B272C2078 /* TerminalLauncher.swift in Sources */,
+				F2DB839C76264FE914DC1B28 /* TerminalLaunchRequest.swift in Sources */,
+				BE4FDED4356AA89774DF4B8A /* TerminalPreferences.swift in Sources */,
+				28BC2444287AB7D7A32B68A3 /* TerminalReadiness.swift in Sources */,
+				7843151598D9561667E57EF3 /* TerminalRegistry.swift in Sources */,
+				2EB570758BE9F11F6E15AE78 /* TerminalSetupCoordinator.swift in Sources */,
+				2358E4D59FFEFE0FCAFE1042 /* TerminalSetupSheetView.swift in Sources */,
 				09979C26D757D52202ED250D /* Theme.swift in Sources */,
 				861A6FDE8151A6DF1D571793 /* TimeFormatter.swift in Sources */,
 				7FF6E85B58542CC7284AA3D0 /* ToolActivityFormatter.swift in Sources */,
@@ -791,6 +884,9 @@
 				F7761B0329D579925F2DB98E /* UsageView.swift in Sources */,
 				C48BDE19A5E58235BAB61F51 /* UsageViewModel.swift in Sources */,
 				663E5EC2269BC72FDE27ADB5 /* WaitingInputCard.swift in Sources */,
+				DE0235CC9D9671CEA84DB392 /* WarpTerminalCapability.swift in Sources */,
+				4CE3642E43CC24EF1EECFF65 /* WezTermTerminalCapability.swift in Sources */,
+				70DE2014995D643A72C0A9D0 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

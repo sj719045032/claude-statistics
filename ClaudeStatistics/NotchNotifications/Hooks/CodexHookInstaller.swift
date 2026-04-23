@@ -8,6 +8,7 @@ struct CodexHookInstaller: HookInstalling {
         "claude-stats-codex-hook.py",
         "codex-island-state.py",
         "claude-island-state.py",
+        "--claude-stats-hook-provider",
     ]
 
     private let supportedHookEvents = [
@@ -40,11 +41,10 @@ struct CodexHookInstaller: HookInstalling {
     }
 
     private var commandPath: String {
-        "python3 ~/.codex/hooks/\(Self.scriptName).py"
+        HookInstallerUtils.currentHookCommand(provider: provider)
     }
 
     var isInstalled: Bool {
-        guard FileManager.default.fileExists(atPath: scriptPath) else { return false }
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: hooksPath)),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let hooks = obj["hooks"] as? [String: Any] else {
@@ -54,10 +54,6 @@ struct CodexHookInstaller: HookInstalling {
     }
 
     func install() async throws -> HookInstallResult {
-        guard HookInstallerUtils.python3Available() else {
-            return .python3Missing
-        }
-
         let snapshots = [
             FileSnapshot.capture(at: scriptPath),
             FileSnapshot.capture(at: hooksPath),
@@ -66,9 +62,9 @@ struct CodexHookInstaller: HookInstalling {
         let hooksDirExisted = FileManager.default.fileExists(atPath: hooksDir)
 
         do {
-            try HookInstallerUtils.installScript(bundleResourceName: Self.scriptName, destinationDir: hooksDir)
             try updateHooks()
             try enableCodexHooksFeature()
+            HookInstallerUtils.removeScript(at: scriptPath)
         } catch {
             for snapshot in snapshots {
                 try? snapshot.restore()
@@ -294,7 +290,6 @@ enum NotchHookSync {
     /// Install or uninstall each provider's hooks based on its own master switch.
     @discardableResult
     static func syncCurrent() async throws -> HookInstallResult {
-        var sawPythonMissing = false
         var sawConfirmationDenied = false
 
         for installer in installers {
@@ -306,8 +301,6 @@ enum NotchHookSync {
             switch result {
             case .success:
                 continue
-            case .python3Missing:
-                sawPythonMissing = true
             case .confirmationDenied:
                 sawConfirmationDenied = true
             case .failure(let error):
@@ -315,7 +308,6 @@ enum NotchHookSync {
             }
         }
 
-        if sawPythonMissing { return .python3Missing }
         if sawConfirmationDenied { return .confirmationDenied }
         return .success
     }

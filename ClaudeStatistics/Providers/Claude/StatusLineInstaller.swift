@@ -2,56 +2,60 @@ import Foundation
 
 /// Manages installation of the Claude Statistics-integrated status line script
 struct StatusLineInstaller {
-    static let scriptPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusline-command.sh")
-    static let backupPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusline-command.sh.bak")
+    private static let managedRoot = (NSHomeDirectory() as NSString).appendingPathComponent(".claude-statistics")
+    private static let managedBinDirectory = (managedRoot as NSString).appendingPathComponent("bin")
+    static let scriptPath = (managedBinDirectory as NSString).appendingPathComponent("claude-stats-statusline")
+    static let backupPath = (managedBinDirectory as NSString).appendingPathComponent("claude-stats-statusline.bak")
+    private static let legacyScriptPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusline-command.sh")
+    private static let legacyBackupPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusline-command.sh.bak")
     static let marker = "# Claude Statistics Integration v3"
     private static let markerPrefix = "# Claude Statistics Integration"
     static let settingsPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/settings.json")
-    static let settingsBackupPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusline-settings.bak.json")
-    private static let expectedCommand = "bash ~/.claude/statusline-command.sh"
+    static let settingsBackupPath = (managedRoot as NSString).appendingPathComponent("statusline-settings.bak.json")
+    private static let legacySettingsBackupPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusline-settings.bak.json")
+    private static let expectedCommand = "bash ~/.claude-statistics/bin/claude-stats-statusline"
+    private static let legacyExpectedCommand = "bash ~/.claude/statusline-command.sh"
 
     /// Check if our integrated script is currently installed and settings.json is synced
     static var isInstalled: Bool {
-        guard let content = try? String(contentsOfFile: scriptPath, encoding: .utf8),
-              content.contains(markerPrefix) else { return false }
-        return isSettingsSynced
+        if scriptContainsMarker(at: scriptPath), isSettingsSynced(with: expectedCommands) {
+            return true
+        }
+
+        // Treat the old ~/.claude install as installed so app startup can migrate it.
+        return scriptContainsMarker(at: legacyScriptPath) && isSettingsSynced(with: legacyExpectedCommands)
     }
 
     /// Check if settings.json statusLine points to our script
-    private static var isSettingsSynced: Bool {
+    private static func isSettingsSynced(with commands: Set<String>) -> Bool {
         guard let settings = readSettings(),
               let statusLine = settings["statusLine"] as? [String: Any],
               let command = statusLine["command"] as? String else {
             return false
         }
-        return command == expectedCommand
+        return commands.contains(command)
     }
 
     /// Check if a backup exists
     static var hasBackup: Bool {
-        FileManager.default.fileExists(atPath: backupPath)
+        let fm = FileManager.default
+        return fm.fileExists(atPath: backupPath) || fm.fileExists(atPath: legacyBackupPath)
     }
 
     /// Install the integrated status line script
     static func install() throws {
         let fm = FileManager.default
+        try fm.createDirectory(atPath: managedBinDirectory, withIntermediateDirectories: true)
 
-        // Backup current script only if it isn't ours (any version)
-        if fm.fileExists(atPath: scriptPath) {
-            let current = try String(contentsOfFile: scriptPath, encoding: .utf8)
-            if !current.contains(markerPrefix) {
-                if fm.fileExists(atPath: backupPath) {
-                    try fm.removeItem(atPath: backupPath)
-                }
-                try fm.copyItem(atPath: scriptPath, toPath: backupPath)
-            }
-        }
+        try backupScriptIfNeeded(at: scriptPath, to: backupPath)
 
         // Write new script
         try generatedScript().write(toFile: scriptPath, atomically: true, encoding: .utf8)
 
         // Make executable
         try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptPath)
+
+        try removeLegacyManagedScriptIfNeeded()
 
         // Sync settings.json to point statusLine to our script
         try syncSettingsOnInstall()
@@ -60,14 +64,16 @@ struct StatusLineInstaller {
     /// Restore the backup script
     static func restore() throws {
         let fm = FileManager.default
-        guard fm.fileExists(atPath: backupPath) else {
+        if fm.fileExists(atPath: backupPath) {
+            try restoreBackup(from: backupPath, to: scriptPath)
+        } else if fm.fileExists(atPath: legacyBackupPath) {
+            if scriptContainsMarker(at: scriptPath) {
+                try? fm.removeItem(atPath: scriptPath)
+            }
+            try restoreBackup(from: legacyBackupPath, to: legacyScriptPath)
+        } else {
             throw StatusLineError.noBackup
         }
-        if fm.fileExists(atPath: scriptPath) {
-            try fm.removeItem(atPath: scriptPath)
-        }
-        try fm.copyItem(atPath: backupPath, toPath: scriptPath)
-        try fm.removeItem(atPath: backupPath)
 
         // Restore original statusLine config in settings.json
         try syncSettingsOnRestore()
@@ -76,6 +82,52 @@ struct StatusLineInstaller {
     enum StatusLineError: LocalizedError {
         case noBackup
         var errorDescription: String? { "No backup file found" }
+    }
+
+    private static var expectedCommands: Set<String> {
+        [expectedCommand, "bash \(scriptPath)"]
+    }
+
+    private static var legacyExpectedCommands: Set<String> {
+        [legacyExpectedCommand, "bash \(legacyScriptPath)"]
+    }
+
+    private static func scriptContainsMarker(at path: String) -> Bool {
+        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
+            return false
+        }
+        return content.contains(markerPrefix)
+    }
+
+    private static func backupScriptIfNeeded(at path: String, to backupPath: String) throws {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: path) else { return }
+
+        let current = try String(contentsOfFile: path, encoding: .utf8)
+        guard !current.contains(markerPrefix) else { return }
+
+        if fm.fileExists(atPath: backupPath) {
+            try fm.removeItem(atPath: backupPath)
+        }
+        try fm.copyItem(atPath: path, toPath: backupPath)
+    }
+
+    private static func removeLegacyManagedScriptIfNeeded() throws {
+        let fm = FileManager.default
+        guard scriptContainsMarker(at: legacyScriptPath) else { return }
+        try fm.removeItem(atPath: legacyScriptPath)
+    }
+
+    private static func restoreBackup(from backupPath: String, to destinationPath: String) throws {
+        let fm = FileManager.default
+        let parentDirectory = (destinationPath as NSString).deletingLastPathComponent
+        try fm.createDirectory(atPath: parentDirectory, withIntermediateDirectories: true)
+
+        if fm.fileExists(atPath: destinationPath) {
+            try fm.removeItem(atPath: destinationPath)
+        }
+        try fm.copyItem(atPath: backupPath, toPath: destinationPath)
+        try fm.removeItem(atPath: backupPath)
     }
 
     // MARK: - Settings.json sync
@@ -99,9 +151,11 @@ struct StatusLineInstaller {
     private static func syncSettingsOnInstall() throws {
         var settings = readSettings() ?? [:]
         let fm = FileManager.default
+        try fm.createDirectory(atPath: managedRoot, withIntermediateDirectories: true)
 
         // Backup current statusLine config on first install only
         if !fm.fileExists(atPath: settingsBackupPath),
+           !fm.fileExists(atPath: legacySettingsBackupPath),
            let current = settings["statusLine"] {
             let backupData = try JSONSerialization.data(withJSONObject: current, options: .prettyPrinted)
             try backupData.write(to: URL(fileURLWithPath: settingsBackupPath), options: .atomic)
@@ -119,11 +173,12 @@ struct StatusLineInstaller {
         var settings = readSettings() ?? [:]
         let fm = FileManager.default
 
-        if fm.fileExists(atPath: settingsBackupPath),
-           let data = fm.contents(atPath: settingsBackupPath),
+        let backupPath = fm.fileExists(atPath: settingsBackupPath) ? settingsBackupPath : legacySettingsBackupPath
+        if fm.fileExists(atPath: backupPath),
+           let data = fm.contents(atPath: backupPath),
            let oldConfig = try? JSONSerialization.jsonObject(with: data) {
             settings["statusLine"] = oldConfig
-            try fm.removeItem(atPath: settingsBackupPath)
+            try fm.removeItem(atPath: backupPath)
         } else {
             settings.removeValue(forKey: "statusLine")
         }
@@ -174,7 +229,7 @@ struct StatusLineInstaller {
         # Includes subagent transcripts; incremental parse via per-file size cache
         # Debug: export CLAUDE_STATUSLINE_DEBUG=1 to see parse stats on stderr
         # ---------------------------------------------------------------------------
-        TRANSCRIPT_CACHE_DIR="$HOME/.claude/statusline-cache"
+        TRANSCRIPT_CACHE_DIR="$HOME/.claude-statistics/statusline-cache"
         mkdir -p "$TRANSCRIPT_CACHE_DIR" 2>/dev/null
 
         total_input_tokens=0
