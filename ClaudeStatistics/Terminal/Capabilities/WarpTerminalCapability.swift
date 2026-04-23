@@ -18,13 +18,16 @@ struct WarpTerminalCapability: TerminalCapability, TerminalLaunching, TerminalRe
     }
 
     func launch(_ request: TerminalLaunchRequest) {
-        guard let scriptPath = AppRuntimePaths.runFile(named: "w.command") else {
-            return
-        }
+        // Mirror GhosttyTerminalCapability: the bootstrap script MUST live
+        // under request.cwd so the launching terminal uses the project
+        // directory as the new tab's working directory. Writing it to
+        // ~/.claude-statistics/run leaves the tab in the wrong cwd.
+        let expandedCwd = (request.cwd as NSString).expandingTildeInPath
+        let scriptPath = (expandedCwd as NSString).appendingPathComponent(".cs-launch")
         let content = """
         #!/bin/bash
         rm -f \(TerminalShellCommand.escape(scriptPath))
-        cd \(TerminalShellCommand.escape(request.cwd)) || exit 1
+        cd \(TerminalShellCommand.escape(expandedCwd)) || exit 1
         exec \(request.commandOnly)
         """
         guard (try? content.write(toFile: scriptPath, atomically: true, encoding: .utf8)) != nil,
