@@ -248,13 +248,13 @@ private struct MenuBarUsageCell: View {
     /// all cells advance in lockstep.
     let tick: Int
 
-    /// Fixed cell width. Tight-fit around icon(15) + inner spacing(2) +
-    /// text (~20pt for "100%") = 37pt, snapped to 38 so the cell doesn't
+    /// Fixed cell width. Tight-fit around icon(15) + inner spacing(5) +
+    /// text (~20pt for "100%") = 40pt, snapped to 42 so the cell doesn't
     /// breathe as segment values change.
-    private static let cellWidth: CGFloat = 38
+    private static let cellWidth: CGFloat = 42
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 5) {
             Image(kind.statusIconAssetName)
                 .resizable()
                 .renderingMode(.template)
