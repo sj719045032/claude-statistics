@@ -72,6 +72,7 @@
 		4E4BEF51FB660CE04D41338F /* IndependentClaudeAccountViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEEBABA82636376B36824D8 /* IndependentClaudeAccountViewModel.swift */; };
 		4F1FBB58C850CD3E947CA886 /* NotchStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3B518873560CAC7DE5DE5B /* NotchStateMachine.swift */; };
 		52769FCFB499502D23765EFB /* ToolActivityFormatterPermissionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F06F5996862455AE5ED7AD2B /* ToolActivityFormatterPermissionsTests.swift */; };
+		52F974903A8AF93F774EBECA /* CodexHookNormalizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EF25B053D417EBE841F89B8 /* CodexHookNormalizerTests.swift */; };
 		5349F8DCA8E3C9A2C61A67D6 /* GeminiUsageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D75041CC7940EEFCCEE54FA /* GeminiUsageService.swift */; };
 		552244856F222EE6F9AFE7DA /* DiagnosticLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B466FB316C76AB0C39E12E7B /* DiagnosticLogger.swift */; };
 		5568C0075035BD96EDA854B5 /* TerminalCLICommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F483343402849CE44F4F47C /* TerminalCLICommand.swift */; };
@@ -162,6 +163,7 @@
 		D64171EFA61052FC0A315681 /* SessionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B71B5593D63536AB462D70 /* SessionViewModel.swift */; };
 		D7035463E2541293F55B654D /* ClaudePKCE.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDE6D238094644B3E5ECD8C9 /* ClaudePKCE.swift */; };
 		D73C2A7290E0250F8B50A372 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3374C538E77CED126DE3016 /* StatusBarController.swift */; };
+		D87F1B9F8C9F7B628DD82D5E /* GeminiHookNormalizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67A6CC8A73A83B2478E9137B /* GeminiHookNormalizerTests.swift */; };
 		D98C48521859A7AF6E45A504 /* ToolOutputCleaning.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F4D9370C84C4AFB66D25201 /* ToolOutputCleaning.swift */; };
 		D99027587C25DA018DE94928 /* ActiveSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E023CB9F472AC7C93777B50 /* ActiveSession.swift */; };
 		DD7C095838B9FA06B94D9DFA /* GeminiAccountManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8938B8C0465ECC95BC0D9BAF /* GeminiAccountManager.swift */; };
@@ -290,11 +292,13 @@
 		669DD3F7CA0ACD5A8FFF69A3 /* ClaudeProviderAccountCardAccessory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeProviderAccountCardAccessory.swift; sourceTree = "<group>"; };
 		674190CA06E6AD12570EA1BF /* AccountManagers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountManagers.swift; sourceTree = "<group>"; };
 		6749A9BF125AC2A04C7043D5 /* DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
+		67A6CC8A73A83B2478E9137B /* GeminiHookNormalizerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiHookNormalizerTests.swift; sourceTree = "<group>"; };
 		68083922F93D555879FAD90B /* ClaudeStatisticsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatisticsApp.swift; sourceTree = "<group>"; };
 		684978AF102DA512FCD3D129 /* CodexAccountManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexAccountManager.swift; sourceTree = "<group>"; };
 		6A32D01DDF055A652F2C104D /* ProcessTreeWalker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessTreeWalker.swift; sourceTree = "<group>"; };
 		6AE7C2A2D6731BCD2D826C90 /* ProviderRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderRegistry.swift; sourceTree = "<group>"; };
 		6E1B839DD5F15A6A55AE3727 /* StatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsView.swift; sourceTree = "<group>"; };
+		6EF25B053D417EBE841F89B8 /* CodexHookNormalizerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexHookNormalizerTests.swift; sourceTree = "<group>"; };
 		6F0F61EEF95C517CC0B363C3 /* ShareMetricsBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareMetricsBuilder.swift; sourceTree = "<group>"; };
 		6F3B518873560CAC7DE5DE5B /* NotchStateMachine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchStateMachine.swift; sourceTree = "<group>"; };
 		711926C1469F96FC6CF23888 /* HookInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookInstaller.swift; sourceTree = "<group>"; };
@@ -433,7 +437,9 @@
 			children = (
 				947363ADD9A5EBADB39651B2 /* ActiveToolsAggregatorTests.swift */,
 				E10F402C2998B35DE30CF5E5 /* ClaudeHookNormalizerTests.swift */,
+				6EF25B053D417EBE841F89B8 /* CodexHookNormalizerTests.swift */,
 				450392F75EF01359109269C9 /* DisplayTextClassifierTests.swift */,
+				67A6CC8A73A83B2478E9137B /* GeminiHookNormalizerTests.swift */,
 				5657C95B75EDEA0DA7660426 /* InformationalEventGateTests.swift */,
 				E077808ABF96135D9B76672B /* LivenessCheckerTests.swift */,
 				4D7AC12A966340D54D712D4B /* NotchAutoAllowRulesTests.swift */,
@@ -932,7 +938,9 @@
 			files = (
 				E0DB60E0DF083742C57F76C8 /* ActiveToolsAggregatorTests.swift in Sources */,
 				88F2EFD1B9C27DA8F671021C /* ClaudeHookNormalizerTests.swift in Sources */,
+				52F974903A8AF93F774EBECA /* CodexHookNormalizerTests.swift in Sources */,
 				0B426BAD8A94D6326C0967A2 /* DisplayTextClassifierTests.swift in Sources */,
+				D87F1B9F8C9F7B628DD82D5E /* GeminiHookNormalizerTests.swift in Sources */,
 				CD563F1C5E793187EEB05347 /* InformationalEventGateTests.swift in Sources */,
 				B67485324065CEED99A923C2 /* LivenessCheckerTests.swift in Sources */,
 				F6EAAF46EC0B0469993F7674 /* NotchAutoAllowRulesTests.swift in Sources */,
