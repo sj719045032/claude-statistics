@@ -1,11 +1,11 @@
 ---
-import HomePage from "../../components/HomePage.astro";
+import Changelog from "../../components/Changelog.astro";
 import SiteLayout from "../../layouts/SiteLayout.astro";
 
 const language = "zh" as const;
-const currentPath = "/zh/";
+const currentPath = "/zh/changelog/";
 ---
 
 <SiteLayout language={language} currentPath={currentPath}>
-  <HomePage language={language} currentPath={currentPath} />
+  <Changelog language={language} currentPath={currentPath} />
 </SiteLayout>

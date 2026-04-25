@@ -1,0 +1,78 @@
+---
+import type { Language } from "../content/site";
+import { featureContent, featureHubCopy, featureSlugs } from "../content/features";
+import SiteHeader from "./SiteHeader.astro";
+import SiteFooter from "./SiteFooter.astro";
+
+interface Props {
+  language: Language;
+  currentPath: string;
+}
+
+const { language, currentPath } = Astro.props;
+const hub = featureHubCopy[language];
+const features = featureContent[language];
+---
+
+<SiteHeader language={language} currentPath={currentPath} />
+
+<main>
+  <section class="page-hero">
+    <div class="wrap">
+      <span class="eyebrow">{hub.eyebrow}</span>
+      <h1>{hub.title}</h1>
+      <p class="lede">{hub.lede}</p>
+    </div>
+  </section>
+
+  <section style="padding-top: 0;">
+    <div class="wrap">
+      <div class="feat-hub">
+        {featureSlugs.map((slug) => {
+          const feature = features[slug];
+          return (
+            <a class="feat-hub-card" href={`/${language}/features/${slug}/`}>
+              <span class="kicker">{feature.hubKicker}</span>
+              <h3>{feature.hubTitle}</h3>
+              <p class="lede-sm">{feature.hubBlurb}</p>
+              <ul>
+                {feature.hubBullets.map((bullet) => <li>{bullet}</li>)}
+              </ul>
+              <span class="feat-cta">{hub.learnMore} →</span>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top: 0;">
+    <div class="wrap">
+      <div class="download-card">
+        <div>
+          <span class="eyebrow" style="color:var(--accent);">
+            {language === "zh" ? "已经准备好" : "Ready to ship"}
+          </span>
+          <h2 style="margin-top:18px;">
+            {language === "zh" ? "下载应用,开始用。" : "Download the app and start using it."}
+          </h2>
+          <p style="margin-top:14px;max-width:480px;">
+            {language === "zh"
+              ? "macOS 14+ · Apple Silicon / Intel · MIT 开源 · 不上传数据。"
+              : "macOS 14+ · Apple Silicon / Intel · MIT open source · nothing leaves your machine."}
+          </p>
+          <div class="download-cta">
+            <a class="btn btn-light" href="https://github.com/sj719045032/claude-statistics/releases">
+              ↓ {language === "zh" ? "下载最新版本" : "Download latest"}
+            </a>
+            <a class="btn btn-outline-light" href={`/${language}/quickstart/`}>
+              {language === "zh" ? "查看快速开始" : "Read Quick Start"}
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<SiteFooter language={language} />

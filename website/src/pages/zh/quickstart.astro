@@ -1,11 +1,11 @@
 ---
-import HomePage from "../../components/HomePage.astro";
+import QuickStart from "../../components/QuickStart.astro";
 import SiteLayout from "../../layouts/SiteLayout.astro";
 
 const language = "zh" as const;
-const currentPath = "/zh/";
+const currentPath = "/zh/quickstart/";
 ---
 
 <SiteLayout language={language} currentPath={currentPath}>
-  <HomePage language={language} currentPath={currentPath} />
+  <QuickStart language={language} currentPath={currentPath} />
 </SiteLayout>

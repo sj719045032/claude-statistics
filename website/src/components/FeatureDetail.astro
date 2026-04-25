@@ -1,0 +1,147 @@
+---
+import type { Language } from "../content/site";
+import {
+  featureContent,
+  featureHubCopy,
+  type FeatureSlug
+} from "../content/features";
+import SiteHeader from "./SiteHeader.astro";
+import SiteFooter from "./SiteFooter.astro";
+
+interface Props {
+  language: Language;
+  currentPath: string;
+  slug: FeatureSlug;
+}
+
+const { language, currentPath, slug } = Astro.props;
+const features = featureContent[language];
+const feature = features[slug];
+const hub = featureHubCopy[language];
+const isZh = language === "zh";
+---
+
+<SiteHeader language={language} currentPath={currentPath} />
+
+<main>
+  <section class="page-hero">
+    <div class="wrap">
+      <div class="crumb">
+        <a href={`/${language}/`}>{isZh ? "首页" : "Home"}</a>
+        <span class="sep">/</span>
+        <a href={`/${language}/features/`}>{isZh ? "功能" : "Features"}</a>
+        <span class="sep">/</span>
+        <span class="here">{feature.eyebrow.split(" · ").slice(-1)[0]}</span>
+      </div>
+      <span class="eyebrow">{feature.eyebrow}</span>
+      <div class="feat-detail-hero" style="margin-top: 24px;">
+        <div>
+          <h1>{feature.title}</h1>
+          <p class="lede" style="margin-top: 22px;">{feature.lede}</p>
+          <div class="hero-cta">
+            <a class="btn btn-primary" href="https://github.com/sj719045032/claude-statistics/releases">
+              ↓ {isZh ? "下载最新版本" : "Download latest"}
+            </a>
+            <a class="btn btn-ghost" href={`/${language}/features/`}>
+              ← {isZh ? "查看全部功能" : "All features"}
+            </a>
+          </div>
+        </div>
+        <div class={feature.heroImage ? "feat-shot" : "feat-shot empty"}>
+          {feature.heroImage ? (
+            <img src={feature.heroImage} alt={feature.heroImageAlt} loading="lazy" />
+          ) : (
+            <span>{isZh ? "动态预览(应用内查看)" : "Live preview (in app)"}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top: 0;">
+    <div class="wrap">
+      <div class="feat-cap-grid">
+        {feature.capabilities.map((capability) => (
+          <div class="feat-cap">
+            <div class="num">{capability.num}</div>
+            <h4>{capability.title}</h4>
+            <p>{capability.text}</p>
+          </div>
+        ))}
+      </div>
+
+      <div class="feat-section">
+        <h3>{feature.howItWorks.title}</h3>
+        <p>{feature.howItWorks.intro}</p>
+        <ul class="feat-howto-list" style="margin-top: 24px;">
+          {feature.howItWorks.steps.map((step, index) => (
+            <li>
+              <span class="dot">{String(index + 1).padStart(2, "0")}</span>
+              <div class="body">
+                <strong>{step.heading}</strong>
+                {step.text}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div class="feat-section">
+        <h3>{feature.scenarios.title}</h3>
+        <ul class="feat-howto-list" style="margin-top: 24px;">
+          {feature.scenarios.items.map((scenario) => (
+            <li>
+              <span class="dot" style="background: rgba(201,100,66,0.12); color: var(--accent);">
+                ✦
+              </span>
+              <div class="body">
+                <strong>{scenario.title}</strong>
+                {scenario.text}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div class="feat-section">
+        <h3>{hub.related}</h3>
+        <div class="feat-related">
+          {feature.related.map((relatedSlug) => {
+            const related = features[relatedSlug];
+            return (
+              <a href={`/${language}/features/${relatedSlug}/`}>
+                <span class="kicker">{related.hubKicker}</span>
+                <strong>{related.hubTitle}</strong>
+              </a>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top: 24px;">
+    <div class="wrap">
+      <div class="download-card">
+        <div>
+          <span class="eyebrow" style="color:var(--accent);">
+            {isZh ? "已经准备好" : "Ready to ship"}
+          </span>
+          <h2 style="margin-top:18px;">
+            {isZh ? "下载应用,亲自试一试。" : "Download the app and try it yourself."}
+          </h2>
+          <div class="download-cta">
+            <a class="btn btn-light" href="https://github.com/sj719045032/claude-statistics/releases">
+              ↓ {isZh ? "下载最新版本" : "Download latest"}
+            </a>
+            <a class="btn btn-outline-light" href={`/${language}/quickstart/`}>
+              {isZh ? "快速开始" : "Quick Start"}
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<SiteFooter language={language} />

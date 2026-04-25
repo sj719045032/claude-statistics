@@ -1,32 +1,18 @@
 ---
-import { getAlternateLanguage, type Language, siteCopy } from "../content/site";
+import { type Language, siteCopy } from "../content/site";
+import { featureContent, featureSlugs } from "../content/features";
+import SiteHeader from "./SiteHeader.astro";
+import SiteFooter from "./SiteFooter.astro";
 
 interface Props {
   language: Language;
+  currentPath: string;
 }
 
-const { language } = Astro.props;
+const { language, currentPath } = Astro.props;
 const copy = siteCopy[language];
-const alternate = getAlternateLanguage(language);
 const isZh = language === "zh";
-
-const nav = isZh
-  ? {
-      features: "亮点",
-      providers: "能力",
-      analytics: "数据",
-      everyTab: "每个 tab",
-      roles: "角色",
-      download: "下载"
-    }
-  : {
-      features: "Features",
-      providers: "Capabilities",
-      analytics: "Analytics",
-      everyTab: "Every tab",
-      roles: "Roles",
-      download: "Download"
-    };
+const features = featureContent[language];
 
 const heroMeta = isZh
   ? [
@@ -140,9 +126,7 @@ const providers = [
   }
 ];
 
-const chartTabs = ["All", "Daily", "Weekly", "Monthly"];
 const chartData = [320, 410, 380, 520, 610, 540, 720, 680, 810, 760, 920, 1050, 980, 1120, 1280, 1200, 1380, 1428];
-const trendData = [40, 55, 62, 58, 72, 90, 110, 140, 168, 200, 245, 290, 340, 410, 495, 565, 640, 720, 800, 890, 940];
 
 function buildCurvePath(data: number[], width: number, height: number, inset = 10) {
   const max = Math.max(...data);
@@ -158,8 +142,6 @@ function buildCurvePath(data: number[], width: number, height: number, inset = 1
     .join(" ");
 }
 
-const areaPath = buildCurvePath(chartData, 600, 180);
-const miniTrendPath = buildCurvePath(trendData, 440, 100, 8);
 const miniUsagePath = buildCurvePath(chartData.slice(0, 10), 220, 30, 4);
 
 function buildHeatmapCells() {
@@ -188,29 +170,6 @@ function buildHeatmapCells() {
 }
 
 const heatmapCells = buildHeatmapCells();
-
-const topProjects = isZh
-  ? [
-      { p: "~/dev/claude-statistics", pct: 100, tok: "按 Token 汇总", cost: "按成本排序" },
-      { p: "~/work/pricing-engine", pct: 76, tok: "可周期钻取", cost: "本地实时生成" },
-      { p: "~/spike/fiber-parser", pct: 58, tok: "项目级排行", cost: "支持趋势联动" },
-      { p: "~/dev/codex-utils", pct: 40, tok: "模型拆分", cost: "统计可导出" },
-      { p: "~/tmp/gemini-test", pct: 24, tok: "跨 provider", cost: "统一视图" }
-    ]
-  : [
-      { p: "~/dev/claude-statistics", pct: 100, tok: "token totals", cost: "cost ranking" },
-      { p: "~/work/pricing-engine", pct: 76, tok: "period drill-down", cost: "generated locally" },
-      { p: "~/spike/fiber-parser", pct: 58, tok: "project ranking", cost: "trend linked" },
-      { p: "~/dev/codex-utils", pct: 40, tok: "model split", cost: "export-ready" },
-      { p: "~/tmp/gemini-test", pct: 24, tok: "cross-provider", cost: "one view" }
-    ];
-
-const modelDistribution = [
-  { m: "claude-sonnet-4.5", pct: 52, color: "#c96442" },
-  { m: "claude-opus-4", pct: 24, color: "#8b4530" },
-  { m: "gpt-5", pct: 14, color: "#3a3a37" },
-  { m: "gemini-2.5-pro", pct: 10, color: "#7a6fa3" }
-];
 
 const previewMetrics = isZh
   ? {
@@ -258,154 +217,12 @@ const previewMetrics = isZh
 
 const shareBadgeLabels = isZh ? ["吞吐猛兽", "缓存法师", "成本克制派", "项目跳跃者"] : ["Throughput Beast", "Cache Wizard", "Cost Minimalist", "Project Hopper"];
 
-const featurePosters = [
-  {
-    eyebrow: isZh ? "01 · SESSIONS" : "01 · SESSIONS",
-    title: isZh ? "所有会话,按项目折叠。" : "Every session, folded by project.",
-    copy: isZh
-      ? "~/.claude 和 ~/.codex 下的所有 transcript,按工作目录分组。模型徽章、token 数、成本、实时 context %。⌘F 全库 FTS 搜索,命中位置高亮。"
-      : "Your transcripts from ~/.claude and ~/.codex, grouped by working directory. Model badge, token count, cost, live context %. ⌘F searches the whole archive with FTS snippets.",
-    key: "sessions"
-  },
-  {
-    eyebrow: isZh ? "02 · TRANSCRIPT" : "02 · TRANSCRIPT",
-    title: isZh ? "工具调用分色、可搜、易读。" : "Tool calls classified, searchable, readable.",
-    copy: isZh
-      ? "User、Claude 和每个工具调用各有颜色。Markdown 正确渲染,代码块高亮。搜索定位到每条命中,滚动时始终保持位置。"
-      : "User, Claude and each tool get their own color. Markdown renders. Code blocks highlight. Search jumps to every hit and stays there while you scroll.",
-    key: "transcript"
-  },
-  {
-    eyebrow: isZh ? "03 · STATS" : "03 · STATS",
-    title: isZh ? "该看的数字,一屏看完。" : "Every number that matters, on one screen.",
-    copy: isZh
-      ? "Tokens、成本、sessions、messages — 跨 Claude / Codex / Gemini 聚合。点进任意项目,双 Y 轴趋势和模型分布立即展开。"
-      : "Tokens, cost, sessions, messages — aggregated across Claude, Codex and Gemini. Drill into any project for a dual-axis trend and model distribution.",
-    key: "stats"
-  },
-  {
-    eyebrow: isZh ? "04 · DAILY" : "04 · DAILY",
-    title: isZh ? "28 天节律,今天一眼可见。" : "A 28-day rhythm, with today in magenta.",
-    copy: isZh
-      ? "每天一根柱,今天那根是品红,永远跳出来。下方详情显示 sessions、messages、工具调用次数和环比变化。"
-      : "Bars for every day. Today's bar is magenta so you can't miss it. Details below show sessions, messages, tool calls and day-over-day delta.",
-    key: "daily"
-  },
-  {
-    eyebrow: isZh ? "05 · USAGE" : "05 · USAGE",
-    title: isZh ? "订阅窗口 · 重置倒计时 · 按 provider 分。" : "Subscription windows. Reset countdowns. Per provider.",
-    copy: isZh
-      ? "Claude 显示 5h / 7d / 7d-Sonnet。Codex 显示 5h / 7d。Gemini 追踪 Pro / Flash / Flash-Lite。绿 → 黄 → 红,一眼告诉你重置前会不会撞顶。"
-      : "Claude shows 5h / 7d / 7d-Sonnet. Codex shows 5h / 7d. Gemini tracks Pro, Flash, Flash-Lite. Green → amber → red tells you at a glance whether you'll hit the ceiling before reset.",
-    key: "usage"
-  },
-  {
-    eyebrow: isZh ? "06 · SETTINGS" : "06 · SETTINGS",
-    title: isZh ? "重度用户真正在乎的每个开关。" : "Every switch a heavy user actually wants.",
-    copy: isZh
-      ? "Resume in Auto、开机自启、全局 ⌃⌘S 快捷键、刷新频率、语言、字号、tab 拖拽重排。Sparkle 后台自动更新。"
-      : "Resume in Auto, launch at login, global ⌃⌘S shortcut, auto-refresh cadence, language, font size, tab reordering. Sparkle auto-updates in the background.",
-    key: "settings"
-  }
-];
-
-const roles = isZh
-  ? [
-      { name: "上下文驯兽师", desc: "Avg context > 75%" },
-      { name: "效率操盘手", desc: "Best token/session ratio" },
-      { name: "全栈开荒者", desc: "≥ 12 跨项目" },
-      { name: "多模型导演", desc: "4+ 模型混用" },
-      { name: "夜行工程师", desc: "> 40% 深夜活跃" },
-      { name: "冲刺型黑客", desc: "3+ 七天突发" },
-      { name: "稳健建造者", desc: "30 天在线" },
-      { name: "工具召唤师", desc: "> 65% tool-call" },
-      { name: "Vibe Coding 之王", desc: "200+ 会话/月" }
-    ]
-  : [
-      { name: "Context Beast Tamer", desc: "Avg context > 75%" },
-      { name: "Efficient Operator", desc: "Best token/session ratio" },
-      { name: "Full-Stack Pathfinder", desc: "≥ 12 cross-project" },
-      { name: "Multi-Model Director", desc: "4+ models mixed" },
-      { name: "Night-Shift Engineer", desc: "> 40% late-night" },
-      { name: "Sprint Hacker", desc: "3+ seven-day bursts" },
-      { name: "Steady Builder", desc: "30 days in a row" },
-      { name: "Tool Summoner", desc: "> 65% tool-call rate" },
-      { name: "Vibe Coding King", desc: "200+ sessions / month" }
-    ];
-
-const footerColumns = isZh
-  ? [
-      {
-        title: "产品",
-        links: [
-          { label: "下载最新版本", href: "https://github.com/sj719045032/claude-statistics/releases/latest" },
-          { label: "功能介绍", href: "#features" },
-          { label: "产品截图", href: "#every-tab" },
-          { label: "更新日志", href: "https://github.com/sj719045032/claude-statistics/releases" }
-        ]
-      },
-      {
-        title: "开发者",
-        links: [
-          { label: "GitHub 仓库", href: "https://github.com/sj719045032/claude-statistics" },
-          { label: "源码构建", href: "https://github.com/sj719045032/claude-statistics/blob/main/README.md" },
-          { label: "问题反馈", href: "https://github.com/sj719045032/claude-statistics/issues" },
-          { label: "贡献指南", href: "https://github.com/sj719045032/claude-statistics/pulls" }
-        ]
-      }
-    ]
-  : [
-      {
-        title: "Product",
-        links: [
-          { label: "Download latest", href: "https://github.com/sj719045032/claude-statistics/releases/latest" },
-          { label: "Features", href: "#features" },
-          { label: "Screenshots", href: "#every-tab" },
-          { label: "Changelog", href: "https://github.com/sj719045032/claude-statistics/releases" }
-        ]
-      },
-      {
-        title: "Developers",
-        links: [
-          { label: "GitHub repo", href: "https://github.com/sj719045032/claude-statistics" },
-          { label: "Build from source", href: "https://github.com/sj719045032/claude-statistics/blob/main/README.md" },
-          { label: "Report issues", href: "https://github.com/sj719045032/claude-statistics/issues" },
-          { label: "Contribute", href: "https://github.com/sj719045032/claude-statistics/pulls" }
-        ]
-      }
-    ];
+const bentoLinks = ["sessions", "usage", "analytics", "notch-island", "accounts", "share"] as const;
 ---
 
-<main>
-  <div class="nav">
-    <div class="wrap nav-inner">
-      <a class="brand" href="#top">
-        <img src="/icon.svg" alt="" />
-        <span>Claude Statistics</span>
-      </a>
-      <nav class="nav-links">
-        <a href="#features">{nav.features}</a>
-        <a href="#providers">{nav.providers}</a>
-        <a href="#analytics">{nav.analytics}</a>
-        <a href="#every-tab">{nav.everyTab}</a>
-        <a href="#roles">{nav.roles}</a>
-        <a href="#download">{nav.download}</a>
-      </nav>
-      <div class="nav-actions">
-        <a
-          class="btn btn-ghost btn-sm"
-          href={`/${alternate}/`}
-          data-language-switch
-          data-target-language={alternate}
-          aria-label={`${copy.switchLabel} / ${siteCopy[alternate].langLabel}`}
-        >
-          {copy.switchLabel}
-        </a>
-        <a class="btn btn-ghost btn-sm" href="https://github.com/sj719045032/claude-statistics">GitHub ↗</a>
-      </div>
-    </div>
-  </div>
+<SiteHeader language={language} currentPath={currentPath} />
 
+<main>
   <section class="hero" id="top">
     <div class="wrap hero-grid">
       <div>
@@ -767,204 +584,10 @@ const footerColumns = isZh
                 ))}
               </div>
             )}
+            <a class="bento-cta-link" href={`/${language}/features/${bentoLinks[index]}/`}>
+              {isZh ? "查看详情" : "Learn more"} →
+            </a>
           </div>
-        ))}
-      </div>
-    </div>
-  </section>
-
-  <section id="analytics">
-    <div class="wrap">
-      <div class="section-head">
-        <span class="eyebrow">{isZh ? "全时段分析" : "All-time analytics"}</span>
-        <h2 class="h2" style="margin-top:16px;">{isZh ? "Stats tab 里的一屏信号。" : "One screen of signal, inside the Stats tab."}</h2>
-        <p>{isZh ? "53 周 GitHub 风格热力图、4 项概览指标、趋势图、Top Projects 成本排名、模型分布 — 把原始 transcript 变成可读信号。" : "53-week GitHub-style heatmap, four overview metrics, trend chart, Top Projects ranked by cost, and model distribution — raw transcripts turned into readable signal."}</p>
-      </div>
-      <div class="chart-card">
-        <div class="chart-head">
-          <div>
-            <div style="font-size:11px;color:var(--fg3);font-family:var(--font-mono);letter-spacing:1px;">{previewMetrics.overviewEyebrow}</div>
-            <div class="total" style="margin-top:6px;">{previewMetrics.overviewTotal}</div>
-            <div style="font-size:12px;color:var(--app-red);font-family:var(--font-mono);margin-top:4px;">{previewMetrics.overviewSub}</div>
-          </div>
-          <div class="chart-tabs">
-            {chartTabs.map((tab, index) => <button class:list={index === 2 && "on"}>{tab}</button>)}
-          </div>
-        </div>
-        <svg viewBox="0 0 600 180" width="100%" preserveAspectRatio="none" style="display:block;">
-          <path d={`${areaPath} L 600 180 L 0 180 Z`} fill="rgba(201,100,66,0.18)"></path>
-          <path d={areaPath} fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"></path>
-        </svg>
-
-        <div style="margin-top:40px;">
-          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;">
-            <div style="font-size:13px;font-weight:600;">Activity · last 12 months</div>
-            <div style="font-family:var(--font-mono);font-size:11px;color:var(--fg3);">{previewMetrics.activityMeta}</div>
-          </div>
-          <div class="heatmap">
-            {heatmapCells.map((cell) => <div class:list={["cell", cell > 0 && `l${cell}`]}></div>)}
-          </div>
-          <div class="hm-legend">
-            <span>Less</span>
-            <span class="sq" style="background:var(--bg-3);"></span>
-            <span class="sq" style="background:#d4c4e0;"></span>
-            <span class="sq" style="background:#bf8cc4;"></span>
-            <span class="sq" style="background:#d868a8;"></span>
-            <span class="sq" style="background:var(--app-magenta);"></span>
-            <span>More</span>
-          </div>
-        </div>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:16px;margin-top:16px;">
-        <div class="chart-card">
-          <div style="font-size:13px;font-weight:500;margin-bottom:14px;">{isZh ? "项目排名 · 按成本" : "Top projects · by cost"}</div>
-          {topProjects.map((project, index) => (
-            <div style="display:grid;grid-template-columns:22px 1fr 64px 64px;gap:10px;align-items:center;padding:10px 0;border-bottom:1px dashed var(--hair);">
-              <span class="mono" style="font-size:11px;color:var(--fg3);">{String(index + 1).padStart(2, "0")}</span>
-              <div>
-                <div class="mono" style="font-size:12.5px;">{project.p}</div>
-                <div style="height:3px;background:rgba(28,28,28,0.06);margin-top:6px;border-radius:999px;overflow:hidden;">
-                  <div style={`height:100%;width:${project.pct}%;background:var(--accent);`}></div>
-                </div>
-              </div>
-                <span class="mono" style="font-size:12px;text-align:right;color:var(--fg2);">{project.tok}</span>
-                <span class="mono" style="font-size:12px;text-align:right;">{project.cost}</span>
-              </div>
-            ))}
-        </div>
-        <div class="chart-card">
-          <div style="font-size:13px;font-weight:500;margin-bottom:14px;">{isZh ? "Cost by model" : "Cost by model"}</div>
-          {modelDistribution.map((model, index) => (
-            <div style={`padding:12px 0;${index < modelDistribution.length - 1 ? "border-bottom:1px dashed var(--hair);" : ""}`}>
-              <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-                <span class="mono" style="font-size:12px;">{model.m}</span>
-                <span class="mono" style="font-size:12px;color:var(--fg3);">{isZh ? "示意分布" : "Preview split"}</span>
-              </div>
-              <div style="height:5px;background:rgba(28,28,28,0.06);border-radius:999px;overflow:hidden;">
-                <div style={`height:100%;width:${model.pct}%;background:${model.color};`}></div>
-              </div>
-            </div>
-          ))}
-          <div style="margin-top:18px;padding:14px;background:var(--paper-2);border-radius:10px;font-family:var(--font-mono);font-size:11.5px;color:var(--fg3);line-height:1.6;">
-            <div style="color:var(--ink);font-size:12px;margin-bottom:4px;">cache read · cache write</div>
-            {previewMetrics.cacheSummary}
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section id="every-tab">
-    <div class="wrap">
-      <div class="section-head">
-        <span class="eyebrow">{isZh ? "每一个 tab · 每一条信号" : "Every tab · every signal"}</span>
-        <h2 class="h2" style="margin-top:16px;">
-          {isZh ? "六块画布,从 session 列表到 settings 开关。" : "Six postcards — from the session list to the settings switches."}
-        </h2>
-        <p>
-          {isZh
-            ? "每一张都抽掉了 chrome,只留下那个 tab 最核心的节奏:折叠的会话、分色的 transcript、主数字 + sparkline、28 天节律、三个配额表、开关行。"
-            : "Each one strips the chrome and keeps the rhythm that tab is really about: folded sessions, color-coded transcript, hero number + sparkline, 28-day bars, three gauges, a row of switches."}
-        </p>
-      </div>
-      <div class="fp-grid">
-        {featurePosters.map((poster) => (
-          <article class="fp-card">
-            <div class="fp-art">
-              {poster.key === "sessions" && (
-                <div class="fp fp-sessions">
-                  <div class="fp-stack">
-                    {[78, 62, 54, 42].map((width, index) => (
-                      <div class:list={["fp-row", index === 0 && "on"]}>
-                        <span class="chev">▸</span>
-                        <span class="name" style={`width:${width}%`}></span>
-                        <span class="cnt">{[12, 8, 5, 3][index]}</span>
-                      </div>
-                    ))}
-                    {[68, 84, 58, 72].map((width) => (
-                      <div class="fp-subrow" style="margin-left:22px;">
-                        <span class="ttl" style={`width:${width}%`}></span>
-                        <span class="meta"></span>
-                      </div>
-                    ))}
-                  </div>
-                  <div class="fp-tag">session · grouped by project</div>
-                </div>
-              )}
-              {poster.key === "transcript" && (
-                <div class="fp fp-tx">
-                  <div class="fp-tx-lines">
-                    {["u", "c", "t", "t", "c", "t", "u", "c", "t", "t", "c"].map((tone, index) => (
-                      <div class:list={["fp-tx-line", `k-${tone}`, index === 5 && "hit"]}>
-                        <span class="tag"></span>
-                        <span class="body"></span>
-                        {index === 5 && <span class="mark">parse</span>}
-                      </div>
-                    ))}
-                  </div>
-                  <div class="fp-tag">transcript · tool calls classified</div>
-                </div>
-              )}
-              {poster.key === "stats" && (
-                <div class="fp fp-stats">
-                  <div class="fp-big">
-                    <div class="v">{previewMetrics.statsPosterTitle}</div>
-                    <div class="l">{previewMetrics.statsPosterValue}</div>
-                  </div>
-                  <svg viewBox="0 0 260 60" preserveAspectRatio="none" class="fp-spark">
-                    <path d={buildCurvePath([18, 22, 30, 28, 42, 55, 48, 62, 78, 72, 88, 104, 96, 118, 132, 148, 164], 260, 60, 4)} fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"></path>
-                  </svg>
-                  <div class="fp-kv">
-                    {previewMetrics.statsPosterItems.map((item) => <span><b>{item}</b></span>)}
-                  </div>
-                  <div class="fp-tag">stats · every signal</div>
-                </div>
-              )}
-              {poster.key === "daily" && (
-                <div class="fp fp-daily">
-                  <div class="fp-bars">
-                    {[42, 58, 76, 64, 92, 48, 22, 88, 110, 84, 132, 104, 152, 96, 64, 128, 148, 124, 102, 164, 142, 96, 118, 148, 132, 84, 172, 196].map((value, index, arr) => (
-                      <div class="b" style={`height:${(value / Math.max(...arr)) * 100}%;background:${index === arr.length - 1 ? "var(--app-magenta)" : index >= arr.length - 4 ? "#a84a9e" : "#6b5a9e"};`}></div>
-                    ))}
-                  </div>
-                  <div class="fp-today"><span class="dot"></span>{previewMetrics.dailySummary}</div>
-                  <div class="fp-tag">daily · 28-day rhythm</div>
-                </div>
-              )}
-              {poster.key === "usage" && (
-                <div class="fp fp-usage">
-                  {[
-                    { label: "5h", pct: 42, state: "safe", reset: "3h 42m left" },
-                    { label: "7d", pct: 38, state: "safe", reset: "7d 23h left" },
-                    { label: "7d Sonnet", pct: 72, state: "caution", reset: "7d 23h left" }
-                  ].map((row) => (
-                    <div class="fp-gauge">
-                      <span class="lbl">{row.label}</span>
-                      <span class="bar"><span class:list={["fill", `s-${row.state}`]} style={`width:${row.pct}%`}></span></span>
-                      <span class="pct">{row.pct}%</span>
-                      <span class="reset">{row.reset}</span>
-                    </div>
-                  ))}
-                  <div class="fp-tag">usage · windows + resets</div>
-                </div>
-              )}
-              {poster.key === "settings" && (
-                <div class="fp fp-settings">
-                  <div class="fp-switch"><span class="dot on"></span><span class="lbl">Resume in Auto</span><span class="tog on"><span></span></span></div>
-                  <div class="fp-switch"><span class="dot on"></span><span class="lbl">Launch at login</span><span class="tog on"><span></span></span></div>
-                  <div class="fp-switch"><span class="dot"></span><span class="lbl">Global shortcut</span><span class="kbd">⌃⌘S</span></div>
-                  <div class="fp-switch"><span class="dot"></span><span class="lbl">Auto refresh</span><span class="seg"><span>5s</span><span class="on">10s</span><span>30s</span></span></div>
-                  <div class="fp-tag">settings · every switch you want</div>
-                </div>
-              )}
-            </div>
-            <div class="fp-copy">
-              <span class="eyebrow">{poster.eyebrow}</span>
-              <h3 class="h3" style="margin-top:10px;margin-bottom:8px;">{poster.title}</h3>
-              <p>{poster.copy}</p>
-            </div>
-          </article>
         ))}
       </div>
     </div>
@@ -972,56 +595,18 @@ const footerColumns = isZh
 
   <section id="roles">
     <div class="wrap">
-      <div class="section-head">
-        <span class="eyebrow">{copy.share.eyebrow}</span>
-        <h2 class="h2" style="margin-top:16px;">{copy.share.title}</h2>
-        <p>{copy.share.text}</p>
-      </div>
-      <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:48px;align-items:start;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;">
         <div>
-          <div class="roles-grid">
-            {roles.map((role, index) => (
-              <div class="role">
-                <div class="rn">ROLE · {String(index + 1).padStart(2, "0")}</div>
-                <div class="rname">{role.name}</div>
-                <div class="rd">{role.desc}</div>
-              </div>
-            ))}
-          </div>
-          <div style="margin-top:24px;padding:20px;background:var(--paper-2);border-radius:12px;">
-            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-              <div style="flex:1 1 240px;">
-                <div style="font-size:13px;font-weight:600;">{isZh ? "可解锁徽章系统" : "Unlockable badge system"}</div>
-                <div style="font-size:12px;color:var(--fg3);margin-top:4px;">
-                  {isZh
-                    ? "按你的实际使用习惯自动解锁 · 形状仅示意,具体图标以 app 为准。"
-                    : "Auto-unlocked from your real usage patterns · shapes illustrative, app ships the real icons."}
-                </div>
-              </div>
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:10px;margin-top:14px;">
-              {[
-                { shape: "diamond", unlocked: true },
-                { shape: "hex", unlocked: true },
-                { shape: "circle", unlocked: true },
-                { shape: "shield", unlocked: true },
-                { shape: "square", unlocked: true },
-                { shape: "triangle", unlocked: false },
-                { shape: "diamond", unlocked: false },
-                { shape: "hex", unlocked: false }
-              ].map((badge) => (
-                <div style={`aspect-ratio:1;${badge.unlocked ? "background:var(--surface);border:1px solid var(--hair-strong);" : "background:transparent;border:1px dashed var(--hair-strong);"}border-radius:10px;display:grid;place-items:center;opacity:${badge.unlocked ? 1 : 0.5};`}>
-                  <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                    {badge.shape === "diamond" && <path d="M14 3 L25 14 L14 25 L3 14 Z" fill={badge.unlocked ? "var(--accent)" : "none"} stroke="var(--fg3)" stroke-width="1.2" stroke-linejoin="round"></path>}
-                    {badge.shape === "hex" && <path d="M14 3 L24 9 L24 19 L14 25 L4 19 L4 9 Z" fill={badge.unlocked ? "var(--app-blue)" : "none"} stroke="var(--fg3)" stroke-width="1.2" stroke-linejoin="round"></path>}
-                    {badge.shape === "circle" && <circle cx="14" cy="14" r="11" fill={badge.unlocked ? "var(--app-magenta)" : "none"} stroke="var(--fg3)" stroke-width="1.2"></circle>}
-                    {badge.shape === "shield" && <path d="M14 3 L24 6 L24 15 Q24 22 14 25 Q4 22 4 15 L4 6 Z" fill={badge.unlocked ? "#6fbf5c" : "none"} stroke="var(--fg3)" stroke-width="1.2" stroke-linejoin="round"></path>}
-                    {badge.shape === "square" && <rect x="4" y="4" width="20" height="20" rx="3" fill={badge.unlocked ? "var(--app-orange)" : "none"} stroke="var(--fg3)" stroke-width="1.2"></rect>}
-                    {badge.shape === "triangle" && <path d="M14 3 L25 23 L3 23 Z" fill={badge.unlocked ? "#a84a9e" : "none"} stroke="var(--fg3)" stroke-width="1.2" stroke-linejoin="round"></path>}
-                  </svg>
-                </div>
-              ))}
-            </div>
+          <span class="eyebrow">{copy.share.eyebrow}</span>
+          <h2 class="h2" style="margin-top:16px;">{copy.share.title}</h2>
+          <p class="lede" style="margin-top:20px;">{copy.share.text}</p>
+          <div class="hero-cta">
+            <a class="btn btn-primary" href={`/${language}/features/share/`}>
+              {isZh ? "查看 9 个角色 + 11 个徽章 →" : "See 9 roles + 11 badges →"}
+            </a>
+            <a class="btn btn-ghost" href={`/${language}/features/`}>
+              {isZh ? "全部功能" : "All features"}
+            </a>
           </div>
         </div>
         <div>
@@ -1127,26 +712,6 @@ const footerColumns = isZh
       </div>
   </section>
 
-  <footer>
-    <div class="wrap">
-      <div class="foot-grid">
-        <div>
-          <div class="brand" style="margin-bottom:12px;">
-            <img src="/icon.svg" alt="" style="width:28px;height:28px;border-radius:7px;" />
-            <span>Claude Statistics</span>
-          </div>
-          <p style="max-width:420px;">{copy.footer.left}</p>
-        </div>
-        {footerColumns.map((column) => (
-          <div>
-            <h5>{column.title}</h5>
-            {column.links.map((link) => <a href={link.href}>{link.label}</a>)}
-          </div>
-        ))}
-      </div>
-    </div>
-  </footer>
-
   <script is:inline>
     (() => {
       const repoApi = "https://api.github.com/repos/sj719045032/claude-statistics";
@@ -1242,3 +807,5 @@ const footerColumns = isZh
     })();
   </script>
 </main>
+
+<SiteFooter language={language} />

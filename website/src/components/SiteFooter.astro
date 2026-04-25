@@ -1,0 +1,109 @@
+---
+import { type Language, siteCopy } from "../content/site";
+
+interface Props {
+  language: Language;
+}
+
+const { language } = Astro.props;
+const copy = siteCopy[language];
+const isZh = language === "zh";
+
+const columns = isZh
+  ? [
+      {
+        title: "产品",
+        links: [
+          { label: "首页", href: `/${language}/` },
+          { label: "功能详情", href: `/${language}/features/` },
+          { label: "快速开始", href: `/${language}/quickstart/` },
+          { label: "更新日志", href: `/${language}/changelog/` }
+        ]
+      },
+      {
+        title: "下载",
+        links: [
+          { label: "下载最新版本", href: "https://github.com/sj719045032/claude-statistics/releases/latest" },
+          { label: "全部历史版本", href: "https://github.com/sj719045032/claude-statistics/releases" },
+          { label: "源码构建", href: "https://github.com/sj719045032/claude-statistics/blob/main/README.md" }
+        ]
+      },
+      {
+        title: "开发者",
+        links: [
+          { label: "GitHub 仓库", href: "https://github.com/sj719045032/claude-statistics" },
+          { label: "问题反馈", href: "https://github.com/sj719045032/claude-statistics/issues" },
+          { label: "贡献指南", href: "https://github.com/sj719045032/claude-statistics/pulls" }
+        ]
+      }
+    ]
+  : [
+      {
+        title: "Product",
+        links: [
+          { label: "Home", href: `/${language}/` },
+          { label: "Features", href: `/${language}/features/` },
+          { label: "Quick Start", href: `/${language}/quickstart/` },
+          { label: "Changelog", href: `/${language}/changelog/` }
+        ]
+      },
+      {
+        title: "Download",
+        links: [
+          { label: "Latest release", href: "https://github.com/sj719045032/claude-statistics/releases/latest" },
+          { label: "All releases", href: "https://github.com/sj719045032/claude-statistics/releases" },
+          { label: "Build from source", href: "https://github.com/sj719045032/claude-statistics/blob/main/README.md" }
+        ]
+      },
+      {
+        title: "Developers",
+        links: [
+          { label: "GitHub repo", href: "https://github.com/sj719045032/claude-statistics" },
+          { label: "Report issues", href: "https://github.com/sj719045032/claude-statistics/issues" },
+          { label: "Contribute", href: "https://github.com/sj719045032/claude-statistics/pulls" }
+        ]
+      }
+    ];
+---
+
+<footer>
+  <div class="wrap">
+    <div class="foot-grid foot-grid-4">
+      <div>
+        <div class="brand" style="margin-bottom:12px;">
+          <img src="/icon.svg" alt="" style="width:28px;height:28px;border-radius:7px;" />
+          <span>Claude Statistics</span>
+        </div>
+        <p class="foot-tag">{copy.footer.left}</p>
+      </div>
+      {columns.map((column) => (
+        <div>
+          <h5>{column.title}</h5>
+          {column.links.map((link) => <a href={link.href}>{link.label}</a>)}
+        </div>
+      ))}
+    </div>
+    <div class="foot-bottom">
+      <span class="foot-mono">© 2025–2026 Claude Statistics · MIT License</span>
+      <span class="foot-mono foot-mono-dim">{isZh ? "为重度 AI 工作流打造" : "Built for serious AI workflows"}</span>
+    </div>
+  </div>
+
+  <script is:inline>
+    (() => {
+      const repoApi = "https://api.github.com/repos/sj719045032/claude-statistics";
+      const starNodes = Array.from(document.querySelectorAll("[data-github-stars]"));
+      if (starNodes.length === 0) return;
+      fetch(repoApi)
+        .then((response) => (response.ok ? response.json() : null))
+        .then((repo) => {
+          if (typeof repo?.stargazers_count === "number") {
+            starNodes.forEach((node) => {
+              node.textContent = `${repo.stargazers_count} ★`;
+            });
+          }
+        })
+        .catch(() => {});
+    })();
+  </script>
+</footer>

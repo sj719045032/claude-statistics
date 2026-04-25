@@ -1,0 +1,17 @@
+---
+import FeatureDetail from "../../../components/FeatureDetail.astro";
+import SiteLayout from "../../../layouts/SiteLayout.astro";
+import { featureSlugs, type FeatureSlug } from "../../../content/features";
+
+export function getStaticPaths() {
+  return featureSlugs.map((slug) => ({ params: { slug } }));
+}
+
+const { slug } = Astro.params as { slug: FeatureSlug };
+const language = "en" as const;
+const currentPath = `/en/features/${slug}/`;
+---
+
+<SiteLayout language={language} currentPath={currentPath}>
+  <FeatureDetail language={language} currentPath={currentPath} slug={slug} />
+</SiteLayout>

@@ -1,0 +1,67 @@
+---
+import { getAlternateLanguage, type Language, siteCopy } from "../content/site";
+
+interface Props {
+  language: Language;
+  currentPath: string;
+}
+
+const { language, currentPath } = Astro.props;
+const copy = siteCopy[language];
+const alternate = getAlternateLanguage(language);
+const isZh = language === "zh";
+
+const links = isZh
+  ? [
+      { href: `/${language}/`, label: "首页", match: "home" },
+      { href: `/${language}/features/`, label: "功能", match: "features" },
+      { href: `/${language}/quickstart/`, label: "快速开始", match: "quickstart" },
+      { href: `/${language}/changelog/`, label: "更新日志", match: "changelog" }
+    ]
+  : [
+      { href: `/${language}/`, label: "Home", match: "home" },
+      { href: `/${language}/features/`, label: "Features", match: "features" },
+      { href: `/${language}/quickstart/`, label: "Quick Start", match: "quickstart" },
+      { href: `/${language}/changelog/`, label: "Changelog", match: "changelog" }
+    ];
+
+function isActive(match: string): boolean {
+  const path = currentPath.replace(/^\/(en|zh)/, "");
+  if (match === "home") return path === "/" || path === "";
+  if (match === "features") return path.startsWith("/features");
+  if (match === "quickstart") return path.startsWith("/quickstart");
+  if (match === "changelog") return path.startsWith("/changelog");
+  return false;
+}
+---
+
+<div class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href={`/${language}/`}>
+      <img src="/icon.svg" alt="" />
+      <span>Claude Statistics</span>
+    </a>
+    <nav class="nav-links">
+      {links.map((link) => (
+        <a href={link.href} class:list={[isActive(link.match) && "on"]}>{link.label}</a>
+      ))}
+    </nav>
+    <div class="nav-actions">
+      <a
+        class="btn btn-ghost btn-sm"
+        href={`/${alternate}/`}
+        data-language-switch
+        data-target-language={alternate}
+        aria-label={`${copy.switchLabel} / ${siteCopy[alternate].langLabel}`}
+      >
+        {copy.switchLabel}
+      </a>
+      <a
+        class="btn btn-ghost btn-sm"
+        href="https://github.com/sj719045032/claude-statistics"
+      >
+        <span data-github-stars>29 ★</span>
+      </a>
+    </div>
+  </div>
+</div>

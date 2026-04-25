@@ -1,0 +1,198 @@
+---
+import { marked } from "marked";
+import type { Language } from "../content/site";
+import SiteHeader from "./SiteHeader.astro";
+import SiteFooter from "./SiteFooter.astro";
+
+interface Props {
+  language: Language;
+  currentPath: string;
+}
+
+const { language, currentPath } = Astro.props;
+const isZh = language === "zh";
+
+type Release = {
+  tag_name: string;
+  name: string | null;
+  published_at: string;
+  body: string;
+  html_url: string;
+  prerelease: boolean;
+  draft: boolean;
+};
+
+async function fetchReleases(): Promise<Release[]> {
+  try {
+    const response = await fetch(
+      "https://api.github.com/repos/sj719045032/claude-statistics/releases?per_page=30",
+      {
+        headers: {
+          "User-Agent": "claude-statistics-website-build",
+          Accept: "application/vnd.github+json"
+        }
+      }
+    );
+    if (!response.ok) {
+      console.warn(`[changelog] GitHub API returned ${response.status}`);
+      return [];
+    }
+    const json = (await response.json()) as Release[];
+    return json.filter((release) => !release.draft);
+  } catch (error) {
+    console.warn("[changelog] failed to fetch releases:", error);
+    return [];
+  }
+}
+
+function splitBody(body: string, lang: Language): string {
+  if (!body) return "";
+  const match = body.match(/^##\s+中文\s*$/m);
+  if (!match || match.index === undefined) {
+    return body.trim();
+  }
+  if (lang === "zh") {
+    const after = body.slice(match.index + match[0].length);
+    return after.replace(/^\s*\n/, "").trim();
+  }
+  return body.slice(0, match.index).trim();
+}
+
+function formatDate(iso: string, lang: Language): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  if (lang === "zh") {
+    return `${year} 年 ${month} 月 ${day} 日`;
+  }
+  const monthName = date.toLocaleString("en-US", { month: "short" });
+  return `${monthName} ${parseInt(day, 10)}, ${year}`;
+}
+
+const releases = await fetchReleases();
+
+const renderedReleases = releases.map((release, index) => {
+  const langBody = splitBody(release.body, language);
+  const html = langBody ? marked.parse(langBody, { breaks: false, gfm: true }) : "";
+  return {
+    tag: release.tag_name,
+    name: release.name || release.tag_name,
+    date: formatDate(release.published_at, language),
+    html,
+    url: release.html_url,
+    isLatest: index === 0 && !release.prerelease,
+    isPrerelease: release.prerelease
+  };
+});
+
+const hero = isZh
+  ? {
+      eyebrow: "更新日志",
+      title: "每个版本都有故事。",
+      lede: "从 GitHub Releases 实时拉取(构建时同步),双语版本说明,完整历史。"
+    }
+  : {
+      eyebrow: "Changelog",
+      title: "Every release tells a story.",
+      lede: "Pulled live from GitHub Releases at build time. Bilingual notes, full history."
+    };
+---
+
+<SiteHeader language={language} currentPath={currentPath} />
+
+<main>
+  <section class="page-hero">
+    <div class="wrap">
+      <span class="eyebrow">{hero.eyebrow}</span>
+      <h1>{hero.title}</h1>
+      <p class="lede">{hero.lede}</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="https://github.com/sj719045032/claude-statistics/releases/latest">
+          ↓ {isZh ? "下载最新版本" : "Download latest"}
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/sj719045032/claude-statistics/releases">
+          {isZh ? "在 GitHub 查看全部" : "View on GitHub"}
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top: 0;">
+    <div class="wrap">
+      {renderedReleases.length === 0 ? (
+        <div class="cl-empty">
+          {isZh
+            ? "构建时未能从 GitHub 拉取版本信息。请到 GitHub Releases 查看完整历史。"
+            : "Couldn't fetch releases from GitHub at build time. View the full history on GitHub Releases."}
+          <div style="margin-top: 16px;">
+            <a class="btn btn-ghost btn-sm" href="https://github.com/sj719045032/claude-statistics/releases">
+              {isZh ? "GitHub Releases →" : "GitHub Releases →"}
+            </a>
+          </div>
+        </div>
+      ) : (
+        <div class="cl-list">
+          {renderedReleases.map((release) => (
+            <article class="cl-item">
+              <div class="cl-head">
+                <span class="cl-version">{release.tag}</span>
+                <span class="cl-date">{release.date}</span>
+                {release.isLatest && <span class="cl-tag">{isZh ? "最新" : "Latest"}</span>}
+                {release.isPrerelease && (
+                  <span class="cl-tag" style="background: var(--app-orange);">
+                    {isZh ? "预发布" : "Pre-release"}
+                  </span>
+                )}
+                <a
+                  href={release.url}
+                  style="margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--fg3);"
+                >
+                  GitHub ↗
+                </a>
+              </div>
+              {release.html ? (
+                <div class="cl-body" set:html={release.html} />
+              ) : (
+                <div class="cl-body" style="color: var(--fg4); font-style: italic;">
+                  {isZh ? "(此版本暂无中文说明)" : "(no English notes for this release)"}
+                </div>
+              )}
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  </section>
+
+  <section style="padding-top: 56px;">
+    <div class="wrap">
+      <div class="download-card">
+        <div>
+          <span class="eyebrow" style="color:var(--accent);">
+            {isZh ? "保持更新" : "Stay current"}
+          </span>
+          <h2 style="margin-top:18px;">
+            {isZh ? "应用通过 Sparkle 自动更新。" : "Updates land automatically via Sparkle."}
+          </h2>
+          <p style="margin-top:14px;max-width:480px;">
+            {isZh
+              ? "每次启动都会检查新版本。增量更新通常只有几 MB,无需重新下载完整 DMG。"
+              : "Every launch checks for new versions. Delta updates typically weigh a few MB — no need to re-download the full DMG."}
+          </p>
+          <div class="download-cta">
+            <a class="btn btn-light" href={`/${language}/quickstart/`}>
+              {isZh ? "查看快速开始" : "Read Quick Start"}
+            </a>
+            <a class="btn btn-outline-light" href={`/${language}/features/`}>
+              {isZh ? "查看功能详情" : "Browse Features"}
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<SiteFooter language={language} />

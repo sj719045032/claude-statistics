@@ -1,0 +1,306 @@
+---
+import type { Language } from "../content/site";
+import SiteHeader from "./SiteHeader.astro";
+import SiteFooter from "./SiteFooter.astro";
+
+interface Props {
+  language: Language;
+  currentPath: string;
+}
+
+const { language, currentPath } = Astro.props;
+const isZh = language === "zh";
+
+const hero = isZh
+  ? {
+      eyebrow: "快速开始",
+      title: "从下载到看到第一份数据,大约 5 分钟。",
+      lede:
+        "Claude Statistics 是个原生 macOS 应用。安装、授权、自动索引,然后所有功能都已就绪 — 不需要登录、不需要订阅、不需要配置文件。"
+    }
+  : {
+      eyebrow: "Quick Start",
+      title: "From download to first data in about five minutes.",
+      lede:
+        "Claude Statistics is a native macOS app. Install it, grant access, let it index — every feature is ready immediately. No login, no subscription, no config files."
+    };
+
+const steps = isZh
+  ? [
+      {
+        n: "01",
+        title: "确认系统要求",
+        body: "Claude Statistics 是为 macOS 14 (Sonoma) 及以上设计的原生应用,在 Apple Silicon 和 Intel 上都跑得动。",
+        bullets: [
+          "macOS 14 Sonoma 或更新",
+          "Apple Silicon(M1+)或 Intel",
+          "至少装了一个 AI CLI:Claude Code、Codex 或 Gemini"
+        ]
+      },
+      {
+        n: "02",
+        title: "下载并安装",
+        body: "从 GitHub Releases 下载最新 DMG,把 Claude Statistics.app 拖进 Applications。",
+        bullets: [
+          "Latest DMG → 双击挂载 → 拖入 Applications",
+          "首次打开如果被 Gatekeeper 拦下,在 Finder 右键选 'Open'",
+          "DMG 未走 Apple notarize,所以你可能需要执行下面这条命令"
+        ],
+        block: {
+          lang: "bash",
+          text: "xattr -cr /Applications/Claude\\ Statistics.app"
+        },
+        callout:
+          "为什么不签名?这是开源项目,Apple Developer 会员费每年 99 美元。MIT 许可意味着任何人都可以从源码编译。"
+      },
+      {
+        n: "03",
+        title: "首次启动 · 授权访问",
+        body: "应用第一次启动时会请求读取 ~/.claude、~/.codex 和 ~/.gemini 三个目录。所有解析都在本地完成 — 没有数据离开你的机器。",
+        bullets: [
+          "在 macOS 隐私设置里授权 Full Disk Access(可选,提升性能)",
+          "应用图标会出现在菜单栏 — 这是它的家",
+          "如果没出现,可能被自动隐藏 — 用 Bartender / Hidden Bar 显示出来"
+        ]
+      },
+      {
+        n: "04",
+        title: "等待第一次解析",
+        body: "Claude Statistics 自动扫描 transcript 并建立 SQLite FTS 索引。首次解析时间取决于历史会话数量,通常几秒到一分钟。",
+        bullets: [
+          "进度条会出现在菜单栏面板顶部",
+          "解析完成后,Stats tab 立即显示总览数字",
+          "Sessions tab 按工作目录折叠所有历史会话"
+        ]
+      },
+      {
+        n: "05",
+        title: "解锁高阶功能",
+        body: "下面这些都在应用内一键开启 — 不需要写命令,但你可以知道它在哪做了什么改动。",
+        sections: [
+          {
+            title: "启用刘海岛(Notch Island)",
+            text:
+              "在 Settings 里为每个 provider 切换 Notch Island 开关。应用会自动安装 hook,写入对应位置:",
+            lines: [
+              "Claude → ~/.claude/settings.json 的 hooks 字段(PreToolUse、PostToolUse、Notification、Stop、PermissionRequest 等)",
+              "Codex → ~/.codex/hooks.json + ~/.codex/config.toml 中启用 [features] codex_hooks = true",
+              "Gemini → ~/.gemini/settings.json 的 hooks 字段(BeforeTool、AfterTool、Notification 等)"
+            ]
+          },
+          {
+            title: "全局快捷键",
+            text: "默认 ⌃⌘S 唤起菜单栏面板。在 Settings → Shortcuts 改键。",
+            lines: []
+          },
+          {
+            title: "切换 CLI 账号",
+            text:
+              "Settings → Accounts。每个 provider 可以保存多个账号,一键切换激活身份 — 应用直接重写 CLI 读取的认证文件,下一次 claude / codex / gemini 调用就以新身份运行。",
+            lines: []
+          },
+          {
+            title: "导出 Share Card",
+            text:
+              "菜单栏底部 Share 按钮 → 选择主题 → 导出 PNG。9 种角色和 11 个徽章基于你的真实使用模式自动派生。",
+            lines: []
+          }
+        ]
+      },
+      {
+        n: "06",
+        title: "出问题怎么办",
+        body: "Claude Statistics 自带诊断导出,可以一键把日志和最近事件打包发给 Issues。",
+        bullets: [
+          "Settings → Diagnostics → Export Diagnostics",
+          "GitHub Issues:https://github.com/sj719045032/claude-statistics/issues",
+          "更新通过 Sparkle 在后台自动完成,每次启动检查"
+        ],
+        callout: "如果 Notch Island 不弹出,通常是 hook 没有装上,或者 Codex 的 codex_hooks feature 还是 false。可以用应用 Settings 重装。"
+      }
+    ]
+  : [
+      {
+        n: "01",
+        title: "Check system requirements",
+        body: "Claude Statistics is a native macOS app for macOS 14 (Sonoma) and up, running on both Apple Silicon and Intel.",
+        bullets: [
+          "macOS 14 Sonoma or newer",
+          "Apple Silicon (M1+) or Intel",
+          "At least one AI CLI installed: Claude Code, Codex, or Gemini"
+        ]
+      },
+      {
+        n: "02",
+        title: "Download and install",
+        body: "Grab the latest DMG from GitHub Releases and drag Claude Statistics.app into Applications.",
+        bullets: [
+          "Latest DMG → double-click to mount → drag to Applications",
+          "If Gatekeeper blocks it on first launch, right-click the app in Finder and choose 'Open'",
+          "The DMG isn't Apple-notarized, so you may need to run the command below"
+        ],
+        block: {
+          lang: "bash",
+          text: "xattr -cr /Applications/Claude\\ Statistics.app"
+        },
+        callout:
+          "Why no signing? This is an open-source project. The Apple Developer membership is $99/year. MIT license means anyone can build from source."
+      },
+      {
+        n: "03",
+        title: "First launch · grant access",
+        body: "On first launch the app asks to read ~/.claude, ~/.codex and ~/.gemini. All parsing happens locally — nothing leaves your machine.",
+        bullets: [
+          "Grant Full Disk Access in System Settings (optional, for performance)",
+          "The app icon lives in the menu bar — that's its home",
+          "If it's hidden, use Bartender / Hidden Bar to surface it"
+        ]
+      },
+      {
+        n: "04",
+        title: "Wait for first parse",
+        body: "Claude Statistics scans transcripts and builds a SQLite FTS index. First parse takes seconds to a minute depending on history size.",
+        bullets: [
+          "A progress bar appears at the top of the menu bar panel",
+          "Once done, the Stats tab shows the totals immediately",
+          "The Sessions tab folds every history session by working directory"
+        ]
+      },
+      {
+        n: "05",
+        title: "Unlock advanced features",
+        body: "Each of these is one-click in-app — you don't write any commands, but you should know where they write changes.",
+        sections: [
+          {
+            title: "Enable Notch Island",
+            text:
+              "Toggle Notch Island per provider in Settings. The app auto-installs hooks at:",
+            lines: [
+              "Claude → hooks field in ~/.claude/settings.json (PreToolUse, PostToolUse, Notification, Stop, PermissionRequest, etc.)",
+              "Codex → ~/.codex/hooks.json + [features] codex_hooks = true in ~/.codex/config.toml",
+              "Gemini → hooks field in ~/.gemini/settings.json (BeforeTool, AfterTool, Notification, etc.)"
+            ]
+          },
+          {
+            title: "Global shortcut",
+            text: "⌃⌘S brings up the panel by default. Rebind in Settings → Shortcuts.",
+            lines: []
+          },
+          {
+            title: "Switch CLI accounts",
+            text:
+              "Settings → Accounts. Save multiple accounts per provider; one-click switches the active identity — the app rewrites the auth file the CLI reads, so your next claude / codex / gemini invocation runs as the new user.",
+            lines: []
+          },
+          {
+            title: "Export a Share Card",
+            text:
+              "Share button at the bottom of the panel → pick a theme → export PNG. 9 roles and 11 badges are auto-derived from your real usage.",
+            lines: []
+          }
+        ]
+      },
+      {
+        n: "06",
+        title: "When something goes wrong",
+        body: "Claude Statistics ships with diagnostics export — bundle logs and recent events into a single tarball for Issues.",
+        bullets: [
+          "Settings → Diagnostics → Export Diagnostics",
+          "GitHub Issues: https://github.com/sj719045032/claude-statistics/issues",
+          "Updates are delivered via Sparkle in the background, checked on each launch"
+        ],
+        callout: "If Notch Island never appears, it's usually a hook that didn't install, or Codex's codex_hooks feature is still false. Re-run the toggle from Settings."
+      }
+    ];
+---
+
+<SiteHeader language={language} currentPath={currentPath} />
+
+<main>
+  <section class="page-hero">
+    <div class="wrap">
+      <span class="eyebrow">{hero.eyebrow}</span>
+      <h1>{hero.title}</h1>
+      <p class="lede">{hero.lede}</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="https://github.com/sj719045032/claude-statistics/releases/latest">
+          ↓ {isZh ? "下载最新 DMG" : "Download the latest DMG"}
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/sj719045032/claude-statistics">
+          {isZh ? "查看源码" : "View source"}
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top: 0;">
+    <div class="wrap">
+      <ol class="qs-steps">
+        {steps.map((step) => (
+          <li class="qs-step">
+            <div class="qs-num">{step.n}</div>
+            <div class="qs-body">
+              <h3>{step.title}</h3>
+              <p>{step.body}</p>
+              {step.bullets && step.bullets.length > 0 && (
+                <ul>
+                  {step.bullets.map((bullet) => <li set:html={bullet.replace(/`([^`]+)`/g, '<code>$1</code>')} />)}
+                </ul>
+              )}
+              {step.block && (
+                <pre class="qs-block">{step.block.text}</pre>
+              )}
+              {step.sections && step.sections.length > 0 && (
+                <div style="display: flex; flex-direction: column; gap: 18px; margin-top: 8px;">
+                  {step.sections.map((section) => (
+                    <div>
+                      <strong style="display: block; font-size: 15px; color: var(--ink); margin-bottom: 6px;">
+                        {section.title}
+                      </strong>
+                      <p style="margin: 0 0 8px;">{section.text}</p>
+                      {section.lines && section.lines.length > 0 && (
+                        <ul style="margin-top: 4px;">
+                          {section.lines.map((line) => <li>{line}</li>)}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {step.callout && (
+                <div class="qs-callout">
+                  <strong>{isZh ? "提示" : "Tip"}</strong> · {step.callout}
+                </div>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </section>
+
+  <section style="padding-top: 56px;">
+    <div class="wrap">
+      <div class="download-card">
+        <div>
+          <span class="eyebrow" style="color:var(--accent);">
+            {isZh ? "继续探索" : "Keep exploring"}
+          </span>
+          <h2 style="margin-top:18px;">
+            {isZh ? "想看每个功能更深入的细节?" : "Want to dive deeper into each feature?"}
+          </h2>
+          <div class="download-cta">
+            <a class="btn btn-light" href={`/${language}/features/`}>
+              {isZh ? "查看功能详情 →" : "Browse Features →"}
+            </a>
+            <a class="btn btn-outline-light" href={`/${language}/changelog/`}>
+              {isZh ? "更新日志" : "Changelog"}
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<SiteFooter language={language} />

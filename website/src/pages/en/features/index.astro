@@ -1,0 +1,11 @@
+---
+import FeaturesHub from "../../../components/FeaturesHub.astro";
+import SiteLayout from "../../../layouts/SiteLayout.astro";
+
+const language = "en" as const;
+const currentPath = "/en/features/";
+---
+
+<SiteLayout language={language} currentPath={currentPath}>
+  <FeaturesHub language={language} currentPath={currentPath} />
+</SiteLayout>
