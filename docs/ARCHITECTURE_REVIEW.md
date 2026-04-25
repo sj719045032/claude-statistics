@@ -6,8 +6,12 @@
 > 配套文档：[`ARCHITECTURE.md`](./ARCHITECTURE.md)
 >
 > **实施进度**：
-> - ✅ 3.2 SessionProvider 协议按能力拆分（2026-04-25）
-> - ✅ 4.3 ActiveSessionsTracker 拆分（2026-04-25，配套 [`notch-hook-event-runtime-design.md`](./notch-hook-event-runtime-design.md) Phase 1）
+> - ✅ 3.2 SessionProvider 协议按能力拆分
+> - ✅ 4.3 ActiveSessionsTracker 拆分（配套 [`notch-hook-event-runtime-design.md`](./notch-hook-event-runtime-design.md) Phase 1）
+> - ✅ 4.4 UserDefaults 集中（部分：跨多文件复用的 raw key 集中到 `AppPreferences`；
+>   单文件单点 key 留在原处）
+> - ⏸️ 4.1 / 4.2 / 5.2：经核查均依赖 profiling 或 corner case，无 baseline 数据时
+>   贸然实施收益不明，**暂缓**
 
 本文档是对 Claude Statistics 代码库的全面架构评估。基于前面对六大子系统（启动 / 数据层 / Provider / Notch / 终端焦点 / UI）的深入阅读，总结出**9 条亮点**和**10 个优化点**，并为每个优化点给出具体的迁移方案、步骤和验证标准。
 
@@ -378,7 +382,7 @@ struct ClaudeStatisticsApp: App {
 
 ---
 
-### 3.2 SessionProvider 协议按能力拆分 ✅ 已完成（2026-04-25）
+### 3.2 SessionProvider 协议按能力拆分 ✅ 已完成
 
 > 落地说明：5 个窄协议（`SessionDataProvider` / `UsageProvider` / `AccountProvider` /
 > `HookProvider` / `SessionLauncher`）已就位；`SessionProvider` 改为合集 typealias，
@@ -748,7 +752,7 @@ func handleEvents(_ events: [FSEvent]) {
 
 ---
 
-### 4.3 ActiveSessionsTracker 拆分 ✅ 已完成（2026-04-25）
+### 4.3 ActiveSessionsTracker 拆分 ✅ 已完成
 
 > 落地说明：1430 → **722 行**；抽出 `LivenessChecker` / `RuntimeStatePersistor` /
 > `TerminalIdentityResolver` / `RuntimeSessionEventApplier` / `ActiveToolsAggregator`。
@@ -871,7 +875,20 @@ final class ActiveSessionsFacade: ObservableObject {
 
 ---
 
-### 4.4 UserDefaults 集中化
+### 4.4 UserDefaults 集中化 ✅ 已完成（部分）
+
+> 落地说明：新增 `Utilities/AppPreferences.swift`，集中收纳所有"跨多文件复用"的 raw
+> key（同步刷新、UI、Notch、Diagnostic、Editor、Provider 用量退避等共 13 个常量），
+> 配套 `registeredDefaults` 字典替换原 `DefaultSettings.register()` 内的硬编码。
+> 已经各自 SSOT 的 namespace（`NotchPreferences` / `MenuBarPreferences` /
+> `TerminalPreferences` / `GlobalHotKeyShortcut` / `NotchEventKind.defaultsKey` /
+> `ProviderRegistry.selectedProviderDefaultsKey` / `ClaudeAccountModeController.defaultsKey`）
+> 维持原状不动；单文件单点的 `"debug.accessibility.promptShown"`、系统 key
+> `"AppleLanguages"` 也保持原位。
+>
+> 验证标准里"`grep UserDefaults.standard` 只在一个文件出现"是个**过强的目标**——
+> 每个 namespace 自己的 SSOT 比强行汇总更可读，不追求 100% 收敛到 `AppPreferences`。
+
 
 #### 现状
 

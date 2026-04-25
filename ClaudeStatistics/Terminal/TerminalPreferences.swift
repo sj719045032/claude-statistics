@@ -31,12 +31,12 @@ enum EditorApp: String, CaseIterable, Identifiable {
     var isInstalled: Bool { appURL != nil }
 
     static var preferred: EditorApp {
-        let raw = UserDefaults.standard.string(forKey: "preferredEditor") ?? "VSCode"
+        let raw = UserDefaults.standard.string(forKey: AppPreferences.preferredEditor) ?? "VSCode"
         return EditorApp(rawValue: raw) ?? .vscode
     }
 
     static func setPreferred(_ app: EditorApp) {
-        UserDefaults.standard.set(app.rawValue, forKey: "preferredEditor")
+        UserDefaults.standard.set(app.rawValue, forKey: AppPreferences.preferredEditor)
     }
 
     static var resumeCopiedToastMessage: String {

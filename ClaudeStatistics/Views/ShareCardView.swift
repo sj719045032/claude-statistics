@@ -4,7 +4,7 @@ import SwiftUI
 
 struct ShareCardView: View {
     let result: ShareRoleResult
-    @AppStorage("appLanguage") private var appLanguage = "auto"
+    @AppStorage(AppPreferences.appLanguage) private var appLanguage = "auto"
 
     private let titleFontSize: CGFloat = 31
     private let subtitleFontSize: CGFloat = 16

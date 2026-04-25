@@ -3,7 +3,7 @@ import SwiftUI
 
 enum LanguageManager {
     static var currentLanguageCode: String? {
-        let lang = UserDefaults.standard.string(forKey: "appLanguage") ?? "auto"
+        let lang = UserDefaults.standard.string(forKey: AppPreferences.appLanguage) ?? "auto"
         switch lang {
         case "en", "zh-Hans":
             return lang
@@ -46,7 +46,7 @@ enum LanguageManager {
 
     /// Call on app startup to apply saved language setting
     static func setup() {
-        let lang = UserDefaults.standard.string(forKey: "appLanguage") ?? "auto"
+        let lang = UserDefaults.standard.string(forKey: AppPreferences.appLanguage) ?? "auto"
         apply(lang)
     }
 }

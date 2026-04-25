@@ -5,7 +5,7 @@ struct SharePreviewView: View {
     let result: ShareRoleResult
     let source: ShareTelemetrySource
     let onClose: () -> Void
-    @AppStorage("appLanguage") private var appLanguage = "auto"
+    @AppStorage(AppPreferences.appLanguage) private var appLanguage = "auto"
     @State private var exportedImage: ExportedShareImage?
     @State private var errorMessage: String?
     @State private var isRendering = false

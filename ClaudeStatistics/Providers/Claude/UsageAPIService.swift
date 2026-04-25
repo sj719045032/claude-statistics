@@ -154,7 +154,7 @@ final class UsageAPIService: ProviderUsageSource {
     }
 
     func resetLocalState() {
-        UserDefaults.standard.removeObject(forKey: "usageAPIRetryAfter")
+        UserDefaults.standard.removeObject(forKey: AppPreferences.claudeUsageRetryAfter)
         try? FileManager.default.removeItem(atPath: appCacheFilePath())
     }
 

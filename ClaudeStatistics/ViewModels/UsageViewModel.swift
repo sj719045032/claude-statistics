@@ -119,7 +119,7 @@ final class UsageViewModel: ObservableObject {
             await self.refresh()
         }
 
-        let interval = UserDefaults.standard.double(forKey: "refreshInterval")
+        let interval = UserDefaults.standard.double(forKey: AppPreferences.refreshInterval)
         autoRefreshInterval = interval > 0 ? interval : 300
     }
 

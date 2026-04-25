@@ -2,13 +2,14 @@ import AppKit
 
 enum NotchSoundPlayer {
     // Plays a short system sound when a high-priority attention event arrives.
-    // Users can disable this via UserDefaults key "notch.sound.enabled".
+    // Users can disable this via the notch sound enabled preference.
     static func playPermissionSound() {
-        guard UserDefaults.standard.object(forKey: "notch.sound.enabled") == nil ||
-              UserDefaults.standard.bool(forKey: "notch.sound.enabled") else {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: AppPreferences.notchSoundEnabled) == nil ||
+              defaults.bool(forKey: AppPreferences.notchSoundEnabled) else {
             return
         }
-        let name = UserDefaults.standard.string(forKey: "notch.sound.name") ?? "Hero"
+        let name = defaults.string(forKey: AppPreferences.notchSoundName) ?? "Hero"
         NSSound(named: NSSound.Name(name))?.play()
     }
 }

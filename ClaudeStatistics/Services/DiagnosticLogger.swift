@@ -41,7 +41,7 @@ final class DiagnosticLogger {
     /// Gated behind `diagnostic.verbose.enabled` so the default runtime
     /// doesn't build the string on every SwiftUI render pass.
     func verbose(_ message: @autoclosure () -> String) {
-        guard UserDefaults.standard.bool(forKey: "diagnostic.verbose.enabled") else { return }
+        guard UserDefaults.standard.bool(forKey: AppPreferences.verboseLogging) else { return }
         log(level: "VERBOSE", message: message())
     }
 

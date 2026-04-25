@@ -10,14 +10,14 @@ struct SettingsView: View {
     @Binding var tabOrder: [AppTab]
     @ObservedObject var updaterService: UpdaterService
     let provider: any SessionProvider
-    @AppStorage("autoRefreshEnabled") private var autoRefreshEnabled = true
-    @AppStorage("refreshInterval") private var refreshInterval = 300.0
+    @AppStorage(AppPreferences.autoRefreshEnabled) private var autoRefreshEnabled = true
+    @AppStorage(AppPreferences.refreshInterval) private var refreshInterval = 300.0
     @AppStorage(TerminalPreferences.preferredTerminalKey) private var preferredTerminal = TerminalPreferences.autoOptionID
-    @AppStorage("preferredEditor") private var preferredEditor = "VSCode"
-    @AppStorage("appLanguage") private var appLanguage = "auto"
-    @AppStorage("fontScale") private var fontScale = 1.0
-    @AppStorage("customInterval") private var customInterval = false
-    @AppStorage("diagnostic.verbose.enabled") private var verboseLogging = false
+    @AppStorage(AppPreferences.preferredEditor) private var preferredEditor = "VSCode"
+    @AppStorage(AppPreferences.appLanguage) private var appLanguage = "auto"
+    @AppStorage(AppPreferences.fontScale) private var fontScale = 1.0
+    @AppStorage(AppPreferences.customInterval) private var customInterval = false
+    @AppStorage(AppPreferences.verboseLogging) private var verboseLogging = false
     @AppStorage(MenuBarPreferences.key(for: .claude)) private var menuBarClaude = true
     @AppStorage(MenuBarPreferences.key(for: .codex)) private var menuBarCodex = true
     @AppStorage(MenuBarPreferences.key(for: .gemini)) private var menuBarGemini = true
@@ -2263,8 +2263,8 @@ private struct NotchNotificationsDetailView: View {
     let provider: ProviderKind
     let onBack: () -> Void
 
-    @AppStorage("notch.sound.enabled") private var soundEnabled: Bool = true
-    @AppStorage("notch.focusSilence.enabled") private var focusSilenceEnabled: Bool = true
+    @AppStorage(AppPreferences.notchSoundEnabled) private var soundEnabled: Bool = true
+    @AppStorage(AppPreferences.notchFocusSilenceEnabled) private var focusSilenceEnabled: Bool = true
     @AppStorage(NotchPreferences.idlePeekDetailedRowsKey) private var idlePeekDetailedRows: Bool = false
     @State private var preferencesRevision = 0
 

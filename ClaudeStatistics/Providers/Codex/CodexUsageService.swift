@@ -12,16 +12,16 @@ final class CodexUsageService: ProviderUsageSource {
     /// Tracks when we can next call the API (set on 429), persisted across restarts
     private(set) var retryAfter: Date? {
         get {
-            if let stored = UserDefaults.standard.object(forKey: "codexUsageAPIRetryAfter") as? Date {
+            if let stored = UserDefaults.standard.object(forKey: AppPreferences.codexUsageRetryAfter) as? Date {
                 return stored > Date() ? stored : nil
             }
             return nil
         }
         set {
             if let date = newValue {
-                UserDefaults.standard.set(date, forKey: "codexUsageAPIRetryAfter")
+                UserDefaults.standard.set(date, forKey: AppPreferences.codexUsageRetryAfter)
             } else {
-                UserDefaults.standard.removeObject(forKey: "codexUsageAPIRetryAfter")
+                UserDefaults.standard.removeObject(forKey: AppPreferences.codexUsageRetryAfter)
             }
         }
     }

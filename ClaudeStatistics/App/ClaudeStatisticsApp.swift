@@ -4,10 +4,7 @@ import TelemetryDeck
 
 private enum DefaultSettings {
     static func register() {
-        UserDefaults.standard.register(defaults: [
-            "autoRefreshEnabled": true,
-            "refreshInterval": 300.0
-        ])
+        UserDefaults.standard.register(defaults: AppPreferences.registeredDefaults)
         MenuBarPreferences.register()
     }
 }
@@ -119,7 +116,7 @@ final class AppState: ObservableObject {
         vm.configure(source: provider.usageSource, usagePresentation: provider.usagePresentation)
         if provider.capabilities.supportsUsage {
             vm.loadCache()
-            if UserDefaults.standard.bool(forKey: "autoRefreshEnabled") {
+            if UserDefaults.standard.bool(forKey: AppPreferences.autoRefreshEnabled) {
                 vm.startAutoRefresh()
             }
         } else {
@@ -328,7 +325,7 @@ final class AppState: ObservableObject {
         configureProfileLoader(for: provider)
         if provider.capabilities.supportsUsage {
             usageViewModel.loadCache()
-            if UserDefaults.standard.bool(forKey: "autoRefreshEnabled") {
+            if UserDefaults.standard.bool(forKey: AppPreferences.autoRefreshEnabled) {
                 usageViewModel.startAutoRefresh()
             }
         } else {
