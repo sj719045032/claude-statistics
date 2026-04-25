@@ -1,9 +1,13 @@
 # Claude Statistics 架构评估与优化建议
 
-> 最后更新：2026-04-24
+> 最后更新：2026-04-25
 > 覆盖版本：v3.1.0
 > 评估范围：140 个 Swift 文件（全量代码库）
 > 配套文档：[`ARCHITECTURE.md`](./ARCHITECTURE.md)
+>
+> **实施进度**：
+> - ✅ 3.2 SessionProvider 协议按能力拆分（2026-04-25）
+> - ✅ 4.3 ActiveSessionsTracker 拆分（2026-04-25，配套 [`notch-hook-event-runtime-design.md`](./notch-hook-event-runtime-design.md) Phase 1）
 
 本文档是对 Claude Statistics 代码库的全面架构评估。基于前面对六大子系统（启动 / 数据层 / Provider / Notch / 终端焦点 / UI）的深入阅读，总结出**9 条亮点**和**10 个优化点**，并为每个优化点给出具体的迁移方案、步骤和验证标准。
 
@@ -374,7 +378,15 @@ struct ClaudeStatisticsApp: App {
 
 ---
 
-### 3.2 SessionProvider 协议按能力拆分
+### 3.2 SessionProvider 协议按能力拆分 ✅ 已完成（2026-04-25）
+
+> 落地说明：5 个窄协议（`SessionDataProvider` / `UsageProvider` / `AccountProvider` /
+> `HookProvider` / `SessionLauncher`）已就位；`SessionProvider` 改为合集 typealias，
+> 全部消费方零改动直接保留。`AccountProvider` 因三家 provider 都实现了 profile fetch，
+> 最终也放进了 typealias（与原计划"仅 Claude 实现"不同）。窄化 1 处：
+> `configureProfileLoader(for: any AccountProvider)`，其余消费方跨多能力，强窄化收益小，
+> 保留 `SessionProvider`。
+
 
 #### 现状
 
@@ -736,7 +748,13 @@ func handleEvents(_ events: [FSEvent]) {
 
 ---
 
-### 4.3 ActiveSessionsTracker 拆分
+### 4.3 ActiveSessionsTracker 拆分 ✅ 已完成（2026-04-25）
+
+> 落地说明：1430 → **722 行**；抽出 `LivenessChecker` / `RuntimeStatePersistor` /
+> `TerminalIdentityResolver` / `RuntimeSessionEventApplier` / `ActiveToolsAggregator`。
+> 与 [`notch-hook-event-runtime-design.md`](./notch-hook-event-runtime-design.md)
+> Phase 1（统一语义事件层 `WireEventTranslator` + `CurrentOperation`）一并完成。
+
 
 #### 现状
 

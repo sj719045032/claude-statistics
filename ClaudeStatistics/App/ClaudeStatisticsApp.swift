@@ -336,7 +336,7 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func configureProfileLoader(for provider: any SessionProvider) {
+    private func configureProfileLoader(for provider: any AccountProvider) {
         profileViewModel.configure(loader: { await provider.fetchProfile() })
     }
 
