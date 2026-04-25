@@ -13,6 +13,10 @@
 > - ✅ 4.3 ActiveSessionsTracker 拆分（配套 [`notch-hook-event-runtime-design.md`](./notch-hook-event-runtime-design.md) Phase 1）
 > - ✅ 4.4 UserDefaults 集中（部分：跨多文件复用的 raw key 集中到 `AppPreferences`；
 >   单文件单点 key 留在原处）
+> - 🟡 5.1 关键路径测试补齐（部分）：`UsageVMRegistry` /
+>   `NotchStateMachine` / `ClaudeHookNormalizer` / `CodexHookNormalizer` /
+>   `GeminiHookNormalizer` 已覆盖（610 → 701 测试）；剩余 `TranscriptParser`
+>   三家 + `ShareRoleEngine` 待补
 > - ⏸️ 4.1 / 4.2 / 5.2：经核查均依赖 profiling 或 corner case，无 baseline 数据时
 >   贸然实施收益不明，**暂缓**
 
