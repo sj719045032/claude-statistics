@@ -13,11 +13,11 @@
 > - ✅ 4.3 ActiveSessionsTracker 拆分（配套 [`notch-hook-event-runtime-design.md`](./notch-hook-event-runtime-design.md) Phase 1）
 > - ✅ 4.4 UserDefaults 集中（部分：跨多文件复用的 raw key 集中到 `AppPreferences`；
 >   单文件单点 key 留在原处）
-> - 🟡 5.1 关键路径测试补齐（接近完成）：`UsageVMRegistry` /
+> - ✅ 5.1 关键路径测试补齐：所有 9 个优先模块已覆盖 —— `UsageVMRegistry` /
 >   `NotchStateMachine` / `ClaudeHookNormalizer` / `CodexHookNormalizer` /
 >   `GeminiHookNormalizer` / `TranscriptParser` (Claude) /
->   `CodexTranscriptParser` / `GeminiTranscriptParser` 已覆盖
->   （610 → 739 测试，+129）；剩余 `ShareRoleEngine`（1177 行）待补
+>   `CodexTranscriptParser` / `GeminiTranscriptParser` / `ShareRoleEngine`
+>   （610 → 751 测试，+141）
 > - ✅ 5.3 MenuBarView 瘦身：595 → 287 行，6 个内嵌子 View 拆到独立文件
 > - ⏸️ 4.1 / 4.2 / 5.2：经核查均依赖 profiling 或 corner case，无 baseline 数据时
 >   贸然实施收益不明，**暂缓**
@@ -1021,7 +1021,27 @@ AppPreferences.notchSoundEnabled
 
 ## 5. 优化点 P2：长期健康
 
-### 5.1 关键路径测试补齐
+### 5.1 关键路径测试补齐 ✅ 已完成
+
+> 落地说明：原计划 6 个优先模块，实际加 9 个测试文件、141 个测试，覆盖到：
+>
+> | 模块 | 测试文件 | 测试数 |
+> |---|---|---|
+> | `UsageVMRegistry` | `UsageVMRegistryTests` | 5 |
+> | `NotchStateMachine` | `NotchStateMachineTests` | 14 |
+> | `ClaudeHookNormalizer` | `ClaudeHookNormalizerTests` | 21 |
+> | `CodexHookNormalizer` | `CodexHookNormalizerTests` | 25 |
+> | `GeminiHookNormalizer` | `GeminiHookNormalizerTests` | 26 |
+> | `TranscriptParser` (Claude) | `TranscriptParserTests` | 14 |
+> | `CodexTranscriptParser` | `CodexTranscriptParserTests` | 11 |
+> | `GeminiTranscriptParser` | `GeminiTranscriptParserTests` | 13 |
+> | `ShareRoleEngine` | `ShareRoleEngineTests` | 12 |
+>
+> 总测试数 610 → 751（+141）。Parser 测试用临时 JSONL/JSON 夹具文件；
+> hook normalizer 测试用 in-memory `[String: Any]` 字典；ShareRoleEngine
+> 用 `metrics(...)` 工厂函数构造 ShareMetrics，覆盖 dispatcher 的 8 类
+> 可观察行为而不是逐个 score 函数。
+
 
 #### 现状
 
