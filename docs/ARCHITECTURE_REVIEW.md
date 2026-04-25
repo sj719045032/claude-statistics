@@ -21,6 +21,8 @@
 > - ✅ 5.3 MenuBarView 瘦身：595 → 287 行，6 个内嵌子 View 拆到独立文件
 > - ⏸️ 4.1 / 4.2 / 5.2：经核查均依赖 profiling 或 corner case，无 baseline 数据时
 >   贸然实施收益不明，**暂缓**
+> - ⏸️ 5.4 依赖注入：3.1 时已隐式做了部分（UsageVMRegistry / NotchRuntimeCoordinator
+>   用闭包注入 store lookup）；正式 `*Managing` 协议化等真有 mock 测试需求再做
 
 本文档是对 Claude Statistics 代码库的全面架构评估。基于前面对六大子系统（启动 / 数据层 / Provider / Notch / 终端焦点 / UI）的深入阅读，总结出**9 条亮点**和**10 个优化点**，并为每个优化点给出具体的迁移方案、步骤和验证标准。
 
@@ -1210,7 +1212,15 @@ struct MenuBarView: View {
 
 ---
 
-### 5.4 依赖注入与可测性
+### 5.4 依赖注入与可测性 ⏸️ 暂缓（部分隐式落地）
+
+> 落地说明：3.1 AppState 拆分时 `UsageVMRegistry` /
+> `NotchRuntimeCoordinator` 已经用闭包注入了 store lookup（不依赖具体
+> registry 类型），是一种轻量 DI。原计划要给 4 个 AccountManager 写
+> `*Managing` 协议 + 构造器默认值，但 5.1 加测试时没有用到 mock
+> （所有测试都是 fixture-based pure-logic），所以协议化暂时无价值。
+> **等真有 mock 需求再做** —— 把"可注入"和"已注入"绑定，避免空跑接口。
+
 
 #### 现状
 
