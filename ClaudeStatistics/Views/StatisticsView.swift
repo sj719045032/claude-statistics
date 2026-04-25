@@ -2,6 +2,7 @@ import SwiftUI
 
 struct StatisticsView: View {
     @ObservedObject var store: SessionDataStore
+    var inlineSessionDetailAdapter: InlineSessionDetailAdapter? = nil
     @State private var selectedPeriodDetail: PeriodStats?
     @State private var selectedProjectForAnalytics: ProjectGroup?
 
@@ -15,7 +16,8 @@ struct StatisticsView: View {
                         withAnimation(Theme.springAnimation) {
                             selectedProjectForAnalytics = nil
                         }
-                    }
+                    },
+                    inlineSessionDetailAdapter: inlineSessionDetailAdapter
                 )
             } else if !store.isFullParseComplete && store.parsedStats.isEmpty {
                 loadingView

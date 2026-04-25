@@ -38,7 +38,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable {
     }
 
     static func loadOrder() -> [AppTab] {
-        guard let data = UserDefaults.standard.data(forKey: "tabOrder"),
+        guard let data = UserDefaults.standard.data(forKey: AppPreferences.tabOrder),
               let order = try? JSONDecoder().decode([AppTab].self, from: data),
               Set(order) == Set(AppTab.allCases) else {
             return defaultOrder
@@ -48,7 +48,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable {
 
     static func saveOrder(_ order: [AppTab]) {
         if let data = try? JSONEncoder().encode(order) {
-            UserDefaults.standard.set(data, forKey: "tabOrder")
+            UserDefaults.standard.set(data, forKey: AppPreferences.tabOrder)
         }
     }
 }
@@ -62,8 +62,8 @@ struct MenuBarView: View {
     @ObservedObject var updaterService: UpdaterService
     @State private var selectedTab: AppTab = AppTab.loadOrder().first ?? .sessions
     @State private var tabOrder: [AppTab] = AppTab.loadOrder()
-    @AppStorage("fontScale") private var fontScale = 1.0
-    @AppStorage("ignoredUpdateVersion") private var ignoredUpdateVersion = ""
+    @AppStorage(AppPreferences.fontScale) private var fontScale = 1.0
+    @AppStorage(AppPreferences.ignoredUpdateVersion) private var ignoredUpdateVersion = ""
     @Namespace private var tabNamespace
     @StateObject private var toastCenter = ToastCenter()
     @StateObject private var terminalSetupCoordinator = TerminalSetupCoordinator.shared
@@ -125,7 +125,10 @@ struct MenuBarView: View {
                     case .sessions:
                         sessionContent
                     case .stats:
-                        StatisticsView(store: store)
+                        StatisticsView(
+                            store: store,
+                            inlineSessionDetailAdapter: makeInlineSessionDetailAdapter()
+                        )
                     case .usage:
                         if appState.providerCapabilities.supportsUsage {
                             ScrollView {
@@ -282,6 +285,30 @@ struct MenuBarView: View {
         } else {
             SessionListView(viewModel: sessionViewModel, store: store)
         }
+    }
+
+    private func makeInlineSessionDetailAdapter() -> InlineSessionDetailAdapter {
+        // Stats tab doesn't own a session-list view-model, but project analytics
+        // there still wants to drill into a session inline. Wire the existing
+        // sessionViewModel through a value-typed adapter so analytics stays
+        // unaware of the view-model itself.
+        InlineSessionDetailAdapter(
+            providerDisplayName: sessionViewModel.providerDisplayName,
+            supportsCost: sessionViewModel.providerCapabilities.supportsCost,
+            resumeCommand: { sessionViewModel.resumeCommand(for: $0) },
+            loadTrendData: { session, granularity in
+                await sessionViewModel.loadTrendData(for: session, granularity: granularity)
+            },
+            onNewSession: { sessionViewModel.openNewSession($0) },
+            onResume: { session in
+                sessionViewModel.resumeSession(session)
+                if TerminalPreferences.isEditorPreferred {
+                    toastCenter.show(EditorApp.resumeCopiedToastMessage)
+                }
+            },
+            onDelete: { sessionViewModel.deleteSession($0) },
+            onOpenTranscript: nil
+        )
     }
 
     private func ensureSelectedTabIsAvailable() {
@@ -452,7 +479,7 @@ struct TabButton: View {
 
 /// Wrapper that reactively applies locale from @AppStorage.
 struct PanelContentView: View {
-    @AppStorage("appLanguage") private var appLanguage = "auto"
+    @AppStorage(AppPreferences.appLanguage) private var appLanguage = "auto"
     @ObservedObject var appState: AppState
 
     private var currentLocale: Locale {

@@ -40,7 +40,24 @@ struct SessionListView: View {
                     withAnimation(Theme.springAnimation) {
                         selectedProjectForAnalytics = nil
                     }
-                }
+                },
+                inlineSessionDetailAdapter: InlineSessionDetailAdapter(
+                    providerDisplayName: viewModel.providerDisplayName,
+                    supportsCost: viewModel.providerCapabilities.supportsCost,
+                    resumeCommand: { viewModel.resumeCommand(for: $0) },
+                    loadTrendData: { session, granularity in
+                        await viewModel.loadTrendData(for: session, granularity: granularity)
+                    },
+                    onNewSession: { viewModel.openNewSession($0) },
+                    onResume: { session in
+                        viewModel.resumeSession(session)
+                        if TerminalPreferences.isEditorPreferred {
+                            toastCenter.show(EditorApp.resumeCopiedToastMessage)
+                        }
+                    },
+                    onDelete: { viewModel.deleteSession($0) },
+                    onOpenTranscript: { viewModel.openTranscript(for: $0) }
+                )
             )
         } else {
             sessionListContent
