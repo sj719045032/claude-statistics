@@ -736,9 +736,9 @@ final class SessionDataStore: ObservableObject {
 
     // MARK: - Top projects (all-time aggregation by project path)
 
-    /// Aggregate all sessions by their `cwd` (or projectPath fallback), sorted by estimated cost desc.
-    /// Used by the All-Time view's "Top Projects" card.
-    var topProjects: [TopProject] {
+    /// Aggregate projects by their `cwd` (or projectPath fallback) for a specific period.
+    /// Aggregate projects by their `cwd` (or projectPath fallback) for a specific period.
+    func aggregatePeriodTopProjects(for period: PeriodStats, periodType: StatsPeriod) -> [TopProject] {
         struct Acc {
             var cost: Double = 0
             var tokens: Int = 0
@@ -746,16 +746,64 @@ final class SessionDataStore: ObservableObject {
             var messageCount: Int = 0
         }
         var acc: [String: Acc] = [:]
-        let sessionById = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
+        
+        // Ensure we have current sessions
+        let currentSessions = sessions.isEmpty ? ProviderRegistry.provider(for: provider.kind).scanSessions() : sessions
+        let sessionById = Dictionary(uniqueKeysWithValues: currentSessions.map { ($0.id, $0) })
+        let resetDate = weeklyResetDate
+        
+        let periodStart = period.period
+        let periodEnd = periodType == .all ? Date.distantFuture : periodType.nextPeriodStart(after: periodStart, weeklyResetDate: resetDate)
 
         for (sessionId, stats) in parsedStats {
             guard let session = sessionById[sessionId] else { continue }
             let key = session.cwd ?? session.projectPath
+            
+            let sStart = stats.startTime ?? session.lastModified
+            let sEnd = stats.endTime ?? session.lastModified
+            
+            // Check if session interval [sStart, sEnd] overlaps with [periodStart, periodEnd)
+            let overlaps = sStart < periodEnd && sEnd >= periodStart
+            guard overlaps else { continue }
+            
             var a = acc[key, default: Acc()]
-            a.cost += stats.estimatedCost
-            a.tokens += stats.totalTokens
-            a.sessionCount += 1
-            a.messageCount += stats.messageCount
+            
+            if stats.fiveMinSlices.isEmpty {
+                // For all-time aggregated stats (Date.distantPast), or if start periods match
+                if periodType == .all || periodType.startOfPeriod(for: sStart, weeklyResetDate: resetDate) == periodStart {
+                    a.cost += stats.estimatedCost
+                    a.tokens += stats.totalTokens
+                    a.messageCount += stats.messageCount
+                    a.sessionCount += 1
+                }
+            } else {
+                var costInPeriod = 0.0
+                var tokensInPeriod = 0
+                var messagesInPeriod = 0
+                var hasActivityInPeriod = false
+                
+                for (sliceTime, slice) in stats.fiveMinSlices {
+                    if sliceTime >= periodStart && sliceTime < periodEnd {
+                        costInPeriod += slice.estimatedCost
+                        tokensInPeriod += slice.totalTokens
+                        messagesInPeriod += slice.messageCount
+                        hasActivityInPeriod = true
+                    }
+                }
+                
+                if hasActivityInPeriod {
+                    a.cost += costInPeriod
+                    a.tokens += tokensInPeriod
+                    a.messageCount += messagesInPeriod
+                    a.sessionCount += 1
+                } else if periodType == .all {
+                    // Fallback for .all when slices exist but for some reason aren't matching
+                    a.cost += stats.estimatedCost
+                    a.tokens += stats.totalTokens
+                    a.messageCount += stats.messageCount
+                    a.sessionCount += 1
+                }
+            }
             acc[key] = a
         }
 
@@ -768,7 +816,16 @@ final class SessionDataStore: ObservableObject {
                 sessionCount: v.sessionCount,
                 messageCount: v.messageCount
             )
-        }.sorted { $0.cost > $1.cost }
+        }.filter { $0.sessionCount > 0 }.sorted { $0.cost > $1.cost }
+    }
+
+    /// Aggregate all sessions by their `cwd` (or projectPath fallback), sorted by estimated cost desc.
+    /// Used by the All-Time view's "Top Projects" card.
+    var topProjects: [TopProject] {
+        guard let agg = visibleStats.first(where: { $0.period == .distantPast }) else {
+            return []
+        }
+        return aggregatePeriodTopProjects(for: agg, periodType: .all)
     }
 
     /// Trim/relabel a full path into something compact enough for a list row.

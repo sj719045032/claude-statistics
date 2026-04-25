@@ -10,12 +10,10 @@ final class NotchNotificationCenter: ObservableObject {
     weak var activeSessionsTracker: ActiveSessionsTracker?
 
     private var queue: [AttentionEvent] = []
-    private var timeoutTimers: [UUID: DispatchSourceTimer] = [:]
-    private var pendingByToolUseId: [String: UUID] = [:]   // dedup permission requests
-    private var displayedWaitingSessionKeys: Set<String> = []
-    private var lastInformationalAtBySession: [String: Date] = [:]
-    // Session-scoped "Always allow" rules: keyed by "provider:sessionId:toolName"
-    private var autoAllowRules: Set<String> = []
+    private let timerStore = NotificationTimerStore()
+    private var permissionRegistry = PermissionRequestRegistry()
+    private var informationalGate = InformationalEventGate()
+    private var autoAllowRules = NotchAutoAllowRules()
     func enqueue(_ event: AttentionEvent) {
         var event = event
         DiagnosticLogger.shared.verbose(
@@ -28,7 +26,7 @@ final class NotchNotificationCenter: ObservableObject {
             clearWaitingInput(for: event)
         }
         if case .sessionEnd = event.kind {
-            clearAutoAllowRules(provider: event.provider, sessionId: event.sessionId)
+            autoAllowRules.clear(provider: event.provider, sessionId: event.sessionId)
         }
         if event.kind.isSilentTracking {
             DiagnosticLogger.shared.verbose("Notch drop: silent-tracking provider=\(event.provider.rawValue) kind=\(describeKind(event.kind)) raw=\(event.rawEventName)")
@@ -39,9 +37,8 @@ final class NotchNotificationCenter: ObservableObject {
         // "Always allow" rule set by the user in a previous prompt — auto-approve silently.
         if case .permissionRequest(let tool, _, _, let interaction) = event.kind,
            interaction == .actionable,
-           let key = autoAllowKey(provider: event.provider, sessionId: event.sessionId, toolName: tool),
-           autoAllowRules.contains(key) {
-            DiagnosticLogger.shared.info("Notch drop: auto-allow rule matched key=\(key)")
+           autoAllowRules.contains(provider: event.provider, sessionId: event.sessionId, toolName: tool) {
+            DiagnosticLogger.shared.info("Notch drop: auto-allow rule matched provider=\(event.provider.rawValue) session=\(event.sessionId) tool=\(tool)")
             event.pending?.resolve(.allow)
             return
         }
@@ -78,12 +75,11 @@ final class NotchNotificationCenter: ObservableObject {
         // and denying the older socket can reject the real prompt before the
         // user has a chance to click Allow.
         if case .permissionRequest(_, _, let toolUseId, _) = event.kind, !toolUseId.isEmpty {
-            if let existingId = pendingByToolUseId[toolUseId] {
+            if let existingId = permissionRegistry.register(toolUseId: toolUseId, eventId: event.id) {
                 DiagnosticLogger.shared.warning("Notch dedup: same toolUseId=\(toolUseId.prefix(8)) keeping existing=\(existingId.uuidString.prefix(8))")
                 event.pending?.resolve(.ask)
                 return
             }
-            pendingByToolUseId[toolUseId] = event.id
         }
 
         // 2. Insert by priority (lower priority.number = higher importance)
@@ -124,15 +120,13 @@ final class NotchNotificationCenter: ObservableObject {
     }
 
     private func scheduleAutoDismiss(for event: AttentionEvent, after seconds: TimeInterval) {
-        guard timeoutTimers[event.id] == nil else { return }
+        guard !timerStore.contains(event.id) else { return }
         if currentEvent?.id == event.id {
             currentAutoDismissDeadline = Date().addingTimeInterval(seconds)
         }
-        let timer = DispatchSource.makeTimerSource(queue: .main)
-        timer.schedule(deadline: .now() + seconds)
-        timer.setEventHandler { [weak self] in self?.dismiss(id: event.id) }
-        timer.resume()
-        timeoutTimers[event.id] = timer
+        timerStore.schedule(id: event.id, after: seconds) { [weak self] in
+            self?.dismiss(id: event.id)
+        }
     }
 
     func decide(id: UUID, decision: Decision) {
@@ -179,7 +173,7 @@ final class NotchNotificationCenter: ObservableObject {
             event.pending?.resolve(.ask)
             clearTimer(event.id)
             if let toolUseId = event.toolUseId {
-                pendingByToolUseId.removeValue(forKey: toolUseId)
+                permissionRegistry.unregister(toolUseId: toolUseId)
             }
         }
         if let current = currentEvent, current.provider == provider {
@@ -205,7 +199,7 @@ final class NotchNotificationCenter: ObservableObject {
     func resumeAutoDismissAfterHover() {
         guard let current = currentEvent,
               let after = current.kind.autoDismissAfter,
-              timeoutTimers[current.id] == nil else { return }
+              !timerStore.contains(current.id) else { return }
         scheduleAutoDismiss(for: current, after: after)
     }
 
@@ -221,22 +215,10 @@ final class NotchNotificationCenter: ObservableObject {
         }
         if let target,
            case .permissionRequest(let tool, _, _, let interaction) = target.kind,
-           interaction == .actionable,
-           let key = autoAllowKey(provider: target.provider, sessionId: target.sessionId, toolName: tool) {
-            autoAllowRules.insert(key)
+           interaction == .actionable {
+            autoAllowRules.insert(provider: target.provider, sessionId: target.sessionId, toolName: tool)
         }
         decide(id: id, decision: .allow)
-    }
-
-    private func autoAllowKey(provider: ProviderKind, sessionId: String, toolName: String?) -> String? {
-        guard !sessionId.isEmpty, let toolName, !toolName.isEmpty else { return nil }
-        return "\(provider.rawValue):\(sessionId):\(toolName)"
-    }
-
-    private func clearAutoAllowRules(provider: ProviderKind, sessionId: String) {
-        guard !sessionId.isEmpty else { return }
-        let prefix = "\(provider.rawValue):\(sessionId):"
-        autoAllowRules = autoAllowRules.filter { !$0.hasPrefix(prefix) }
     }
 
     // Default-on. Users can flip it off in Settings to force every event to
@@ -300,11 +282,9 @@ final class NotchNotificationCenter: ObservableObject {
     private func scheduleTimeout(for event: AttentionEvent) {
         guard let pending = event.pending else { return }
         let delay = max(0.1, pending.timeoutAt.timeIntervalSinceNow)
-        let timer = DispatchSource.makeTimerSource(queue: .main)
-        timer.schedule(deadline: .now() + delay)
-        timer.setEventHandler { [weak self] in self?.handleTimeout(id: event.id) }
-        timer.resume()
-        timeoutTimers[event.id] = timer
+        timerStore.schedule(id: event.id, after: delay) { [weak self] in
+            self?.handleTimeout(id: event.id)
+        }
     }
 
     private func handleTimeout(id: UUID) {
@@ -316,30 +296,26 @@ final class NotchNotificationCenter: ObservableObject {
         if currentEvent?.id == id {
             currentAutoDismissDeadline = nil
         }
-        guard let timer = timeoutTimers.removeValue(forKey: id) else { return }
-        timer.setEventHandler {}
-        timer.cancel()
+        timerStore.cancel(id)
     }
 
     private func shouldSuppressInformationalEvent(_ event: AttentionEvent) -> Bool {
-        guard let key = informationalSessionKey(for: event) else { return false }
+        guard let key = InformationalEventGate.key(for: event) else { return false }
 
         switch event.kind {
         case .waitingInput:
-            if displayedWaitingSessionKeys.contains(key)
-                || currentEvent.map({ informationalSessionKey(for: $0) == key && $0.kind.isWaitingInput }) == true
-                || queue.contains(where: { informationalSessionKey(for: $0) == key && $0.kind.isWaitingInput }) {
+            if informationalGate.wasWaitingShown(key: key)
+                || currentEvent.map({ InformationalEventGate.key(for: $0) == key && $0.kind.isWaitingInput }) == true
+                || queue.contains(where: { InformationalEventGate.key(for: $0) == key && $0.kind.isWaitingInput }) {
                 return true
             }
-            displayedWaitingSessionKeys.insert(key)
+            informationalGate.markWaitingShown(key: key)
             return false
         case .taskDone, .sessionStart, .taskFailed:
-            let now = Date()
-            if let last = lastInformationalAtBySession[key],
-               now.timeIntervalSince(last) < 30 {
+            if informationalGate.isWithinRateLimitWindow(key: key) {
                 return true
             }
-            lastInformationalAtBySession[key] = now
+            informationalGate.recordInformational(key: key)
             return false
         case .permissionRequest, .activityPulse, .sessionEnd:
             return false
@@ -349,19 +325,19 @@ final class NotchNotificationCenter: ObservableObject {
     private func noteDismissed(_ event: AttentionEvent?) {
         guard let event else { return }
         if case .permissionRequest(_, _, let toolUseId, _) = event.kind, !toolUseId.isEmpty {
-            pendingByToolUseId.removeValue(forKey: toolUseId)
+            permissionRegistry.unregister(toolUseId: toolUseId)
         }
-        guard let key = informationalSessionKey(for: event) else { return }
+        guard let key = InformationalEventGate.key(for: event) else { return }
         if event.kind.isWaitingInput {
-            displayedWaitingSessionKeys.remove(key)
+            informationalGate.clearWaitingShown(key: key)
         }
     }
 
     private func clearWaitingInput(for event: AttentionEvent) {
-        guard let key = informationalSessionKey(for: event) else { return }
-        displayedWaitingSessionKeys.remove(key)
+        guard let key = InformationalEventGate.key(for: event) else { return }
+        informationalGate.clearWaitingShown(key: key)
 
-        if currentEvent.map({ informationalSessionKey(for: $0) == key && $0.kind.isWaitingInput }) == true {
+        if currentEvent.map({ InformationalEventGate.key(for: $0) == key && $0.kind.isWaitingInput }) == true {
             currentEvent?.pending?.resolve(.ask)
             if let id = currentEvent?.id {
                 clearTimer(id)
@@ -371,7 +347,7 @@ final class NotchNotificationCenter: ObservableObject {
         }
 
         queue.removeAll { queued in
-            guard informationalSessionKey(for: queued) == key, queued.kind.isWaitingInput else {
+            guard InformationalEventGate.key(for: queued) == key, queued.kind.isWaitingInput else {
                 return false
             }
             queued.pending?.resolve(.ask)
@@ -380,11 +356,6 @@ final class NotchNotificationCenter: ObservableObject {
         }
 
         advance()
-    }
-
-    private func informationalSessionKey(for event: AttentionEvent) -> String? {
-        guard !event.sessionId.isEmpty else { return nil }
-        return "\(event.provider.rawValue):\(event.sessionId)"
     }
 
     private func enrichPermissionRequest(_ event: AttentionEvent) -> AttentionEvent {
@@ -415,7 +386,8 @@ final class NotchNotificationCenter: ObservableObject {
             return
         }
 
-        if let current = currentEvent, shouldClearPermission(current, becauseOf: event) {
+        if let current = currentEvent,
+           PermissionRequestRegistry.shouldClearPermission(candidate: current, becauseOf: event) {
             DiagnosticLogger.shared.info(
                 "Notch stale permission cleared current session=\(current.sessionId) trigger=\(event.rawEventName) toolUseId=\(event.toolUseId ?? "-")"
             )
@@ -423,7 +395,7 @@ final class NotchNotificationCenter: ObservableObject {
         }
 
         let staleIDs = queue
-            .filter { shouldClearPermission($0, becauseOf: event) }
+            .filter { PermissionRequestRegistry.shouldClearPermission(candidate: $0, becauseOf: event) }
             .map(\.id)
         for id in staleIDs {
             DiagnosticLogger.shared.info(
@@ -433,28 +405,6 @@ final class NotchNotificationCenter: ObservableObject {
         }
     }
 
-    private func shouldClearPermission(_ candidate: AttentionEvent, becauseOf trigger: AttentionEvent) -> Bool {
-        guard case .permissionRequest(let permissionTool, _, let permissionToolUseId, _) = candidate.kind else {
-            return false
-        }
-        guard candidate.provider == trigger.provider,
-              candidate.sessionId == trigger.sessionId else {
-            return false
-        }
-
-        if trigger.rawEventName == "Stop" || trigger.rawEventName == "StopFailure" || trigger.rawEventName == "SessionEnd" {
-            return true
-        }
-
-        let triggerToolUseId = trigger.toolUseId?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalizedTriggerToolUseId = (triggerToolUseId?.isEmpty == false) ? triggerToolUseId : nil
-        if let normalizedTriggerToolUseId, !permissionToolUseId.isEmpty {
-            return permissionToolUseId == normalizedTriggerToolUseId
-        }
-
-        guard let triggerTool = trigger.toolName?.lowercased() else { return false }
-        return permissionTool.lowercased() == triggerTool
-    }
 }
 
 private extension AttentionKind {

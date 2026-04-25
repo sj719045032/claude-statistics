@@ -194,11 +194,10 @@ enum ToolActivityFormatter {
             return localized("notch.operation.compactingContext")
 
         case "PostToolUse", "PostToolUseFailure", "SubagentStop", "PostCompact", "AfterModel":
-            // Don't overwrite the richer PreToolUse/SubagentStart activity
-            // with a generic "Thinking…" — let the previous line persist until
-            // the next tool starts, so the UI reads "Reading foo.swift…" rather
-            // than flipping to the vague fallback between tool calls.
-            return nil
+            // Transition back to a generic "Thinking..." or "Working..." state
+            // so the Notch stays active and clearly indicates progress between
+            // tool calls or while finishing a turn.
+            return fallbackProcessingText(for: provider)
 
         case "Notification":
             // permission_prompt is fired alongside PermissionRequest, which

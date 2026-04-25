@@ -9,6 +9,7 @@ import SwiftUI
 struct AllTimeView: View {
     let stat: PeriodStats
     @ObservedObject var store: SessionDataStore
+    @Binding var selectedProject: ProjectGroup?
 
     @State private var trendData: [TrendDataPoint] = []
     @State private var heatmapScope: CalendarHeatmap.Scope = .last12Months
@@ -185,31 +186,25 @@ struct AllTimeView: View {
     // MARK: - Top projects (by cost)
 
     private var topProjectsCard: some View {
-        let top = Array(store.topProjects.prefix(10))
-        return Group {
-            if !top.isEmpty {
-                SectionCard {
-                    VStack(spacing: 6) {
-                        HStack {
-                            Label("allTime.topProjects", systemImage: "folder.fill")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text("\(top.count)")
-                                .font(.system(size: 10, design: .monospaced))
-                                .foregroundStyle(.tertiary)
-                        }
-                        Divider()
-                        let maxCost = top.first?.cost ?? 1
-                        ForEach(Array(top.enumerated()), id: \.element.id) { index, proj in
-                            TopProjectRow(
-                                project: proj,
-                                maxCost: max(maxCost, 0.000001),
-                                delay: Double(index) * 0.03
-                            )
-                        }
-                    }
-                }
+        PeriodTopProjectsCard(top: store.topProjects) { project in
+            let projectSessions = store.sessions.filter { ($0.cwd ?? $0.projectPath) == project.path }
+            guard !projectSessions.isEmpty else { return }
+            
+            let sorted = projectSessions.sorted { $0.lastModified > $1.lastModified }
+            let resolvedPath = sorted.first.map { store.provider.resolvedProjectPath(for: $0) } ?? project.path
+            
+            let group = ProjectGroup(
+                projectPath: project.path,
+                sessions: sorted,
+                resolvedPath: resolvedPath,
+                totalCost: project.cost,
+                totalTokens: project.tokens,
+                totalMessages: project.messageCount,
+                toolUseCount: 0
+            )
+            
+            withAnimation(Theme.springAnimation) {
+                selectedProject = group
             }
         }
     }
@@ -251,74 +246,4 @@ struct AllTimeView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-}
-
-// MARK: - Top project row
-
-private struct TopProjectRow: View {
-    let project: TopProject
-    let maxCost: Double
-    let delay: Double
-
-    @State private var appeared = false
-
-    var body: some View {
-        HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(project.displayName)
-                    .font(.system(size: 11, weight: .medium))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                HStack(spacing: 8) {
-                    Text("\(project.sessionCount) sessions")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.tertiary)
-                    Text(TimeFormatter.tokenCount(project.tokens))
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                }
-
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Color.gray.opacity(0.12))
-                            .frame(height: 3)
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Color.blue.opacity(0.55))
-                            .frame(
-                                width: appeared
-                                    ? geo.size.width * CGFloat(project.cost / maxCost)
-                                    : 0,
-                                height: 3
-                            )
-                    }
-                }
-                .frame(height: 3)
-            }
-
-            Text(costString(project.cost))
-                .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                .foregroundStyle(costColor(project.cost))
-                .frame(minWidth: 60, alignment: .trailing)
-        }
-        .onAppear {
-            appeared = false
-            withAnimation(.easeOut(duration: 0.4).delay(delay)) {
-                appeared = true
-            }
-        }
-    }
-
-    private func costString(_ cost: Double) -> String {
-        if cost >= 1.0 { return String(format: "$%.2f", cost) }
-        if cost >= 0.01 { return String(format: "$%.3f", cost) }
-        return String(format: "$%.4f", cost)
-    }
-
-    private func costColor(_ cost: Double) -> Color {
-        if cost > 100.0 { return .red }
-        if cost > 10.0 { return .orange }
-        return .green
-    }
 }

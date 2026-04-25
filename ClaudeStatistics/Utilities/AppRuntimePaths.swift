@@ -6,12 +6,23 @@ enum AppRuntimePaths {
     /// with a release install. The whole subtree is per-build, which means
     /// flipping this one line cascades through everything below.
     static let rootDirectory: String = {
-        let isDebug = (Bundle.main.bundleIdentifier ?? "").hasSuffix(".debug")
+        let bundleID = Bundle.main.bundleIdentifier ?? ""
+        let execPath = ProcessInfo.processInfo.arguments.first ?? ""
+        
+        let isDebug = bundleID.hasSuffix(".debug") || 
+                      execPath.contains("/Debug/") || 
+                      execPath.hasSuffix("-debug")
+                      
         let folderName = isDebug ? ".claude-statistics-debug" : ".claude-statistics"
         return (NSHomeDirectory() as NSString).appendingPathComponent(folderName)
     }()
     static let binDirectory = (rootDirectory as NSString).appendingPathComponent("bin")
     static let runDirectory = (rootDirectory as NSString).appendingPathComponent("run")
+    
+    static var hookBinaryName: String {
+        let isDebug = (Bundle.main.bundleIdentifier ?? "").hasSuffix(".debug")
+        return isDebug ? "claude-stats-hook-debug" : "claude-stats-hook"
+    }
     /// Disk buffer for hook events that arrived while the app's socket wasn't
     /// listening (errno=ECONNREFUSED on connect). Drained by `AttentionBridge`
     /// at startup so a hook fired during a brief restart window isn't lost.

@@ -4,8 +4,15 @@ struct GeminiHookInstaller: HookInstalling {
     let provider: ProviderKind = .gemini
 
     private static let scriptName = "claude-stats-gemini-hook"
-    private static let managedMarkers = ["claude-stats-gemini-hook.py", "--claude-stats-hook-provider"]
+    private static let managedMarkers = [
+        "claude-stats-gemini-hook",
+        "claude-stats-hook",
+        "--claude-stats-hook-provider"
+    ]
 
+    // Per Gemini's hook reference, "ToolPermission" is a `notification_type`
+    // value inside Notification events, NOT an event name on its own. The
+    // permission notification still fires through the Notification hook.
     private let supportedHookEvents = [
         "BeforeAgent",
         "BeforeTool",
@@ -18,7 +25,6 @@ struct GeminiHookInstaller: HookInstalling {
         "SessionEnd",
         "PreCompress",
         "Notification",
-        "ToolPermission",
     ]
 
     private var geminiDir: String {
@@ -48,17 +54,25 @@ struct GeminiHookInstaller: HookInstalling {
             return false
         }
 
-        for (_, value) in hooks {
-            guard let definitions = value as? [[String: Any]] else { continue }
+        // We check if ALL supported events have the EXACT current command.
+        // If even one is missing or has an old path/quoting, we treat it as 
+        // not installed so that `install()` will refresh everything.
+        let targetCommand = commandPath
+        for event in supportedHookEvents {
+            guard let definitions = hooks[event] as? [[String: Any]] else { return false }
+            
+            var foundExactMatch = false
             for definition in definitions {
                 guard let inner = definition["hooks"] as? [[String: Any]] else { continue }
-                if inner.contains(where: { Self.isManagedCommand($0["command"] as? String ?? "") }) {
-                    return true
+                if inner.contains(where: { ($0["command"] as? String) == targetCommand }) {
+                    foundExactMatch = true
+                    break
                 }
             }
+            if !foundExactMatch { return false }
         }
 
-        return false
+        return true
     }
 
     func install() async throws -> HookInstallResult {

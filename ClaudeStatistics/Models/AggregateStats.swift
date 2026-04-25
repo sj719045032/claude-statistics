@@ -105,6 +105,28 @@ enum StatsPeriod: String, CaseIterable {
         case .monthly: return 12
         }
     }
+
+    func nextPeriodStart(after date: Date, weeklyResetDate: Date? = nil) -> Date {
+        let cal = Calendar.current
+        switch self {
+        case .all:
+            return Date.distantFuture
+        case .daily:
+            return cal.date(byAdding: .day, value: 1, to: date)!
+        case .weekly:
+            if let reset = weeklyResetDate {
+                // Find next occurrence of the same time offset
+                let diff = date.timeIntervalSince(reset)
+                let weekSeconds: Double = 7 * 24 * 3600
+                let weeks = floor(diff / weekSeconds)
+                return reset.addingTimeInterval((weeks + 1) * weekSeconds)
+            } else {
+                return cal.date(byAdding: .day, value: 7, to: date)!
+            }
+        case .monthly:
+            return cal.date(byAdding: .month, value: 1, to: date)!
+        }
+    }
 }
 
 struct PeriodComparison {

@@ -357,8 +357,10 @@ final class ToolActivityFormatterCoreTests: XCTestCase {
         XCTAssertTrue(summary?.lowercased().contains("tool") ?? false)
     }
 
-    func test_liveSummary_postToolUseReturnsNil() {
-        // Don't overwrite the previous running summary on PostToolUse.
+    func test_liveSummary_postToolUseReturnsFallback() {
+        // PostToolUse transitions back to a generic processing label so the
+        // notch keeps a visible status between tool calls. Should be a
+        // non-empty fallback, not nil.
         let summary = ToolActivityFormatter.liveSummary(
             rawEventName: "PostToolUse",
             notificationType: nil,
@@ -366,7 +368,8 @@ final class ToolActivityFormatterCoreTests: XCTestCase {
             input: nil,
             provider: .claude
         )
-        XCTAssertNil(summary)
+        XCTAssertNotNil(summary)
+        XCTAssertFalse(summary?.isEmpty ?? true)
     }
 
     func test_liveSummary_notificationReturnsNil() {

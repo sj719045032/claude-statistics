@@ -5,7 +5,8 @@ struct CodexHookInstaller: HookInstalling {
 
     private static let scriptName = "claude-stats-codex-hook"
     private static let managedMarkers = [
-        "claude-stats-codex-hook.py",
+        "claude-stats-codex-hook",
+        "claude-stats-hook",
         "codex-island-state.py",
         "claude-island-state.py",
         "--claude-stats-hook-provider",
@@ -58,7 +59,24 @@ struct CodexHookInstaller: HookInstalling {
               let hooks = obj["hooks"] as? [String: Any] else {
             return false
         }
-        return containsManagedCommand(in: hooks)
+        return containsExactCommand(in: hooks, target: commandPath)
+    }
+
+    private func containsExactCommand(in hooks: [String: Any], target: String) -> Bool {
+        for event in supportedHookEvents {
+            guard let entries = hooks[event] as? [[String: Any]] else { return false }
+            
+            var found = false
+            for entry in entries {
+                guard let inner = entry["hooks"] as? [[String: Any]] else { continue }
+                if inner.contains(where: { ($0["command"] as? String) == target }) {
+                    found = true
+                    break
+                }
+            }
+            if !found { return false }
+        }
+        return true
     }
 
     func install() async throws -> HookInstallResult {
@@ -259,19 +277,6 @@ struct CodexHookInstaller: HookInstalling {
             sanitized["hooks"] = retained
             return sanitized
         }
-    }
-
-    private func containsManagedCommand(in hooks: [String: Any]) -> Bool {
-        for (_, value) in hooks {
-            guard let entries = value as? [[String: Any]] else { continue }
-            for entry in entries {
-                guard let inner = entry["hooks"] as? [[String: Any]] else { continue }
-                if inner.contains(where: { Self.isManagedCommand($0["command"] as? String ?? "") }) {
-                    return true
-                }
-            }
-        }
-        return false
     }
 
     private static func isManagedCommand(_ command: String) -> Bool {

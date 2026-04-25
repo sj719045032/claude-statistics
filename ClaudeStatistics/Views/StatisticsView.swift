@@ -3,10 +3,21 @@ import SwiftUI
 struct StatisticsView: View {
     @ObservedObject var store: SessionDataStore
     @State private var selectedPeriodDetail: PeriodStats?
+    @State private var selectedProjectForAnalytics: ProjectGroup?
 
     var body: some View {
         VStack(spacing: 0) {
-            if !store.isFullParseComplete && store.parsedStats.isEmpty {
+            if let project = selectedProjectForAnalytics {
+                ProjectAnalyticsView(
+                    group: project,
+                    store: store,
+                    onBack: {
+                        withAnimation(Theme.springAnimation) {
+                            selectedProjectForAnalytics = nil
+                        }
+                    }
+                )
+            } else if !store.isFullParseComplete && store.parsedStats.isEmpty {
                 loadingView
             } else if store.periodStats.isEmpty {
                 emptyView
@@ -15,7 +26,8 @@ struct StatisticsView: View {
                     stat: detail,
                     periodType: store.selectedPeriod,
                     store: store,
-                    onBack: { selectedPeriodDetail = nil }
+                    onBack: { selectedPeriodDetail = nil },
+                    selectedProject: $selectedProjectForAnalytics
                 )
             } else {
                 statsContent
@@ -71,7 +83,7 @@ struct StatisticsView: View {
             if store.selectedPeriod == .all {
                 // All-time view takes over the entire area — renders its own header + share button
                 if let stat = store.visibleStats.first {
-                    AllTimeView(stat: stat, store: store)
+                    AllTimeView(stat: stat, store: store, selectedProject: $selectedProjectForAnalytics)
                 } else {
                     emptyView
                 }
@@ -226,6 +238,128 @@ struct StatisticsView: View {
         id.replacingOccurrences(of: "claude-", with: "")
     }
 }
+
+// MARK: - Top project row
+
+struct TopProjectRow: View {
+    let project: TopProject
+    let maxCost: Double
+    let delay: Double
+    var onTap: (() -> Void)? = nil
+
+    @State private var appeared = false
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: { onTap?() }) {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(project.displayName)
+                        .font(.system(size: 11, weight: .medium))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    HStack(spacing: 8) {
+                        Text("\(project.sessionCount) sessions")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.tertiary)
+                        Text(TimeFormatter.tokenCount(project.tokens))
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color.gray.opacity(0.12))
+                                .frame(height: 3)
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color.blue.opacity(0.55))
+                                .frame(
+                                    width: appeared
+                                        ? geo.size.width * CGFloat(project.cost / maxCost)
+                                        : 0,
+                                    height: 3
+                                )
+                        }
+                    }
+                    .frame(height: 3)
+                }
+
+                Text(costString(project.cost))
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(costColor(project.cost))
+                    .frame(minWidth: 60, alignment: .trailing)
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 8))
+                    .foregroundStyle(.quaternary)
+            }
+            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
+            .background(isHovered ? Color.primary.opacity(0.04) : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .onAppear {
+            appeared = false
+            withAnimation(.easeOut(duration: 0.4).delay(delay)) {
+                appeared = true
+            }
+        }
+    }
+
+    private func costString(_ cost: Double) -> String {
+        if cost >= 1.0 { return String(format: "$%.2f", cost) }
+        if cost >= 0.01 { return String(format: "$%.3f", cost) }
+        return String(format: "$%.4f", cost)
+    }
+
+    private func costColor(_ cost: Double) -> Color {
+        if cost > 5.0 { return .red }
+        if cost > 1.0 { return .orange }
+        return .green
+    }
+}
+
+// MARK: - PeriodTopProjectsCard
+
+struct PeriodTopProjectsCard: View {
+    let top: [TopProject]
+    let onProjectTap: (TopProject) -> Void
+
+    var body: some View {
+        Group {
+            if !top.isEmpty {
+                SectionCard {
+                    VStack(spacing: 6) {
+                        HStack {
+                            Label("allTime.topProjects", systemImage: "folder.fill")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("\(top.count)")
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(.tertiary)
+                        }
+                        Divider()
+                        let maxCost = top.first?.cost ?? 1
+                        ForEach(Array(top.prefix(10).enumerated()), id: \.element.id) { index, proj in
+                            TopProjectRow(
+                                project: proj,
+                                maxCost: max(maxCost, 0.000001),
+                                delay: Double(index) * 0.03,
+                                onTap: { onProjectTap(proj) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 // MARK: - Delta Badge
 
@@ -564,8 +698,10 @@ struct PeriodDetailView: View {
     let periodType: StatsPeriod
     let store: SessionDataStore
     let onBack: () -> Void
+    @Binding var selectedProject: ProjectGroup?
 
     @State private var trendData: [TrendDataPoint] = []
+    @State private var topProjects: [TopProject] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -607,10 +743,7 @@ struct PeriodDetailView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    // 1. Overview — single row of 4 metrics to match AllTimeView's layout.
-                    //    No period-over-period delta here; the deltas show up in the period
-                    //    list on the Stats main screen, which is the context where comparison
-                    //    actually helps.
+                    // 1. Overview
                     SectionCard {
                         HStack(spacing: 12) {
                             CostCell(cost: stat.totalCost)
@@ -640,8 +773,32 @@ struct PeriodDetailView: View {
 
                     // 3. Tokens + Models — unified breakdown
                     CostModelsCard(period: stat)
+                    
+                    // 4. Top Projects
+                    PeriodTopProjectsCard(top: topProjects) { project in
+                        // Map TopProject back to ProjectGroup for analytics view
+                        let projectSessions = store.sessions.filter { ($0.cwd ?? $0.projectPath) == project.path }
+                        guard !projectSessions.isEmpty else { return }
+                        
+                        let sorted = projectSessions.sorted { $0.lastModified > $1.lastModified }
+                        let resolvedPath = sorted.first.map { store.provider.resolvedProjectPath(for: $0) } ?? project.path
+                        
+                        let group = ProjectGroup(
+                            projectPath: project.path,
+                            sessions: sorted,
+                            resolvedPath: resolvedPath,
+                            totalCost: project.cost,
+                            totalTokens: project.tokens,
+                            totalMessages: project.messageCount,
+                            toolUseCount: 0 // Will be re-calculated in analytics view if needed
+                        )
+                        
+                        withAnimation(Theme.springAnimation) {
+                            selectedProject = group
+                        }
+                    }
 
-                    // 4. Tool usage breakdown
+                    // 5. Tool usage breakdown
                     if !stat.toolUseCounts.isEmpty {
                         SectionCard {
                             VStack(spacing: 6) {
@@ -666,6 +823,9 @@ struct PeriodDetailView: View {
 
                 }
                 .padding(12)
+            }
+            .onAppear {
+                topProjects = store.aggregatePeriodTopProjects(for: stat, periodType: periodType)
             }
         }
     }

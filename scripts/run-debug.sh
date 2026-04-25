@@ -17,16 +17,21 @@ ENSURE_DEBUG_CODE_SIGN_IDENTITY="${ENSURE_DEBUG_CODE_SIGN_IDENTITY:-1}"
 # Release's authorization shadows Debug in the Settings UI even though CGEventTap
 # creation keeps failing for the Debug signature.
 DEBUG_BUNDLE_ID="${DEBUG_BUNDLE_ID:-com.tinystone.ClaudeStatistics.debug}"
+STABLE_APP_DIR="${HOME}/Applications"
+STABLE_APP_PATH="${STABLE_APP_DIR}/${DEBUG_APP_NAME}.app"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENSURE_DEBUG_CODE_SIGN_SCRIPT="${SCRIPT_DIR}/ensure-debug-codesign.sh"
 
-# 1. Kill only the previous Debug instance. Release is a separate app now and
-# should be allowed to coexist; touching it here makes diagnosis harder and can
-# provoke system-level relaunch behavior we don't want during local testing.
+# 1. Kill both the previous Debug instance and the Release instance. lsregister
+# -trusted can cause backgroundd to re-evaluate SMAppService registrations and
+# restart the Release build if it was previously running. Stopping it here keeps
+# the development environment clean and avoids the two builds racing over shared
+# resources (hooks, status-line config, usage cache).
 echo "==> Killing old instances..."
 killall "${DEBUG_APP_NAME}" 2>/dev/null || true
-while pgrep -x "${DEBUG_APP_NAME}" >/dev/null 2>&1; do sleep 0.2; done
+killall "${APP_NAME}" 2>/dev/null || true
+while pgrep -x "${DEBUG_APP_NAME}" >/dev/null 2>&1 || pgrep -x "${APP_NAME}" >/dev/null 2>&1; do sleep 0.2; done
 
 # 2. Clean up any stale DerivedData builds to avoid bundle ID conflicts
 echo "==> Cleaning stale builds..."
@@ -112,14 +117,29 @@ else
   codesign --force --deep --sign - "${APP_PATH}"
 fi
 
-# 6. Re-register with Launch Services. Xcode first registers the bundle id
-# under "Claude Statistics.app" (pre-rename), leaving a stale path entry
-# that makes macOS show two identical rows and the TCC list silently
-# drop us. Unregister the old path first, then register the Debug path.
-${LSREGISTER} -u "${BUILT_APP_PATH}" 2>/dev/null || true
-${LSREGISTER} -f -R -trusted "${APP_PATH}"
+# 6. Copy to ~/Applications for stable TCC registration. Apps in /tmp are not
+# treated as persistent by macOS and won't appear in System Settings →
+# Accessibility. Copying to ~/Applications gives TCC a stable bundle path.
+echo "==> Installing to ${STABLE_APP_PATH}..."
+mkdir -p "${STABLE_APP_DIR}"
+rm -rf "${STABLE_APP_PATH}"
+cp -R "${APP_PATH}" "${STABLE_APP_PATH}"
 
-# 6. Final kill + launch of Debug only.
+# 7. Re-register with Launch Services. Unregister both the pre-rename path and
+# the /tmp path, then register the stable ~/Applications path so the TCC UI
+# can resolve the bundle.
+${LSREGISTER} -u "${BUILT_APP_PATH}" 2>/dev/null || true
+${LSREGISTER} -u "${APP_PATH}" 2>/dev/null || true
+${LSREGISTER} -f -R "${STABLE_APP_PATH}"
+
+# 8. Reset the one-shot accessibility prompt flag. The app only shows the
+# AXIsProcessTrustedWithOptions dialog if this key is absent AND the app is
+# not yet trusted. Deleting it here means a fresh build always re-prompts
+# when needed; if already authorized AXIsProcessTrusted() is true and the
+# whole block is skipped — so this is safe to run unconditionally.
+defaults delete "${DEBUG_BUNDLE_ID}" "debug.accessibility.promptShown" 2>/dev/null || true
+
+# 9. Final kill + launch of Debug only.
 killall "${DEBUG_APP_NAME}" 2>/dev/null || true
 while pgrep -x "${DEBUG_APP_NAME}" >/dev/null 2>&1; do sleep 0.2; done
 
@@ -127,9 +147,9 @@ while pgrep -x "${DEBUG_APP_NAME}" >/dev/null 2>&1; do sleep 0.2; done
 #    `open -a`) while attaching the launch to the user's GUI session more
 #    reliably than spawning the binary directly from headless environments.
 echo "==> Launching..."
-if ! open -n "${APP_PATH}"; then
+if ! open -n "${STABLE_APP_PATH}"; then
   echo "==> open failed, falling back to direct binary launch..."
-  nohup "${APP_PATH}/Contents/MacOS/${DEBUG_APP_NAME}" >/dev/null 2>&1 &
+  nohup "${STABLE_APP_PATH}/Contents/MacOS/${DEBUG_APP_NAME}" >/dev/null 2>&1 &
 fi
 sleep 2
 

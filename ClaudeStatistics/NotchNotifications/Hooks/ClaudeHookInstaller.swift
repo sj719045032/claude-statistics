@@ -51,19 +51,24 @@ struct ClaudeHookInstaller: HookInstalling {
               let hooks = obj["hooks"] as? [String: Any] else {
             return false
         }
-        for (_, value) in hooks {
-            guard let matchers = value as? [[String: Any]] else { continue }
+        
+        let targetCommand = commandPath
+        let events = eventNames()
+        for event in events {
+            guard let matchers = hooks[event] as? [[String: Any]] else { return false }
+            
+            var foundExactMatch = false
             for matcher in matchers {
                 guard let inner = matcher["hooks"] as? [[String: Any]] else { continue }
-                for h in inner {
-                    if let cmd = h["command"] as? String,
-                       Self.managedMarkers.contains(where: { cmd.contains($0) }) {
-                        return true
-                    }
+                if inner.contains(where: { ($0["command"] as? String) == targetCommand }) {
+                    foundExactMatch = true
+                    break
                 }
             }
+            if !foundExactMatch { return false }
         }
-        return false
+        
+        return true
     }
 
     func install() async throws -> HookInstallResult {

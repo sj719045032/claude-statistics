@@ -77,6 +77,12 @@ extension ToolActivityFormatter {
             }
             return localized("notch.operation.searching")
 
+        case "ls":
+            if let path = preferredText(in: input, keys: ["path", "file_path"]) {
+                return truncate(localizedFormat("notch.operation.listingNamed", displayPath(path)), limit: 140)
+            }
+            return localized("notch.operation.listing")
+
         case "websearch", "web_search":
             if let query = preferredText(in: input, keys: ["query", "prompt", "q"]) {
                 return truncate(localizedFormat("notch.operation.searchingNamed", query), limit: 140)
@@ -90,10 +96,16 @@ extension ToolActivityFormatter {
             return localized("notch.operation.fetching")
 
         case "task", "agent":
-            if let description = preferredText(in: input, keys: ["description", "prompt"]) {
-                return truncate("Task(\(description))", limit: 140)
+            if let description = preferredText(in: input, keys: ["description", "prompt", "objective"]) {
+                return truncate(localizedFormat("notch.operation.runningAgentNamed", description), limit: 140)
             }
             return localized("notch.operation.runningAgent")
+
+        case "help":
+            if let query = preferredText(in: input, keys: ["query", "question"]) {
+                return truncate(localizedFormat("notch.operation.helpingNamed", query), limit: 140)
+            }
+            return localized("notch.operation.helping")
 
         case "todowrite":
             return localized("notch.operation.updatingTodos")

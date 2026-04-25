@@ -60,50 +60,93 @@ enum HookInstallerUtils {
 
     static func managedHookExecutablePath() -> String {
         // Debug vs release isolation is handled at the root-directory layer
-        // (`.claude-statistics` vs `.claude-statistics-debug`), so the symlink
-        // name can stay simple here — each build's bin/ already lives in its
-        // own root.
-        (AppRuntimePaths.binDirectory as NSString).appendingPathComponent("claude-stats-hook")
+        // (`.claude-statistics` vs `.claude-statistics-debug`), and now also
+        // includes an optional -debug suffix for the binary itself to assist
+        // shell-based debugging.
+        (AppRuntimePaths.binDirectory as NSString).appendingPathComponent(AppRuntimePaths.hookBinaryName)
     }
 
+    /// Writes a stable sh wrapper at `~/.claude-statistics{,-debug}/bin/<hookBinaryName>`
+    /// instead of a symlink into the live `.app`. The wrapper resolves the
+    /// current bundle path at hook-time via Launch Services / Spotlight, so it
+    /// keeps working across `mv` renames in `run-debug.sh`, Sparkle relaunches,
+    /// and any LS path churn — none of which the prior symlink-to-executable
+    /// design survived. `Bundle.main.executablePath` was the unstable input that
+    /// kept pointing the symlink at the pre-`mv` (no-Debug-suffix) path; we
+    /// keep it only as the last-resort fallback baked into the wrapper.
     @discardableResult
     static func ensureManagedHookExecutableLink() -> String? {
-        guard let executablePath = Bundle.main.executablePath ?? ProcessInfo.processInfo.arguments.first,
-              !executablePath.isEmpty else {
-            return nil
-        }
-
-        let fm = FileManager.default
-        let linkPath = managedHookExecutablePath()
+        let wrapperPath = managedHookExecutablePath()
         guard AppRuntimePaths.ensureBinDirectory() != nil else { return nil }
 
+        let bundleID = Bundle.main.bundleIdentifier ?? ""
+        let executableName = (Bundle.main.infoDictionary?["CFBundleExecutable"] as? String) ?? ""
+        let fallbackBinary = Bundle.main.executablePath ?? ProcessInfo.processInfo.arguments.first ?? ""
+
+        guard !bundleID.isEmpty, !executableName.isEmpty else { return nil }
+
+        let script = wrapperScript(bundleID: bundleID, executableName: executableName, fallbackBinary: fallbackBinary)
+        let fm = FileManager.default
+
+        if let existing = try? String(contentsOfFile: wrapperPath, encoding: .utf8), existing == script {
+            return wrapperPath
+        }
+
+        // Cover the legacy symlink layout — fileExists follows symlinks, so we
+        // also probe destinationOfSymbolicLink to detect a dangling link.
+        if fm.fileExists(atPath: wrapperPath) || (try? fm.destinationOfSymbolicLink(atPath: wrapperPath)) != nil {
+            try? fm.removeItem(atPath: wrapperPath)
+        }
+
         do {
-            var shouldReplace = true
-            if let destination = try? fm.destinationOfSymbolicLink(atPath: linkPath), destination == executablePath {
-                shouldReplace = false
-            }
-
-            if shouldReplace {
-                if fm.fileExists(atPath: linkPath) || (try? fm.destinationOfSymbolicLink(atPath: linkPath)) != nil {
-                    try? fm.removeItem(atPath: linkPath)
-                }
-                try fm.createSymbolicLink(atPath: linkPath, withDestinationPath: executablePath)
-            }
-
-            return linkPath
+            try script.write(toFile: wrapperPath, atomically: true, encoding: .utf8)
+            try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: wrapperPath)
+            return wrapperPath
         } catch {
             return nil
         }
     }
 
+    private static func wrapperScript(bundleID: String, executableName: String, fallbackBinary: String) -> String {
+        let esc: (String) -> String = { $0.replacingOccurrences(of: "'", with: "'\\''") }
+        return """
+        #!/bin/sh
+        # Auto-managed by Claude Statistics. Rewritten on every app launch so
+        # editing this file by hand will not stick. The wrapper resolves the
+        # live app bundle path at hook-time, which keeps the hook working when
+        # the .app gets renamed/moved/rebuilt and the Bundle.main path the host
+        # app saw at launch is no longer accurate.
+        BUNDLE_ID='\(esc(bundleID))'
+        EXEC_NAME='\(esc(executableName))'
+        FALLBACK='\(esc(fallbackBinary))'
+
+        # lsappinfo only knows about running apps. The output line looks like
+        # `"LSBundlePath"="/path/to/.app"` on macOS 14+; older macOS used
+        # lowercased `bundlepath`. NR==1 + field 4 picks the path either way
+        # since `-only bundlepath` produces a single line.
+        APP_PATH=$(/usr/bin/lsappinfo info -only bundlepath -app "$BUNDLE_ID" 2>/dev/null \
+                    | awk -F'"' 'NR==1 && NF>=4 {print $4}')
+
+        if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+            APP_PATH=$(/usr/bin/mdfind "kMDItemCFBundleIdentifier == '$BUNDLE_ID'" 2>/dev/null | head -n 1)
+        fi
+
+        if [ -n "$APP_PATH" ] && [ -d "$APP_PATH" ]; then
+            exec "$APP_PATH/Contents/MacOS/$EXEC_NAME" "$@"
+        else
+            exec "$FALLBACK" "$@"
+        fi
+        """
+    }
+
     static func currentHookCommand(provider: ProviderKind) -> String {
-        let executablePath = ensureManagedHookExecutableLink()
+        // The wrapper path lives under ~/.claude-statistics{,-debug}/bin/ so it
+        // never contains spaces — no quoting needed in the hook command string.
+        let wrapperPath = ensureManagedHookExecutableLink()
             ?? Bundle.main.executablePath
             ?? ProcessInfo.processInfo.arguments.first
             ?? ""
-        
-        // Only quote if the path contains spaces
-        let formattedPath = executablePath.contains(" ") ? shellQuoted(executablePath) : executablePath
+        let formattedPath = wrapperPath.contains(" ") ? shellQuoted(wrapperPath) : wrapperPath
         return "\(formattedPath) --claude-stats-hook-provider \(provider.rawValue)"
     }
 

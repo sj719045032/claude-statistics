@@ -189,9 +189,11 @@ struct ActiveSession: Identifiable, Equatable {
         case "edit", "multiedit":          return "pencil.line"
         case "grep":                       return "magnifyingglass"
         case "glob":                       return "folder"
+        case "ls":                         return "list.bullet"
         case "webfetch":                   return "arrow.down.circle"
         case "websearch", "web_search":    return "globe"
         case "todowrite":                  return "checklist"
+        case "help":                       return "questionmark.circle"
         case "notebookedit":               return "book"
         default:                           return "wrench.and.screwdriver"
         }

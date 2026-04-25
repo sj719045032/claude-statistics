@@ -194,8 +194,16 @@ struct StatusLineInstaller {
     // MARK: - Script generation
 
     private static func generatedScript() -> String {
-        let pricingPath = "~/.claude-statistics/pricing.json"
-        let usageCachePath = "~/.claude-statistics/usage-cache.json"
+        // Root is templated in at install time so debug builds (running out
+        // of `~/.claude-statistics-debug/`) read their own pricing/cache/
+        // history. Whichever build last ran `install()` wins the single
+        // `statusLine` slot in `~/.claude/settings.json` and its script
+        // points at its own root.
+        let appRoot = AppRuntimePaths.rootDirectory
+        let pricingPath = "\(appRoot)/pricing.json"
+        let usageCachePath = "\(appRoot)/usage-cache.json"
+        let transcriptCacheDir = "\(appRoot)/statusline-cache"
+        let historyPath = "\(appRoot)/usage-history.jsonl"
 
         return """
         #!/usr/bin/env bash
@@ -234,7 +242,7 @@ struct StatusLineInstaller {
         # Includes subagent transcripts; incremental parse via per-file size cache
         # Debug: export CLAUDE_STATUSLINE_DEBUG=1 to see parse stats on stderr
         # ---------------------------------------------------------------------------
-        TRANSCRIPT_CACHE_DIR="$HOME/.claude-statistics/statusline-cache"
+        TRANSCRIPT_CACHE_DIR="\(transcriptCacheDir)"
         mkdir -p "$TRANSCRIPT_CACHE_DIR" 2>/dev/null
 
         total_input_tokens=0
@@ -243,7 +251,7 @@ struct StatusLineInstaller {
         cache_read_tokens=0
         total_cost="0.00"
 
-        PRICING_FILE="$HOME/.claude-statistics/pricing.json"
+        PRICING_FILE="\(pricingPath)"
 
         # Portable file size: macOS -f%z / Linux -c%s
         _stat_size() {
@@ -611,7 +619,7 @@ struct StatusLineInstaller {
         # Rate limits from stdin — write to usage cache (no API call needed)
         # Requires Claude Code v2.1.80+; silently skipped on older versions
         # ---------------------------------------------------------------------------
-        APP_USAGE_CACHE="$HOME/.claude-statistics/usage-cache.json"
+        APP_USAGE_CACHE="\(usageCachePath)"
 
         rl_5h_pct=$(echo "$input" | jq -r '.rate_limits.five_hour.used_percentage // empty' 2>/dev/null)
         rl_5h_reset=$(echo "$input" | jq -r '.rate_limits.five_hour.resets_at // empty' 2>/dev/null)
@@ -728,7 +736,7 @@ struct StatusLineInstaller {
 
         # --- Append to usage-history.jsonl ---
         # Dedup: skip if same values within 5 minutes
-        history_path = os.path.expanduser('~/.claude-statistics/usage-history.jsonl')
+        history_path = '\(historyPath)'
         entry = {'ts': now_ts, 'fh': stdin_5h, 'fh_r': stdin_5h_r, 'sd': stdin_7d, 'sd_r': stdin_7d_r}
 
         should_append = True

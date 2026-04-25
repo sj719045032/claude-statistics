@@ -108,9 +108,11 @@ enum CanonicalToolName {
         case "edit", "multiedit": return "Edit"
         case "grep": return "Grep"
         case "glob": return "Glob"
+        case "ls": return "List"
         case "webfetch": return "Fetch"
         case "websearch": return "Search"
         case "task", "agent": return "Agent"
+        case "help": return "Help"
         case "todowrite": return "Todo"
         default:
             guard let first = canonical.first else { return canonical }

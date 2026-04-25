@@ -601,6 +601,11 @@
 "notch.operation.fetching" = "Fetching...";
 "notch.operation.fetchingNamed" = "Fetching: %@";
 "notch.operation.runningAgent" = "Running agent...";
+"notch.operation.runningAgentNamed" = "Agent: %@...";
+"notch.operation.listing" = "Listing...";
+"notch.operation.listingNamed" = "List %@";
+"notch.operation.helping" = "Looking up help...";
+"notch.operation.helpingNamed" = "Help: %@";
 "notch.operation.updatingTodos" = "Updating todos...";
 "notch.operation.enteringPlanMode" = "Entering plan mode...";
 "notch.operation.exitingPlanMode" = "Exiting plan mode...";

@@ -1,49 +1,5 @@
 import Foundation
 
-enum AttentionBridgeAuth {
-    /// Debug vs release isolation lives at the `AppRuntimePaths.rootDirectory`
-    /// layer (`.claude-statistics` vs `.claude-statistics-debug`), so the
-    /// filenames here can stay simple — no `-debug` suffix needed.
-    static var socketPath: String {
-        let directory = AppRuntimePaths.ensureRunDirectory() ?? AppRuntimePaths.runDirectory
-        return (directory as NSString).appendingPathComponent("attention.sock")
-    }
-
-    static var tokenPath: String {
-        (AppRuntimePaths.rootDirectory as NSString).appendingPathComponent("attention-token")
-    }
-
-    static func ensureToken() -> String? {
-        let fm = FileManager.default
-        let path = tokenPath
-
-        if let token = loadToken() {
-            try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path)
-            return token
-        }
-
-        do {
-            guard AppRuntimePaths.ensureRootDirectory() != nil else { return nil }
-            let token = UUID().uuidString.replacingOccurrences(of: "-", with: "")
-            try "\(token)\n".write(toFile: path, atomically: true, encoding: .utf8)
-            try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path)
-            return token
-        } catch {
-            DiagnosticLogger.shared.warning("AttentionBridge token create failed path=\(path) error=\(error.localizedDescription)")
-            return nil
-        }
-    }
-
-    static func loadToken() -> String? {
-        guard let token = try? String(contentsOfFile: tokenPath, encoding: .utf8)
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-              !token.isEmpty else {
-            return nil
-        }
-        return token
-    }
-}
-
 final class AttentionBridge {
     weak var notchCenter: NotchNotificationCenter?
 
@@ -179,59 +135,15 @@ final class AttentionBridge {
     private func processWireMessage(_ msg: WireMessage, fd: Int32?, replayed: Bool) {
         // kind 的 summary/message associated type 是给 UI 卡片用的。对有
         // transcript 的事件 (Stop/Notification/SessionStart) 优先用 Claude
-        // 真实最后一段 text，退化到 WireMessage.message（C 语义的状态串）。
+        // 真实最后一段 text,退化到 WireMessage.message(C 语义的状态串)。
         let kindSummary = msg.commentary_text ?? msg.message
-        let kind: AttentionKind
-        switch msg.event {
-        case "PermissionRequest":
-            kind = .permissionRequest(
-                tool: msg.tool_name ?? "",
-                input: msg.tool_input ?? [:],
-                toolUseId: msg.tool_use_id ?? "",
-                interaction: .actionable
-            )
-        case "ToolPermission":
-            kind = .permissionRequest(
-                tool: msg.tool_name ?? "",
-                input: msg.tool_input ?? [:],
-                toolUseId: msg.tool_use_id ?? "",
-                interaction: .passive
-            )
-        case "StopFailure":
-            kind = .taskFailed(summary: kindSummary)
-        case "Stop":
-            // Claude finished its turn cleanly — surface as "task done".
-            // The notification `idle_prompt` below (Claude proactively
-            // asks the user something) stays as .waitingInput, since
-            // that's a genuine "please respond" prompt.
-            kind = .taskDone(summary: kindSummary)
-        case "SubagentStop":
-            kind = .activityPulse
-        case "SessionStart":
-            kind = .sessionStart(source: kindSummary)
-        case "SessionEnd":
-            kind = .sessionEnd
-        case "Notification":
-            switch msg.notification_type {
-            case "idle_prompt":
-                kind = .waitingInput(message: kindSummary)
-            case "permission_prompt":
-                kind = .activityPulse
-            default:
-                kind = .activityPulse
-            }
-        case "UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure", "SubagentStart", "PreCompact", "PostCompact":
-            kind = .activityPulse
-        default:
-            kind = .activityPulse
-        }
-
-        let provider: ProviderKind
-        switch msg.provider {
-        case "codex":  provider = .codex
-        case "gemini": provider = .gemini
-        default:       provider = .claude
-        }
+        let kindBase = WireEventTranslator.translateKind(
+            event: msg.event,
+            notificationType: msg.notification_type,
+            summary: kindSummary
+        )
+        let kind = WireEventTranslator.resolvePermissionFields(kindBase, in: msg)
+        let provider = WireEventTranslator.translateProvider(msg.provider)
 
         // Per-provider master switch. When a provider is disabled we close
         // the connection immediately without spinning up a PendingResponse
@@ -250,30 +162,9 @@ final class AttentionBridge {
             pending = nil
         }
 
-        let event = AttentionEvent(
-            id: UUID(),
+        let event = WireEventTranslator.makeEvent(
+            from: msg,
             provider: provider,
-            rawEventName: msg.event,
-            notificationType: msg.notification_type,
-            toolName: msg.tool_name,
-            toolInput: msg.tool_input,
-            toolUseId: msg.tool_use_id,
-            toolResponse: msg.tool_response,
-            message: msg.message,
-            sessionId: msg.session_id ?? "",
-            projectPath: msg.cwd,
-            transcriptPath: msg.transcript_path,
-            tty: msg.tty,
-            pid: msg.pid.map { Int32($0) },
-            terminalName: msg.terminal_name,
-            terminalSocket: msg.terminal_socket,
-            terminalWindowID: msg.terminal_window_id,
-            terminalTabID: msg.terminal_tab_id,
-            terminalStableID: msg.terminal_surface_id,
-            receivedAt: Date(),
-            promptText: msg.prompt_text,
-            commentaryText: msg.commentary_text,
-            commentaryAt: msg.commentary_timestamp.flatMap(AttentionBridge.parseIsoTimestamp),
             kind: kind,
             pending: pending
         )
@@ -295,7 +186,7 @@ final class AttentionBridge {
                 guard let input = msg.tool_input, !input.isEmpty else { return "-" }
                 return input
                     .sorted(by: { $0.key < $1.key })
-                    .map { "\($0.key):\(Self.jsonKindLabel($0.value))" }
+                    .map { "\($0.key):\(WireEventTranslator.jsonKindLabel($0.value))" }
                     .joined(separator: ",")
             }()
             DiagnosticLogger.shared.verbose(
@@ -400,81 +291,4 @@ final class AttentionBridge {
         return String(data: result, encoding: .utf8)
     }
 
-    /// Shared parser for the hook's ISO-8601 `message_timestamp` field. The
-    /// Claude transcript timestamps use fractional seconds + 'Z' (e.g.
-    /// "2026-04-24T10:42:56.566Z"), which ISO8601DateFormatter can handle
-    /// when told to include fractional seconds.
-    static func parseIsoTimestamp(_ raw: String) -> Date? {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-        if let d = fractionalIsoFormatter.date(from: trimmed) { return d }
-        return isoFormatter.date(from: trimmed)
-    }
-
-    private static let fractionalIsoFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
-
-    private static let isoFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime]
-        return f
-    }()
-
-    /// Short label for a JSONValue's kind, used by permission-schema logs.
-    /// Arrays/objects include the element count so we can spot `edits: array(3)`.
-    static func jsonKindLabel(_ value: JSONValue) -> String {
-        switch value {
-        case .string:             return "string"
-        case .number:             return "number"
-        case .bool:               return "bool"
-        case .null:               return "null"
-        case .array(let items):   return "array(\(items.count))"
-        case .object(let dict):   return "object(\(dict.count))"
-        }
-    }
-}
-
-// MARK: - Wire protocol
-
-private struct WireMessage: Decodable {
-    let v: Int?
-    let auth_token: String?
-    let provider: String?
-    let event: String
-    let status: String?
-    let notification_type: String?
-    let session_id: String?
-    let cwd: String?
-    let transcript_path: String?
-    let pid: Int?
-    let tty: String?
-    let terminal_name: String?
-    let terminal_socket: String?
-    let terminal_window_id: String?
-    let terminal_tab_id: String?
-    let terminal_surface_id: String?
-    let tool_name: String?
-    let tool_input: [String: JSONValue]?
-    let tool_use_id: String?
-    let tool_response: String?
-    /// Status string / tool command description (semantic C and D). Read by
-    /// AttentionEvent.livePreview (.waitingInput / .taskDone / .taskFailed)
-    /// and by PermissionRequestCard. NOT read as prompt or commentary.
-    let message: String?
-    /// The user's typed prompt. Only UserPromptSubmit writes this. Consumed
-    /// by AttentionEvent.livePrompt. (Semantic A)
-    let prompt_text: String?
-    /// Claude's assistant text — the actual agent commentary. Any event whose
-    /// normalizer can read it from the transcript writes it here. Consumed
-    /// by AttentionEvent.liveProgressNote. (Semantic B)
-    let commentary_text: String?
-    /// ISO-8601 of the transcript entry that produced `commentary_text`, so
-    /// downstream can place `latestProgressNoteAt` at when the text was
-    /// actually written, not when the hook fired.
-    let commentary_timestamp: String?
-    let expects_response: Bool?
-    let timeout_ms: Int?
 }

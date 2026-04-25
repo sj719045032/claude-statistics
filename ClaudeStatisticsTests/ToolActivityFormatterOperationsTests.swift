@@ -637,7 +637,11 @@ final class ToolActivityFormatterOperationsTests: XCTestCase {
             tool: "Task",
             input: ["description": .string("plan migration")]
         )
-        XCTAssertEqual(result, "Task(plan migration)")
+        XCTAssertNotNil(result)
+        XCTAssertTrue(
+            result.contains("plan migration"),
+            "expected description in result, got '\(result)'"
+        )
     }
 
     func test_runningSummary_taskWithoutDescriptionFallsBack() {

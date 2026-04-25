@@ -15,7 +15,6 @@ extension HookRunner {
             "SessionEnd",
             "PreCompress",
             "Notification",
-            "ToolPermission",
         ]
         guard relayedEvents.contains(event) else { return nil }
 
@@ -26,67 +25,51 @@ extension HookRunner {
         let cwd = resolvedHookCWD(payload: payload)
         let terminalContext = terminalContextForGemini(event: event, terminalName: terminalName, cwd: cwd)
 
-        var wireEvent = event
+        // Map Gemini's hook_event_name to the wire event AttentionBridge
+        // dispatches on. Notification + notification_type="ToolPermission"
+        // gets its own wire event because passive permission cards have
+        // their own lane downstream.
+        var wireEvent: String
         var toolName: String?
         var toolInput: [String: Any]?
         var toolUseId: String?
-
         switch event {
         case "BeforeAgent":
             wireEvent = "UserPromptSubmit"
         case "BeforeTool":
             wireEvent = "PreToolUse"
-            let normalizedToolName = canonicalGeminiToolName(toolNameValue(payload))
-            toolName = normalizedToolName
-            toolInput = normalizeGeminiToolInput(toolName: normalizedToolName, rawInput: payload["tool_input"])
-                ?? normalizeGeminiToolInput(toolName: normalizedToolName, rawInput: payload["args"])
+            toolName = canonicalGeminiToolName(toolNameValue(payload))
+            toolInput = normalizeGeminiToolInput(payload["tool_input"])
+                ?? normalizeGeminiToolInput(payload["args"])
             toolUseId = normalizedToolUseId(payload: payload, toolInput: toolInput)
-        case "BeforeToolSelection":
-            wireEvent = "BeforeToolSelection"
-        case "BeforeModel":
-            wireEvent = "BeforeModel"
         case "AfterTool":
             wireEvent = "PostToolUse"
-            let normalizedToolName = canonicalGeminiToolName(toolNameValue(payload))
-            toolName = normalizedToolName
-            toolInput = normalizeGeminiToolInput(toolName: normalizedToolName, rawInput: payload["tool_input"])
-                ?? normalizeGeminiToolInput(toolName: normalizedToolName, rawInput: payload["args"])
+            toolName = canonicalGeminiToolName(toolNameValue(payload))
+            toolInput = normalizeGeminiToolInput(payload["tool_input"])
+                ?? normalizeGeminiToolInput(payload["args"])
             toolUseId = normalizedToolUseId(payload: payload, toolInput: toolInput)
-        case "AfterModel":
-            wireEvent = "AfterModel"
         case "AfterAgent":
             wireEvent = "Stop"
-        case "ToolPermission":
-            wireEvent = "ToolPermission"
-            let normalizedToolName = canonicalGeminiToolName(toolNameValue(payload))
-            toolName = normalizedToolName
-            toolInput = normalizeGeminiToolInput(toolName: normalizedToolName, rawInput: payload["tool_input"])
-                ?? normalizeGeminiToolInput(toolName: normalizedToolName, rawInput: payload["args"])
-            toolUseId = normalizedToolUseId(payload: payload, toolInput: toolInput)
-        case "Notification" where isGeminiToolPermissionNotification(payload: payload, notificationType: notificationType):
-            wireEvent = "ToolPermission"
-            let details = geminiNotificationToolDetails(details: payload["details"])
-            toolName = details.name
-            toolInput = details.input
-            toolUseId = normalizedToolUseId(payload: payload, toolInput: toolInput)
-        case "PreCompress":
-            wireEvent = "PreCompress"
+        case "Notification":
+            wireEvent = notificationType == "ToolPermission" ? "ToolPermission" : "Notification"
         default:
-            break
+            // BeforeToolSelection / BeforeModel / AfterModel / SessionStart /
+            // SessionEnd / PreCompress pass through under their own names.
+            wireEvent = event
         }
 
         let status: String
-        switch wireEvent {
-        case "ToolPermission":
-            status = "waiting_for_approval"
-        case "PreToolUse":
-            status = "running_tool"
-        case "BeforeToolSelection", "BeforeModel", "AfterModel", "PreCompress":
-            status = "processing"
-        case "Stop", "SessionStart":
+        switch event {
+        case "Notification":
+            status = wireEvent == "ToolPermission" ? "waiting_for_approval" : "notification"
+        case "SessionStart", "AfterAgent":
             status = "waiting_for_input"
         case "SessionEnd":
             status = "ended"
+        case "PreCompress":
+            status = "compacting"
+        case "BeforeTool":
+            status = "running_tool"
         default:
             status = "processing"
         }
@@ -101,167 +84,147 @@ extension HookRunner {
             terminalName: terminalName,
             terminalContext: terminalContext
         )
-        // Gemini hooks often use 'sessionId' camelCase
+
+        // Gemini hook payloads use camelCase `sessionId`; baseMessage only
+        // reads snake_case `session_id`, so backfill here.
         if message["session_id"] == nil {
             set(&message, "session_id", stringValue(payload["sessionId"]))
         }
         set(&message, "tool_name", toolName)
         set(&message, "tool_input", toolInput)
-        set(&message, "tool_use_id", toolUseId ?? normalizedToolUseId(payload: payload, toolInput: toolInput))
-        let semanticText = geminiMessage(payload: payload, event: event)
-        // Route by wireEvent (the event name downstream consumers see) into
-        // the matching semantic lane.
-        switch wireEvent {
-        case "UserPromptSubmit":
-            set(&message, "prompt_text", semanticText)
-        case "Notification", "PermissionRequest", "ToolPermission", "SessionStart", "SessionEnd":
-            set(&message, "message", semanticText)
+        set(&message, "tool_use_id", toolUseId)
+
+        // Per-event semantic-lane routing matches Codex/Claude so downstream
+        // (livePrompt / liveProgressNote / livePreview) can pick the right
+        // text without guessing.
+        switch event {
+        case "BeforeAgent":
+            // Semantic A: the user's prompt.
+            set(&message, "prompt_text", firstText(payload["prompt"]))
+
+        case "Notification":
+            // ToolPermission notification → tool/path summary for the card;
+            // other notifications → status string.
+            let text = firstText(payload["message"])
+                ?? firstText(payload["details"])
+                ?? firstText(payload["reason"])
+            set(&message, "message", text)
+
+        case "SessionStart":
+            // `source` is "startup" | "resume" | "clear" per the docs.
+            set(&message, "message", firstText(payload["source"]))
+
+        case "SessionEnd":
+            // `reason` is "exit" | "clear" | "logout" | "prompt_input_exit" | "other".
+            set(&message, "message", firstText(payload["reason"]))
+
+        case "AfterAgent":
+            // The turn's final response. `prompt_response` is the documented
+            // field per Gemini's hook reference; transcript tail-scan is a
+            // fallback for older payload shapes.
+            if let promptResponse = firstText(payload["prompt_response"]) {
+                set(&message, "commentary_text", promptResponse)
+            } else if let extracted = lastAssistantFromGeminiTranscript(payload: payload) {
+                set(&message, "commentary_text", extracted.text)
+                set(&message, "commentary_timestamp", extracted.timestamp)
+            }
+
+        case "AfterModel":
+            // Streaming chunk-level — fires on every token batch. Writing
+            // commentary_text here would clobber the field N times per turn
+            // and the rendered text would only ever be the latest chunk
+            // (likely a partial sentence). Mid-turn assistant text is read
+            // from the transcript on the surrounding tool events instead.
+            // We still relay the wire event so RuntimeSessionEventApplier
+            // can clear the BeforeModel "thinking" indicator.
+            break
+
+        case "BeforeTool", "AfterTool", "BeforeModel", "BeforeToolSelection", "PreCompress":
+            // No assistant text in these payloads — Gemini's hooks don't
+            // expose per-message replies. Tail-scan the transcript for the
+            // most recent `type: "gemini"` message so the notch bottom row
+            // can show "Gemini said …" between tool calls. Same approach
+            // as Claude's lastAssistantTextFromTranscript.
+            if let extracted = lastAssistantFromGeminiTranscript(payload: payload) {
+                set(&message, "commentary_text", extracted.text)
+                set(&message, "commentary_timestamp", extracted.timestamp)
+            }
+
         default:
-            set(&message, "commentary_text", semanticText)
+            break
         }
 
-        if event == "AfterTool", let response = toolResponseText(payload: payload) {
+        if event == "AfterTool",
+           let response = geminiToolResponseText(payload: payload) {
             set(&message, "tool_response", String(response.prefix(HookDefaults.maxToolResponseLength)))
         }
 
         return HookAction(message: message)
     }
-}
 
-private func geminiMessage(payload: [String: Any], event: String) -> String? {
-    switch event {
-    case "BeforeAgent":
-        return firstText(payload["prompt"])
-    case "BeforeModel":
-        return firstText(payload["llm_request"])
-    case "AfterModel":
-        return firstText(payload["llm_response"])
-    case "AfterAgent":
-        return firstText(payload["prompt_response"])
-            ?? firstText(payload["prompt"])
-            ?? firstText(payload["reason"])
-    case "SessionStart":
-        return firstText(payload["source"])
-    case "SessionEnd":
-        return firstText(payload["reason"])
-    case "Notification":
-        return firstText(payload["message"])
-    default:
-        return firstText(payload["message"])
-            ?? firstText(payload["reason"])
-            ?? firstText(payload["warning"])
+    private func canonicalGeminiToolName(_ raw: String?) -> String? {
+        guard let raw else { return nil }
+        return ProviderKind.gemini.canonicalToolName(raw)
     }
-}
 
-private let geminiToolNameMap: [String: String] = [
-    "run_shell_command": "bash",
-    "read_file": "read",
-    "write_file": "write",
-    "replace": "edit",
-    "glob": "glob",
-    "grep": "grep",
-    "grep_search": "grep",
-    "web_fetch": "fetch",
-    "web_search": "websearch",
-    "google_web_search": "websearch",
-    "save_memory": "memory",
-    "shell": "bash",
-    "readfile": "read",
-    "searchtext": "grep",
-    "findfiles": "glob",
-]
-
-private func canonicalGeminiToolName(_ name: String?) -> String? {
-    guard let name, !name.isEmpty else { return nil }
-    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-    return geminiToolNameMap[trimmed] ?? geminiToolNameMap[trimmed.lowercased()] ?? trimmed
-}
-
-private func normalizeGeminiToolInput(toolName: String?, rawInput: Any?) -> [String: Any]? {
-    guard var input = nestedDictionaryValue(
-        rawInput,
-        preferredKeys: ["tool_input", "args", "arguments", "parameters", "input"]
-    ) else {
-        if toolName == "bash", let command = stringValue(rawInput) {
-            return ["command": command]
+    private func normalizeGeminiToolInput(_ rawInput: Any?) -> [String: Any]? {
+        guard let rawInput else { return nil }
+        if let dict = rawInput as? [String: Any] { return dict }
+        if let str = rawInput as? String,
+           let data = str.data(using: .utf8),
+           let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return dict
         }
         return nil
     }
 
-    switch toolName {
-    case "edit":
-        migrateKey(in: &input, from: "filePath", to: "file_path")
-        migrateKey(in: &input, from: "absolute_path", to: "file_path")
-        migrateKey(in: &input, from: "oldString", to: "old_string")
-        migrateKey(in: &input, from: "newString", to: "new_string")
-    case "read", "write":
-        migrateKey(in: &input, from: "filePath", to: "file_path")
-        migrateKey(in: &input, from: "absolute_path", to: "file_path")
-    case "bash":
-        migrateKey(in: &input, from: "cmd", to: "command")
-    default:
-        break
-    }
-
-    return input
-}
-
-private func isGeminiToolPermissionNotification(payload: [String: Any], notificationType: String?) -> Bool {
-    let normalizedType = notificationType?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    if ["toolpermission", "tool_permission", "permission"].contains(normalizedType ?? "") {
-        return true
-    }
-
-    guard let details = dictionaryValue(payload["details"]) else { return false }
-    let detailType = stringValue(details["type"])?.lowercased()
-    return ["exec", "edit", "mcp"].contains(detailType ?? "")
-}
-
-private func geminiNotificationToolDetails(details: Any?) -> (name: String?, input: [String: Any]?) {
-    guard let details = dictionaryValue(details) else { return (nil, nil) }
-
-    let title = stringValue(details["title"])
-    switch stringValue(details["type"]) {
-    case "exec":
-        return ("bash", compactDictionary([
-            "command": stringValue(details["command"]),
-            "description": title,
-            "root_command": stringValue(details["rootCommand"]),
-        ]))
-    case "edit":
-        return ("edit", compactDictionary([
-            "file_path": stringValue(details["filePath"]),
-            "description": title,
-        ]))
-    case "mcp":
-        return (stringValue(details["toolName"]) ?? "mcp", compactDictionary([
-            "server_name": stringValue(details["serverName"]),
-            "tool_display_name": stringValue(details["toolDisplayName"]),
-            "description": title,
-        ]))
-    case "info":
-        return ("info", compactDictionary([
-            "prompt": stringValue(details["prompt"]),
-            "description": title,
-        ]))
-    default:
-        return (title, compactDictionary([
-            "description": title,
-        ]))
-    }
-}
-
-private func migrateKey(in object: inout [String: Any], from source: String, to destination: String) {
-    guard object[destination] == nil, let value = object[source] else { return }
-    object[destination] = value
-}
-
-private func compactDictionary(_ object: [String: Any?]) -> [String: Any]? {
-    var result: [String: Any] = [:]
-    for (key, value) in object {
-        if let value {
-            result[key] = value
+    /// Gemini's `tool_response` is an object with `llmContent` /
+    /// `returnDisplay` / `error`, not a string. Prefer the human-readable
+    /// `returnDisplay`, fall back to `llmContent`, then `error`.
+    private func geminiToolResponseText(payload: [String: Any]) -> String? {
+        guard let response = payload["tool_response"] as? [String: Any] else {
+            return toolResponseText(payload: payload)
         }
+        return firstText(response["returnDisplay"])
+            ?? firstText(response["llmContent"])
+            ?? firstText(response["error"])
     }
-    return result.isEmpty ? nil : result
+
+    /// Walk back from the end of the Gemini transcript JSON and return the
+    /// most recent `type: "gemini"` message's content + timestamp. Gemini
+    /// rewrites the entire transcript file on each save (not jsonl-append),
+    /// so we just parse it in full instead of doing Claude's exponential
+    /// tail-window scan.
+    private func lastAssistantFromGeminiTranscript(payload: [String: Any]) -> (text: String, timestamp: String?)? {
+        guard let rawPath = stringValue(payload["transcript_path"]), !rawPath.isEmpty else { return nil }
+        let path = (rawPath as NSString).expandingTildeInPath
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let messages = root["messages"] as? [[String: Any]] else { return nil }
+
+        for msg in messages.reversed() {
+            guard let type = msg["type"] as? String, type == "gemini" else { continue }
+            guard let text = extractGeminiTranscriptText(msg["content"]) else { continue }
+            let timestamp = msg["timestamp"] as? String
+            return (text, timestamp)
+        }
+        return nil
+    }
+
+    /// Gemini messages store content either as a plain string ("gemini"
+    /// replies) or as `[{"text": "..."}]` (user prompts). Handle both so the
+    /// same helper works regardless of which side wrote the message.
+    private func extractGeminiTranscriptText(_ raw: Any?) -> String? {
+        if let text = raw as? String {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        if let parts = raw as? [[String: Any]] {
+            let texts = parts.compactMap { $0["text"] as? String }
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            return texts.isEmpty ? nil : texts.joined(separator: "\n")
+        }
+        return nil
+    }
 }

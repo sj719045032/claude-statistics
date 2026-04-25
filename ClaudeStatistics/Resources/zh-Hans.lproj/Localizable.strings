@@ -94,8 +94,21 @@
 "stats.periods %lld" = "%lld 个周期";
 "stats.tools" = "工具";
 "stats.toolUsage" = "工具使用";
-"stats.topProjects" = "热门项目";
+"stats.topProjects" = "项目排行";
 "stats.back" = "统计";
+
+/* Tool Names */
+"tool.bash" = "终端";
+"tool.read" = "读取";
+"tool.write" = "写入";
+"tool.edit" = "修改";
+"tool.grep" = "搜索";
+"tool.glob" = "匹配";
+"tool.ls" = "列表";
+"tool.webfetch" = "抓取";
+"tool.websearch" = "网页搜索";
+"tool.agent" = "代理";
+"tool.help" = "帮助";
 
 /* Usage */
 "usage.title" = "用量";
@@ -583,24 +596,29 @@
 "notch.operation.choosingTools" = "正在选择工具...";
 "notch.operation.runningSubagent" = "正在运行子代理...";
 "notch.operation.runningToolNamed" = "正在运行 %@...";
-"notch.operation.reading" = "Read";
-"notch.operation.readingNamed" = "Read %@";
-"notch.operation.readingMultipleNamed" = "Read %@ + %d more";
-"notch.operation.editing" = "Edit";
-"notch.operation.editingNamed" = "Edit %@";
-"notch.operation.editingMultipleNamed" = "Edit %@ + %d more";
-"notch.operation.writing" = "Write";
-"notch.operation.writingNamed" = "Write %@";
-"notch.operation.writingMultipleNamed" = "Write %@ + %d more";
+"notch.operation.reading" = "读取";
+"notch.operation.readingNamed" = "正在读取 %@";
+"notch.operation.readingMultipleNamed" = "正在读取 %@ 等 %d 个文件";
+"notch.operation.editing" = "修改";
+"notch.operation.editingNamed" = "正在修改 %@";
+"notch.operation.editingMultipleNamed" = "正在修改 %@ 等 %d 个文件";
+"notch.operation.writing" = "写入";
+"notch.operation.writingNamed" = "正在写入 %@";
+"notch.operation.writingMultipleNamed" = "正在写入 %@ 等 %d 个文件";
+"notch.operation.listing" = "正在列出目录...";
+"notch.operation.listingNamed" = "正在列出 %@...";
 "notch.operation.runningCommand" = "正在运行命令...";
 "notch.operation.runningCommandNamed" = "正在运行：%@";
-"notch.operation.searching" = "Search";
-"notch.operation.searchingNamed" = "Search %@";
-"notch.operation.searchingPatternsCount" = "搜索 %d 个模式";
+"notch.operation.searching" = "搜索";
+"notch.operation.searchingNamed" = "正在搜索 %@";
+"notch.operation.searchingPatternsCount" = "正在搜索 %d 个模式";
 "notch.operation.searchingWeb" = "正在搜索网页...";
 "notch.operation.fetching" = "抓取中...";
 "notch.operation.fetchingNamed" = "正在抓取：%@";
 "notch.operation.runningAgent" = "正在运行代理...";
+"notch.operation.runningAgentNamed" = "代理：正在执行 %@...";
+"notch.operation.helping" = "正在查询帮助...";
+"notch.operation.helpingNamed" = "帮助：正在查询 %@...";
 "notch.operation.updatingTodos" = "正在更新待办...";
 "notch.operation.enteringPlanMode" = "正在进入规划模式...";
 "notch.operation.exitingPlanMode" = "正在退出规划模式...";

@@ -142,8 +142,14 @@ enum GeminiToolNames {
             return "edit"
         case "web_fetch":
             return "webfetch"
-        case "web_search", "google_web_search":
+        case "web_search", "google_web_search", "google_search":
             return "websearch"
+        case "list_directory":
+            return "ls"
+        case "codebase_investigator":
+            return "agent"
+        case "cli_help":
+            return "help"
         default:
             return nil
         }
