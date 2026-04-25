@@ -80,6 +80,7 @@
 		5568C0075035BD96EDA854B5 /* TerminalCLICommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F483343402849CE44F4F47C /* TerminalCLICommand.swift */; };
 		55DE2FD77D568E40AE4C239B /* CodexProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF8FD132C6328D09C336FB9 /* CodexProvider.swift */; };
 		56242266D3D70E01E2A22FCA /* TerminalFocusTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10E8B731850ABEECA18B111F /* TerminalFocusTarget.swift */; };
+		57D5A6D151D1FF3C3171CB7D /* GeminiTranscriptParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECF822CEEB2C6D6968C06E5D /* GeminiTranscriptParserTests.swift */; };
 		58108CACA592BE955CCE7191 /* GeminiTranscriptParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 488C2018A8681C6E971CF6A8 /* GeminiTranscriptParser.swift */; };
 		58946ED75833B063091E2FC7 /* SharePreviewWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A2B4F377370E1969E00AD7 /* SharePreviewWindowController.swift */; };
 		58C1BB54AF46F2D4E1C5DAAB /* CredentialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA6D16472FCD12FE7A8C1891 /* CredentialService.swift */; };
@@ -411,6 +412,7 @@
 		EB1DFC6E058CCC6A5552A8DD /* NotchStateMachineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchStateMachineTests.swift; sourceTree = "<group>"; };
 		EB7C0918B3E022C679ECD9CD /* UsageVMRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageVMRegistry.swift; sourceTree = "<group>"; };
 		EBD75397BB200D96BF189CEB /* AppTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTab.swift; sourceTree = "<group>"; };
+		ECF822CEEB2C6D6968C06E5D /* GeminiTranscriptParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiTranscriptParserTests.swift; sourceTree = "<group>"; };
 		EDE6D238094644B3E5ECD8C9 /* ClaudePKCE.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudePKCE.swift; sourceTree = "<group>"; };
 		EEDC6DF1C15355DC5AE2FCF9 /* TrendChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendChartView.swift; sourceTree = "<group>"; };
 		EF76C0BD045510B9035C9733 /* ToolActivityFormatter+Completion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ToolActivityFormatter+Completion.swift"; sourceTree = "<group>"; };
@@ -457,6 +459,7 @@
 				2C1C75DCADED926320D04BC3 /* CodexTranscriptParserTests.swift */,
 				450392F75EF01359109269C9 /* DisplayTextClassifierTests.swift */,
 				67A6CC8A73A83B2478E9137B /* GeminiHookNormalizerTests.swift */,
+				ECF822CEEB2C6D6968C06E5D /* GeminiTranscriptParserTests.swift */,
 				5657C95B75EDEA0DA7660426 /* InformationalEventGateTests.swift */,
 				E077808ABF96135D9B76672B /* LivenessCheckerTests.swift */,
 				4D7AC12A966340D54D712D4B /* NotchAutoAllowRulesTests.swift */,
@@ -966,6 +969,7 @@
 				3B9A964005C3F7C930946293 /* CodexTranscriptParserTests.swift in Sources */,
 				0B426BAD8A94D6326C0967A2 /* DisplayTextClassifierTests.swift in Sources */,
 				D87F1B9F8C9F7B628DD82D5E /* GeminiHookNormalizerTests.swift in Sources */,
+				57D5A6D151D1FF3C3171CB7D /* GeminiTranscriptParserTests.swift in Sources */,
 				CD563F1C5E793187EEB05347 /* InformationalEventGateTests.swift in Sources */,
 				B67485324065CEED99A923C2 /* LivenessCheckerTests.swift in Sources */,
 				F6EAAF46EC0B0469993F7674 /* NotchAutoAllowRulesTests.swift in Sources */,
