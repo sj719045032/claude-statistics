@@ -1,0 +1,35 @@
+name: Redeploy website on release
+
+# Triggers a Vercel deploy hook whenever a GitHub Release is published or edited,
+# so the /changelog page (which fetches releases at build time) stays current.
+# Manual runs are also allowed for testing.
+
+on:
+  release:
+    types: [published, edited]
+  workflow_dispatch: {}
+
+jobs:
+  redeploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel deploy hook
+        env:
+          DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "::error::VERCEL_DEPLOY_HOOK secret is not set in repository settings."
+            exit 1
+          fi
+
+          response=$(curl -sS -X POST "$DEPLOY_HOOK" -w "\n%{http_code}")
+          status=$(printf '%s' "$response" | tail -n1)
+          body=$(printf '%s' "$response" | sed '$d')
+
+          echo "HTTP $status"
+          echo "$body"
+
+          if [ "$status" != "200" ] && [ "$status" != "201" ]; then
+            echo "::error::Deploy hook returned status $status"
+            exit 1
+          fi
