@@ -47,6 +47,7 @@
 		3A28E84ED0B7490923FA86B0 /* ShareMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA8B62A57C9E8AD16345458A /* ShareMetrics.swift */; };
 		3AD8ED72F8D42B9DB0614F77 /* UpdaterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7AD5E89B648F5018E34233A /* UpdaterService.swift */; };
 		3B999876C754DFF2C3409CF8 /* UsageVMRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB7C0918B3E022C679ECD9CD /* UsageVMRegistry.swift */; };
+		3B9A964005C3F7C930946293 /* CodexTranscriptParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C1C75DCADED926320D04BC3 /* CodexTranscriptParserTests.swift */; };
 		3BED6D466169435AA6DCE604 /* PermissionRequestCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7159F0102A6FC05DC3F187A2 /* PermissionRequestCard.swift */; };
 		3EB9F1EB0E5CCFFEB816D80D /* GlobalHotKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B4066C394B5E23322D32189 /* GlobalHotKeyManager.swift */; };
 		3EFB09CA9B06B024D797832B /* UsageAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32FE333B9AD0368698B9A39F /* UsageAPIService.swift */; };
@@ -106,6 +107,7 @@
 		7CD9C8820D5C77BDC5DE0E35 /* PendingResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A3701AFF5252558AFDD027 /* PendingResponse.swift */; };
 		7DDF1FCD20AD18EFE47F3067 /* ToolActivityFormatterCompletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F10B1989F38BD8829116BBE /* ToolActivityFormatterCompletionTests.swift */; };
 		7E48B08D0513149CA87ADE4C /* TerminalIdentityResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B71EA214A4CBCF6BFE070E4A /* TerminalIdentityResolver.swift */; };
+		7FE4347A1452269B1C4BA6BD /* TranscriptParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30A2C90E33CD4B1328D25897 /* TranscriptParserTests.swift */; };
 		7FF6E85B58542CC7284AA3D0 /* ToolActivityFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D74BEFC175DFC5CD3999DBE1 /* ToolActivityFormatter.swift */; };
 		8085DD6DBD24695A898B8A4B /* TerminalFocusCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A51BA7586FEEB898B1FE9ED8 /* TerminalFocusCoordinator.swift */; };
 		811F6A7F43B2B7E7B0588324 /* ClaudeHookNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0C7C98F9FB93519DCD7D594 /* ClaudeHookNormalizer.swift */; };
@@ -254,9 +256,11 @@
 		1EBE034854D1539811ED0D5F /* SearchUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchUtils.swift; sourceTree = "<group>"; };
 		2292302272EF00BEA6426BAA /* NotificationTimerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationTimerStore.swift; sourceTree = "<group>"; };
 		24A2B4F377370E1969E00AD7 /* SharePreviewWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharePreviewWindowController.swift; sourceTree = "<group>"; };
+		2C1C75DCADED926320D04BC3 /* CodexTranscriptParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexTranscriptParserTests.swift; sourceTree = "<group>"; };
 		2D75041CC7940EEFCCEE54FA /* GeminiUsageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiUsageService.swift; sourceTree = "<group>"; };
 		2E023CB9F472AC7C93777B50 /* ActiveSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveSession.swift; sourceTree = "<group>"; };
 		2EDF09CC0594DB9C35748FF4 /* AggregateStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AggregateStats.swift; sourceTree = "<group>"; };
+		30A2C90E33CD4B1328D25897 /* TranscriptParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptParserTests.swift; sourceTree = "<group>"; };
 		32FE333B9AD0368698B9A39F /* UsageAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageAPIService.swift; sourceTree = "<group>"; };
 		3511F107E29217FB16567AF9 /* UsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageView.swift; sourceTree = "<group>"; };
 		35EC230BC5F1EF207A984D87 /* FSEventsWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FSEventsWatcher.swift; sourceTree = "<group>"; };
@@ -450,6 +454,7 @@
 				947363ADD9A5EBADB39651B2 /* ActiveToolsAggregatorTests.swift */,
 				E10F402C2998B35DE30CF5E5 /* ClaudeHookNormalizerTests.swift */,
 				6EF25B053D417EBE841F89B8 /* CodexHookNormalizerTests.swift */,
+				2C1C75DCADED926320D04BC3 /* CodexTranscriptParserTests.swift */,
 				450392F75EF01359109269C9 /* DisplayTextClassifierTests.swift */,
 				67A6CC8A73A83B2478E9137B /* GeminiHookNormalizerTests.swift */,
 				5657C95B75EDEA0DA7660426 /* InformationalEventGateTests.swift */,
@@ -469,6 +474,7 @@
 				1A2B4B94E4739481488C153E /* ToolActivityFormatterOperationsTests.swift */,
 				F06F5996862455AE5ED7AD2B /* ToolActivityFormatterPermissionsTests.swift */,
 				720816DDD296B62AA0B21501 /* ToolOutputCleaningTests.swift */,
+				30A2C90E33CD4B1328D25897 /* TranscriptParserTests.swift */,
 				109BA2D83C763E18D01DF5F8 /* UsageVMRegistryTests.swift */,
 				17CEC3E9B44025FEE0E05C89 /* WireEventTranslatorTests.swift */,
 			);
@@ -957,6 +963,7 @@
 				E0DB60E0DF083742C57F76C8 /* ActiveToolsAggregatorTests.swift in Sources */,
 				88F2EFD1B9C27DA8F671021C /* ClaudeHookNormalizerTests.swift in Sources */,
 				52F974903A8AF93F774EBECA /* CodexHookNormalizerTests.swift in Sources */,
+				3B9A964005C3F7C930946293 /* CodexTranscriptParserTests.swift in Sources */,
 				0B426BAD8A94D6326C0967A2 /* DisplayTextClassifierTests.swift in Sources */,
 				D87F1B9F8C9F7B628DD82D5E /* GeminiHookNormalizerTests.swift in Sources */,
 				CD563F1C5E793187EEB05347 /* InformationalEventGateTests.swift in Sources */,
@@ -976,6 +983,7 @@
 				06784AC10F46DD7CBA02214C /* ToolActivityFormatterOperationsTests.swift in Sources */,
 				52769FCFB499502D23765EFB /* ToolActivityFormatterPermissionsTests.swift in Sources */,
 				496ADA262A3B2001DC3E40B2 /* ToolOutputCleaningTests.swift in Sources */,
+				7FE4347A1452269B1C4BA6BD /* TranscriptParserTests.swift in Sources */,
 				E8DE1057D8CA0EF0311CD390 /* UsageVMRegistryTests.swift in Sources */,
 				4C27C5DD7022DEE994CAA840 /* WireEventTranslatorTests.swift in Sources */,
 			);
