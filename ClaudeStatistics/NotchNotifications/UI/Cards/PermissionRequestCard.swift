@@ -18,21 +18,57 @@ struct PermissionRequestCard: View {
             projectPath: projectPath,
             title: title
         ) {
-            if !commandPreviewLines.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(Array(commandPreviewLines.enumerated()), id: \.offset) { _, line in
-                        Text(line)
-                            .font(.system(size: 11, weight: .regular, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.65))
-                            .lineLimit(2)
-                            .truncationMode(.tail)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+            if !previewContent.isEmpty {
+                // Three-tier permission preview: primary payload (code / path /
+                // diff / list), metadata (label: value options), descriptions
+                // (Claude's "why"). Each tier has its own visual style so a
+                // long command wrapping to multiple lines is unambiguous.
+                ScrollView(.vertical, showsIndicators: true) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let primary = previewContent.primary {
+                            primaryView(primary)
+                        }
+                        if !previewContent.metadata.isEmpty {
+                            VStack(alignment: .leading, spacing: 3) {
+                                ForEach(Array(previewContent.metadata.enumerated()), id: \.offset) { _, entry in
+                                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                        Text(entry.label)
+                                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                                            .foregroundStyle(.white.opacity(0.42))
+                                        Text(entry.value)
+                                            .font(.system(size: 10, weight: .regular, design: .monospaced))
+                                            .foregroundStyle(.white.opacity(0.72))
+                                            .textSelection(.enabled)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                }
+                            }
+                        }
+                        if !previewContent.descriptions.isEmpty {
+                            VStack(alignment: .leading, spacing: 3) {
+                                ForEach(Array(previewContent.descriptions.enumerated()), id: \.offset) { _, desc in
+                                    HStack(alignment: .top, spacing: 5) {
+                                        Text("›")
+                                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                                            .foregroundStyle(.white.opacity(0.32))
+                                        Text(desc)
+                                            .font(.system(size: 10, weight: .regular))
+                                            .foregroundStyle(.white.opacity(0.58))
+                                            .textSelection(.enabled)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                }
+                            }
+                        }
                     }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
+                .frame(maxHeight: 520)   // adaptive up to ~two thirds of a 14" notch screen
+                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 7))
             }
         } bottomLeading: {
             if let remaining, remaining > 0 {
@@ -56,7 +92,7 @@ struct PermissionRequestCard: View {
                         action: onFocusTerminal
                     )
                 }
-                if event.pending != nil {
+                if event.isActionableApproval {
                     NotchPillButton(
                         titleKey: "notch.common.deny",
                         style: .secondary,
@@ -112,13 +148,13 @@ struct PermissionRequestCard: View {
     }
 
     private var title: String {
-        if case .permissionRequest(let tool, _, _) = event.kind {
-            if event.pending == nil {
+        if case .permissionRequest(let tool, _, _, let interaction) = event.kind {
+            if interaction == .passive {
                 return String(format: LanguageManager.localizedString("notch.permission.externalTitle"), tool)
             }
             return String(format: LanguageManager.localizedString("notch.permission.title"), tool)
         }
-        if event.pending == nil {
+        if event.isPassiveApproval {
             return LanguageManager.localizedString("notch.permission.externalTitle")
         }
         return LanguageManager.localizedString("notch.permission.title")
@@ -126,7 +162,7 @@ struct PermissionRequestCard: View {
 
     private var alwaysAllowTooltip: String {
         let toolName: String
-        if case .permissionRequest(let tool, _, _) = event.kind {
+        if case .permissionRequest(let tool, _, _, _) = event.kind {
             toolName = tool
         } else {
             toolName = ""
@@ -134,9 +170,51 @@ struct PermissionRequestCard: View {
         return String(format: LanguageManager.localizedString("notch.common.allowAlways.tooltip"), toolName)
     }
 
-    private var commandPreviewLines: [String] {
-        guard case .permissionRequest(let tool, let input, _) = event.kind else { return [] }
-        return PermissionInputFormatter.details(tool: tool, input: input)
+    private var previewContent: ToolActivityFormatter.PermissionPreviewContent {
+        guard case .permissionRequest(let tool, let input, _, _) = event.kind else {
+            return ToolActivityFormatter.PermissionPreviewContent(primary: nil, metadata: [], descriptions: [])
+        }
+        return ToolActivityFormatter.permissionPreview(tool: tool, input: input)
+    }
+
+    @ViewBuilder
+    private func primaryView(_ primary: ToolActivityFormatter.PermissionPreviewContent.Primary) -> some View {
+        switch primary {
+        case .code(let text):
+            // Full multi-line code/command — equidistant font, preserves
+            // indentation, selectable.
+            Text(text)
+                .font(.system(size: 11, weight: .regular, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.85))
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        case .inline(let text):
+            // Single-line identifier (path / url / pattern / query).
+            Text(text)
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.9))
+                .textSelection(.enabled)
+                .lineLimit(nil)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        case .diff(let oldText, let newText):
+            // Edit tool: full unified diff (shared with the conversation
+            // history view) — red "-" / green "+" lines with 3 lines of
+            // context, collapsed gaps, and monospaced content.
+            UnifiedDiffView(oldText: oldText, newText: newText)
+        case .list(let items):
+            VStack(alignment: .leading, spacing: 3) {
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                    Text(item)
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.78))
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
     }
 
     private var remaining: TimeInterval? {

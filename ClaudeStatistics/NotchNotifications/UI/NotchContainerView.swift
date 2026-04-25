@@ -1,5 +1,49 @@
 import SwiftUI
 
+/// Single source of truth for an idle-peek session row's layout height. Used
+/// by both the shell sizing in `NotchContainerView.idlePeekContentHeight` and
+/// the per-row `.frame(height:)` in `IdlePeekCard` so the two are guaranteed
+/// to agree — no estimate/actual mismatch, no inner empty gap below the last
+/// row, no overflow clipping. Rows are forced to this deterministic height.
+enum IdlePeekLayout {
+    /// Rendered height per tool row inside `detailedToolsSection`. Tool rows
+    /// are size-10/9 SF Pro / mono / rounded inside an HStack — empirically
+    /// ~13pt at the system default leading.
+    static let toolLineHeight: CGFloat = 13
+    /// `VStack(spacing: 2)` gap between adjacent tool rows in the section.
+    static let toolRowSpacing: CGFloat = 2
+    /// `detailedToolsSection` adds `.padding(.top, 2)` of its own.
+    static let toolSectionLead: CGFloat = 2
+    /// Inserting `detailedToolsSection` adds one extra child to the row's
+    /// outer `VStack(spacing: 3)`, contributing one more 3pt gap that the
+    /// triptych-only baseline doesn't include.
+    static let detailedSectionExtraGap: CGFloat = 3
+
+    static func rowHeight(
+        for session: ActiveSession,
+        baseHeight: CGFloat,
+        detailedMode: Bool
+    ) -> CGFloat {
+        guard detailedMode else { return baseHeight }
+        // Matches `activeToolsToShowInDetail`: all in-flight tools render in
+        // the detail section now that MIDDLE is a count-only aggregate.
+        let active = session.activeTools.count
+        let cutoff = Date().addingTimeInterval(-ActiveSession.recentToolsWindow)
+        let recent = session.recentlyCompletedTools
+            .filter { $0.completedAt >= cutoff }
+            .count
+        let total = active + recent
+        guard total > 0 else { return baseHeight }
+        // Section height = N rows × rowH + (N-1) × rowSpacing + lead.
+        // Plus one extra 3pt gap from the outer VStack opening up.
+        return baseHeight
+            + CGFloat(total) * toolLineHeight
+            + CGFloat(max(0, total - 1)) * toolRowSpacing
+            + toolSectionLead
+            + detailedSectionExtraGap
+    }
+}
+
 private struct TopRevealMaskShape: Shape {
     var revealHeight: CGFloat
     var bottomCornerRadius: CGFloat
@@ -57,6 +101,14 @@ struct NotchContainerView: View {
     var onKeyboardCaptureChange: (Bool) -> Void = { _ in }
     var onInteractiveSizeChange: (CGSize) -> Void = { _ in }
 
+    // Binds to the same UserDefaults key as ActiveSessionRow's @AppStorage.
+    // Declared here (even though it's not read directly in most branches) so
+    // SwiftUI knows the container's body + size computations depend on it;
+    // without this binding, flipping the toggle would leave the outer notch
+    // window clamped to the compact-mode height.
+    @AppStorage(NotchPreferences.idlePeekDetailedRowsKey)
+    private var idlePeekDetailedRows: Bool = false
+
     // Hover state split between two zones so either keeps the island revealed.
     @State private var hoveringNotchZone = false
     @State private var hoveringIsland    = false
@@ -113,6 +165,12 @@ struct NotchContainerView: View {
     @State private var idlePeekShellHeightOverride: CGFloat?
     @State private var idlePeekRevealHeightOverride: CGFloat?
     @State private var pendingIdlePeekRevealReset: DispatchWorkItem?
+    /// Last shell height we observed while the idle peek was open. Lets the
+    /// session-change handler animate from the previous height to the new
+    /// one (the SwiftUI `.onChange` callback only sees the new sessions, so
+    /// the old height has to be carried in `@State`). Reset to 0 when the
+    /// peek closes so the next reopen doesn't animate from a stale value.
+    @State private var lastObservedIdlePeekShellHeight: CGFloat = 0
     @State private var isClosingReveal = false
     @State private var selectedEventAction: EventCardAction?
     @State private var selectedIdleSessionID: String?
@@ -121,7 +179,11 @@ struct NotchContainerView: View {
 
     private var rawHovering: Bool { !hoverReentrySuppressed && (hoveringNotchZone || hoveringIsland) }
     private let visibleIdleRows = 3
-    private let idlePeekRowHeight: CGFloat = 57
+    // Triptych row: header(16) + 3 content lines(13 × 3) + 3 gaps(3 × 3) + vertical padding(6 × 2) = 76.
+    // Must match the row's actual natural size so the shell sizing formula
+    // in `idlePeekContentHeight` doesn't overshoot and leave visible empty
+    // space between the last row and the container's bottom edge.
+    private let idlePeekRowHeight: CGFloat = 76
     private let idlePeekRowSpacing: CGFloat = 4
     private let idlePeekToggleGap: CGFloat = 4
     private let idlePeekToggleHeight: CGFloat = 16
@@ -203,8 +265,40 @@ struct NotchContainerView: View {
         .onChange(of: activeTracker.sessions) { _, _ in
             if activeTracker.totalCount <= visibleIdleRows {
                 idlePeekShowingAllSessions = false
+                // ↑ Drives `handleIdlePeekRowsVisibilityChange`, which already
+                // animates. Skip the session-driven animation below to avoid
+                // double-firing.
+                lastObservedIdlePeekShellHeight = idlePeekExpandedShellHeight(showingAllSessions: false)
+                return
             }
-            reportInteractiveSize()
+            let newHeight = idlePeekExpandedShellHeight(showingAllSessions: idlePeekShowingAllSessions)
+            let oldHeight = lastObservedIdlePeekShellHeight
+            lastObservedIdlePeekShellHeight = newHeight
+
+            let canAnimate = oldHeight > 0
+                && abs(newHeight - oldHeight) > 0.5
+                && idlePeekActive
+                && revealExpandedIsland
+                && notchCenter.currentEvent == nil
+                && closingEvent == nil
+            if canAnimate {
+                animateIdlePeekShellResize(oldHeight: oldHeight, newHeight: newHeight)
+            } else {
+                reportInteractiveSize()
+            }
+        }
+        .onChange(of: revealExpandedIsland) { _, expanded in
+            // Reset the height baseline when the peek closes so the next
+            // reopen doesn't animate from a stale snapshot. On reopen, seed
+            // it with the current computed height so the first session-driven
+            // change has a valid `oldHeight` to animate from.
+            if expanded {
+                lastObservedIdlePeekShellHeight = idlePeekExpandedShellHeight(
+                    showingAllSessions: idlePeekShowingAllSessions
+                )
+            } else {
+                lastObservedIdlePeekShellHeight = 0
+            }
         }
         .onChange(of: notchCenter.currentEvent) { oldEvent, event in
             DiagnosticLogger.shared.info(
@@ -234,6 +328,14 @@ struct NotchContainerView: View {
                 // the peek or suppress reentry.
                 wasPeekingOnEventArrival = idlePeekActive && effectiveHovering
                 idlePeekActive = false
+                // Force a panel resize NOW: the state machine may already be
+                // `.expanded` (idle peek was open), so `machine.show(.expanded)`
+                // below is a no-op and `.onChange(of: machine.state)` won't
+                // fire. Without this, the panel stays clamped to whatever the
+                // idle peek was sized to until the event card's own intrinsic
+                // measurement arrives — long enough that the bottom action
+                // buttons render clipped.
+                reportInteractiveSize(expandedOverride: true)
                 schedulePanelExpansion {
                     machine.show(expanded: true)
                 }
@@ -468,7 +570,15 @@ struct NotchContainerView: View {
                 // fires. Pick a value close to the typical final height so the
                 // first frame isn't obviously wrong while we wait; measurement
                 // takes over within ~1 frame.
-                case .permissionRequest: fallbackBase = 200; maxAllowed = 360
+                // Permission card grows with content so long commands / diffs
+                // / todo lists aren't clipped behind a hard-coded ceiling. Hard
+                // cap by the visible screen height so a pathological heredoc
+                // doesn't push past the menu bar; actual height still follows
+                // the measured card (min(maxAllowed, intrinsic + chrome)).
+                case .permissionRequest:
+                    fallbackBase = 200
+                    let screenHeight = NSScreen.main?.visibleFrame.height ?? 900
+                    maxAllowed = max(420, screenHeight - 120)
                 case .taskFailed:        fallbackBase = 180; maxAllowed = 420
                 case .waitingInput:      fallbackBase = 200; maxAllowed = 440
                 case .taskDone:          fallbackBase = 200; maxAllowed = 420
@@ -482,7 +592,14 @@ struct NotchContainerView: View {
             } else {
                 h = idlePeekShellHeightOverride ?? idlePeekExpandedShellHeight(showingAllSessions: idlePeekShowingAllSessions)
             }
-            return CGSize(width: NotchStateMachine.expandedWidth, height: h)
+            // Detailed mode widens every expanded panel (idle peek + all
+            // event cards) so long command previews, diffs, and permission
+            // payloads have room to breathe without wrapping. When the
+            // preference is off, everyone shares the compact 440pt width.
+            let w = idlePeekDetailedRows
+                ? NotchStateMachine.expandedDetailedWidth
+                : NotchStateMachine.expandedWidth
+            return CGSize(width: w, height: h)
         }
 
         // Compact with event: small pill showing summary.
@@ -543,12 +660,21 @@ struct NotchContainerView: View {
     }
 
     private func idlePeekContentHeight(showingAllSessions: Bool) -> CGFloat {
+        let sessions = activeTracker.sessions
         let rowCount = showingAllSessions
-            ? activeTracker.sessions.count
-            : min(activeTracker.sessions.count, visibleIdleRows)
+            ? sessions.count
+            : min(sessions.count, visibleIdleRows)
         guard rowCount > 0 else { return idlePeekEmptyHeight }
 
-        let rowsHeight = CGFloat(rowCount) * idlePeekRowHeight
+        let rowsHeight: CGFloat
+        let visibleSessions = Array(sessions.prefix(rowCount))
+        rowsHeight = visibleSessions.reduce(0) { sum, session in
+            sum + IdlePeekLayout.rowHeight(
+                for: session,
+                baseHeight: idlePeekRowHeight,
+                detailedMode: idlePeekDetailedRows
+            )
+        }
         let rowGaps = CGFloat(max(0, rowCount - 1)) * idlePeekRowSpacing
         let toggleHeight = idlePeekShowsToggle ? idlePeekToggleGap + idlePeekToggleHeight : 0
         return rowsHeight + rowGaps + toggleHeight
@@ -567,9 +693,10 @@ struct NotchContainerView: View {
         if event != nil {
             return 14
         }
-        // Match horizontal padding (18) when there's no toggle so short lists
-        // (1-3 rows) look balanced. With toggle, the toggle row carries its
-        // own spacing so the outer padding can stay tight.
+        // Rows now force themselves to the exact height the shell estimate
+        // expects (see `IdlePeekLayout.rowHeight` + `.frame(height:)` inside
+        // `IdlePeekCard`), so there's no estimate/actual slack. Bottom
+        // padding is a clean 18pt mirroring the horizontal padding.
         return idlePeekShowsToggle ? 4 : 18
     }
 
@@ -659,11 +786,20 @@ struct NotchContainerView: View {
     }
 
     private func handleIdlePeekRowsVisibilityChange(from oldValue: Bool, to newValue: Bool) {
-        pendingIdlePeekRevealReset?.cancel()
-        pendingIdlePeekRevealReset = nil
-
         let oldHeight = idlePeekExpandedShellHeight(showingAllSessions: oldValue)
         let newHeight = idlePeekExpandedShellHeight(showingAllSessions: newValue)
+        animateIdlePeekShellResize(oldHeight: oldHeight, newHeight: newHeight)
+    }
+
+    /// Animates the idle-peek shell from `oldHeight` to `newHeight` using the
+    /// override mechanism: the panel snaps to whichever is larger so SwiftUI
+    /// has enough canvas, the SwiftUI reveal mask animates from old to new,
+    /// then both overrides reset after `idlePeekResizeDuration`. Used by both
+    /// the show-all toggle and active-session count changes (tools starting
+    /// or finishing) so the panel resizes smoothly in both cases.
+    private func animateIdlePeekShellResize(oldHeight: CGFloat, newHeight: CGFloat) {
+        pendingIdlePeekRevealReset?.cancel()
+        pendingIdlePeekRevealReset = nil
 
         guard notchCenter.currentEvent == nil,
               closingEvent == nil,
@@ -1330,7 +1466,7 @@ struct NotchContainerView: View {
 
     private func compactSummary(for event: AttentionEvent) -> String {
         switch event.kind {
-        case .permissionRequest(let tool, _, _):
+        case .permissionRequest(let tool, _, _, _):
             return String(format: LanguageManager.localizedString("notch.compact.permission"), tool)
         case .waitingInput:
             return String(format: LanguageManager.localizedString("notch.compact.waiting"), event.provider.displayName)
@@ -1419,7 +1555,7 @@ struct NotchContainerView: View {
             if eventHasFocusHint(event) {
                 actions.append(.returnToTerminal)
             }
-            if event.pending != nil {
+            if event.isActionableApproval {
                 actions.append(contentsOf: [.deny, .allow, .allowAlways])
             } else {
                 actions.append(.dismiss)
@@ -1663,6 +1799,8 @@ struct IdlePeekCard: View {
     var onOpenSession: (ActiveSession) -> Void
     var onInternalInteraction: () -> Void = {}
 
+    @AppStorage(NotchPreferences.idlePeekDetailedRowsKey) private var detailedMode: Bool = false
+
     var body: some View {
         Group {
             if activeTracker.sessions.isEmpty {
@@ -1678,7 +1816,16 @@ struct IdlePeekCard: View {
                                 ActiveSessionRow(session: session, isKeyboardSelected: keyboardSelectedSessionID == session.id && !keyboardSelectsToggle) {
                                     onOpenSession(session)
                                 }
-                                .frame(height: rowHeight)
+                                // Force each row to the same height the shell
+                                // uses when summing `idlePeekContentHeight`.
+                                // Guarantees shell edge == last row edge, no
+                                // estimate/actual slack leaking as bottom
+                                // padding.
+                                .frame(height: IdlePeekLayout.rowHeight(
+                                    for: session,
+                                    baseHeight: rowHeight,
+                                    detailedMode: detailedMode
+                                ))
                             }
                         }
                     }
@@ -1715,7 +1862,12 @@ struct IdlePeekCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: contentHeight, maxHeight: contentHeight, alignment: .topLeading)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: contentHeight,
+            maxHeight: detailedMode ? .infinity : contentHeight,
+            alignment: .topLeading
+        )
         .clipped()
         .onChange(of: activeTracker.totalCount) { _, totalCount in
             if totalCount <= visibleRows {
@@ -1734,9 +1886,40 @@ private struct ActiveSessionRow: View {
     let isKeyboardSelected: Bool
     let onClick: () -> Void
 
+    @AppStorage(NotchPreferences.idlePeekDetailedRowsKey) private var detailedMode: Bool = false
+
     private let rowSlotHeight: CGFloat = 13
     /// Seconds per pulse cycle for the running-status dot ring.
     private let pulseCycle: TimeInterval = 1.1
+
+    private var sortedActiveTools: [(id: String, entry: ActiveToolEntry)] {
+        session.activeTools
+            .map { (id: $0.key, entry: $0.value) }
+            .sorted { $0.entry.startedAt < $1.entry.startedAt }
+    }
+
+    /// Triptych payload — same content in both modes. Detailed mode adds the
+    /// per-tool list below the triptych; otherwise the row reads identically.
+    private var triptych: ProviderSessionDisplayContent {
+        session.triptychContent
+    }
+
+    private var freshRecentlyCompleted: [CompletedToolEntry] {
+        let cutoff = Date().addingTimeInterval(-ActiveSession.recentToolsWindow)
+        return session.recentlyCompletedTools.filter { $0.completedAt >= cutoff }
+    }
+
+    /// Active tools to render in the detail section. Always surface every
+    /// in-flight tool — MIDDLE in detailed mode is a CLI-style count
+    /// aggregate ("Reading 1 file"), so the specific target belongs here
+    /// and there's no duplication to guard against.
+    private var activeToolsToShowInDetail: [(id: String, entry: ActiveToolEntry)] {
+        sortedActiveTools
+    }
+
+    private var hasDetailedSectionContent: Bool {
+        !activeToolsToShowInDetail.isEmpty || !freshRecentlyCompleted.isEmpty
+    }
 
     var body: some View {
         Button(action: onClick) {
@@ -1780,6 +1963,24 @@ private struct ActiveSessionRow: View {
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
                             .background(session.provider.badgeColor.opacity(0.16), in: Capsule())
+                        if session.activeSubagentCount > 0 {
+                            HStack(spacing: 2) {
+                                Image(systemName: "wand.and.stars")
+                                    .font(.system(size: 8, weight: .semibold))
+                                Text("\(session.activeSubagentCount)")
+                                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            }
+                            .foregroundStyle(.white.opacity(0.9))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color.purple.opacity(0.32), in: Capsule())
+                        }
+                        // Background-shell chip intentionally omitted:
+                        // Claude Code has no natural-exit hook for `run_in_background: true`
+                        // shells, so the count only increments. Once the shells have
+                        // actually exited the chip would falsely claim N still running.
+                        // `KillShell`/`SessionEnd` reset it, but that's not a reliable
+                        // liveness signal — better to hide it than mislead.
                         Spacer(minLength: 4)
                         Text(session.relativeActivityDescription)
                             .font(.system(size: 10, weight: .regular, design: .monospaced))
@@ -1789,10 +1990,31 @@ private struct ActiveSessionRow: View {
                             .foregroundStyle(.white.opacity(session.hasFocusHint ? 0.72 : 0.32))
                             .frame(width: 14, height: 14)
                     }
-                    operationLine
+                    // Triptych (top-to-bottom, chronological):
+                    //   promptLine     — user's last input            (earliest)
+                    //   action + commentary — ordered by timestamp so MIDDLE
+                    //     is always the earlier event and BOTTOM the later
+                    //     one. `detailedToolsSection` tracks action since it
+                    //     is action's expansion (in-flight + recent tools).
+                    promptLine
                         .frame(height: rowSlotHeight, alignment: .topLeading)
-                    previewRow
-                        .frame(height: rowSlotHeight, alignment: .topLeading)
+                    if triptych.isChronologicallyReversed {
+                        commentaryLine
+                            .frame(height: rowSlotHeight, alignment: .topLeading)
+                        actionLine
+                            .frame(height: rowSlotHeight, alignment: .topLeading)
+                        if detailedMode && hasDetailedSectionContent {
+                            detailedToolsSection
+                        }
+                    } else {
+                        actionLine
+                            .frame(height: rowSlotHeight, alignment: .topLeading)
+                        if detailedMode && hasDetailedSectionContent {
+                            detailedToolsSection
+                        }
+                        commentaryLine
+                            .frame(height: rowSlotHeight, alignment: .topLeading)
+                    }
                 }
             }
             .padding(.horizontal, 8)
@@ -1810,49 +2032,153 @@ private struct ActiveSessionRow: View {
     }
 
     @ViewBuilder
-    private var previewRow: some View {
-        if let supporting = session.supportingLineText {
-            HStack(alignment: .top, spacing: 5) {
-                Image(systemName: session.supportingLineSymbol)
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.55))
-                    .frame(width: 11)
-                    .padding(.top, 2)
-                Text(supporting)
-                    .font(.system(size: 10, weight: .regular))
-                    .foregroundStyle(.white.opacity(0.42))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+    private var detailedToolsSection: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(activeToolsToShowInDetail, id: \.id) { item in
+                    toolRow(
+                        toolName: item.entry.toolName,
+                        detail: item.entry.detail,
+                        elapsed: Self.elapsedText(from: item.entry.startedAt, to: context.date),
+                        trailing: nil,
+                        faded: false
+                    )
+                }
+                ForEach(Array(freshRecentlyCompleted.enumerated()), id: \.offset) { _, entry in
+                    toolRow(
+                        toolName: entry.toolName,
+                        detail: entry.detail,
+                        elapsed: nil,
+                        trailing: String(
+                            format: LanguageManager.localizedString("notch.detailed.finishedAgo"),
+                            Self.elapsedText(from: entry.completedAt, to: context.date)
+                        ),
+                        faded: true,
+                        failed: entry.failed
+                    )
+                }
             }
-        } else {
-            Color.clear
+            .padding(.top, 2)
         }
     }
 
     @ViewBuilder
-    private var operationLine: some View {
+    private func toolRow(
+        toolName: String,
+        detail: String?,
+        elapsed: String?,
+        trailing: String?,
+        faded: Bool,
+        failed: Bool = false
+    ) -> some View {
+        let baseOpacity: Double = faded ? 0.42 : 0.78
+        let detailOpacity: Double = faded ? 0.34 : 0.58
+        let trailingOpacity: Double = faded ? 0.30 : 0.40
+        HStack(alignment: .firstTextBaseline, spacing: 5) {
+            Image(systemName: failed ? "xmark.circle" : (faded ? "checkmark" : ActiveSession.toolSymbol(toolName)))
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.white.opacity(baseOpacity - 0.08))
+                .frame(width: 11)
+            Text(toolName)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(baseOpacity))
+            if let detail, !detail.isEmpty {
+                Text(detail)
+                    .font(.system(size: 10, weight: .regular, design: .monospaced))
+                    .foregroundStyle(.white.opacity(detailOpacity))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer(minLength: 4)
+            if let elapsed {
+                Text(elapsed)
+                    .font(.system(size: 9, weight: .regular, design: .monospaced))
+                    .foregroundStyle(.white.opacity(trailingOpacity))
+            }
+            if let trailing {
+                Text(trailing)
+                    .font(.system(size: 9, weight: .regular, design: .monospaced))
+                    .foregroundStyle(.white.opacity(trailingOpacity))
+            }
+        }
+    }
+
+    private static func elapsedText(from started: Date, to now: Date) -> String {
+        let secs = Int(max(0, now.timeIntervalSince(started)))
+        if secs < 60 { return "\(secs)s" }
+        if secs < 3600 {
+            let m = secs / 60, s = secs % 60
+            return s == 0 ? "\(m)m" : "\(m)m\(s)s"
+        }
+        let h = secs / 3600, m = (secs % 3600) / 60
+        return m == 0 ? "\(h)h" : "\(h)h\(m)m"
+    }
+
+    @ViewBuilder
+    private var promptLine: some View {
+        triptychRow(
+            symbol: triptych.promptSymbol,
+            text: triptych.promptText,
+            textOpacity: 0.62,
+            symbolOpacity: 0.58,
+            truncation: .tail
+        )
+    }
+
+    @ViewBuilder
+    private var commentaryLine: some View {
+        triptychRow(
+            symbol: triptych.commentarySymbol,
+            text: triptych.commentaryText,
+            textOpacity: 0.62,
+            symbolOpacity: 0.58,
+            truncation: .tail
+        )
+    }
+
+    @ViewBuilder
+    private func triptychRow(
+        symbol: String,
+        text: String,
+        textOpacity: Double,
+        symbolOpacity: Double,
+        truncation: Text.TruncationMode
+    ) -> some View {
+        HStack(alignment: .top, spacing: 5) {
+            Image(systemName: symbol)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.white.opacity(symbolOpacity))
+                .frame(width: 11)
+                .padding(.top, 2)
+            Text(text)
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(textOpacity))
+                .lineLimit(1)
+                .truncationMode(truncation)
+        }
+    }
+
+    @ViewBuilder
+    private var actionLine: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             HStack(spacing: 8) {
-                if let text = session.operationLineText {
-                    HStack(spacing: 4) {
-                        Image(systemName: session.operationLineSymbol)
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.72))
-                            .frame(width: 11)
-                        Text(text)
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.62))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        if let elapsed = session.currentToolElapsedText(at: context.date) {
-                            Text(elapsed)
-                                .font(.system(size: 10, weight: .regular, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.42))
-                        }
+                HStack(spacing: 4) {
+                    Image(systemName: triptych.actionSymbol)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.82))
+                        .frame(width: 11)
+                    Text(triptych.actionText)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.78))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    if let elapsed = session.currentToolElapsedText(at: context.date) {
+                        Text(elapsed)
+                            .font(.system(size: 10, weight: .regular, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.52))
                     }
                 }
             }
-            .opacity(session.operationLineText != nil ? 1 : 0)
         }
     }
 }

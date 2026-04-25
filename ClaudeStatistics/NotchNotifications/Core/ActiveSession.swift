@@ -11,8 +11,79 @@ enum ActiveSessionStatus: String, Codable {
     case idle       // no recent signal — stale
 }
 
+enum CurrentOperationKind: String, Codable {
+    case tool
+    case compacting
+    case compressing
+    case modelThinking
+    case toolSelection
+    case subagent
+    case genericProcessing
+}
+
+struct CurrentOperation: Codable, Equatable {
+    let kind: CurrentOperationKind
+    let text: String
+    let symbol: String
+    let startedAt: Date
+    let toolName: String?
+    let toolUseId: String?
+    var semanticKey: String? = nil
+
+    var isGenericFallback: Bool {
+        kind == .genericProcessing
+    }
+
+    var keepsSessionRunning: Bool {
+        switch kind {
+        case .tool, .compacting, .compressing, .modelThinking, .toolSelection, .subagent:
+            return true
+        case .genericProcessing:
+            return false
+        }
+    }
+}
+
+enum ToolOutputKind: String, Codable {
+    case result
+    case echo
+    case rawSnippet
+}
+
+struct ToolOutputSummary: Codable, Equatable {
+    let text: String
+    let kind: ToolOutputKind
+    var semanticKey: String? = nil
+}
+
+/// One tool call in flight, keyed by toolUseId in `activeTools`. Lets the row
+/// aggregate "Reading 3 files · Searching 2 patterns" across parent + subagent
+/// activity instead of flipping between whichever `currentToolName` happened
+/// to fire last.
+struct ActiveToolEntry: Codable, Equatable {
+    let toolName: String
+    let detail: String?
+    let startedAt: Date
+}
+
+/// Afterglow entry: a tool that just finished. Kept in `recentlyCompletedTools`
+/// for a short window so sub-second tools (Read/Grep) don't merely flash past
+/// in the detailed row — the user sees "✓ Read foo.swift 3s ago" instead of a
+/// blank gap between PreToolUse and PostToolUse.
+struct CompletedToolEntry: Codable, Equatable {
+    let toolName: String
+    let detail: String?
+    let startedAt: Date
+    let completedAt: Date
+    let failed: Bool
+}
+
 struct ActiveSession: Identifiable, Equatable {
-    static let approvalStaleInterval: TimeInterval = 300
+    // Was 300s — too forgiving once you've already approved. Post-approval
+    // events sometimes can't clear the flag (toolUseId mismatch in subagent
+    // storms), so a shorter stale window keeps the "approval" label from
+    // lingering after the real moment has passed.
+    static let approvalStaleInterval: TimeInterval = 60
 
     let id: String
     let sessionId: String
@@ -20,11 +91,15 @@ struct ActiveSession: Identifiable, Equatable {
     let projectName: String
     let projectPath: String?
     let currentActivity: String?
+    let currentActivitySemanticKey: String?
+    let latestProgressNote: String?
+    let latestProgressNoteAt: Date?
     let latestPrompt: String?
     let latestPromptAt: Date?
     let latestPreview: String?
     let latestPreviewAt: Date?
     let lastActivityAt: Date
+    let currentOperation: CurrentOperation?
     let tty: String?
     let pid: Int32?
     let terminalName: String?
@@ -38,6 +113,7 @@ struct ActiveSession: Identifiable, Equatable {
     /// Surfaced in the IdlePeekCard row so the user can see what background
     /// shells / subagents are producing without opening the terminal.
     var latestToolOutput: String? = nil
+    var latestToolOutputSummary: ToolOutputSummary? = nil
     var latestToolOutputAt: Date? = nil
     /// Tool name that produced `latestToolOutput`, used to pick the right
     /// SF Symbol icon when rendering.
@@ -62,6 +138,22 @@ struct ActiveSession: Identifiable, Equatable {
     /// How many subagents are currently running (incremented on SubagentStart,
     /// decremented on SubagentStop).
     var activeSubagentCount: Int = 0
+    /// Every tool call currently in flight across parent + subagents on this
+    /// session, keyed by toolUseId. Populated on PreToolUse, cleared on
+    /// PostToolUse/PostToolUseFailure for the matching toolUseId, and fully
+    /// reset on Stop/StopFailure/SessionEnd.
+    var activeTools: [String: ActiveToolEntry] = [:]
+    /// Newest-first capped buffer of tools that just left `activeTools`. UI
+    /// shows them in a dimmer style with "Ns ago" to keep sub-second tools
+    /// visible instead of merely flashing past.
+    var recentlyCompletedTools: [CompletedToolEntry] = []
+    static let recentToolsMaxCount = 5
+    // 20s chosen so the MIDDLE aggregate ("Reading 2 files · Running 1
+    // command") stays populated across the usual between-tool gap when
+    // Claude is generating reasoning text between tool calls. Shorter and
+    // the row flickers to "Thinking…" briefly; much longer and the "finished
+    // Xs ago" trailing in the detailed section starts to feel stale.
+    static let recentToolsWindow: TimeInterval = 20
 
     var relativeActivityDescription: String {
         let elapsed = Int(Date().timeIntervalSince(lastActivityAt))
@@ -159,11 +251,20 @@ struct ActiveSession: Identifiable, Equatable {
     }
 
     var displayToolSymbol: String {
-        ActiveSession.toolSymbol(approvalToolName ?? currentToolName ?? latestToolOutputTool)
+        currentOperation?.symbol
+            ?? ActiveSession.toolSymbol(approvalToolName ?? currentToolName ?? latestToolOutputTool)
     }
 
     var supportingLineSymbol: String {
         displayContent.supportingLineSymbol
+    }
+
+    /// Triptych payload exposed to the row view. Each sub-field is guaranteed
+    /// non-empty (formatter applies static fallbacks), so the UI never needs
+    /// to guard for optionals. Simple and detailed modes share this content;
+    /// detailed mode just renders an additional tool-list section beneath.
+    var triptychContent: ProviderSessionDisplayContent {
+        ProviderSessionDisplayFormatter(session: self).content
     }
 
     var displayStatus: ActiveSessionStatus {
@@ -192,11 +293,20 @@ struct ActiveSession: Identifiable, Equatable {
 
     /// Downgrade stale runtime statuses — if nothing has happened for a while,
     /// treat the session as idle regardless of the last known event.
+    ///
+    /// `.running` has no time-based downgrade: the tracker flips it to
+    /// done/failed/idle on Stop/StopFailure/SessionEnd, and the outer
+    /// `pruneInactiveSessions` pass drops any session whose pid/terminal
+    /// has disappeared. A staleness clock on top of that fires falsely
+    /// during long Claude thinking windows (no hook events until the first
+    /// tool) and long-running tools (PreToolUse → PostToolUse minutes apart
+    /// with nothing in between). Previously this flipped the summary row to
+    /// "Idle" while the detailed section was still showing live activity.
     private var effectiveStatus: ActiveSessionStatus {
         let elapsed = Date().timeIntervalSince(lastActivityAt)
         switch status {
         case .running:
-            return elapsed < 30 ? .running : .idle
+            return .running
         case .approval:
             return elapsed < 300 ? .approval : .idle
         case .waiting:
