@@ -36,10 +36,7 @@ final class AppState: ObservableObject {
     let updaterService = UpdaterService()
     let notchCenter = NotchNotificationCenter()
     lazy var activeSessionsTracker = ActiveSessionsTracker()
-    let claudeAccountManager = ClaudeAccountManager()
-    let independentClaudeAccountManager = IndependentClaudeAccountManager()
-    let codexAccountManager = CodexAccountManager()
-    let geminiAccountManager = GeminiAccountManager()
+    let accounts = AccountManagers()
     private var cancellables: Set<AnyCancellable> = []
     private var runtimeBridgeCancellables: [ProviderKind: AnyCancellable] = [:]
     private var storesByProvider: [ProviderKind: SessionDataStore] = [:]
@@ -227,15 +224,7 @@ final class AppState: ObservableObject {
     }
 
     func refreshProviderAfterAccountChange(_ kind: ProviderKind) {
-        switch kind {
-        case .claude:
-            claudeAccountManager.load()
-            independentClaudeAccountManager.load()
-        case .codex:
-            codexAccountManager.load()
-        case .gemini:
-            geminiAccountManager.load()
-        }
+        accounts.reload(for: kind)
 
         if let existingStore = storesByProvider[kind] {
             existingStore.stop()

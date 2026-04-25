@@ -4,8 +4,8 @@ extension ClaudeProvider: ProviderAccountCardSupplementProviding {
     func makeAccountCardAccessory(context: ProviderSettingsContext) -> AnyView {
         AnyView(ClaudeProviderAccountCardAccessory(
             appState: context.appState,
-            accountManager: context.appState.claudeAccountManager,
-            independentManager: context.appState.independentClaudeAccountManager,
+            accountManager: context.appState.accounts.claude,
+            independentManager: context.appState.accounts.independentClaude,
             profileViewModel: context.profileViewModel,
             triggerStyle: .text
         ))
@@ -14,8 +14,8 @@ extension ClaudeProvider: ProviderAccountCardSupplementProviding {
     func makeCompactAccountSwitcherAccessory(context: ProviderSettingsContext, triggerStyle: AccountSwitcherTriggerStyle) -> AnyView {
         AnyView(ClaudeProviderAccountCardAccessory(
             appState: context.appState,
-            accountManager: context.appState.claudeAccountManager,
-            independentManager: context.appState.independentClaudeAccountManager,
+            accountManager: context.appState.accounts.claude,
+            independentManager: context.appState.accounts.independentClaude,
             profileViewModel: context.profileViewModel,
             triggerStyle: triggerStyle
         ))

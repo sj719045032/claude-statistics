@@ -22,6 +22,7 @@
 		12EC494D81F51B865094B844 /* ActiveToolsAggregator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B781AB1E0AD0CC70F783E1F7 /* ActiveToolsAggregator.swift */; };
 		1386DA5988E3BA59D802B154 /* ToolActivityFormatter+Permissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00B22ECE4D683B12838FAF26 /* ToolActivityFormatter+Permissions.swift */; };
 		1458F0ADB236E3CA0EDFAF4F /* PermissionRequestRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F1F7334EBE1509C248AE11 /* PermissionRequestRegistryTests.swift */; };
+		16C8950AF8AB3AF65152C71A /* AccountManagers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674190CA06E6AD12570EA1BF /* AccountManagers.swift */; };
 		1835A993B30EC7AE040F7829 /* SessionScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54DA495D7C6105F8AD37FD7D /* SessionScanner.swift */; };
 		19BCF9602F4555F5E007C0EA /* ShareCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9D13F949F9557AC75AAC3B1 /* ShareCardView.swift */; };
 		1A2595CC75D0C5C9E079B80B /* ClaudeOAuthCallbackServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86DF62498CA52D57F92CB797 /* ClaudeOAuthCallbackServer.swift */; };
@@ -278,6 +279,7 @@
 		6470B331BB31EF4AE6E5CF51 /* GeminiProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiProvider.swift; sourceTree = "<group>"; };
 		66851A558CEC1E024AAC87E6 /* TerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalCapability.swift; sourceTree = "<group>"; };
 		669DD3F7CA0ACD5A8FFF69A3 /* ClaudeProviderAccountCardAccessory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeProviderAccountCardAccessory.swift; sourceTree = "<group>"; };
+		674190CA06E6AD12570EA1BF /* AccountManagers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountManagers.swift; sourceTree = "<group>"; };
 		6749A9BF125AC2A04C7043D5 /* DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
 		68083922F93D555879FAD90B /* ClaudeStatisticsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatisticsApp.swift; sourceTree = "<group>"; };
 		684978AF102DA512FCD3D129 /* CodexAccountManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexAccountManager.swift; sourceTree = "<group>"; };
@@ -752,6 +754,7 @@
 		CC48F81473E62C269C6F830D /* App */ = {
 			isa = PBXGroup;
 			children = (
+				674190CA06E6AD12570EA1BF /* AccountManagers.swift */,
 				E3E1273546BE9434362C72E0 /* ClaudeStatistics.entitlements */,
 				68083922F93D555879FAD90B /* ClaudeStatisticsApp.swift */,
 				BF23C58F1F4E3E5605623ECE /* Info.plist */,
@@ -936,6 +939,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9C5D211F3293A0DCD5005A50 /* AccessibilityFocuser.swift in Sources */,
+				16C8950AF8AB3AF65152C71A /* AccountManagers.swift in Sources */,
 				4734910CD82A2F831E344A1C /* ActivateFocuser.swift in Sources */,
 				D99027587C25DA018DE94928 /* ActiveSession.swift in Sources */,
 				A2F1B0B01CE980A41F32D377 /* ActiveSessionsTracker.swift in Sources */,

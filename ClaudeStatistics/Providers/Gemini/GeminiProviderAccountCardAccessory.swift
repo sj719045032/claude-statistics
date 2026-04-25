@@ -4,7 +4,7 @@ extension GeminiProvider: ProviderAccountCardSupplementProviding {
     func makeAccountCardAccessory(context: ProviderSettingsContext) -> AnyView {
         AnyView(GeminiProviderAccountCardAccessory(
             appState: context.appState,
-            accountManager: context.appState.geminiAccountManager,
+            accountManager: context.appState.accounts.gemini,
             profileViewModel: context.profileViewModel,
             triggerStyle: .text
         ))
@@ -13,7 +13,7 @@ extension GeminiProvider: ProviderAccountCardSupplementProviding {
     func makeCompactAccountSwitcherAccessory(context: ProviderSettingsContext, triggerStyle: AccountSwitcherTriggerStyle) -> AnyView {
         AnyView(GeminiProviderAccountCardAccessory(
             appState: context.appState,
-            accountManager: context.appState.geminiAccountManager,
+            accountManager: context.appState.accounts.gemini,
             profileViewModel: context.profileViewModel,
             triggerStyle: triggerStyle
         ))

@@ -4,7 +4,7 @@ extension CodexProvider: ProviderAccountCardSupplementProviding {
     func makeAccountCardAccessory(context: ProviderSettingsContext) -> AnyView {
         AnyView(CodexProviderAccountCardAccessory(
             appState: context.appState,
-            codexAccountManager: context.appState.codexAccountManager,
+            codexAccountManager: context.appState.accounts.codex,
             profileViewModel: context.profileViewModel,
             triggerStyle: .text
         ))
@@ -13,7 +13,7 @@ extension CodexProvider: ProviderAccountCardSupplementProviding {
     func makeCompactAccountSwitcherAccessory(context: ProviderSettingsContext, triggerStyle: AccountSwitcherTriggerStyle) -> AnyView {
         AnyView(CodexProviderAccountCardAccessory(
             appState: context.appState,
-            codexAccountManager: context.appState.codexAccountManager,
+            codexAccountManager: context.appState.accounts.codex,
             profileViewModel: context.profileViewModel,
             triggerStyle: triggerStyle
         ))
