@@ -56,6 +56,7 @@
 "detail.user" = "User";
 "detail.assistant" = "Assistant";
 "detail.tools" = "Tools";
+"detail.topSessions" = "Top Sessions";
 "detail.trend" = "Trend";
 "detail.modelBreakdown" = "Model Breakdown";
 "detail.calls %lld" = "%lld calls";
@@ -117,6 +118,7 @@
 "usage.safeEstimate %@" = "At current rate, resets before exhaustion (%@ remaining)";
 "usage.exhaustShort %@" = "· exhausts in %@";
 "usage.safeShort %@" = "· safe (%@ left)";
+"usage.safeRelaxed" = "· plenty, use freely";
 "usage.noData" = "No usage data available";
 "usage.retry" = "Retry";
 "usage.updated %@" = "Updated: %@";

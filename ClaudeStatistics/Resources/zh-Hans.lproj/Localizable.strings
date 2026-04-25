@@ -56,6 +56,7 @@
 "detail.user" = "用户";
 "detail.assistant" = "助手";
 "detail.tools" = "工具";
+"detail.topSessions" = "热门会话";
 "detail.trend" = "趋势";
 "detail.modelBreakdown" = "模型明细";
 "detail.calls %lld" = "%lld 次调用";
@@ -130,6 +131,7 @@
 "usage.safeEstimate %@" = "按当前速率，重置前不会耗尽（余量约 %@）";
 "usage.exhaustShort %@" = "· %@ 后耗尽";
 "usage.safeShort %@" = "· 安全（余 %@）";
+"usage.safeRelaxed" = "· 用不完尽情用";
 "usage.noData" = "暂无用量数据";
 "usage.retry" = "重试";
 "usage.updated %@" = "更新于: %@";

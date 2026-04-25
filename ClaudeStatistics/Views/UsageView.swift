@@ -642,9 +642,19 @@ struct UsageWindowRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if let estimate = exhaustEstimate {
-                    Text(estimate.willExhaust ? "usage.exhaustShort \(estimate.text)" : "usage.safeShort \(estimate.text)")
-                        .font(.caption2)
-                        .foregroundStyle(estimate.willExhaust ? .red : .green)
+                    // When willExhaust=false the predicted exhaust time exceeds
+                    // the refresh window — drop the "(Nd Nh left)" detail (it's
+                    // unactionable and often absurd, e.g. "682d left" on a 7-day
+                    // window) and just signal abundance.
+                    if estimate.willExhaust {
+                        Text("usage.exhaustShort \(estimate.text)")
+                            .font(.caption2)
+                            .foregroundStyle(.red)
+                    } else {
+                        Text("usage.safeRelaxed")
+                            .font(.caption2)
+                            .foregroundStyle(.green)
+                    }
                 }
                 Spacer()
                 Text("\(Int(utilization))%")

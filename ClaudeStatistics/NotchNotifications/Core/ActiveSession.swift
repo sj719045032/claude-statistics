@@ -148,12 +148,12 @@ struct ActiveSession: Identifiable, Equatable {
     /// visible instead of merely flashing past.
     var recentlyCompletedTools: [CompletedToolEntry] = []
     static let recentToolsMaxCount = 5
-    // 20s chosen so the MIDDLE aggregate ("Reading 2 files · Running 1
+    // 10s chosen so the MIDDLE aggregate ("Reading 2 files · Running 1
     // command") stays populated across the usual between-tool gap when
     // Claude is generating reasoning text between tool calls. Shorter and
     // the row flickers to "Thinking…" briefly; much longer and the "finished
     // Xs ago" trailing in the detailed section starts to feel stale.
-    static let recentToolsWindow: TimeInterval = 20
+    static let recentToolsWindow: TimeInterval = 10
 
     var relativeActivityDescription: String {
         let elapsed = Int(Date().timeIntervalSince(lastActivityAt))
