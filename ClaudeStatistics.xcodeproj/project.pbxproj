@@ -58,6 +58,7 @@
 		44E7A09BC65C965BF8866C76 /* ShareRoleEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C96479A32A5A1C4D1A624B /* ShareRoleEngine.swift */; };
 		45389ED6B2BB7C7A180BE038 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 0065997B44AE9D9948026A26 /* Sparkle */; };
 		45713102A127B294274B48AB /* PricingFetchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93CE07D7E98CD2B87F87C0E0 /* PricingFetchService.swift */; };
+		4595CF76EA672D49B9A3B417 /* NotchRuntimeCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06379230FC976FFF3DCD0718 /* NotchRuntimeCoordinator.swift */; };
 		45A6E616AE59B788E2E060B0 /* ProviderSessionDisplayFormatter+Filters.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDD81B5645107DB493B28671 /* ProviderSessionDisplayFormatter+Filters.swift */; };
 		46DAF4D49E051526F8F5AC55 /* EditorTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08D0262FC6126091E6321EE0 /* EditorTerminalCapability.swift */; };
 		4734910CD82A2F831E344A1C /* ActivateFocuser.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD33F591AEEB93C40913AC8F /* ActivateFocuser.swift */; };
@@ -215,6 +216,7 @@
 		027CDBE36D6D9439DB32C0AE /* HookCLI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookCLI.swift; sourceTree = "<group>"; };
 		03DF8D6D8A1022EF2721BE82 /* NotchNotificationCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchNotificationCenter.swift; sourceTree = "<group>"; };
 		044319D72CE45477BDDCBE97 /* AttentionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionBridge.swift; sourceTree = "<group>"; };
+		06379230FC976FFF3DCD0718 /* NotchRuntimeCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchRuntimeCoordinator.swift; sourceTree = "<group>"; };
 		08D0262FC6126091E6321EE0 /* EditorTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorTerminalCapability.swift; sourceTree = "<group>"; };
 		0A1B35CE39EF2CA012E3BAC2 /* ProviderSettingsSectionProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderSettingsSectionProviding.swift; sourceTree = "<group>"; };
 		0AD3D99C9F42189EFF639E71 /* ProviderContextRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderContextRegistry.swift; sourceTree = "<group>"; };
@@ -763,6 +765,7 @@
 				68083922F93D555879FAD90B /* ClaudeStatisticsApp.swift */,
 				BF23C58F1F4E3E5605623ECE /* Info.plist */,
 				15809DA1BE38EFE9D002FB73 /* main.swift */,
+				06379230FC976FFF3DCD0718 /* NotchRuntimeCoordinator.swift */,
 				0AD3D99C9F42189EFF639E71 /* ProviderContextRegistry.swift */,
 				C3374C538E77CED126DE3016 /* StatusBarController.swift */,
 				F5486873DBEC29739725E366 /* StatusBarPanel.swift */,
@@ -1021,6 +1024,7 @@
 				6CB9AC028D3C2D548F717E01 /* NotchContainerView.swift in Sources */,
 				ABD9E24D7183BFE4F589B9E4 /* NotchNotificationCenter.swift in Sources */,
 				4841EE61F68CFF9A626C33CB /* NotchPreferences.swift in Sources */,
+				4595CF76EA672D49B9A3B417 /* NotchRuntimeCoordinator.swift in Sources */,
 				9903B18A767F040AC0460163 /* NotchShape.swift in Sources */,
 				959A2084C81A5FE36AFCC670 /* NotchSoundPlayer.swift in Sources */,
 				4F1FBB58C850CD3E947CA886 /* NotchStateMachine.swift in Sources */,

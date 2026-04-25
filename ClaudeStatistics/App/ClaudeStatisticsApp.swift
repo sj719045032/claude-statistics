@@ -32,6 +32,7 @@ final class AppState: ObservableObject {
     let accounts = AccountManagers()
     let providerContexts: ProviderContextRegistry
     let usageVMs: UsageVMRegistry
+    let notchRuntime: NotchRuntimeCoordinator
 
     /// Convenience: the primary usage VM (bound to the current
     /// provider). Many existing call sites still reference
@@ -56,7 +57,13 @@ final class AppState: ObservableObject {
         let contexts = ProviderContextRegistry(activeSessionsTracker: tracker)
         self.providerContexts = contexts
         contexts.bootstrap(startupKinds)
-        self.usageVMs = UsageVMRegistry(lookupStore: { [weak contexts] in contexts?.store(for: $0) })
+        let lookupStore: (ProviderKind) -> SessionDataStore? = { [weak contexts] in contexts?.store(for: $0) }
+        self.usageVMs = UsageVMRegistry(lookupStore: lookupStore)
+        self.notchRuntime = NotchRuntimeCoordinator(
+            notchCenter: notchCenter,
+            activeSessionsTracker: tracker,
+            lookupStore: lookupStore
+        )
 
         let store = contexts.store(for: selectedKind)!
         self.store = store
@@ -139,39 +146,15 @@ final class AppState: ObservableObject {
     }
 
     func purgeNotchRuntime(for providers: [ProviderKind]) {
-        for kind in providers {
-            notchCenter.purgeProvider(kind)
-            activeSessionsTracker.purgeRuntime(for: kind)
-        }
+        notchRuntime.purge(for: providers)
     }
 
     func refreshNotchActiveSessionsIfEnabled() {
-        if NotchPreferences.anyProviderEnabled {
-            activeSessionsTracker.refresh()
-        }
+        notchRuntime.refreshIfEnabled()
     }
 
     func restoreNotchRuntime(for providers: [ProviderKind]) {
-        for kind in providers {
-            let store = providerContexts.store(for: kind)
-            let sessions = store?.sessions
-            let restoredSource: [Session]
-            if let sessions, !sessions.isEmpty {
-                restoredSource = sessions
-            } else {
-                restoredSource = ProviderRegistry.provider(for: kind).scanSessions()
-            }
-            // Feed stats into the restore so the triptych has real text on the
-            // first render. Without this, the runtime copy is shell-only and
-            // the UI shows "No prompt yet / Idle / Waiting for input" until
-            // the first syncTranscriptSignals debounce fires.
-            activeSessionsTracker.restoreRuntime(
-                for: kind,
-                sessions: restoredSource,
-                quickStats: store?.quickStats ?? [:],
-                parsedStats: store?.parsedStats ?? [:]
-            )
-        }
+        notchRuntime.restore(for: providers)
     }
 
     func refreshProviderAfterAccountChange(_ kind: ProviderKind) {
