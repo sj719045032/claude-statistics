@@ -13,10 +13,12 @@
 > - ✅ 4.3 ActiveSessionsTracker 拆分（配套 [`notch-hook-event-runtime-design.md`](./notch-hook-event-runtime-design.md) Phase 1）
 > - ✅ 4.4 UserDefaults 集中（部分：跨多文件复用的 raw key 集中到 `AppPreferences`；
 >   单文件单点 key 留在原处）
-> - 🟡 5.1 关键路径测试补齐（部分）：`UsageVMRegistry` /
+> - 🟡 5.1 关键路径测试补齐（接近完成）：`UsageVMRegistry` /
 >   `NotchStateMachine` / `ClaudeHookNormalizer` / `CodexHookNormalizer` /
->   `GeminiHookNormalizer` 已覆盖（610 → 701 测试）；剩余 `TranscriptParser`
->   三家 + `ShareRoleEngine` 待补
+>   `GeminiHookNormalizer` / `TranscriptParser` (Claude) /
+>   `CodexTranscriptParser` / `GeminiTranscriptParser` 已覆盖
+>   （610 → 739 测试，+129）；剩余 `ShareRoleEngine`（1177 行）待补
+> - ✅ 5.3 MenuBarView 瘦身：595 → 287 行，6 个内嵌子 View 拆到独立文件
 > - ⏸️ 4.1 / 4.2 / 5.2：经核查均依赖 profiling 或 corner case，无 baseline 数据时
 >   贸然实施收益不明，**暂缓**
 
@@ -1122,7 +1124,17 @@ func isMainAppAlive() -> Bool {
 
 ---
 
-### 5.3 MenuBarView 瘦身
+### 5.3 MenuBarView 瘦身 ✅ 已完成（实用版）
+
+> 落地说明：595 → **287 行**。6 个内嵌子 View（`AppTab` 枚举 / `TabButton` /
+> `UpdateBanner` / `TerminalSetupBanner` / `ParseProgressBadge` /
+> `ProviderSwitcherButton` / `PanelContentView` / `Toast`）抽到独立文件；
+> `MenuBarView` 自身用命名子视图 `tabBar` / `banners` / `tabContent` /
+> `footer` / `providerSwitcher` 切分 body。原计划 < 200 行没达成，再拆要把
+> `sessionContent` 和 footer 提出去——但它们都依赖 `sessionViewModel` /
+> `store` / `toastCenter` / `appState` / `updaterService` 五条线，强行拆分
+> 会让父子 View 之间冒出一堆透传，可读性反降。
+
 
 #### 现状
 
