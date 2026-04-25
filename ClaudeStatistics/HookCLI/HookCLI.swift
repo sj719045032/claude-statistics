@@ -64,6 +64,7 @@ struct HookRunner {
         }
 
         guard let action else { return 0 }
+        logHookDispatch(for: action.message, expectsResponse: action.expectsResponse)
         let decision = socketDecision(
             for: action.message,
             expectsResponse: action.expectsResponse,
@@ -85,7 +86,7 @@ struct HookRunner {
     ) -> [String: Any] {
         var message: [String: Any] = [
             "v": 1,
-            "auth_token": AttentionBridgeAuth.loadToken(debug: isDebugHookInvocation) ?? "",
+            "auth_token": AttentionBridgeAuth.loadToken() ?? "",
             "provider": provider.rawValue,
             "event": event,
             "status": status,
@@ -96,6 +97,7 @@ struct HookRunner {
         set(&message, "notification_type", notificationType)
         set(&message, "session_id", stringValue(payload["session_id"]))
         set(&message, "cwd", cwd)
+        set(&message, "transcript_path", stringValue(payload["transcript_path"]))
         set(&message, "tty", currentTTY(pid: Int(getppid())))
         set(&message, "terminal_name", terminalName)
         set(&message, "terminal_socket", terminalContext.socket)
@@ -116,39 +118,64 @@ struct HookRunner {
         }
 
         let payloadData = data + Data([0x0A])
+        let diagnosticContext = HookSocketDiagnosticContext(
+            provider: provider,
+            event: stringValue(message["event"]) ?? "-",
+            sessionId: stringValue(message["session_id"]) ?? "-",
+            toolName: stringValue(message["tool_name"]) ?? "-",
+            toolUseId: stringValue(message["tool_use_id"]) ?? "-"
+        )
         for path in socketPathCandidates {
             guard let responseData = sendToSocket(
                 path: path,
                 payload: payloadData,
                 expectsResponse: expectsResponse,
-                responseTimeoutSeconds: responseTimeoutSeconds
+                responseTimeoutSeconds: responseTimeoutSeconds,
+                diagnosticContext: diagnosticContext
             ) else {
                 continue
             }
 
             guard expectsResponse else { return nil }
             guard let object = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any] else {
+                DiagnosticLogger.shared.warning(
+                    "HookCLI invalid response provider=\(provider.rawValue) event=\(diagnosticContext.event) session=\(diagnosticContext.sessionId) toolUseId=\(diagnosticContext.toolUseId) bytes=\(responseData.count)"
+                )
                 continue
             }
             return stringValue(object["decision"])
         }
 
+        let joinedPaths = socketPathCandidates.joined(separator: ",")
+        DiagnosticLogger.shared.warning(
+            "HookCLI socket delivery failed provider=\(provider.rawValue) event=\(diagnosticContext.event) session=\(diagnosticContext.sessionId) tool=\(diagnosticContext.toolName) toolUseId=\(diagnosticContext.toolUseId) expectsResp=\(expectsResponse) paths=\(joinedPaths)"
+        )
         return nil
     }
 
     private var socketPathCandidates: [String] {
-        [AttentionBridgeAuth.socketPath(debug: isDebugHookInvocation)]
+        [AttentionBridgeAuth.socketPath]
     }
 
-    private var isDebugHookInvocation: Bool {
-        if (Bundle.main.bundleIdentifier ?? "").hasSuffix(".debug") {
-            return true
-        }
-        let invocation = ProcessInfo.processInfo.arguments.joined(separator: " ")
-        return invocation.contains("claude-stats-hook-debug")
-            || invocation.contains("Claude Statistics Debug.app")
-            || invocation.contains("Claude Statistics Debug")
+    private func logHookDispatch(for message: [String: Any], expectsResponse: Bool) {
+        let event = stringValue(message["event"]) ?? "-"
+        let sessionId = stringValue(message["session_id"]) ?? "-"
+        let tool = stringValue(message["tool_name"]) ?? "-"
+        let toolUseId = stringValue(message["tool_use_id"]) ?? "-"
+        let cwd = stringValue(message["cwd"]) ?? "-"
+        let tty = stringValue(message["tty"]) ?? "-"
+        DiagnosticLogger.shared.verbose(
+            "HookCLI dispatch provider=\(provider.rawValue) event=\(event) session=\(sessionId) tool=\(tool) toolUseId=\(toolUseId) expectsResp=\(expectsResponse) cwd=\(cwd) tty=\(tty)"
+        )
     }
+}
+
+private struct HookSocketDiagnosticContext {
+    let provider: ProviderKind
+    let event: String
+    let sessionId: String
+    let toolName: String
+    let toolUseId: String
 }
 
 struct TerminalContext {
@@ -400,8 +427,8 @@ func terminalContextForGemini(event: String, terminalName: String?, cwd: String?
         event: event,
         terminalName: terminalName,
         cwd: cwd,
-        ghosttyFrontmostEvents: ["BeforeAgent"],
-        ghosttyFallbackMode: .disabled
+        ghosttyFrontmostEvents: ["BeforeAgent", "BeforeModel", "BeforeTool", "SessionStart"],
+        ghosttyFallbackMode: .uniqueDirectoryMatch
     )
 }
 
@@ -620,10 +647,17 @@ private func sendToSocket(
     path: String,
     payload: Data,
     expectsResponse: Bool,
-    responseTimeoutSeconds: Int
+    responseTimeoutSeconds: Int,
+    diagnosticContext: HookSocketDiagnosticContext
 ) -> Data? {
     let fd = socket(AF_UNIX, SOCK_STREAM, 0)
-    guard fd >= 0 else { return nil }
+    guard fd >= 0 else {
+        let code = errno
+        DiagnosticLogger.shared.warning(
+            "HookCLI socket create failed provider=\(diagnosticContext.provider.rawValue) event=\(diagnosticContext.event) session=\(diagnosticContext.sessionId) toolUseId=\(diagnosticContext.toolUseId) errno=\(code) reason=\(String(cString: strerror(code)))"
+        )
+        return nil
+    }
     defer { close(fd) }
 
     var sendTimeout = timeval(tv_sec: HookDefaults.shortIOTimeoutSeconds, tv_usec: 0)
@@ -653,9 +687,35 @@ private func sendToSocket(
             connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
         }
     }
-    guard connectResult == 0 else { return nil }
+    guard connectResult == 0 else {
+        let code = errno
+        DiagnosticLogger.shared.warning(
+            "HookCLI socket connect failed provider=\(diagnosticContext.provider.rawValue) event=\(diagnosticContext.event) session=\(diagnosticContext.sessionId) toolUseId=\(diagnosticContext.toolUseId) path=\(path) errno=\(code) reason=\(String(cString: strerror(code)))"
+        )
+        // App not listening (ECONNREFUSED) or socket file gone (ENOENT) —
+        // typically a brief restart window. Persist the payload to the
+        // pending dir so AttentionBridge can replay it once the listener is
+        // back. Permission requests need a synchronous decision and can't be
+        // replayed (the tool will already have run by then), so we only
+        // buffer fire-and-forget events.
+        if !expectsResponse, code == ECONNREFUSED || code == ENOENT {
+            bufferPendingHookPayload(payload: payload, context: diagnosticContext)
+        }
+        return nil
+    }
 
-    guard writeAll(fd: fd, data: payload) else { return nil }
+    guard writeAll(fd: fd, data: payload) else {
+        let code = errno
+        DiagnosticLogger.shared.warning(
+            "HookCLI socket write failed provider=\(diagnosticContext.provider.rawValue) event=\(diagnosticContext.event) session=\(diagnosticContext.sessionId) toolUseId=\(diagnosticContext.toolUseId) path=\(path) errno=\(code) reason=\(String(cString: strerror(code)))"
+        )
+        // We connected but the write got interrupted (server crashed
+        // mid-handshake, EPIPE, etc.). Same recovery path as connect-fail.
+        if !expectsResponse {
+            bufferPendingHookPayload(payload: payload, context: diagnosticContext)
+        }
+        return nil
+    }
 
     guard expectsResponse else { return Data() }
 
@@ -665,12 +725,62 @@ private func sendToSocket(
         let bytesRead = withUnsafeMutableBytes(of: &byte) { pointer in
             Darwin.read(fd, pointer.baseAddress, 1)
         }
-        if bytesRead <= 0 { break }
+        if bytesRead < 0 {
+            let code = errno
+            DiagnosticLogger.shared.warning(
+                "HookCLI socket read failed provider=\(diagnosticContext.provider.rawValue) event=\(diagnosticContext.event) session=\(diagnosticContext.sessionId) toolUseId=\(diagnosticContext.toolUseId) path=\(path) errno=\(code) reason=\(String(cString: strerror(code)))"
+            )
+            return nil
+        }
+        if bytesRead == 0 { break }
         if byte == 0x0A { break }
         response.append(byte)
     }
 
-    return response.isEmpty ? nil : response
+    if response.isEmpty {
+        DiagnosticLogger.shared.warning(
+            "HookCLI socket empty response provider=\(diagnosticContext.provider.rawValue) event=\(diagnosticContext.event) session=\(diagnosticContext.sessionId) toolUseId=\(diagnosticContext.toolUseId) path=\(path)"
+        )
+        return nil
+    }
+
+    return response
+}
+
+/// Persist a hook payload that couldn't be delivered to the running app's
+/// socket. `AttentionBridge.drainPendingMessages()` reads these on next
+/// startup and re-injects them through the normal event pipeline.
+///
+/// File naming: `<unix-millis>-<pid>-<short-uuid>.json`. The leading
+/// millis-since-epoch lets the drain side replay in chronological order
+/// even if multiple HookCLI instances raced. Atomic write via .tmp + rename
+/// so the drain side never sees a half-written file.
+private func bufferPendingHookPayload(payload: Data, context: HookSocketDiagnosticContext) {
+    let fm = FileManager.default
+    guard let pendingDir = AppRuntimePaths.ensurePendingDirectory() else {
+        DiagnosticLogger.shared.warning(
+            "HookCLI buffer dir create failed event=\(context.event) toolUseId=\(context.toolUseId) path=\(AppRuntimePaths.pendingDirectory)"
+        )
+        return
+    }
+    let timestampMs = Int64(Date().timeIntervalSince1970 * 1000)
+    let pid = ProcessInfo.processInfo.processIdentifier
+    let rand = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)
+    let filename = "\(timestampMs)-\(pid)-\(rand).json"
+    let finalPath = (pendingDir as NSString).appendingPathComponent(filename)
+    let tmpPath = finalPath + ".tmp"
+    do {
+        try payload.write(to: URL(fileURLWithPath: tmpPath), options: .atomic)
+        try fm.moveItem(atPath: tmpPath, toPath: finalPath)
+        DiagnosticLogger.shared.warning(
+            "HookCLI buffered to disk provider=\(context.provider.rawValue) event=\(context.event) session=\(context.sessionId) toolUseId=\(context.toolUseId) file=\(filename)"
+        )
+    } catch {
+        try? fm.removeItem(atPath: tmpPath)
+        DiagnosticLogger.shared.warning(
+            "HookCLI buffer write failed event=\(context.event) toolUseId=\(context.toolUseId) error=\(error.localizedDescription)"
+        )
+    }
 }
 
 private func writeAll(fd: Int32, data: Data) -> Bool {

@@ -6,6 +6,9 @@ final class GeminiSessionScanner {
 
     private let tmpDirectory = (NSHomeDirectory() as NSString).appendingPathComponent(".gemini/tmp")
     private let historyDirectory = (NSHomeDirectory() as NSString).appendingPathComponent(".gemini/history")
+    private let cacheLock = NSLock()
+    private var cachedRootFilesSignature: [String: Date] = [:]
+    private var cachedProjectRootsByHash: [String: String] = [:]
 
     private init() {}
 
@@ -89,15 +92,34 @@ final class GeminiSessionScanner {
         let fm = FileManager.default
         guard let directories = try? fm.contentsOfDirectory(
             at: URL(fileURLWithPath: historyDirectory),
-            includingPropertiesForKeys: nil,
+            includingPropertiesForKeys: [.contentModificationDateKey],
             options: [.skipsHiddenFiles]
         ) else {
             return [:]
         }
 
-        var roots: [String: String] = [:]
+        var signature: [String: Date] = [:]
+        var rootFiles: [(String, URL)] = []
         for directory in directories {
             let rootFile = directory.appendingPathComponent(".project_root")
+            guard fm.fileExists(atPath: rootFile.path) else { continue }
+            let modifiedAt = (try? rootFile.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+                ?? ((try? fm.attributesOfItem(atPath: rootFile.path)[.modificationDate]) as? Date)
+                ?? .distantPast
+            signature[rootFile.path] = modifiedAt
+            rootFiles.append((rootFile.path, rootFile))
+        }
+
+        cacheLock.lock()
+        if signature == cachedRootFilesSignature {
+            let cached = cachedProjectRootsByHash
+            cacheLock.unlock()
+            return cached
+        }
+        cacheLock.unlock()
+
+        var roots: [String: String] = [:]
+        for (_, rootFile) in rootFiles {
             guard let data = fm.contents(atPath: rootFile.path),
                   let rawRoot = String(data: data, encoding: .utf8)?
                     .trimmingCharacters(in: .whitespacesAndNewlines),
@@ -106,6 +128,11 @@ final class GeminiSessionScanner {
             }
             roots[sha256(rawRoot)] = rawRoot
         }
+
+        cacheLock.lock()
+        cachedRootFilesSignature = signature
+        cachedProjectRootsByHash = roots
+        cacheLock.unlock()
         return roots
     }
 

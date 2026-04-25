@@ -170,7 +170,7 @@ struct PeriodStats: Identifiable {
                 cacheCreationTotalTokens: mts.cacheCreationTotalTokens,
                 cacheReadTokens: mts.cacheReadTokens
             )
-            usage.sessionCount += 1
+            usage.messageCount += mts.messageCount
             if !ModelPricing.shared.isExactMatch(for: model) {
                 usage.isEstimated = true
             }
@@ -206,6 +206,7 @@ struct PeriodStats: Identifiable {
             usage.cacheCreationTotalTokens += stats.cacheCreationTotalTokens
             usage.cacheReadTokens += stats.cacheReadTokens
             usage.cost += stats.estimatedCost
+            usage.messageCount += stats.messageCount
             usage.sessionCount += 1
             if stats.isCostEstimated { usage.isEstimated = true }
             modelBreakdown[model] = usage
@@ -229,6 +230,7 @@ struct PeriodStats: Identifiable {
                     cacheReadTokens: mts.cacheReadTokens
                 )
                 usage.cost += cost
+                usage.messageCount += mts.messageCount
                 usage.sessionCount += 1
                 if !ModelPricing.shared.isExactMatch(for: model) {
                     usage.isEstimated = true

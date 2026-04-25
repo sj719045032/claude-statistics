@@ -4,11 +4,13 @@ import SQLite3
 final class CodexSessionScanner {
     static let shared = CodexSessionScanner()
 
-    private let dbPath = (NSHomeDirectory() as NSString).appendingPathComponent(".codex/state_5.sqlite")
+    static let codexRootPath = (NSHomeDirectory() as NSString).appendingPathComponent(".codex")
+    static let codexStateDBPath = (codexRootPath as NSString).appendingPathComponent("state_5.sqlite")
 
     private init() {}
 
     func scanSessions() -> [Session] {
+        let dbPath = Self.codexStateDBPath
         guard FileManager.default.fileExists(atPath: dbPath) else {
             DiagnosticLogger.shared.warning("Codex state DB not found at \(dbPath)")
             return []
@@ -130,5 +132,19 @@ final class CodexSessionScanner {
         if !trimmedTitle.isEmpty { return trimmedTitle }
         let parent = (filePath as NSString).deletingLastPathComponent
         return parent.isEmpty ? sessionId : parent
+    }
+
+    static func sessionId(forRolloutPath path: String) -> String? {
+        guard path.hasSuffix(".jsonl") else { return nil }
+        let fileName = (path as NSString).lastPathComponent
+        let pattern = #"([0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12})\.jsonl$"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let range = NSRange(location: 0, length: fileName.utf16.count)
+        guard let match = regex.firstMatch(in: fileName, options: [], range: range),
+              match.numberOfRanges >= 2,
+              let idRange = Range(match.range(at: 1), in: fileName) else {
+            return nil
+        }
+        return String(fileName[idRange])
     }
 }

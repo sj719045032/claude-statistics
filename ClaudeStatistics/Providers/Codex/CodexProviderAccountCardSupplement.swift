@@ -10,12 +10,12 @@ extension CodexProvider: ProviderAccountCardSupplementProviding {
         ))
     }
 
-    func makeCompactAccountSwitcherAccessory(context: ProviderSettingsContext) -> AnyView {
+    func makeCompactAccountSwitcherAccessory(context: ProviderSettingsContext, triggerStyle: AccountSwitcherTriggerStyle) -> AnyView {
         AnyView(CodexProviderAccountCardAccessory(
             appState: context.appState,
             codexAccountManager: context.appState.codexAccountManager,
             profileViewModel: context.profileViewModel,
-            triggerStyle: .icon
+            triggerStyle: triggerStyle
         ))
     }
 }

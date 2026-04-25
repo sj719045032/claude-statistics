@@ -492,29 +492,13 @@ final class GeminiTranscriptParser {
     }
 
     private func normalizedToolName(_ toolCall: GeminiToolCall) -> String {
-        switch toolCall.name {
-        case "run_shell_command":
-            return "bash"
-        case "grep_search":
-            return "grep"
-        case "read_file":
-            return "read"
-        case "write_file":
-            return "write"
-        case "glob":
-            return "glob"
-        case "replace":
-            return "edit"
-        case "web_fetch":
-            return "fetch"
-        case "web_search", "google_web_search":
-            return "websearch"
-        default:
-            if let displayName = toolCall.displayName {
-                return displayName
-            }
-            return toolCall.name
+        let canonical = ProviderKind.gemini.canonicalToolName(toolCall.name)
+        // Keep Gemini's own displayName when the alias table didn't match —
+        // `displayName(for:)` would otherwise title-case an unknown key.
+        if canonical.isEmpty || canonical == toolCall.name.lowercased() {
+            return toolCall.displayName ?? toolCall.name
         }
+        return canonical
     }
 
     private func toolSummary(for toolCall: GeminiToolCall) -> String {
@@ -669,31 +653,12 @@ final class GeminiTranscriptParser {
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
             .split(separator: "\n", omittingEmptySubsequences: false)
-            .map { cleanedToolOutputLine(String($0)) }
-            .filter { !$0.isEmpty && !isUnhelpfulToolMetadataLine($0) }
+            .map { ToolOutputCleaning.cleanedLine(String($0)) }
+            .filter { !$0.isEmpty && !ToolOutputCleaning.isUnhelpfulMetadataLine($0) }
             .joined(separator: "\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         return cleaned.isEmpty ? nil : cleaned
-    }
-
-    private func cleanedToolOutputLine(_ text: String) -> String {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "" }
-
-        if trimmed.lowercased().hasPrefix("output:") {
-            let stripped = trimmed.dropFirst("Output:".count)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            return stripped
-        }
-
-        return trimmed
-    }
-
-    private func isUnhelpfulToolMetadataLine(_ text: String) -> Bool {
-        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return normalized.hasPrefix("process group pgid:")
-            || normalized.hasPrefix("background pids:")
     }
 
     private func lastPathComponent(_ path: String) -> String {

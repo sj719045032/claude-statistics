@@ -75,8 +75,11 @@ final class DatabaseService {
         """)
     }
 
-    /// Current schema version — bump to force full reparse of session cache
-    private static let currentSchemaVersion: Int32 = 9
+    /// Current schema version.
+    /// v10 refreshes cached Codex quick titles after prompt-cleaning changes.
+    private static let currentSchemaVersion: Int32 = 10
+    private static let fullResetSchemaVersion: Int32 = 9
+    private static let codexTitleCacheMigrationVersion: Int32 = 10
 
     private func migrateIfNeeded() {
         var version: Int32 = 0
@@ -86,6 +89,18 @@ final class DatabaseService {
             version = sqlite3_column_int(stmt, 0)
         }
         sqlite3_finalize(stmt)
+
+        if version < Self.fullResetSchemaVersion {
+            resetDatabase()
+            version = Self.fullResetSchemaVersion
+            execute("PRAGMA user_version = \(version)")
+        }
+
+        if version < Self.codexTitleCacheMigrationVersion {
+            resetProviderCache(provider: .codex)
+            version = Self.codexTitleCacheMigrationVersion
+            execute("PRAGMA user_version = \(version)")
+        }
 
         if version < Self.currentSchemaVersion {
             resetDatabase()
@@ -100,6 +115,37 @@ final class DatabaseService {
         execute("DROP TABLE IF EXISTS messages")
         execute("DROP TABLE IF EXISTS session_cache")
         createTables()
+    }
+
+    func resetProviderCache(provider: ProviderKind) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db else { return }
+
+        execute("BEGIN TRANSACTION")
+        defer {
+            if sqlite3_get_autocommit(db) == 0 {
+                execute("ROLLBACK")
+            }
+        }
+
+        let statements = [
+            "DELETE FROM session_cache WHERE provider = ?",
+            "DELETE FROM messages WHERE provider = ?"
+        ]
+
+        for sql in statements {
+            var stmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+            sqlite3_bind_text(stmt, 1, provider.rawValue, -1, sqliteTransient)
+            guard sqlite3_step(stmt) == SQLITE_DONE else {
+                sqlite3_finalize(stmt)
+                return
+            }
+            sqlite3_finalize(stmt)
+        }
+
+        execute("COMMIT")
     }
 
     // MARK: - Stats Cache

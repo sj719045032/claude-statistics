@@ -31,16 +31,16 @@ const nav = isZh
 const heroMeta = isZh
   ? [
       { k: "版本", v: "v2.7.8", kind: "version" },
+      { k: "更新", v: "近期", kind: "updated" },
       { k: "Stars", v: "29", kind: "stars" },
       { k: "平台", v: "macOS 14+" },
-      { k: "架构", v: "Apple Silicon · Intel" },
       { k: "许可", v: "MIT · 开源" }
     ]
   : [
       { k: "Latest", v: "v2.7.8", kind: "version" },
+      { k: "Updated", v: "recently", kind: "updated" },
       { k: "Stars", v: "29", kind: "stars" },
       { k: "Platform", v: "macOS 14+" },
-      { k: "Arch", v: "Apple Silicon · Intel" },
       { k: "License", v: "MIT · open source" }
     ];
 
@@ -430,6 +430,7 @@ const footerColumns = isZh
                 class="mv"
                 {...(item.kind === "version" ? { "data-github-version": true } : {})}
                 {...(item.kind === "stars" ? { "data-github-stars": true } : {})}
+                {...(item.kind === "updated" ? { "data-github-updated": true, "data-lang": language } : {})}
               >
                 {item.kind === "stars" ? `${item.v} ★` : item.v}
               </div>
@@ -549,6 +550,121 @@ const footerColumns = isZh
     </div>
   </section>
 
+  <section id="notch-island" class="notch-section">
+    <div class="wrap">
+      <div>
+        <span class="eyebrow">{isZh ? "刘海岛" : "Notch Island"}</span>
+        <h2 class="h2" style="margin-top:16px;">
+          {isZh
+            ? "停驻在 MacBook 刘海区的实时活动面板。"
+            : "A live activity surface docked to the MacBook notch."}
+        </h2>
+        <p class="lede" style="margin-top:20px;">
+          {isZh
+            ? "平时是一条黑色刘海，完全透明于你的工作流。Claude Code / Codex / Gemini 有事情发生时它才弹出来——审批请求、等待输入、会话状态，一眼可见。一键 Return 跳回会话所在的精确终端 tab。"
+            : "Normally just a black notch, invisible to your workflow. Whenever Claude Code / Codex / Gemini has something happening — a permission request, waiting input, a session status change — it expands. One keystroke jumps back to the exact terminal tab."}
+        </p>
+        <ul class="notch-feature-list">
+          <li>
+            <div>
+              <strong>{isZh ? "活动会话列表" : "Active sessions list"}</strong>
+              {isZh
+                ? "按项目分组展示所有在跑的会话，实时状态：等待输入 / 工作中 / 等待审批。"
+                : "Every running session grouped by project, with live status: waiting / working / awaiting approval."}
+            </div>
+          </li>
+          <li>
+            <div>
+              <strong>{isZh ? "权限审批" : "Permission cards"}</strong>
+              {isZh
+                ? "Claude Code 的权限请求以 Allow / Deny 卡片形式内联弹出，决定通过 hook 协议回写，不用切回终端。"
+                : "Claude Code permission requests surface as inline Allow / Deny cards, decisions written back through the hook protocol."}
+            </div>
+          </li>
+          <li>
+            <div>
+              <strong>{isZh ? "精确 tab 跳转" : "Tab-accurate focus"}</strong>
+              {isZh
+                ? "点击卡片或按 Return 跳转到会话所在的精确终端 tab——Ghostty surface id / iTerm2 tty / Terminal tab 全支持。"
+                : "Click a card or hit Return to land in the session's exact terminal tab — Ghostty surface id, iTerm2 tty, Terminal tab all handled."}
+            </div>
+          </li>
+        </ul>
+      </div>
+      <div class="notch-stage">
+        <div class="notch">
+          <div class="notch-content notch-state-list">
+            <div class="notch-card">
+              <div class="notch-card-head">
+                <span class="notch-dot green" />
+                <span class="notch-mono strong">claude-statistics</span>
+                <span class="notch-tag">Claude</span>
+                <span class="notch-mono dim push">1s ago <span class="notch-arrow">↗</span></span>
+              </div>
+              <div class="notch-mono dim notch-card-line">
+                <span class="notch-ic">❯_</span>mcp__claude-in-chrome__read_…
+              </div>
+              <div class="notch-mono dim notch-card-line faint">
+                <span class="notch-ic">👤</span>{isZh ? "你直接打开网页看看呢" : "just open the page yourself"}
+              </div>
+            </div>
+            <div class="notch-card">
+              <div class="notch-card-head">
+                <span class="notch-dot amber" />
+                <span class="notch-mono strong">claude-statistics</span>
+                <span class="notch-tag">Claude</span>
+                <span class="notch-mono dim push">1m ago <span class="notch-arrow">↗</span></span>
+              </div>
+              <div class="notch-mono dim notch-card-line">
+                <span class="notch-ic">👤</span>{isZh ? "直接填吧都加一下" : "just fill them all in"}
+              </div>
+            </div>
+            <div class="notch-card">
+              <div class="notch-card-head">
+                <span class="notch-dot brown" />
+                <span class="notch-mono strong">cbdc-chain</span>
+                <span class="notch-tag">Claude</span>
+                <span class="notch-mono dim push">11m ago <span class="notch-arrow">↗</span></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="notch-content notch-state-perm">
+            <div class="notch-card">
+              <div class="notch-card-head">
+                <span class="notch-perm-icon">⚠</span>
+                <span class="notch-mono strong">{isZh ? "权限请求" : "Permission request"}</span>
+                <span class="notch-tag amber">Bash</span>
+                <span class="notch-mono dim push">claude-statistics</span>
+              </div>
+              <div class="notch-perm-cmd">
+                <span class="notch-ic">❯_</span>rm -rf build/
+              </div>
+              <div class="notch-perm-buttons">
+                <button class="notch-btn deny">{isZh ? "拒绝" : "Deny"}</button>
+                <button class="notch-btn allow">{isZh ? "允许" : "Allow"}</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="notch-content notch-state-done">
+            <div class="notch-card">
+              <div class="notch-card-head">
+                <span class="notch-done-tick">✓</span>
+                <span class="notch-mono strong">{isZh ? "任务完成" : "Task complete"}</span>
+                <span class="notch-tag">Claude</span>
+                <span class="notch-mono dim push">{isZh ? "刚刚" : "just now"}</span>
+              </div>
+              <div class="notch-mono dim notch-card-line">
+                <span class="notch-ic">✨</span>{isZh ? "会话结束 · 12.4k tokens · $0.08" : "Session done · 12.4k tokens · $0.08"}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section id="providers">
     <div class="wrap">
       <div class="section-head">
@@ -592,7 +708,7 @@ const footerColumns = isZh
       </div>
       <div class="bento">
         {copy.features.cards.map((card, index) => (
-          <div class:list={["bento-card", index === 0 && "sp4 bento-dark", index === 1 && "sp2", index === 2 && "sp3", index === 3 && "sp3", index === 4 && "sp2", index === 5 && "sp4 bento-accent"]}>
+          <div class:list={["bento-card", index === 0 && "sp3 bento-dark", index === 1 && "sp3", index === 2 && "sp3", index === 3 && "sp3", index === 4 && "sp2", index === 5 && "sp4 bento-accent"]}>
             <span class="kicker">{card.kicker}</span>
             <h3 class="h3">{card.title}</h3>
             <p>{card.text}</p>
@@ -619,8 +735,25 @@ const footerColumns = isZh
             )}
 
             {index === 1 && (
-              <div style="margin-top:16px;display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--ink);color:#e8e6dc;border-radius:8px;font-family:var(--font-mono);font-size:11px;">
-                <span>Claude · 78% · 3:42 left</span>
+              <div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">
+                {[
+                  { label: "Claude · 5h window", pct: 78, reset: "3:42 left", color: "var(--app-red)" },
+                  { label: "Claude · 7d window", pct: 46, reset: "4d 12h", color: "var(--accent)" },
+                  { label: "Codex · 5h window", pct: 52, reset: "2:10 left", color: "var(--app-magenta)" },
+                  { label: "Codex · weekly", pct: 37, reset: "resets Sun", color: "var(--app-orange)" },
+                  { label: "Gemini · Flash", pct: 62, reset: "resets 00:00 UTC", color: "var(--app-blue)" },
+                  { label: "Gemini · Flash Lite", pct: 31, reset: "daily bucket", color: "var(--app-green)" }
+                ].map((row) => (
+                  <div>
+                    <div style="display:flex;align-items:baseline;justify-content:space-between;font-family:var(--font-mono);font-size:11px;margin-bottom:6px;">
+                      <span style="color:var(--fg2);">{row.label}</span>
+                      <span style="color:var(--fg3);">{row.pct}% · {row.reset}</span>
+                    </div>
+                    <div style="height:4px;background:rgba(28,28,28,0.06);border-radius:999px;overflow:hidden;">
+                      <div style={`height:100%;width:${row.pct}%;background:${row.color};`}></div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -983,6 +1116,7 @@ const footerColumns = isZh
                   class="mv"
                   {...(item.kind === "version" ? { "data-github-version": true } : {})}
                   {...(item.kind === "stars" ? { "data-github-stars": true } : {})}
+                  {...(item.kind === "updated" ? { "data-github-updated": true, "data-lang": language } : {})}
                 >
                   {item.kind === "stars" ? `${item.v} ★` : item.v}
                 </div>
@@ -1020,6 +1154,23 @@ const footerColumns = isZh
 
       const versionNodes = Array.from(document.querySelectorAll("[data-github-version]"));
       const starNodes = Array.from(document.querySelectorAll("[data-github-stars]"));
+      const updatedNodes = Array.from(document.querySelectorAll("[data-github-updated]"));
+
+      const formatRelative = (iso, lang) => {
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return null;
+        const diff = Math.max(0, Date.now() - date.getTime());
+        const min = Math.floor(diff / 60000);
+        const hr = Math.floor(diff / 3600000);
+        const day = Math.floor(diff / 86400000);
+        const mon = Math.floor(day / 30);
+        const isZh = lang === "zh";
+        if (min < 1) return isZh ? "刚刚" : "just now";
+        if (min < 60) return isZh ? `${min} 分钟前` : `${min}m ago`;
+        if (hr < 24) return isZh ? `${hr} 小时前` : `${hr}h ago`;
+        if (day < 30) return isZh ? `${day} 天前` : `${day}d ago`;
+        return isZh ? `${mon} 个月前` : `${mon}mo ago`;
+      };
 
       Promise.allSettled([
         fetch(repoApi).then((response) => response.ok ? response.json() : null),
@@ -1037,6 +1188,13 @@ const footerColumns = isZh
         if (typeof repo?.stargazers_count === "number") {
           starNodes.forEach((node) => {
             node.textContent = `${repo.stargazers_count} ★`;
+          });
+        }
+
+        if (latest?.published_at) {
+          updatedNodes.forEach((node) => {
+            const label = formatRelative(latest.published_at, node.dataset.lang);
+            if (label) node.textContent = label;
           });
         }
       });

@@ -101,10 +101,24 @@ extension HookRunner {
             terminalName: terminalName,
             terminalContext: terminalContext
         )
+        // Gemini hooks often use 'sessionId' camelCase
+        if message["session_id"] == nil {
+            set(&message, "session_id", stringValue(payload["sessionId"]))
+        }
         set(&message, "tool_name", toolName)
         set(&message, "tool_input", toolInput)
         set(&message, "tool_use_id", toolUseId ?? normalizedToolUseId(payload: payload, toolInput: toolInput))
-        set(&message, "message", geminiMessage(payload: payload, event: event))
+        let semanticText = geminiMessage(payload: payload, event: event)
+        // Route by wireEvent (the event name downstream consumers see) into
+        // the matching semantic lane.
+        switch wireEvent {
+        case "UserPromptSubmit":
+            set(&message, "prompt_text", semanticText)
+        case "Notification", "PermissionRequest", "ToolPermission", "SessionStart", "SessionEnd":
+            set(&message, "message", semanticText)
+        default:
+            set(&message, "commentary_text", semanticText)
+        }
 
         if event == "AfterTool", let response = toolResponseText(payload: payload) {
             set(&message, "tool_response", String(response.prefix(HookDefaults.maxToolResponseLength)))

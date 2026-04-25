@@ -53,3 +53,23 @@ targets:
         SWIFT_STRICT_CONCURRENCY: minimal
     entitlements:
       path: ClaudeStatistics/App/ClaudeStatistics.entitlements
+    scheme:
+      testTargets:
+        - ClaudeStatisticsTests
+
+  ClaudeStatisticsTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: ClaudeStatisticsTests
+    dependencies:
+      - target: ClaudeStatistics
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        SWIFT_STRICT_CONCURRENCY: minimal
+        PRODUCT_BUNDLE_IDENTIFIER: com.tinystone.ClaudeStatisticsTests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Claude Statistics.app/Contents/MacOS/Claude Statistics"
+        BUNDLE_LOADER: "$(TEST_HOST)"

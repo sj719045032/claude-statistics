@@ -19,6 +19,38 @@ when missing, so the Debug app can keep a stable TCC identity across rebuilds.
 rm -rf ~/Library/Developer/Xcode/DerivedData/ClaudeStatistics-*/Build/Products/Debug/Claude\ Statistics.app
 ```
 
+## Provider Code Organization
+
+The app supports three providers (Claude / Codex / Gemini). Provider-specific
+behaviour lives under `ClaudeStatistics/Providers/<Provider>/`; cross-provider
+logic lives in shared files (`Models/`, `NotchNotifications/Core/`, etc.).
+
+**Rule of thumb — per-provider data, shared behaviour:**
+
+- **Provider-owned**: any alias table, format quirk, schema hook, or mapping
+  that only one provider cares about. Example: Codex's raw tool names
+  (`apply_patch`, `exec_command`) → canonical names live in
+  `CodexToolNames.canonical(_:)` inside `CodexProvider.swift`. Gemini's
+  (`run_shell_command`, `read_file`) live in `GeminiToolNames.canonical(_:)`
+  inside `GeminiProvider.swift`.
+- **Shared/common**: the canonical vocabulary itself and how it's rendered.
+  Example: the set of canonical tool names and `CanonicalToolName.displayName
+  (for:)` ("edit" → "Edit", "bash" → "Bash") live in
+  `Models/ProviderKind.swift`.
+- **Dispatcher**: `ProviderKind.canonicalToolName(_:)` picks the right
+  provider's alias table from `self`. Callers with a `ProviderKind` in scope
+  call this; callers without one use `CanonicalToolName.resolve(_:)` which
+  tries every provider's table.
+
+**Never** put Codex-only or Gemini-only constants inside shared files (e.g.
+`ToolActivityFormatter`). Adding a new alias should touch exactly one
+provider file; adding a new canonical verb touches `Models/ProviderKind.swift`
+plus any `switch` case that branches on it.
+
+When you catch yourself writing `switch providerName { case "apply_patch": … }`
+inside shared code, stop — route it through a provider-owned alias table and
+have the shared code switch on the canonical value instead.
+
 ## Release a New Version
 
 ```bash

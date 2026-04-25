@@ -59,6 +59,11 @@ struct UsageView: View {
             ensureValidSelectedWindow()
             ensureValidSelectedTrendWindow()
         }
+        .task(id: store.provider.kind) {
+            if store.provider.capabilities.supportsProfile {
+                await profileViewModel.loadProfile()
+            }
+        }
         .onChange(of: viewModel.usageData) { _, _ in
             ensureValidSelectedWindow()
             ensureValidSelectedTrendWindow()
@@ -85,13 +90,9 @@ extension UsageView {
     private var header: some View {
         HStack(spacing: 8) {
             Text("usage.title")
-                .font(.headline)
+                .font(.system(size: 15, weight: .bold))
 
-            if let accountSwitcherProvider = store.provider as? any ProviderAccountCardSupplementProviding {
-                accountSwitcherProvider.makeCompactAccountSwitcherAccessory(
-                    context: ProviderSettingsContext(appState: appState, profileViewModel: profileViewModel)
-                )
-            }
+            accountSwitcher
 
             Spacer()
 
@@ -127,6 +128,55 @@ extension UsageView {
                 .help("usage.refresh")
             }
         }
+    }
+
+    @ViewBuilder
+    private var accountSwitcher: some View {
+        if profileViewModel.profileLoading {
+            ProgressView()
+                .scaleEffect(0.6)
+                .frame(width: 24, height: 24)
+        } else if let accountSwitcherProvider = store.provider as? any ProviderAccountCardSupplementProviding {
+            accountSwitcherProvider.makeCompactAccountSwitcherAccessory(
+                context: ProviderSettingsContext(appState: appState, profileViewModel: profileViewModel),
+                triggerStyle: accountSwitcherTriggerStyle
+            )
+        }
+    }
+
+    private var accountSwitcherTriggerStyle: AccountSwitcherTriggerStyle {
+        if let profile = profileViewModel.userProfile,
+           let label = usageAccountSummaryText(for: profile) {
+            return .chip(label: label, avatarInitial: usageAccountAvatarInitial(for: profile))
+        }
+        return .icon
+    }
+
+    private func usageAccountSummaryText(for profile: UserProfile) -> String? {
+        if let email = profile.account?.email?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !email.isEmpty {
+            return email
+        }
+
+        let displayName = profile.account?.displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fullName = profile.account?.fullName?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return [displayName, fullName]
+            .compactMap { value -> String? in
+                guard let value else { return nil }
+                return value.isEmpty ? nil : value
+            }
+            .first
+    }
+
+    private func usageAccountAvatarInitial(for profile: UserProfile) -> String {
+        let source = profile.account?.displayName
+            ?? profile.account?.fullName
+            ?? profile.account?.email
+            ?? store.provider.displayName
+        let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let first = trimmed.first else { return String(store.provider.displayName.prefix(1)) }
+        return String(first).uppercased()
     }
 
     @ViewBuilder

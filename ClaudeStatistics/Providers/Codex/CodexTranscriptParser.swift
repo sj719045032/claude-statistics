@@ -49,8 +49,14 @@ final class CodexTranscriptParser {
                         if let text = extractMessageText(from: event.payload) {
                             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
                             if !trimmed.isEmpty {
-                                quick.lastOutputPreview = truncate(trimmed, limit: Self.assistantPreviewLimit)
-                                quick.lastOutputPreviewAt = event.timestamp
+                                let truncated = truncate(trimmed, limit: Self.assistantPreviewLimit)
+                                if isCodexCommentary(payload: event.payload) {
+                                    quick.latestProgressNote = truncated
+                                    quick.latestProgressNoteAt = event.timestamp
+                                } else {
+                                    quick.lastOutputPreview = truncated
+                                    quick.lastOutputPreviewAt = event.timestamp
+                                }
                             }
                         }
                     }
@@ -65,6 +71,14 @@ final class CodexTranscriptParser {
                 }
 
             case "event_msg":
+                if isCodexAgentCommentary(payload: event.payload),
+                   let text = commentaryText(from: event.payload) {
+                    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty {
+                        quick.latestProgressNote = truncate(trimmed, limit: Self.assistantPreviewLimit)
+                        quick.latestProgressNoteAt = event.timestamp
+                    }
+                }
                 if let usage = tokenUsage(from: event.payload) {
                     latestUsage = usage.total
                     let lastContext = usage.last.inputTokens + usage.last.cachedInputTokens
@@ -91,6 +105,9 @@ final class CodexTranscriptParser {
                 cacheCreationTotalTokens: 0,
                 cacheReadTokens: latestUsage.cachedInputTokens
             )
+        }
+        if let note = quick.latestProgressNote?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
+            DiagnosticLogger.shared.verbose("Codex quick commentary latest session=\((path as NSString).lastPathComponent) len=\(note.count)")
         }
         return quick
     }
@@ -132,8 +149,14 @@ final class CodexTranscriptParser {
                         if let text = extractMessageText(from: event.payload) {
                             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
                             if !trimmed.isEmpty {
-                                stats.lastOutputPreview = truncate(trimmed, limit: Self.assistantPreviewLimit)
-                                stats.lastOutputPreviewAt = event.timestamp
+                                let truncated = truncate(trimmed, limit: Self.assistantPreviewLimit)
+                                if isCodexCommentary(payload: event.payload) {
+                                    stats.latestProgressNote = truncated
+                                    stats.latestProgressNoteAt = event.timestamp
+                                } else {
+                                    stats.lastOutputPreview = truncated
+                                    stats.lastOutputPreviewAt = event.timestamp
+                                }
                             }
                         }
                     }
@@ -150,6 +173,14 @@ final class CodexTranscriptParser {
                 }
 
             case "event_msg":
+                if isCodexAgentCommentary(payload: event.payload),
+                   let text = commentaryText(from: event.payload) {
+                    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty {
+                        stats.latestProgressNote = truncate(trimmed, limit: Self.assistantPreviewLimit)
+                        stats.latestProgressNoteAt = event.timestamp
+                    }
+                }
                 guard let usage = tokenUsage(from: event.payload) else { continue }
 
                 let contextTokens = usage.last.inputTokens + usage.last.cachedInputTokens
@@ -190,6 +221,9 @@ final class CodexTranscriptParser {
             stats.fiveMinSlices[time, default: SessionStats.DaySlice()].toolUseCounts[toolName, default: 0] += 1
         }
 
+        if let note = stats.latestProgressNote?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
+            DiagnosticLogger.shared.verbose("Codex full commentary latest session=\((path as NSString).lastPathComponent) len=\(note.count)")
+        }
         return stats
     }
 
@@ -410,32 +444,87 @@ final class CodexTranscriptParser {
         return payload["text"] as? String
     }
 
+    private func commentaryText(from payload: [String: Any]) -> String? {
+        if let message = payload["message"] as? String, !message.isEmpty {
+            return message
+        }
+        return extractMessageText(from: payload)
+    }
+
+    private func isCodexCommentary(payload: [String: Any]) -> Bool {
+        guard (payload["role"] as? String) == "assistant" else { return false }
+        return (payload["phase"] as? String) == "commentary"
+    }
+
+    private func isCodexAgentCommentary(payload: [String: Any]) -> Bool {
+        guard (payload["type"] as? String) == "agent_message" else { return false }
+        return (payload["phase"] as? String) == "commentary"
+    }
+
     private func cleanUserText(_ text: String) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
-        if trimmed.hasPrefix("<environment_context>") || trimmed.hasPrefix("<permissions instructions>") {
+        if isInjectedInstructionEnvelope(trimmed) {
             return nil
         }
 
         let firstLine = trimmed
             .components(separatedBy: .newlines)
-            .first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? trimmed
+            .compactMap(cleanUserTextLine)
+            .first
 
-        return firstLine.isEmpty ? nil : firstLine
+        guard let firstLine, !firstLine.isEmpty else { return nil }
+        return firstLine
     }
 
     private func cleanSearchText(_ text: String) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count > 2 else { return nil }
 
-        if trimmed.hasPrefix("<environment_context>") || trimmed.hasPrefix("<permissions instructions>") {
+        if isInjectedInstructionEnvelope(trimmed) {
             return nil
         }
 
         let stripped = SearchUtils.stripMarkdown(trimmed)
         return stripped.count > 2 ? stripped : nil
+    }
+
+    private func isInjectedInstructionEnvelope(_ text: String) -> Bool {
+        text.hasPrefix("<environment_context>")
+            || text.hasPrefix("<permissions instructions>")
+            || text.hasPrefix("# AGENTS.md instructions for ")
+            || text.hasPrefix("<INSTRUCTIONS>")
+    }
+
+    private func cleanUserTextLine(_ rawLine: String) -> String? {
+        var line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !line.isEmpty else { return nil }
+
+        if line.hasPrefix("<image name=")
+            || line == "</image>"
+            || line == "<environment_context>"
+            || line == "</environment_context>"
+            || line == "<permissions instructions>"
+            || line == "</permissions instructions>"
+            || line == "<INSTRUCTIONS>"
+            || line == "</INSTRUCTIONS>"
+            || line.hasPrefix("# AGENTS.md instructions for ") {
+            return nil
+        }
+
+        line = line.replacingOccurrences(
+            of: #"\[Image #\d+\]"#,
+            with: "",
+            options: .regularExpression
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if line.hasPrefix("# ") {
+            line.removeFirst(2)
+            line = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        return line.isEmpty ? nil : line
     }
 
     private func searchTextForTool(name rawName: String, arguments: String) -> String? {
@@ -478,16 +567,12 @@ final class CodexTranscriptParser {
     }
 
     private func normalizedToolName(_ rawName: String) -> String {
-        switch rawName {
-        case "exec_command", "write_stdin":
-            return "Bash"
-        case "apply_patch":
-            return "Edit"
-        case "read_mcp_resource":
-            return "Read"
-        default:
-            return rawName
-        }
+        let canonical = ProviderKind.codex.canonicalToolName(rawName)
+        let pretty = CanonicalToolName.displayName(for: canonical)
+        // `displayName(for:)` title-cases unknown canonicals, which would turn
+        // a pass-through name like `view_image` into `View_image`. Keep the
+        // provider's raw label when the alias table didn't match.
+        return canonical == rawName.lowercased() ? rawName : pretty
     }
 
     private func toolDescriptor(name rawName: String, arguments: String) -> ToolDescriptor {

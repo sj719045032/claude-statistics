@@ -2,18 +2,23 @@ import Foundation
 
 /// Manages installation of the Claude Statistics-integrated status line script
 struct StatusLineInstaller {
-    private static let managedRoot = (NSHomeDirectory() as NSString).appendingPathComponent(".claude-statistics")
-    private static let managedBinDirectory = (managedRoot as NSString).appendingPathComponent("bin")
-    static let scriptPath = (managedBinDirectory as NSString).appendingPathComponent("claude-stats-statusline")
-    static let backupPath = (managedBinDirectory as NSString).appendingPathComponent("claude-stats-statusline.bak")
+    private static var managedRoot: String { AppRuntimePaths.rootDirectory }
+    private static var managedBinDirectory: String { AppRuntimePaths.binDirectory }
+    static var scriptPath: String { (managedBinDirectory as NSString).appendingPathComponent("claude-stats-statusline") }
+    static var backupPath: String { (managedBinDirectory as NSString).appendingPathComponent("claude-stats-statusline.bak") }
     private static let legacyScriptPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusline-command.sh")
     private static let legacyBackupPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusline-command.sh.bak")
     static let marker = "# Claude Statistics Integration v3"
     private static let markerPrefix = "# Claude Statistics Integration"
     static let settingsPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/settings.json")
-    static let settingsBackupPath = (managedRoot as NSString).appendingPathComponent("statusline-settings.bak.json")
+    static var settingsBackupPath: String { (managedRoot as NSString).appendingPathComponent("statusline-settings.bak.json") }
     private static let legacySettingsBackupPath = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusline-settings.bak.json")
-    private static let expectedCommand = "bash ~/.claude-statistics/bin/claude-stats-statusline"
+    /// Status line config in `~/.claude/settings.json` only allows ONE
+    /// command, so debug and release can't coexist there. Whichever build
+    /// last ran `install()` wins — and its bash script reads from its own
+    /// per-build root (`AppRuntimePaths.rootDirectory`). Path is templated
+    /// into the script at install time, not hardcoded.
+    private static var expectedCommand: String { "bash \(scriptPath)" }
     private static let legacyExpectedCommand = "bash ~/.claude/statusline-command.sh"
 
     /// Check if our integrated script is currently installed and settings.json is synced

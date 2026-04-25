@@ -51,6 +51,7 @@ xcuserdata/
 .cs-launch
 .vercel
 node_modules/
+website/dist/
 .qwen/
 # Python compiled caches next to bundled hook scripts
 __pycache__/

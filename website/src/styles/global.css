@@ -577,3 +577,255 @@ footer a:hover { color: var(--ink); }
 .tr .opts { display: flex; gap: 2px; background: rgba(255,255,255,0.08); padding: 3px; border-radius: 6px; }
 .tr .opts button { flex: 1; background: transparent; border: 0; color: rgba(255,255,255,0.75); padding: 5px 8px; font-size: 11.5px; border-radius: 4px; cursor: pointer; font-family: inherit; font-weight: 500; }
 .tr .opts button.on { background: #f7f4ed; color: var(--ink); }
+
+
+
+/* ---------- Notch Island animated demo ---------- */
+/* 4-state loop: idle → list → permission → done → idle. The notch
+   hangs from the top of a dark stage (bottom corners rounded), morphs
+   size per state, and fades its content in/out. Total cycle 16s. */
+.notch-stage {
+  position: relative;
+  margin-top: 0;
+  height: 340px;
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 120%, rgba(201,100,66,0.18) 0%, transparent 55%),
+    linear-gradient(180deg, #1c1c1b 0%, #232322 100%);
+}
+.notch-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 30% 20%, rgba(201,100,66,0.08) 0%, transparent 40%),
+              radial-gradient(circle at 70% 40%, rgba(34,197,94,0.05) 0%, transparent 35%);
+  pointer-events: none;
+}
+.notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #000;
+  border-radius: 0 0 22px 22px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+  animation: notchMorph 16s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes notchMorph {
+  /* idle 0–1s */
+  0%,   6%    { width: 180px; height: 28px; }
+  /* list 1.5–5s */
+  12%,  31%   { width: 420px; height: 210px; }
+  /* idle 5.5–6.5s */
+  37%,  40%   { width: 180px; height: 28px; }
+  /* permission 7–10.5s */
+  46%,  65%   { width: 380px; height: 152px; }
+  /* idle 11–12s */
+  71%,  74%   { width: 180px; height: 28px; }
+  /* done 12.5–15s */
+  80%,  94%   { width: 360px; height: 96px; }
+  /* idle back */
+  100%        { width: 180px; height: 28px; }
+}
+
+.notch-content {
+  position: absolute;
+  inset: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  opacity: 0;
+}
+.notch-state-list { animation: notchListShow 16s ease-in-out infinite; }
+.notch-state-perm { animation: notchPermShow 16s ease-in-out infinite; }
+.notch-state-done { animation: notchDoneShow 16s ease-in-out infinite; }
+
+@keyframes notchListShow {
+  0%, 9%      { opacity: 0; transform: translateY(-3px); }
+  14%, 32%    { opacity: 1; transform: translateY(0); }
+  36%, 100%   { opacity: 0; transform: translateY(-3px); }
+}
+@keyframes notchPermShow {
+  0%, 43%     { opacity: 0; transform: translateY(-3px); }
+  48%, 65%    { opacity: 1; transform: translateY(0); }
+  70%, 100%   { opacity: 0; transform: translateY(-3px); }
+}
+@keyframes notchDoneShow {
+  0%, 77%     { opacity: 0; transform: translateY(-3px); }
+  82%, 93%    { opacity: 1; transform: translateY(0); }
+  97%, 100%   { opacity: 0; transform: translateY(-3px); }
+}
+
+/* ---------- Shared notch card styling ---------- */
+.notch-card {
+  background: rgba(255,255,255,0.04);
+  border-radius: 10px;
+  padding: 9px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.notch-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1;
+}
+.notch-card-line {
+  padding-left: 18px;
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.notch-card-line.faint { color: #6b6b67; }
+
+.notch-dot {
+  width: 8px; height: 8px; border-radius: 999px; flex: 0 0 auto;
+}
+.notch-dot.green { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.4); }
+.notch-dot.amber { background: #f59e0b; box-shadow: 0 0 6px rgba(245,158,11,0.4); }
+.notch-dot.brown { background: #a16207; }
+
+.notch-mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #f7f4ed;
+  line-height: 1.4;
+}
+.notch-mono.strong { font-weight: 600; }
+.notch-mono.dim { color: #9a9996; }
+.notch-mono.push {
+  margin-left: auto;
+  font-size: 10px;
+  color: #87867f;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.notch-ic {
+  display: inline-block;
+  width: 14px;
+  margin-right: 4px;
+  opacity: 0.7;
+  text-align: left;
+}
+.notch-arrow { opacity: 0.7; }
+
+.notch-tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(201,100,66,0.22);
+  color: #e8896c;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.notch-tag.amber { background: rgba(245,158,11,0.22); color: #fbbf24; }
+
+/* ---------- Permission state ---------- */
+.notch-perm-icon {
+  width: 16px; height: 16px;
+  flex: 0 0 auto;
+  background: rgba(245,158,11,0.22);
+  color: #fbbf24;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+.notch-perm-cmd {
+  background: rgba(0,0,0,0.4);
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #f7f4ed;
+  line-height: 1.3;
+}
+.notch-perm-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+.notch-btn {
+  flex: 1;
+  padding: 7px;
+  border-radius: 7px;
+  border: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.notch-btn:hover { transform: translateY(-1px); }
+.notch-btn.allow { background: #22c55e; color: #0a0a0a; }
+.notch-btn.deny  { background: rgba(255,255,255,0.08); color: #f7f4ed; }
+
+/* ---------- Done state ---------- */
+.notch-done-tick {
+  width: 16px; height: 16px;
+  flex: 0 0 auto;
+  background: rgba(34,197,94,0.22);
+  color: #22c55e;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* ---------- Dedicated Notch Island section ---------- */
+.notch-section {
+  position: relative;
+  padding: 64px 0 48px;
+}
+.notch-section .wrap {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 48px;
+  align-items: center;
+}
+@media (max-width: 960px) {
+  .notch-section .wrap { grid-template-columns: 1fr; gap: 32px; }
+}
+.notch-feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 24px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.notch-feature-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--fg3);
+}
+.notch-feature-list li strong {
+  color: var(--fg1);
+  display: block;
+  margin-bottom: 2px;
+  font-weight: 600;
+  font-size: 15px;
+}
+.notch-feature-list li::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  margin-top: 9px;
+}

@@ -82,27 +82,50 @@ final class SessionScanner {
         return uniqueSessionId(projectDirectory: projectDir, transcriptFileName: fileName)
     }
 
-    /// Read cwd from JSONL file by reading in 64KB chunks until found
+    /// Read cwd from the transcript payload. In practice `cwd` is usually near
+    /// the start of the JSONL, so we scan the early bytes in small chunks first,
+    /// then keep reading to EOF only when needed to avoid false negatives.
     private func readCwd(from path: String) -> String? {
         guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
         defer { handle.closeFile() }
 
         var buffer = Data()
-        let chunkSize = 65536
+        let initialChunkSize = 8192
+        let initialScanLimit = 131072
+        let fallbackChunkSize = 65536
 
-        while buffer.count < 1_048_576 {
-            let chunk = handle.readData(ofLength: chunkSize)
+        func extractCwd(from buffer: Data) -> String? {
+            guard let content = String(data: buffer, encoding: .utf8),
+                  let range = content.range(of: "\"cwd\":\"") else {
+                return nil
+            }
+            let start = range.upperBound
+            guard let end = content[start...].firstIndex(of: "\"") else {
+                return nil
+            }
+            return String(content[start..<end])
+        }
+
+        while buffer.count < initialScanLimit {
+            let chunk = handle.readData(ofLength: initialChunkSize)
             if chunk.isEmpty { break }
             buffer.append(chunk)
 
-            if let content = String(data: buffer, encoding: .utf8),
-               let range = content.range(of: "\"cwd\":\"") {
-                let start = range.upperBound
-                if let end = content[start...].firstIndex(of: "\"") {
-                    return String(content[start..<end])
-                }
+            if let cwd = extractCwd(from: buffer) {
+                return cwd
             }
         }
-        return nil
+
+        while true {
+            let chunk = handle.readData(ofLength: fallbackChunkSize)
+            if chunk.isEmpty { break }
+            buffer.append(chunk)
+
+            if let cwd = extractCwd(from: buffer) {
+                return cwd
+            }
+        }
+
+        return extractCwd(from: buffer)
     }
 }

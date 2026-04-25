@@ -4,6 +4,8 @@ struct SessionQuickStats: Codable {
     var startTime: Date?
     var model: String?
     var topic: String?
+    var latestProgressNote: String?
+    var latestProgressNoteAt: Date?
     var lastPrompt: String?
     var lastPromptAt: Date?
     var lastOutputPreview: String?

@@ -137,16 +137,10 @@ export const siteCopy: Record<Language, SiteCopy> = {
       title: "A native-feeling command center with the visual confidence of a modern product site.",
       cards: [
         {
-          kicker: "Notch Island",
-          title: "Every running Claude / Codex / Gemini session handled from the MacBook notch.",
-          text: "Live activity surface with inline Allow / Deny permission cards, waiting-input pulses, and one-keystroke focus back into the exact terminal tab the session is running in.",
-          large: true,
-          accent: true
-        },
-        {
           kicker: "Session intelligence",
           title: "Search transcripts, inspect tools, and jump back into the exact project context.",
-          text: "Browse grouped sessions, inspect token and model breakdowns, and reopen work in your preferred terminal."
+          text: "Browse grouped sessions, inspect token and model breakdowns, and reopen work in your preferred terminal.",
+          large: true
         },
         {
           kicker: "Usage visibility",
@@ -375,16 +369,10 @@ export const siteCopy: Record<Language, SiteCopy> = {
       title: "既有原生工具的质感，也有现代产品官网该有的视觉张力。",
       cards: [
         {
-          kicker: "刘海岛",
-          title: "所有在跑的 Claude / Codex / Gemini 会话，从 MacBook 刘海区一键处理。",
-          text: "实时活动面板：权限审批卡（Allow / Deny）、等待输入提示，一键 Return 跳回会话所在的精确终端 tab。",
-          large: true,
-          accent: true
-        },
-        {
           kicker: "会话 intelligence",
           title: "搜索 transcript、查看工具调用，并回到准确的项目上下文继续工作。",
-          text: "你可以浏览分组会话、查看 token 和模型拆分，并用偏好的终端一键恢复工作流。"
+          text: "你可以浏览分组会话、查看 token 和模型拆分，并用偏好的终端一键恢复工作流。",
+          large: true
         },
         {
           kicker: "配额可见性",

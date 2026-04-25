@@ -13,10 +13,18 @@ struct CodexHookInstaller: HookInstalling {
 
     private let supportedHookEvents = [
         "SessionStart",
+        "SessionEnd",
         "UserPromptSubmit",
         "PreToolUse",
         "PermissionRequest",
         "PostToolUse",
+        "PostToolUseFailure",
+        "Notification",
+        "SubagentStart",
+        "SubagentStop",
+        "PreCompact",
+        "PostCompact",
+        "StopFailure",
         "Stop",
     ]
 

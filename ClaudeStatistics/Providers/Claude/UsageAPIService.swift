@@ -314,11 +314,7 @@ final class UsageAPIService: ProviderUsageSource {
     }
 
     private func appCacheFilePath() -> String {
-        let dir = (NSHomeDirectory() as NSString).appendingPathComponent(".claude-statistics")
-        let fm = FileManager.default
-        if !fm.fileExists(atPath: dir) {
-            try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
-        }
+        let dir = AppRuntimePaths.ensureRootDirectory() ?? AppRuntimePaths.rootDirectory
         return (dir as NSString).appendingPathComponent(cacheFileName)
     }
 }

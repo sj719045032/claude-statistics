@@ -14,8 +14,7 @@ final class UsageHistoryStore {
     private let filePath: String
 
     private init() {
-        let dir = (NSHomeDirectory() as NSString).appendingPathComponent(".claude-statistics")
-        filePath = (dir as NSString).appendingPathComponent("usage-history.jsonl")
+        filePath = (AppRuntimePaths.rootDirectory as NSString).appendingPathComponent("usage-history.jsonl")
     }
 
     func load() -> [UsageHistorySample] {

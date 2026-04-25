@@ -52,6 +52,8 @@ struct SessionStats: Codable {
     var model: String = "Unknown"
     var startTime: Date?
     var endTime: Date?
+    var latestProgressNote: String?
+    var latestProgressNoteAt: Date?
     var lastPrompt: String?
     var lastPromptAt: Date?
     var lastOutputPreview: String?
@@ -201,7 +203,8 @@ struct SessionStats: Codable {
 
     // MARK: - Codable (only stored fields)
     enum CodingKeys: String, CodingKey {
-        case model, startTime, endTime, lastPrompt, lastPromptAt, lastOutputPreview, lastOutputPreviewAt
+        case model, startTime, endTime, latestProgressNote, latestProgressNoteAt
+        case lastPrompt, lastPromptAt, lastOutputPreview, lastOutputPreviewAt
         case lastToolName, lastToolSummary, lastToolDetail, lastToolAt, contextTokens
         case userMessageCount, assistantMessageCount, fiveMinSlices
     }
@@ -211,6 +214,8 @@ struct SessionStats: Codable {
         try container.encode(model, forKey: .model)
         try container.encodeIfPresent(startTime, forKey: .startTime)
         try container.encodeIfPresent(endTime, forKey: .endTime)
+        try container.encodeIfPresent(latestProgressNote, forKey: .latestProgressNote)
+        try container.encodeIfPresent(latestProgressNoteAt, forKey: .latestProgressNoteAt)
         try container.encodeIfPresent(lastPrompt, forKey: .lastPrompt)
         try container.encodeIfPresent(lastPromptAt, forKey: .lastPromptAt)
         try container.encodeIfPresent(lastOutputPreview, forKey: .lastOutputPreview)
@@ -233,6 +238,8 @@ struct SessionStats: Codable {
         model = try container.decodeIfPresent(String.self, forKey: .model) ?? "Unknown"
         startTime = try container.decodeIfPresent(Date.self, forKey: .startTime)
         endTime = try container.decodeIfPresent(Date.self, forKey: .endTime)
+        latestProgressNote = try container.decodeIfPresent(String.self, forKey: .latestProgressNote)
+        latestProgressNoteAt = try container.decodeIfPresent(Date.self, forKey: .latestProgressNoteAt)
         lastPrompt = try container.decodeIfPresent(String.self, forKey: .lastPrompt)
         lastPromptAt = try container.decodeIfPresent(Date.self, forKey: .lastPromptAt)
         lastOutputPreview = try container.decodeIfPresent(String.self, forKey: .lastOutputPreview)
@@ -383,7 +390,7 @@ final class ModelPricing {
     }
 
     private var configDir: String {
-        (NSHomeDirectory() as NSString).appendingPathComponent(".claude-statistics")
+        AppRuntimePaths.rootDirectory
     }
 
     private var pricingFilePath: String {

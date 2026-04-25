@@ -18,7 +18,7 @@ final class NotchNotificationCenter: ObservableObject {
     private var autoAllowRules: Set<String> = []
     func enqueue(_ event: AttentionEvent) {
         var event = event
-        DiagnosticLogger.shared.info(
+        DiagnosticLogger.shared.verbose(
             "Notch enqueue start kind=\(describeKind(event.kind)) session=\(event.sessionId) toolUseId=\(event.toolUseId ?? "-") currentEvent=\(currentEvent.map { String($0.id.uuidString.prefix(8)) } ?? "nil") queueCount=\(queue.count)"
         )
         activeSessionsTracker?.record(event: event)
@@ -31,13 +31,14 @@ final class NotchNotificationCenter: ObservableObject {
             clearAutoAllowRules(provider: event.provider, sessionId: event.sessionId)
         }
         if event.kind.isSilentTracking {
-            DiagnosticLogger.shared.info("Notch drop: silent-tracking provider=\(event.provider.rawValue) kind=\(describeKind(event.kind)) raw=\(event.rawEventName)")
+            DiagnosticLogger.shared.verbose("Notch drop: silent-tracking provider=\(event.provider.rawValue) kind=\(describeKind(event.kind)) raw=\(event.rawEventName)")
             event.pending?.resolve(.ask)
             return
         }
 
         // "Always allow" rule set by the user in a previous prompt — auto-approve silently.
-        if case .permissionRequest(let tool, _, _) = event.kind,
+        if case .permissionRequest(let tool, _, _, let interaction) = event.kind,
+           interaction == .actionable,
            let key = autoAllowKey(provider: event.provider, sessionId: event.sessionId, toolName: tool),
            autoAllowRules.contains(key) {
             DiagnosticLogger.shared.info("Notch drop: auto-allow rule matched key=\(key)")
@@ -76,7 +77,7 @@ final class NotchNotificationCenter: ObservableObject {
         // is too aggressive: some CLIs emit the same approval more than once,
         // and denying the older socket can reject the real prompt before the
         // user has a chance to click Allow.
-        if case .permissionRequest(_, _, let toolUseId) = event.kind, !toolUseId.isEmpty {
+        if case .permissionRequest(_, _, let toolUseId, _) = event.kind, !toolUseId.isEmpty {
             if let existingId = pendingByToolUseId[toolUseId] {
                 DiagnosticLogger.shared.warning("Notch dedup: same toolUseId=\(toolUseId.prefix(8)) keeping existing=\(existingId.uuidString.prefix(8))")
                 event.pending?.resolve(.ask)
@@ -138,12 +139,24 @@ final class NotchNotificationCenter: ObservableObject {
         DiagnosticLogger.shared.info("Notch decide id=\(id.uuidString.prefix(8)) decision=\(decision.rawValue) current=\(currentEvent.map { String($0.id.uuidString.prefix(8)) } ?? "nil") queueCount=\(queue.count)")
         if currentEvent?.id == id {
             noteDismissed(currentEvent)
+            if let current = currentEvent {
+                activeSessionsTracker?.resolveApproval(
+                    provider: current.provider,
+                    sessionId: current.sessionId,
+                    decision: decision
+                )
+            }
             currentEvent?.pending?.resolve(decision)
             clearTimer(id)
             currentEvent = nil
             advance()
         } else if let idx = queue.firstIndex(where: { $0.id == id }) {
             noteDismissed(queue[idx])
+            activeSessionsTracker?.resolveApproval(
+                provider: queue[idx].provider,
+                sessionId: queue[idx].sessionId,
+                decision: decision
+            )
             queue[idx].pending?.resolve(decision)
             clearTimer(id)
             queue.remove(at: idx)
@@ -164,8 +177,7 @@ final class NotchNotificationCenter: ObservableObject {
         queue.removeAll { $0.provider == provider }
         for event in queueRemoved {
             event.pending?.resolve(.ask)
-            timeoutTimers[event.id]?.cancel()
-            timeoutTimers.removeValue(forKey: event.id)
+            clearTimer(event.id)
             if let toolUseId = event.toolUseId {
                 pendingByToolUseId.removeValue(forKey: toolUseId)
             }
@@ -183,8 +195,7 @@ final class NotchNotificationCenter: ObservableObject {
     func pauseAutoDismissForHover() {
         guard let current = currentEvent,
               current.kind.autoDismissAfter != nil else { return }
-        timeoutTimers[current.id]?.cancel()
-        timeoutTimers.removeValue(forKey: current.id)
+        clearTimer(current.id)
         currentAutoDismissDeadline = nil
     }
 
@@ -209,7 +220,8 @@ final class NotchNotificationCenter: ObservableObject {
             target = queue.first { $0.id == id }
         }
         if let target,
-           case .permissionRequest(let tool, _, _) = target.kind,
+           case .permissionRequest(let tool, _, _, let interaction) = target.kind,
+           interaction == .actionable,
            let key = autoAllowKey(provider: target.provider, sessionId: target.sessionId, toolName: tool) {
             autoAllowRules.insert(key)
         }
@@ -248,7 +260,7 @@ final class NotchNotificationCenter: ObservableObject {
 
     private func describeKind(_ kind: AttentionKind) -> String {
         switch kind {
-        case .permissionRequest(let tool, _, let tid): return "permission(\(tool),tid=\(tid.prefix(8)))"
+        case .permissionRequest(let tool, _, let tid, let interaction): return "permission(\(interaction.rawValue),\(tool),tid=\(tid.prefix(8)))"
         case .waitingInput:      return "waitingInput"
         case .taskDone:          return "taskDone"
         case .taskFailed:        return "taskFailed"
@@ -304,7 +316,9 @@ final class NotchNotificationCenter: ObservableObject {
         if currentEvent?.id == id {
             currentAutoDismissDeadline = nil
         }
-        timeoutTimers.removeValue(forKey: id)?.cancel()
+        guard let timer = timeoutTimers.removeValue(forKey: id) else { return }
+        timer.setEventHandler {}
+        timer.cancel()
     }
 
     private func shouldSuppressInformationalEvent(_ event: AttentionEvent) -> Bool {
@@ -334,7 +348,7 @@ final class NotchNotificationCenter: ObservableObject {
 
     private func noteDismissed(_ event: AttentionEvent?) {
         guard let event else { return }
-        if case .permissionRequest(_, _, let toolUseId) = event.kind, !toolUseId.isEmpty {
+        if case .permissionRequest(_, _, let toolUseId, _) = event.kind, !toolUseId.isEmpty {
             pendingByToolUseId.removeValue(forKey: toolUseId)
         }
         guard let key = informationalSessionKey(for: event) else { return }
@@ -420,7 +434,7 @@ final class NotchNotificationCenter: ObservableObject {
     }
 
     private func shouldClearPermission(_ candidate: AttentionEvent, becauseOf trigger: AttentionEvent) -> Bool {
-        guard case .permissionRequest(let permissionTool, _, let permissionToolUseId) = candidate.kind else {
+        guard case .permissionRequest(let permissionTool, _, let permissionToolUseId, _) = candidate.kind else {
             return false
         }
         guard candidate.provider == trigger.provider,

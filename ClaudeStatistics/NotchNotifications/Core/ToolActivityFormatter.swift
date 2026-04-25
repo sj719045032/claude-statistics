@@ -1,91 +1,144 @@
 import Foundation
 
 enum ToolActivityFormatter {
-    static func operationSummary(tool: String, input: [String: JSONValue]) -> String? {
-        if tool.lowercased() == "bash",
-           let command = preferredText(in: input, keys: ["command"]),
-           let summary = shellCommandSummary(command) {
-            return truncate(summary.operation, limit: 180)
-        }
-
-        for key in operationPreferredKeys(for: tool) {
-            if let value = input[key], let rendered = render(value), !rendered.isEmpty {
-                return truncate(rendered, limit: 180)
-            }
-        }
-
-        return detailSummary(tool: tool, input: input)
+    static func localized(_ key: String) -> String {
+        LanguageManager.localizedString(key)
     }
 
-    static func permissionDetails(tool: String, input: [String: JSONValue]) -> [String] {
-        switch tool.lowercased() {
-        case "bash":
-            var lines: [String] = []
-            if let command = preferredText(in: input, keys: ["command"]) {
-                lines.append(command)
-            }
-            if let description = preferredText(in: input, keys: ["description"]),
-               !description.isEmpty,
-               description != lines.first {
-                lines.append(description)
-            }
-            if let warning = preferredText(in: input, keys: ["warning", "reason", "message"]),
-               !warning.isEmpty,
-               !lines.contains(warning) {
-                lines.append(warning)
-            }
-            if !lines.isEmpty {
-                return lines.map { truncate($0, limit: 280) }
-            }
+    static func localizedFormat(_ key: String, _ arguments: CVarArg...) -> String {
+        String(format: localized(key), locale: LanguageManager.currentLocale, arguments: arguments)
+    }
 
-        case "read", "write", "edit", "multiedit":
-            var lines: [String] = []
-            if let path = preferredText(in: input, keys: ["file_path", "path"]) {
-                lines.append(path)
-            }
-            if let instruction = preferredText(in: input, keys: ["description", "prompt"]),
-               !instruction.isEmpty,
-               !lines.contains(instruction) {
-                lines.append(instruction)
-            }
-            if !lines.isEmpty {
-                return lines.map { truncate($0, limit: 280) }
-            }
+    /// Thin wrapper that forwards to the provider-agnostic resolver in
+    /// `CanonicalToolName`. Callers that have a `ProviderKind` in scope
+    /// should prefer `provider.canonicalToolName(raw)` directly; this helper
+    /// exists for formatter paths (`summarizeToolCompletion`, `semanticKey`,
+    /// `preferredKeys`, …) that don't receive a provider but still need a
+    /// stable canonical form.
+    static func canonicalToolName(_ raw: String?) -> String {
+        CanonicalToolName.resolve(raw)
+    }
 
-        case "websearch", "web_search":
-            var lines: [String] = []
-            if let query = preferredText(in: input, keys: ["query", "prompt", "q"]) {
-                lines.append(query)
+    static func currentOperation(
+        rawEventName: String,
+        toolName: String?,
+        input: [String: JSONValue]?,
+        provider: ProviderKind,
+        receivedAt: Date,
+        toolUseId: String?
+    ) -> CurrentOperation? {
+        switch rawEventName {
+        case "PreToolUse":
+            let resolvedTool = toolName ?? ""
+            let text = toolName.map { runningSummary(tool: $0, input: input ?? [:]) }
+                ?? fallbackProcessingText(for: provider)
+            return CurrentOperation(
+                kind: .tool,
+                text: text,
+                symbol: ActiveSession.toolSymbol(resolvedTool),
+                startedAt: receivedAt,
+                toolName: toolName,
+                toolUseId: toolUseId,
+                semanticKey: semanticKey(forTool: toolName, input: input ?? [:], toolUseId: toolUseId)
+            )
+
+        case "SubagentStart":
+            let text: String
+            if let toolName {
+                text = localizedFormat("notch.operation.runningToolNamed", toolName)
+            } else {
+                text = localized("notch.operation.runningSubagent")
             }
-            if let note = preferredText(in: input, keys: ["description", "reason"]),
-               !note.isEmpty,
-               !lines.contains(note) {
-                lines.append(note)
-            }
-            if !lines.isEmpty {
-                return lines.map { truncate($0, limit: 280) }
-            }
+            return CurrentOperation(
+                kind: .subagent,
+                text: text,
+                symbol: "wand.and.stars",
+                startedAt: receivedAt,
+                toolName: toolName,
+                toolUseId: toolUseId,
+                semanticKey: semanticKey(forTool: toolName, input: input ?? [:], toolUseId: toolUseId)
+            )
+
+        case "BeforeToolSelection":
+            return CurrentOperation(
+                kind: .toolSelection,
+                text: localized("notch.operation.choosingTools"),
+                symbol: "slider.horizontal.3",
+                startedAt: receivedAt,
+                toolName: nil,
+                toolUseId: toolUseId,
+                semanticKey: semanticKey(forOperation: rawEventName, toolUseId: toolUseId)
+            )
+
+        case "BeforeModel":
+            return CurrentOperation(
+                kind: .modelThinking,
+                text: fallbackProcessingText(for: provider),
+                symbol: "sparkles",
+                startedAt: receivedAt,
+                toolName: nil,
+                toolUseId: toolUseId,
+                semanticKey: semanticKey(forOperation: rawEventName, toolUseId: toolUseId)
+            )
+
+        case "PreCompress":
+            return CurrentOperation(
+                kind: .compressing,
+                text: localized("notch.operation.compressingContext"),
+                symbol: "arrow.down.left.and.arrow.up.right",
+                startedAt: receivedAt,
+                toolName: nil,
+                toolUseId: toolUseId,
+                semanticKey: semanticKey(forOperation: rawEventName, toolUseId: toolUseId)
+            )
+
+        case "PreCompact":
+            return CurrentOperation(
+                kind: .compacting,
+                text: localized("notch.operation.compactingContext"),
+                symbol: "arrow.down.left.and.arrow.up.right",
+                startedAt: receivedAt,
+                toolName: nil,
+                toolUseId: toolUseId,
+                semanticKey: semanticKey(forOperation: rawEventName, toolUseId: toolUseId)
+            )
+
+        case "UserPromptSubmit":
+            return CurrentOperation(
+                kind: .genericProcessing,
+                text: fallbackProcessingText(for: provider),
+                symbol: "sparkles",
+                startedAt: receivedAt,
+                toolName: nil,
+                toolUseId: toolUseId,
+                semanticKey: semanticKey(forOperation: rawEventName, toolUseId: toolUseId)
+            )
+
+        case "SessionStart":
+            return CurrentOperation(
+                kind: .genericProcessing,
+                text: localized("notch.operation.starting"),
+                symbol: "play.circle",
+                startedAt: receivedAt,
+                toolName: nil,
+                toolUseId: toolUseId,
+                semanticKey: semanticKey(forOperation: rawEventName, toolUseId: toolUseId)
+            )
 
         default:
-            break
+            return nil
         }
-
-        let fallback = input.keys.sorted().compactMap { key -> String? in
-            guard let value = input[key], let rendered = render(value), !rendered.isEmpty else { return nil }
-            return truncate("\(prettyKey(key)): \(rendered)", limit: 280)
-        }
-        return Array(fallback.prefix(3))
     }
 
     static func detailSummary(tool: String, input: [String: JSONValue]) -> String? {
         for key in preferredKeys(for: tool) {
-            if let value = input[key], let rendered = render(value), !rendered.isEmpty {
+            if let value = input[key], let rendered = renderForKey(key, value), !rendered.isEmpty {
                 return truncate(rendered, limit: 220)
             }
         }
 
         let pairs = input.keys.sorted().compactMap { key -> String? in
-            guard let value = input[key], let rendered = render(value), !rendered.isEmpty else { return nil }
+            guard let value = input[key], let rendered = renderForKey(key, value), !rendered.isEmpty else { return nil }
             return "\(prettyKey(key)): \(rendered)"
         }
 
@@ -124,21 +177,21 @@ enum ToolActivityFormatter {
 
         case "SubagentStart":
             if let toolName {
-                return "Running \(toolName)…"
+                return localizedFormat("notch.operation.runningToolNamed", toolName)
             }
             return fallbackProcessingText(for: provider)
 
         case "BeforeToolSelection":
-            return "Choosing tools…"
+            return localized("notch.operation.choosingTools")
 
         case "BeforeModel":
             return fallbackProcessingText(for: provider)
 
         case "PreCompress":
-            return "Compressing context…"
+            return localized("notch.operation.compressingContext")
 
         case "PreCompact":
-            return "Compacting context…"
+            return localized("notch.operation.compactingContext")
 
         case "PostToolUse", "PostToolUseFailure", "SubagentStop", "PostCompact", "AfterModel":
             // Don't overwrite the richer PreToolUse/SubagentStart activity
@@ -155,470 +208,40 @@ enum ToolActivityFormatter {
             return nil
 
         case "SessionStart":
-            return "Starting…"
+            return localized("notch.operation.starting")
 
         default:
             return nil
         }
     }
 
-    private static func runningSummary(tool: String, input: [String: JSONValue]) -> String {
-        switch tool.lowercased() {
-        case "read":
-            if let path = preferredText(in: input, keys: ["file_path", "path"]) {
-                return "Reading \(lastPathComponent(path))…"
-            }
-            return "Reading…"
-
-        case "edit", "multiedit":
-            if let path = preferredText(in: input, keys: ["file_path", "path"]) {
-                return "Editing \(lastPathComponent(path))…"
-            }
-            return "Editing…"
-
-        case "write":
-            if let path = preferredText(in: input, keys: ["file_path", "path"]) {
-                return "Writing \(lastPathComponent(path))…"
-            }
-            return "Writing…"
-
-        case "bash":
-            if let command = preferredText(in: input, keys: ["command"]),
-               let summary = shellCommandSummary(command) {
-                return truncate(summary.running, limit: 140)
-            }
-            if let description = preferredText(in: input, keys: ["description"]), !description.isEmpty {
-                return truncate(description, limit: 140)
-            }
-            if let command = preferredText(in: input, keys: ["command"]) {
-                return truncate("Running: \(command)", limit: 140)
-            }
-            return "Running command…"
-
-        case "grep", "glob":
-            if let pattern = preferredText(in: input, keys: ["pattern"]) {
-                return truncate("Searching: \(pattern)", limit: 140)
-            }
-            return "Searching…"
-
-        case "websearch", "web_search":
-            if let query = preferredText(in: input, keys: ["query", "prompt", "q"]) {
-                return truncate("Searching: \(query)", limit: 140)
-            }
-            return "Searching the web…"
-
-        case "webfetch", "fetch":
-            if let url = preferredText(in: input, keys: ["url"]) {
-                return truncate("Fetching: \(url)", limit: 140)
-            }
-            return "Fetching…"
-
-        case "task", "agent":
-            if let description = preferredText(in: input, keys: ["description", "prompt"]) {
-                return truncate(description, limit: 140)
-            }
-            return "Running agent…"
-
-        case "todowrite":
-            return "Updating todos…"
-
-        case "enterplanmode":
-            return "Entering plan mode…"
-
-        case "exitplanmode":
-            return "Exiting plan mode…"
-
-        default:
-            if let detail = detailSummary(tool: tool, input: input) {
-                return truncate("\(tool): \(detail)", limit: 140)
-            }
-            return "\(tool)…"
-        }
-    }
-
-    private struct ShellCommandSummary {
-        let operation: String
-        let running: String
-    }
-
-    private static func shellCommandSummary(_ rawCommand: String, depth: Int = 0) -> ShellCommandSummary? {
-        guard depth < 3 else { return nil }
-
-        let command = meaningfulShellSegment(rawCommand)
-        var tokens = normalizedShellTokens(command)
-        guard !tokens.isEmpty else { return nil }
-
-        let executable = executableName(tokens[0])
-        if ["bash", "sh", "zsh"].contains(executable),
-           let commandIndex = shellInlineCommandIndex(in: tokens),
-           tokens.indices.contains(commandIndex + 1) {
-            return shellCommandSummary(tokens[commandIndex + 1], depth: depth + 1)
-        }
-
-        tokens = normalizedShellTokens(command)
-        guard let root = tokens.first.map(executableName) else { return nil }
-        let lowerCommand = command.lowercased()
-
-        switch root {
-        case "xcodebuild":
-            if let scheme = optionValue(after: "-scheme", in: tokens) {
-                return makeCommandSummary(
-                    operation: lowerCommand.contains(" test") ? "Testing \(scheme)" : "Building \(scheme)"
-                )
-            }
-            return makeCommandSummary(operation: lowerCommand.contains(" test") ? "Running Xcode tests" : "Building with Xcode")
-
-        case "rg", "ripgrep":
-            if let pattern = searchPattern(in: tokens.dropFirst()) {
-                return makeCommandSummary(operation: "Searching: \(pattern)")
-            }
-            return makeCommandSummary(operation: "Searching the workspace")
-
-        case "grep":
-            if let pattern = searchPattern(in: tokens.dropFirst()) {
-                return makeCommandSummary(operation: "Searching: \(pattern)")
-            }
-            return makeCommandSummary(operation: "Searching files")
-
-        case "find":
-            if let pattern = optionValue(afterAnyOf: ["-name", "-iname"], in: tokens) {
-                return makeCommandSummary(operation: "Finding \(filePatternDescription(pattern))")
-            }
-            return makeCommandSummary(operation: "Finding files")
-
-        case "sed", "nl", "cat", "head", "tail", "less", "more":
-            if let path = firstPathToken(in: tokens.dropFirst()) {
-                return makeCommandSummary(operation: "Reading \(lastPathComponent(path))")
-            }
-            return makeCommandSummary(operation: "Reading output")
-
-        case "ls":
-            if let path = firstPathToken(in: tokens.dropFirst()) {
-                return makeCommandSummary(operation: "Listing \(lastPathComponent(path))")
-            }
-            return makeCommandSummary(operation: "Listing files")
-
-        case "git":
-            return gitCommandSummary(tokens: tokens)
-
-        case "go":
-            return buildToolSummary(name: "Go", tokens: tokens)
-
-        case "swift":
-            return buildToolSummary(name: "Swift", tokens: tokens)
-
-        case "npm", "pnpm", "yarn":
-            return packageCommandSummary(manager: root, tokens: tokens)
-
-        case "make":
-            let target = tokens.dropFirst().first { !$0.hasPrefix("-") }
-            return makeCommandSummary(operation: target.map { "Running make \($0)" } ?? "Running make")
-
-        case "docker":
-            return dockerCommandSummary(tokens: tokens)
-
-        case "curl":
-            if let url = tokens.first(where: { $0.hasPrefix("http://") || $0.hasPrefix("https://") }) {
-                return makeCommandSummary(operation: "Fetching \(url)")
-            }
-            return makeCommandSummary(operation: "Fetching remote data")
-
-        case "date":
-            return makeCommandSummary(operation: "Checking the time")
-
-        case "sleep":
-            return makeCommandSummary(operation: "Waiting")
-
-        case "python", "python3", "node", "ruby", "perl":
-            if let script = firstPathToken(in: tokens.dropFirst()) {
-                return makeCommandSummary(operation: "Running \(lastPathComponent(script))")
-            }
-            return makeCommandSummary(operation: "Running \(root)")
-
-        case "bash", "sh", "zsh":
-            if let script = firstPathToken(in: tokens.dropFirst()) {
-                return makeCommandSummary(operation: "Running \(lastPathComponent(script))")
-            }
-            return makeCommandSummary(operation: "Running shell command")
-
+    static func liveSemanticKey(
+        rawEventName: String,
+        toolName: String?,
+        input: [String: JSONValue]?,
+        toolUseId: String?
+    ) -> String? {
+        switch rawEventName {
+        case "ToolPermission", "PreToolUse", "SubagentStart":
+            return semanticKey(forTool: toolName, input: input ?? [:], toolUseId: toolUseId)
+        case "UserPromptSubmit", "BeforeToolSelection", "BeforeModel", "PreCompress", "PreCompact", "SessionStart":
+            return semanticKey(forOperation: rawEventName, toolUseId: toolUseId)
         default:
             return nil
-        }
-    }
-
-    private static func makeCommandSummary(operation: String) -> ShellCommandSummary {
-        ShellCommandSummary(operation: operation, running: "\(operation)…")
-    }
-
-    private static func meaningfulShellSegment(_ rawCommand: String) -> String {
-        let collapsed = rawCommand
-            .replacingOccurrences(of: "\n", with: " ")
-            .split(whereSeparator: \.isWhitespace)
-            .joined(separator: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        let segments = collapsed
-            .components(separatedBy: " && ")
-            .flatMap { $0.components(separatedBy: ";") }
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-
-        for segment in segments where !segment.isEmpty {
-            let lower = segment.lowercased()
-            if lower.hasPrefix("cd ")
-                || lower.hasPrefix("export ")
-                || lower.hasPrefix("source ")
-                || lower.hasPrefix("set ") {
-                continue
-            }
-            return segment
-        }
-
-        return collapsed
-    }
-
-    private static func normalizedShellTokens(_ command: String) -> [String] {
-        var tokens = shellTokens(command)
-        if executableName(tokens.first ?? "") == "env" {
-            tokens.removeFirst()
-        }
-        while let first = tokens.first,
-              first.contains("="),
-              !first.hasPrefix("-"),
-              first.first?.isLetter == true {
-            tokens.removeFirst()
-        }
-        while let first = tokens.first, executableName(first) == "command" {
-            tokens.removeFirst()
-        }
-        return tokens
-    }
-
-    private static func shellTokens(_ command: String) -> [String] {
-        var tokens: [String] = []
-        var current = ""
-        var quote: Character?
-
-        for char in command {
-            if let activeQuote = quote {
-                if char == activeQuote {
-                    quote = nil
-                } else {
-                    current.append(char)
-                }
-                continue
-            }
-
-            if char == "\"" || char == "'" {
-                quote = char
-                continue
-            }
-
-            if char.isWhitespace {
-                if !current.isEmpty {
-                    tokens.append(current)
-                    current = ""
-                }
-                continue
-            }
-
-            current.append(char)
-        }
-
-        if !current.isEmpty {
-            tokens.append(current)
-        }
-        return tokens
-    }
-
-    private static func executableName(_ token: String) -> String {
-        (token as NSString).lastPathComponent.lowercased()
-    }
-
-    private static func shellInlineCommandIndex(in tokens: [String]) -> Int? {
-        tokens.firstIndex(where: { $0 == "-c" || $0 == "-lc" || $0 == "-ic" })
-    }
-
-    private static func searchPattern<S: Sequence>(in tokenSequence: S) -> String? where S.Element == String {
-        let tokens = Array(tokenSequence)
-        var index = 0
-        while index < tokens.count {
-            let token = tokens[index]
-            if token == "|" { break }
-            if token.hasPrefix("-") {
-                if optionTakesValue(token), index + 1 < tokens.count {
-                    index += 2
-                } else {
-                    index += 1
-                }
-                continue
-            }
-            if looksLikePath(token) {
-                index += 1
-                continue
-            }
-            return truncate(token, limit: 80)
-        }
-        return nil
-    }
-
-    private static func firstPathToken<S: Sequence>(in tokenSequence: S) -> String? where S.Element == String {
-        let tokens = Array(tokenSequence)
-        var index = 0
-        while index < tokens.count {
-            let token = tokens[index]
-            if token == "|" { break }
-            if token.hasPrefix("-") {
-                index += optionTakesValue(token) && index + 1 < tokens.count ? 2 : 1
-                continue
-            }
-            let cleaned = cleanedShellToken(token)
-            if looksLikePath(cleaned) {
-                return cleaned
-            }
-            index += 1
-        }
-        return nil
-    }
-
-    private static func optionValue(after option: String, in tokens: [String]) -> String? {
-        guard let index = tokens.firstIndex(of: option), tokens.indices.contains(index + 1) else {
-            return nil
-        }
-        return cleanedShellToken(tokens[index + 1])
-    }
-
-    private static func optionValue(afterAnyOf options: [String], in tokens: [String]) -> String? {
-        for option in options {
-            if let value = optionValue(after: option, in: tokens) {
-                return value
-            }
-        }
-        return nil
-    }
-
-    private static func optionTakesValue(_ token: String) -> Bool {
-        [
-            "-e", "--regexp",
-            "-f", "--file",
-            "-m", "--max-count",
-            "-A", "-B", "-C",
-            "-n", "--lines",
-            "-d", "--data",
-            "-H", "--header",
-            "-o", "--output",
-            "-name", "-iname",
-            "-maxdepth", "-mindepth",
-            "-scheme", "-project", "-workspace", "-destination",
-        ].contains(token)
-    }
-
-    private static func looksLikePath(_ token: String) -> Bool {
-        let cleaned = cleanedShellToken(token)
-        guard !cleaned.isEmpty,
-              !cleaned.hasPrefix("-"),
-              !cleaned.contains("://"),
-              !cleaned.contains("=") else {
-            return false
-        }
-
-        if cleaned == "." || cleaned == ".." || cleaned.hasPrefix("/") || cleaned.hasPrefix("~/") {
-            return true
-        }
-        if cleaned.contains("/") {
-            return true
-        }
-
-        let ext = (cleaned as NSString).pathExtension
-        return !ext.isEmpty && ext.count <= 8
-    }
-
-    private static func cleanedShellToken(_ token: String) -> String {
-        token.trimmingCharacters(in: CharacterSet(charactersIn: "\"'`"))
-            .trimmingCharacters(in: CharacterSet(charactersIn: ","))
-    }
-
-    private static func filePatternDescription(_ pattern: String) -> String {
-        let cleaned = cleanedShellToken(pattern)
-            .replacingOccurrences(of: "*.", with: "")
-            .replacingOccurrences(of: "*", with: "")
-        guard !cleaned.isEmpty else { return "files" }
-        switch cleaned.lowercased() {
-        case "swift": return "Swift files"
-        case "sh", "bash", "zsh": return "shell scripts"
-        case "json": return "JSON files"
-        case "md", "markdown": return "Markdown files"
-        default: return "\(cleaned) files"
-        }
-    }
-
-    private static func gitCommandSummary(tokens: [String]) -> ShellCommandSummary {
-        let subcommand = tokens.dropFirst().first { !$0.hasPrefix("-") }?.lowercased()
-        switch subcommand {
-        case "status": return makeCommandSummary(operation: "Checking git status")
-        case "diff": return makeCommandSummary(operation: "Reviewing git diff")
-        case "show": return makeCommandSummary(operation: "Inspecting git commit")
-        case "log": return makeCommandSummary(operation: "Reading git history")
-        case "add": return makeCommandSummary(operation: "Staging changes")
-        case "commit": return makeCommandSummary(operation: "Committing changes")
-        case "push": return makeCommandSummary(operation: "Pushing changes")
-        case "pull": return makeCommandSummary(operation: "Pulling changes")
-        case "fetch": return makeCommandSummary(operation: "Fetching git updates")
-        case "checkout", "switch": return makeCommandSummary(operation: "Switching git branch")
-        default: return makeCommandSummary(operation: "Running git")
-        }
-    }
-
-    private static func buildToolSummary(name: String, tokens: [String]) -> ShellCommandSummary {
-        let subcommand = tokens.dropFirst().first { !$0.hasPrefix("-") }?.lowercased()
-        switch subcommand {
-        case "test": return makeCommandSummary(operation: "Running \(name) tests")
-        case "build": return makeCommandSummary(operation: "Building with \(name)")
-        case "run": return makeCommandSummary(operation: "Running \(name)")
-        case "mod": return makeCommandSummary(operation: "Updating Go modules")
-        default: return makeCommandSummary(operation: "Running \(name)")
-        }
-    }
-
-    private static func packageCommandSummary(manager: String, tokens: [String]) -> ShellCommandSummary {
-        let subcommand = tokens.dropFirst().first { !$0.hasPrefix("-") }?.lowercased()
-        switch subcommand {
-        case "install", "i": return makeCommandSummary(operation: "Installing packages")
-        case "test": return makeCommandSummary(operation: "Running package tests")
-        case "build": return makeCommandSummary(operation: "Building package")
-        case "dev", "start": return makeCommandSummary(operation: "Starting dev server")
-        case "run":
-            let script = tokens.dropFirst(2).first { !$0.hasPrefix("-") }
-            return makeCommandSummary(operation: script.map { "Running \($0)" } ?? "Running package script")
-        default: return makeCommandSummary(operation: "Running \(manager)")
-        }
-    }
-
-    private static func dockerCommandSummary(tokens: [String]) -> ShellCommandSummary {
-        let subcommand = tokens.dropFirst().first { !$0.hasPrefix("-") }?.lowercased()
-        switch subcommand {
-        case "ps": return makeCommandSummary(operation: "Checking containers")
-        case "logs": return makeCommandSummary(operation: "Reading container logs")
-        case "exec": return makeCommandSummary(operation: "Running command in container")
-        case "build": return makeCommandSummary(operation: "Building Docker image")
-        case "run": return makeCommandSummary(operation: "Running Docker container")
-        case "pull": return makeCommandSummary(operation: "Pulling Docker image")
-        case "push": return makeCommandSummary(operation: "Pushing Docker image")
-        case "inspect": return makeCommandSummary(operation: "Inspecting container")
-        default: return makeCommandSummary(operation: "Running Docker")
         }
     }
 
     private static func fallbackProcessingText(for provider: ProviderKind) -> String {
         switch provider {
         case .claude:
-            return "Thinking…"
+            return localized("notch.operation.thinking")
         case .codex, .gemini:
-            return "Working…"
+            return localized("notch.operation.working")
         }
     }
 
     private static func preferredKeys(for tool: String) -> [String] {
-        switch tool.lowercased() {
+        switch canonicalToolName(tool) {
         case "websearch", "web_search":
             return ["query", "prompt", "q", "url"]
         case "bash":
@@ -634,50 +257,190 @@ enum ToolActivityFormatter {
         }
     }
 
-    private static func operationPreferredKeys(for tool: String) -> [String] {
-        switch tool.lowercased() {
-        case "bash":
-            return ["description", "command"]
-        case "read", "write", "edit", "multiedit":
-            return ["file_path", "path", "description", "prompt"]
-        case "grep", "glob":
-            return ["pattern", "path"]
-        case "websearch", "web_search":
-            return ["query", "prompt", "q"]
-        case "webfetch", "fetch":
-            return ["url"]
-        case "task", "agent":
-            return ["description", "prompt"]
-        default:
-            return ["command", "query", "prompt", "url", "file_path", "path", "pattern", "description"]
-        }
-    }
-
-    private static func preferredText(in input: [String: JSONValue], keys: [String]) -> String? {
+    static func preferredText(in input: [String: JSONValue], keys: [String]) -> String? {
         for key in keys {
-            if let value = input[key], let rendered = render(value), !rendered.isEmpty {
+            if let value = input[key], let rendered = renderForKey(key, value), !rendered.isEmpty {
                 return rendered
             }
         }
         return nil
     }
 
-    private static func lastPathComponent(_ path: String) -> String {
-        let expanded = (path as NSString).expandingTildeInPath
-        let last = URL(fileURLWithPath: expanded).lastPathComponent
-        return last.isEmpty ? path : last
+    /// Path-like keys whose string values should be stripped of paren/bracket
+    /// wrappers and surrounding quotes before display. Claude hooks sometimes
+    /// forward `file_path` still wrapped like `(\t"UsageView.swift" )`, so we
+    /// apply the same cleanup `fileOperationSummary` uses for primary paths.
+    private static let pathLikeRenderKeys: Set<String> = [
+        "file_path", "filepath", "path",
+        "file_paths", "filepaths", "paths"
+    ]
+
+    static func renderForKey(_ key: String, _ value: JSONValue) -> String? {
+        if case .string(let text) = value, pathLikeRenderKeys.contains(key.lowercased()) {
+            let cleaned = normalizedPathText(text)
+            return cleaned.isEmpty ? nil : cleaned
+        }
+        return render(value)
     }
 
-    private static func prettyKey(_ key: String) -> String {
+
+    /// Basename plus as many leading parent segments as fit under `maxLength`.
+    /// Short repo-relative paths show in full; deep absolute paths degrade to
+    /// their trailing 2–3 segments so the row never runs past its budget.
+    static func displayPath(_ raw: String, maxLength: Int = 60) -> String {
+        let normalized = normalizedPathText(raw)
+        let expanded = (normalized as NSString).expandingTildeInPath
+        let components = (expanded as NSString).pathComponents.filter { $0 != "/" }
+        guard let last = components.last, !last.isEmpty else { return normalized }
+
+        var chosen = last
+        var index = components.count - 2
+        while index >= 0 {
+            let candidate = components[index...].joined(separator: "/")
+            if candidate.count > maxLength { break }
+            chosen = candidate
+            index -= 1
+        }
+        return chosen
+    }
+
+    static func preferredPaths(in input: [String: JSONValue], keys: [String]) -> [String] {
+        for key in keys {
+            guard let value = input[key] else { continue }
+            let paths = extractPaths(from: value)
+            if !paths.isEmpty {
+                return paths
+            }
+        }
+        return []
+    }
+
+    private static func extractPaths(from value: JSONValue) -> [String] {
+        switch value {
+        case .string(let text):
+            let trimmed = normalizedPathText(text)
+            return trimmed.isEmpty ? [] : [trimmed]
+        case .array(let items):
+            return items.flatMap(extractPaths(from:))
+        case .object(let object):
+            for key in ["file_path", "path", "file_paths", "paths"] {
+                if let nested = object[key] {
+                    let extracted = extractPaths(from: nested)
+                    if !extracted.isEmpty {
+                        return extracted
+                    }
+                }
+            }
+            return []
+        case .number, .bool, .null:
+            return []
+        }
+    }
+
+    static func lastPathComponent(_ path: String) -> String {
+        let normalized = normalizedPathText(path)
+        let expanded = (normalized as NSString).expandingTildeInPath
+        let last = URL(fileURLWithPath: expanded).lastPathComponent
+        return last.isEmpty ? normalized : last
+    }
+
+    static func semanticKey(forOperation operation: String, toolUseId: String?) -> String {
+        if let id = nonEmptySemanticValue(toolUseId) {
+            return "operation:\(operation.lowercased()):\(id)"
+        }
+        return "operation:\(operation.lowercased())"
+    }
+
+    static func semanticKey(
+        forTool toolName: String?,
+        input: [String: JSONValue],
+        toolUseId: String?
+    ) -> String? {
+        if let id = nonEmptySemanticValue(toolUseId) {
+            return "tool-use:\(id)"
+        }
+
+        let tool = canonicalToolName(toolName)
+        guard !tool.isEmpty else { return nil }
+
+        if let command = preferredText(in: input, keys: ["command"]) {
+            return "tool:\(tool):command:\(semanticText(command))"
+        }
+
+        let paths = preferredPaths(in: input, keys: ["file_path", "path", "file_paths", "paths"])
+        if !paths.isEmpty {
+            let joined = paths
+                .map { semanticText(normalizedPathText($0)) }
+                .joined(separator: "|")
+            return "tool:\(tool):paths:\(joined)"
+        }
+
+        if let pattern = preferredText(in: input, keys: ["pattern"]) {
+            return "tool:\(tool):pattern:\(semanticText(pattern))"
+        }
+
+        return "tool:\(tool)"
+    }
+
+    private static func nonEmptySemanticValue(_ text: String?) -> String? {
+        let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed?.isEmpty == false ? trimmed : nil
+    }
+
+    private static func semanticText(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+    }
+
+    static func normalizedPathText(_ raw: String) -> String {
+        var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Some tool payloads stringify path lists as `("foo.swift")` or
+        // `["foo.swift"]`. Strip the wrapping punctuation before we compute
+        // the display name so the UI reads `Reading foo.swift...`.
+        let wrapperPairs: [(Character, Character)] = [
+            ("(", ")"),
+            ("[", "]"),
+            ("{", "}")
+        ]
+
+        var didTrimWrapper = true
+        while didTrimWrapper, text.count >= 2 {
+            didTrimWrapper = false
+            for (start, end) in wrapperPairs {
+                guard text.first == start, text.last == end else { continue }
+                text = String(text.dropFirst().dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+                didTrimWrapper = true
+                break
+            }
+        }
+
+        text = text.trimmingCharacters(in: CharacterSet(charactersIn: "\"'`"))
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func prettyKey(_ key: String) -> String {
         key.replacingOccurrences(of: "_", with: " ")
     }
 
-    private static func truncate(_ text: String, limit: Int) -> String {
-        let trimmed = text
-            .replacingOccurrences(of: "\n", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count > limit else { return trimmed }
-        return String(trimmed.prefix(limit)) + "…"
+    static func truncate(_ text: String, limit: Int, preserveNewlines: Bool = false) -> String {
+        let normalized: String
+        if preserveNewlines {
+            // Keep line breaks (heredocs, multi-line scripts) but normalize
+            // CRLF → LF and strip trailing/leading whitespace.
+            normalized = text
+                .replacingOccurrences(of: "\r\n", with: "\n")
+                .replacingOccurrences(of: "\r", with: "\n")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        } else {
+            normalized = text
+                .replacingOccurrences(of: "\n", with: " ")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard normalized.count > limit else { return normalized }
+        return String(normalized.prefix(limit)) + "…"
     }
 
     private static func render(_ value: JSONValue) -> String? {

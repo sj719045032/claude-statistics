@@ -43,6 +43,90 @@ enum ProviderKind: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+extension ProviderKind {
+    /// Lower-cased canonical tool name for this provider's raw tool name —
+    /// `Edit` / `apply_patch` / `replace` all collapse to `"edit"`, `Read` /
+    /// `read_file` collapse to `"read"`, etc. The alias tables live in each
+    /// provider's own file (`ClaudeToolNames` / `CodexToolNames` /
+    /// `GeminiToolNames`) so adding a new alias for one provider doesn't
+    /// touch shared code. Unknown names pass through as lower-cased.
+    func canonicalToolName(_ raw: String?) -> String {
+        guard let raw else { return "" }
+        let normalized = raw
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "-", with: "_")
+            .replacingOccurrences(of: " ", with: "_")
+        guard !normalized.isEmpty else { return "" }
+        if let mapped = providerAlias(normalized) {
+            return mapped
+        }
+        return normalized
+    }
+
+    private func providerAlias(_ normalized: String) -> String? {
+        switch self {
+        case .claude: return ClaudeToolNames.canonical(normalized)
+        case .codex:  return CodexToolNames.canonical(normalized)
+        case .gemini: return GeminiToolNames.canonical(normalized)
+        }
+    }
+}
+
+/// Canonical tool-name vocabulary shared across providers. Each provider's
+/// alias table funnels its raw names into these values, and consumers that
+/// need a UI label use `displayName(for:)` here — keeping pretty capitalization
+/// in one place instead of duplicated across transcript parsers and formatters.
+enum CanonicalToolName {
+    /// Tool-name fallback used by callers that lack a `ProviderKind` context.
+    /// Tries every provider's alias table in turn; returns the lower-cased
+    /// normalized name when no provider recognizes the alias.
+    static func resolve(_ raw: String?) -> String {
+        guard let raw else { return "" }
+        let normalized = raw
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "-", with: "_")
+            .replacingOccurrences(of: " ", with: "_")
+        guard !normalized.isEmpty else { return "" }
+        for kind in ProviderKind.allCases {
+            if let mapped = alias(from: kind, normalized: normalized) {
+                return mapped
+            }
+        }
+        return normalized
+    }
+
+    /// Pretty label for a canonical tool name (e.g. `"edit"` → `"Edit"`).
+    /// Used by transcript parsers and any UI that wants a consistent verb
+    /// across providers. Unknown canonicals get a title-cased fallback.
+    static func displayName(for canonical: String) -> String {
+        switch canonical {
+        case "bash": return "Bash"
+        case "read": return "Read"
+        case "write": return "Write"
+        case "edit", "multiedit": return "Edit"
+        case "grep": return "Grep"
+        case "glob": return "Glob"
+        case "webfetch": return "Fetch"
+        case "websearch": return "Search"
+        case "task", "agent": return "Agent"
+        case "todowrite": return "Todo"
+        default:
+            guard let first = canonical.first else { return canonical }
+            return String(first).uppercased() + canonical.dropFirst()
+        }
+    }
+
+    private static func alias(from kind: ProviderKind, normalized: String) -> String? {
+        switch kind {
+        case .claude: return ClaudeToolNames.canonical(normalized)
+        case .codex:  return CodexToolNames.canonical(normalized)
+        case .gemini: return GeminiToolNames.canonical(normalized)
+        }
+    }
+}
+
 /// Controls which providers' usage cells are shown in the status bar strip.
 /// Defaults to all three enabled so a fresh install shows every configured
 /// provider; the user can hide individual providers from Settings.

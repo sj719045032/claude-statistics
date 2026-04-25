@@ -11,13 +11,13 @@ extension ClaudeProvider: ProviderAccountCardSupplementProviding {
         ))
     }
 
-    func makeCompactAccountSwitcherAccessory(context: ProviderSettingsContext) -> AnyView {
+    func makeCompactAccountSwitcherAccessory(context: ProviderSettingsContext, triggerStyle: AccountSwitcherTriggerStyle) -> AnyView {
         AnyView(ClaudeProviderAccountCardAccessory(
             appState: context.appState,
             accountManager: context.appState.claudeAccountManager,
             independentManager: context.appState.independentClaudeAccountManager,
             profileViewModel: context.profileViewModel,
-            triggerStyle: .icon
+            triggerStyle: triggerStyle
         ))
     }
 }

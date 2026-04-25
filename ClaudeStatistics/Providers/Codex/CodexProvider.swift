@@ -13,9 +13,10 @@ final class CodexProvider: SessionProvider, @unchecked Sendable {
     // credentialStatus: nil — Codex profile is decoded locally, no explicit credential check needed
     var statusLineInstaller: (any StatusLineInstalling)? { CodexStatusLineAdapter() }
     var notchHookInstaller: (any HookInstalling)? { CodexHookInstaller() }
-    // Codex's hook runtime only fires PermissionRequest (on sandbox escalation)
-    // and Stop (= taskDone). No Notification idle_prompt, no StopFailure.
-    var supportedNotchEvents: Set<NotchEventKind> { [.permission, .taskDone] }
+    // Current local Codex traces still mostly show the core 6 events, but we
+    // register the broader lifecycle set so waiting/failed paths can surface
+    // automatically as the runtime exposes them.
+    var supportedNotchEvents: Set<NotchEventKind> { [.permission, .waitingInput, .taskDone, .taskFailed] }
     var pricingFetcher: (any ProviderPricingFetching)? { CodexPricingFetchService.shared }
     var pricingSourceLocalizationKey: String? { "pricing.source.codex" }
     var pricingSourceURL: URL? { URL(string: "https://developers.openai.com/api/docs/pricing") }
@@ -37,7 +38,38 @@ final class CodexProvider: SessionProvider, @unchecked Sendable {
     }
 
     func makeWatcher(onChange: @escaping (Set<String>) -> Void) -> (any SessionWatcher)? {
-        nil
+        let rootPath = CodexSessionScanner.codexRootPath
+        guard FileManager.default.fileExists(atPath: rootPath) else { return nil }
+        return FSEventsWatcher(
+            path: rootPath,
+            debounceSeconds: 2.0,
+            fileFilter: { path in
+                if path.contains("/sessions/") && path.hasSuffix(".jsonl") {
+                    return true
+                }
+                let fileName = (path as NSString).lastPathComponent
+                return fileName == "state_5.sqlite" ||
+                    fileName == "state_5.sqlite-wal" ||
+                    fileName == "state_5.sqlite-shm"
+            },
+            onChange: onChange
+        )
+    }
+
+    func changedSessionIds(for changedPaths: Set<String>) -> Set<String> {
+        Set(changedPaths.compactMap { path in
+            guard path.contains("/sessions/") else { return nil }
+            return CodexSessionScanner.sessionId(forRolloutPath: path)
+        })
+    }
+
+    func shouldRescanSessions(for changedPaths: Set<String>) -> Bool {
+        changedPaths.contains { path in
+            let fileName = (path as NSString).lastPathComponent
+            return fileName == "state_5.sqlite" ||
+                fileName == "state_5.sqlite-wal" ||
+                fileName == "state_5.sqlite-shm"
+        }
     }
 
     func parseQuickStats(at path: String) -> SessionQuickStats {
@@ -96,6 +128,28 @@ final class CodexProvider: SessionProvider, @unchecked Sendable {
                 cwd: path
             )
         )
+    }
+}
+
+// MARK: - Tool name canonicalization
+
+/// Maps Codex's raw tool names (`apply_patch`, `exec_command`, …) onto the
+/// shared canonical vocabulary (`edit`, `bash`, …). Input is expected to be
+/// the lower-cased/underscore-normalized form that `ProviderKind
+/// .canonicalToolName(_:)` produces; returns `nil` when no alias applies so
+/// the caller can keep the original name.
+enum CodexToolNames {
+    static func canonical(_ normalized: String) -> String? {
+        switch normalized {
+        case "exec_command", "write_stdin", "local_shell":
+            return "bash"
+        case "apply_patch":
+            return "edit"
+        case "read_mcp_resource":
+            return "read"
+        default:
+            return nil
+        }
     }
 }
 

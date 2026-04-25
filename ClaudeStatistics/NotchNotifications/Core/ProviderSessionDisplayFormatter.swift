@@ -319,12 +319,12 @@ struct ProviderSessionDisplayFormatter {
 
         var buckets: [String: Int] = [:]
         for entry in active.values {
-            let canonical = CanonicalToolName.resolve(entry.toolName)
-            buckets[canonical, default: 0] += 1
+            let bucket = bucketKey(toolName: entry.toolName, detail: entry.detail)
+            buckets[bucket, default: 0] += 1
         }
         for entry in freshRecent {
-            let canonical = CanonicalToolName.resolve(entry.toolName)
-            buckets[canonical, default: 0] += 1
+            let bucket = bucketKey(toolName: entry.toolName, detail: entry.detail)
+            buckets[bucket, default: 0] += 1
         }
 
         let totalCalls = buckets.values.reduce(0, +)
@@ -340,6 +340,36 @@ struct ProviderSessionDisplayFormatter {
         return phrases.joined(separator: " · ")
     }
 
+    /// Maps an entry to its aggregate bucket. Bash entries get re-routed by
+    /// their parsed command intent — `bash + grep …` joins the searching
+    /// bucket with `Grep` calls, `bash + ls …` becomes a `listing` bucket,
+    /// `bash + cat/sed/head/tail` joins the reading bucket with `Read`
+    /// calls. This matches what Claude Code's own CLI shows ("Searching for
+    /// 2 patterns, reading 1 file, listing 1 directory…") instead of
+    /// flattening every shell call into a vague "Running N commands".
+    ///
+    /// Detection is by detail-string prefix because `ActiveToolEntry`
+    /// doesn't preserve the raw command — `operationSummary(...)` already
+    /// parsed the command into "Searching files" / "Listing /tmp" /
+    /// "Reading foo.txt" / etc. via `shellCommandSummary`. Those phrases
+    /// are hard-coded English in `ToolActivityFormatter`, so prefix
+    /// matching is locale-stable.
+    private static func bucketKey(toolName: String, detail: String?) -> String {
+        let canonical = CanonicalToolName.resolve(toolName)
+        guard canonical == "bash" || canonical == "bashoutput", let detail else {
+            return canonical
+        }
+        // Drop a leading "Running " that shellCommandSummary occasionally
+        // prepends ("Running ls …" — though typically it's just "Listing").
+        let trimmed = detail.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("Searching") { return "grep" }
+        if trimmed.hasPrefix("Finding")   { return "find" }
+        if trimmed.hasPrefix("Listing")   { return "ls" }
+        if trimmed.hasPrefix("Reading")   { return "read" }
+        if trimmed.hasPrefix("Fetching")  { return "fetch" }
+        return canonical
+    }
+
     private static func phraseForBucket(tool: String, count: Int) -> String {
         let key: String
         switch tool {
@@ -348,6 +378,8 @@ struct ProviderSessionDisplayFormatter {
         case "write":                           key = "notch.activeTools.writing"
         case "grep":                            key = "notch.activeTools.searching"
         case "glob":                            key = "notch.activeTools.globbing"
+        case "ls":                              key = "notch.activeTools.listing"
+        case "find":                            key = "notch.activeTools.finding"
         case "bash", "bashoutput":              key = "notch.activeTools.running"
         case "task", "agent":                   key = "notch.activeTools.delegating"
         case "websearch", "web_search":         key = "notch.activeTools.websearching"

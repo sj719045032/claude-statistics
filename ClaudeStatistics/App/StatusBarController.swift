@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import SwiftUI
 import Combine
 
@@ -7,6 +8,48 @@ extension Notification.Name {
     /// the settings pane's "Open Accessibility Settings" button handing off
     /// focus to System Settings.
     static let closeStatusBarPanel = Notification.Name("ClaudeStatistics.closeStatusBarPanel")
+}
+
+enum AccessibilityPermissionSupport {
+    static var isTrusted: Bool {
+        AXIsProcessTrusted()
+    }
+
+    static func registerVisibility(prompt: Bool) {
+        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        _ = AXIsProcessTrustedWithOptions([promptKey: prompt] as CFDictionary)
+    }
+
+    static func registerViaEventTapProbe() {
+        let mask = (1 << CGEventType.keyDown.rawValue)
+        let noopCallback: CGEventTapCallBack = { _, _, event, _ in
+            Unmanaged.passUnretained(event)
+        }
+
+        if let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: CGEventMask(mask),
+            callback: noopCallback,
+            userInfo: nil
+        ) {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
+        }
+    }
+
+    static func openSystemSettings(closePanel: Bool = true) {
+        registerViaEventTapProbe()
+
+        if closePanel {
+            NotificationCenter.default.post(name: .closeStatusBarPanel, object: nil)
+        }
+
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+    }
 }
 
 /// Manages the NSStatusItem and the floating panel.

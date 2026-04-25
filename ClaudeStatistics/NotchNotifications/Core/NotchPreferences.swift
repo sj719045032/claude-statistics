@@ -23,6 +23,15 @@ enum NotchPreferences {
         return d.object(forKey: keyboardControlsEnabledKey) == nil || d.bool(forKey: keyboardControlsEnabledKey)
     }
 
+    /// Expanded-row mode in IdlePeekCard: when on, each session row renders
+    /// a vertical list of every active tool call (parent + subagent) instead
+    /// of the single aggregated line. Off by default — row-dense layout.
+    static let idlePeekDetailedRowsKey = "notch.idlePeek.detailedRows"
+
+    static var idlePeekDetailedRows: Bool {
+        UserDefaults.standard.bool(forKey: idlePeekDetailedRowsKey)
+    }
+
     /// Reads the master switch for a provider. Default is on.
     static func isEnabled(_ kind: ProviderKind) -> Bool {
         let d = UserDefaults.standard

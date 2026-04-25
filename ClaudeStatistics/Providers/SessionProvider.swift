@@ -249,6 +249,7 @@ protocol SessionProvider: Sendable {
     func scanSessions() -> [Session]
     func makeWatcher(onChange: @escaping (Set<String>) -> Void) -> (any SessionWatcher)?
     func changedSessionIds(for changedPaths: Set<String>) -> Set<String>
+    func shouldRescanSessions(for changedPaths: Set<String>) -> Bool
 
     func parseQuickStats(at path: String) -> SessionQuickStats
     func parseSession(at path: String) -> SessionStats
@@ -326,6 +327,9 @@ extension SessionProvider {
             changedIds.insert((fileName as NSString).deletingPathExtension)
         }
         return changedIds
+    }
+    func shouldRescanSessions(for changedPaths: Set<String>) -> Bool {
+        alwaysRescanOnFileChanges
     }
 
     func parseSearchIndexMessages(at path: String) -> [SearchIndexMessage] {

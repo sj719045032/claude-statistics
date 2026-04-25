@@ -25,11 +25,17 @@ final class NotchStateMachine: ObservableObject {
 
     // Expanded (opened) — Dynamic Island style
     static let expandedWidth: CGFloat     = 440
+    /// Wider IdlePeek for the detailed-rows opt-in. Modest bump (100pt) so
+    /// per-tool lines can show longer paths / commands without the row
+    /// becoming a billboard — 720 felt cavernous when most rows are just two
+    /// short status lines.
+    static let expandedDetailedWidth: CGFloat = 540
     static let expandedMinHeight: CGFloat = 150
     static let openedTopCornerRadius: CGFloat    = 19
     static let openedBottomCornerRadius: CGFloat = 24
 
-    // Window frame sized to hold the largest expected card + breathing room
+    // Window frame sized to hold the largest expected card + breathing room.
+    // windowWidth must accommodate the widest island state (detailed mode).
     static let windowWidth: CGFloat  = 640
     static let windowHeight: CGFloat = 360
 

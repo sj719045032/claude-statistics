@@ -33,17 +33,33 @@ echo "==> Cleaning stale builds..."
 find ~/Library/Developer/Xcode/DerivedData -path "*/Debug/${APP_NAME}.app" -type d -exec rm -rf {} + 2>/dev/null || true
 
 # 3. Build — override bundle ID so Debug has its own TCC slot in System Settings.
+# Full xcodebuild output goes to a log file; on failure we grep out
+# error/warning lines so the caller sees what actually broke without having
+# to re-run xcodebuild by hand. `-quiet` is dropped (the log file keeps noise
+# off the terminal, and swallowing it in -quiet mode hides the error context).
 echo "==> Building debug (bundle id: ${DEBUG_BUNDLE_ID})..."
-xcodebuild build \
-  -scheme ClaudeStatistics \
-  -configuration Debug \
-  -destination 'platform=macOS' \
-  -derivedDataPath "${BUILD_DIR}" \
-  PRODUCT_BUNDLE_IDENTIFIER="${DEBUG_BUNDLE_ID}" \
-  -quiet 2>&1 | tail -3
+mkdir -p "${BUILD_DIR}"
+BUILD_LOG="${BUILD_DIR}/xcodebuild.log"
+if ! xcodebuild build \
+    -scheme ClaudeStatistics \
+    -configuration Debug \
+    -destination 'platform=macOS' \
+    -derivedDataPath "${BUILD_DIR}" \
+    PRODUCT_BUNDLE_IDENTIFIER="${DEBUG_BUNDLE_ID}" \
+    >"${BUILD_LOG}" 2>&1; then
+  echo "==> BUILD FAILED — compile errors:"
+  echo "----------------------------------------"
+  grep -E "error:|warning:" "${BUILD_LOG}" | head -60 || true
+  echo "----------------------------------------"
+  echo "==> Full log: ${BUILD_LOG}"
+  exit 1
+fi
+
+# Surface the xcodebuild summary tail on success too (destination warnings etc.)
+tail -4 "${BUILD_LOG}"
 
 if [ ! -d "${BUILT_APP_PATH}" ]; then
-  echo "ERROR: Build failed, ${BUILT_APP_PATH} not found"
+  echo "ERROR: Build succeeded but ${BUILT_APP_PATH} not found (unexpected)"
   exit 1
 fi
 

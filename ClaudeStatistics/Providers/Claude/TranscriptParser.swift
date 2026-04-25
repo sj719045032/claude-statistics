@@ -477,6 +477,12 @@ final class TranscriptParser {
                    let preview = Self.extractAssistantPreview(from: message) {
                     quick.lastOutputPreview = preview
                     quick.lastOutputPreviewAt = entry.timestampDate
+                    // Mirror the preview into latestProgressNote so the
+                    // triptych's BOTTOM row (agent commentary) has a second
+                    // data source. The hook's tail-read is the fast path; this
+                    // parser scan is the safety net when the hook misses.
+                    quick.latestProgressNote = preview
+                    quick.latestProgressNoteAt = entry.timestampDate
                     foundOutputPreview = true
                 }
             }

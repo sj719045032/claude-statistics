@@ -9,11 +9,11 @@ struct ProviderSettingsContext {
 @MainActor
 protocol ProviderAccountCardSupplementProviding {
     func makeAccountCardAccessory(context: ProviderSettingsContext) -> AnyView
-    func makeCompactAccountSwitcherAccessory(context: ProviderSettingsContext) -> AnyView
+    func makeCompactAccountSwitcherAccessory(context: ProviderSettingsContext, triggerStyle: AccountSwitcherTriggerStyle) -> AnyView
 }
 
 extension ProviderAccountCardSupplementProviding {
-    func makeCompactAccountSwitcherAccessory(context: ProviderSettingsContext) -> AnyView {
+    func makeCompactAccountSwitcherAccessory(context: ProviderSettingsContext, triggerStyle: AccountSwitcherTriggerStyle) -> AnyView {
         makeAccountCardAccessory(context: context)
     }
 }
@@ -21,6 +21,7 @@ extension ProviderAccountCardSupplementProviding {
 enum AccountSwitcherTriggerStyle {
     case text
     case icon
+    case chip(label: String, avatarInitial: String)
 }
 
 struct AccountSwitcherAccessory<Account: Identifiable>: View {
@@ -45,7 +46,7 @@ struct AccountSwitcherAccessory<Account: Identifiable>: View {
 
     var body: some View {
         Group {
-            if triggerStyle == .text {
+            if case .text = triggerStyle {
                 Button { showingAccountsPopover.toggle() } label: { triggerLabel }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
@@ -164,6 +165,42 @@ struct AccountSwitcherAccessory<Account: Identifiable>: View {
             .background(Color.primary.opacity(0.06))
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .help("settings.accountSwitcher.switchAccount")
+        case let .chip(label, avatarInitial):
+            HStack(spacing: 6) {
+                ZStack {
+                    Circle()
+                        .fill(Color.primary.opacity(0.08))
+                    if isAddingAccount {
+                        ProgressView()
+                            .scaleEffect(0.45)
+                    } else {
+                        Text(avatarInitial)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(width: 20, height: 20)
+
+                Text(label)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.primary.opacity(0.85))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: 200)
+                    .fixedSize(horizontal: true, vertical: false)
+
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.white.opacity(0.04), lineWidth: 1)
+            }
+            .help(label)
         }
     }
 

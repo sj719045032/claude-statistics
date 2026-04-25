@@ -114,6 +114,18 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
     }
 }
 
+// MARK: - Tool name canonicalization
+
+/// Claude's native tool names already match the shared canonical vocabulary
+/// (`Edit`, `Read`, `Write`, `Bash`, …), so there are no aliases to rewrite.
+/// Claude-only tools that fall outside the shared vocabulary (`TodoWrite`,
+/// `EnterPlanMode`, `ExitPlanMode`) simply pass through as-is.
+enum ClaudeToolNames {
+    static func canonical(_ normalized: String) -> String? {
+        nil
+    }
+}
+
 // MARK: - StatusLine adapter
 
 struct ClaudeStatusLineAdapter: StatusLineInstalling {

@@ -619,14 +619,17 @@ struct CostModelsCard: View {
                                         .font(.system(size: 11, weight: .medium))
                                         .lineLimit(1)
                                     Spacer()
-                                    if item.messageCount > 0 {
-                                        Text("detail.msgs \(item.messageCount)")
-                                            .font(.system(size: 10))
-                                            .foregroundStyle(.tertiary)
-                                    } else if item.sessionCount > 1 {
-                                        Text("detail.sessions \(item.sessionCount)")
-                                            .font(.system(size: 10))
-                                            .foregroundStyle(.tertiary)
+                                    HStack(spacing: 4) {
+                                        if item.sessionCount > 1 {
+                                            Text("detail.sessions \(item.sessionCount)")
+                                                .font(.system(size: 10))
+                                                .foregroundStyle(.tertiary)
+                                        }
+                                        if item.messageCount > 0 {
+                                            Text("detail.msgs \(item.messageCount)")
+                                                .font(.system(size: 10))
+                                                .foregroundStyle(.tertiary)
+                                        }
                                     }
                                     let pct = grandTotal > 0 ? Double(item.totalTokens) / Double(grandTotal) * 100 : 0
                                     Text("\(TimeFormatter.tokenCount(item.totalTokens)) (\(String(format: "%.2f", pct))%)")

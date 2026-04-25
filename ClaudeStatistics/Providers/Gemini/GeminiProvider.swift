@@ -13,8 +13,8 @@ final class GeminiProvider: SessionProvider, @unchecked Sendable {
     var credentialStatus: Bool? { GeminiUsageService.shared.hasUsableCredentials }
     var statusLineInstaller: (any StatusLineInstalling)? { GeminiStatusLineAdapter() }
     var notchHookInstaller: (any HookInstalling)? { GeminiHookInstaller() }
-    // Gemini CLI currently exposes ToolPermission via Notification and has no
-    // idle-prompt equivalent, so Gemini notch events are permission + task done.
+    // Gemini permission prompts are passive notifications: the app can surface
+    // them, but approval still has to happen in the terminal.
     var supportedNotchEvents: Set<NotchEventKind> { [.permission, .taskDone] }
     var pricingFetcher: (any ProviderPricingFetching)? { GeminiPricingFetchService.shared }
     var pricingSourceLocalizationKey: String? { "pricing.source.gemini" }
@@ -117,6 +117,36 @@ final class GeminiProvider: SessionProvider, @unchecked Sendable {
                 cwd: path
             )
         )
+    }
+}
+
+// MARK: - Tool name canonicalization
+
+/// Maps Gemini's raw tool names (`run_shell_command`, `read_file`, …) onto
+/// the shared canonical vocabulary (`bash`, `read`, …). Input is expected to
+/// be the lower-cased/underscore-normalized form that
+/// `ProviderKind.canonicalToolName(_:)` produces; returns `nil` when no
+/// alias applies so the caller can keep the original name.
+enum GeminiToolNames {
+    static func canonical(_ normalized: String) -> String? {
+        switch normalized {
+        case "run_shell_command":
+            return "bash"
+        case "grep_search":
+            return "grep"
+        case "read_file":
+            return "read"
+        case "write_file":
+            return "write"
+        case "replace":
+            return "edit"
+        case "web_fetch":
+            return "webfetch"
+        case "web_search", "google_web_search":
+            return "websearch"
+        default:
+            return nil
+        }
     }
 }
 

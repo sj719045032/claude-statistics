@@ -44,6 +44,7 @@ final class AppState: ObservableObject {
     let codexAccountManager = CodexAccountManager()
     let geminiAccountManager = GeminiAccountManager()
     private var cancellables: Set<AnyCancellable> = []
+    private var runtimeBridgeCancellables: [ProviderKind: AnyCancellable] = [:]
     private var storesByProvider: [ProviderKind: SessionDataStore] = [:]
     private var sessionViewModelsByProvider: [ProviderKind: SessionViewModel] = [:]
 
@@ -77,6 +78,12 @@ final class AppState: ObservableObject {
         self.sessionViewModel = sessionViewModelsByProvider[selectedKind]!
         usageViewModel.store = store
         configureUsageState(for: store.provider)
+
+        for kind in startupKinds {
+            if let store = storesByProvider[kind] {
+                bindRuntimeBridge(for: kind, store: store)
+            }
+        }
 
         // Sync subscription weekly reset date to SessionDataStore
         usageViewModel.$usageData
@@ -199,6 +206,29 @@ final class AppState: ObservableObject {
         }
     }
 
+    func restoreNotchRuntime(for providers: [ProviderKind]) {
+        for kind in providers {
+            let store = storesByProvider[kind]
+            let sessions = store?.sessions
+            let restoredSource: [Session]
+            if let sessions, !sessions.isEmpty {
+                restoredSource = sessions
+            } else {
+                restoredSource = ProviderRegistry.provider(for: kind).scanSessions()
+            }
+            // Feed stats into the restore so the triptych has real text on the
+            // first render. Without this, the runtime copy is shell-only and
+            // the UI shows "No prompt yet / Idle / Waiting for input" until
+            // the first syncTranscriptSignals debounce fires.
+            activeSessionsTracker.restoreRuntime(
+                for: kind,
+                sessions: restoredSource,
+                quickStats: store?.quickStats ?? [:],
+                parsedStats: store?.parsedStats ?? [:]
+            )
+        }
+    }
+
     func refreshProviderAfterAccountChange(_ kind: ProviderKind) {
         switch kind {
         case .claude:
@@ -220,6 +250,7 @@ final class AppState: ObservableObject {
         storesByProvider[kind] = rebuiltStore
         sessionViewModelsByProvider[kind] = rebuiltViewModel
         rebuiltStore.start()
+        bindRuntimeBridge(for: kind, store: rebuiltStore)
 
         if providerKind == kind {
             store = rebuiltStore
@@ -243,6 +274,19 @@ final class AppState: ObservableObject {
                 old.stopAutoRefresh()
             }
             secondaryUsageViewModels[kind] = makeSecondaryUsageViewModel(for: kind)
+        }
+    }
+
+    func rebuildSessionCache(for kind: ProviderKind) {
+        let context = ensureProviderContext(for: kind)
+        context.viewModel.selectedSession = nil
+        context.viewModel.selectedSessionStats = nil
+        context.viewModel.showTranscript = false
+        context.store.forceRescan()
+
+        if providerKind == kind {
+            store = context.store
+            sessionViewModel = context.viewModel
         }
     }
 
@@ -308,7 +352,33 @@ final class AppState: ObservableObject {
         storesByProvider[kind] = store
         sessionViewModelsByProvider[kind] = viewModel
         store.start()
+        bindRuntimeBridge(for: kind, store: store)
         return (store, viewModel)
+    }
+
+    private func bindRuntimeBridge(for kind: ProviderKind, store: SessionDataStore) {
+        runtimeBridgeCancellables[kind]?.cancel()
+
+        guard kind == .codex else {
+            runtimeBridgeCancellables[kind] = nil
+            return
+        }
+
+        runtimeBridgeCancellables[kind] = Publishers.CombineLatest3(
+            store.$sessions,
+            store.$quickStats,
+            store.$parsedStats
+        )
+        .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
+        .sink { [weak self] sessions, quickStats, parsedStats in
+            guard let self, NotchPreferences.isEnabled(kind) else { return }
+            self.activeSessionsTracker.syncTranscriptSignals(
+                provider: kind,
+                sessions: sessions,
+                quickStats: quickStats,
+                parsedStats: parsedStats
+            )
+        }
     }
 }
 
@@ -319,6 +389,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var notchBridge: AttentionBridge?
     private var notchWindowController: NotchWindowController?
     private var notchStateObserver: NSObjectProtocol?
+    private var lastEnabledNotchProviders: Set<ProviderKind>?
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Menu-bar app + local socket bridge + pending approval state means we
         // should stay alive even when there is no key window. Letting AppKit's
@@ -372,8 +443,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // after a prompt, and a silent CGEventTap probe that *fails* doesn't
         // count. Passing prompt=false adds the entry with its switch off so
         // the user can flip it themselves without a popup.
-        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        _ = AXIsProcessTrustedWithOptions([promptKey: false] as CFDictionary)
+        AccessibilityPermissionSupport.registerVisibility(prompt: false)
 
         // Debug builds (different bundle id) need a manual nudge: if the
         // silent register above didn't stick, fire the prompt once. This is
@@ -390,7 +460,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NSApp.setActivationPolicy(.regular)
                 NSApp.activate(ignoringOtherApps: true)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    _ = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
+                    AccessibilityPermissionSupport.registerVisibility(prompt: true)
                     UserDefaults.standard.set(true, forKey: key)
                     // Restore menu-bar-only policy after the prompt has fired.
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -403,21 +473,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // If the user has already granted access, probe a tap once so macOS
         // wires up the permission for this launch without waiting for the
         // first keyboard interception.
-        let mask = (1 << CGEventType.keyDown.rawValue)
-        let noopCallback: CGEventTapCallBack = { _, _, event, _ in
-            Unmanaged.passUnretained(event)
-        }
-        if let tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: CGEventMask(mask),
-            callback: noopCallback,
-            userInfo: nil
-        ) {
-            CGEvent.tapEnable(tap: tap, enable: false)
-            CFMachPortInvalidate(tap)
-        }
+        AccessibilityPermissionSupport.registerViaEventTapProbe()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -473,12 +529,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func applyNotchProviderPreferences() {
         Task { _ = try? await NotchHookSync.syncCurrent() }
 
+        let enabledProviders = Set(ProviderRegistry.supportedProviders.filter {
+            NotchPreferences.isEnabled($0)
+        })
         let disabledProviders = ProviderRegistry.supportedProviders.filter {
-            !NotchPreferences.isEnabled($0)
+            !enabledProviders.contains($0)
         }
+        let providersToRestore = lastEnabledNotchProviders.map {
+            Array(enabledProviders.subtracting($0))
+        } ?? Array(enabledProviders)
+
         appState.purgeNotchRuntime(for: disabledProviders)
         reconcileNotchStack()
+        if !providersToRestore.isEmpty {
+            appState.restoreNotchRuntime(for: providersToRestore)
+        }
         appState.refreshNotchActiveSessionsIfEnabled()
+        lastEnabledNotchProviders = enabledProviders
     }
 
     private func handleNotchStateChanged() {

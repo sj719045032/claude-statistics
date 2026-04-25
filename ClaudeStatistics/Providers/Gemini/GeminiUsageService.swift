@@ -617,10 +617,7 @@ final class GeminiUsageService: ProviderUsageSource {
     }
 
     private func cacheFilePath() -> String {
-        let dir = (NSHomeDirectory() as NSString).appendingPathComponent(".claude-statistics")
-        if !FileManager.default.fileExists(atPath: dir) {
-            try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-        }
+        let dir = AppRuntimePaths.ensureRootDirectory() ?? AppRuntimePaths.rootDirectory
         return (dir as NSString).appendingPathComponent(cacheFileName)
     }
 

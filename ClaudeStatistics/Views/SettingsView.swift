@@ -31,6 +31,7 @@ struct SettingsView: View {
     @State private var showNotchSettings = false
     @State private var showKeyboardShortcuts = false
     @State private var showTerminalFocusSettings = false
+    @State private var showDeveloperSettings = false
     @State private var hasToken: Bool?
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var isTabOrderExpanded = false
@@ -50,6 +51,12 @@ struct SettingsView: View {
                 TerminalFocusSettingsView(
                     preferredOptionID: preferredTerminal,
                     onBack: { showTerminalFocusSettings = false }
+                )
+            } else if showDeveloperSettings {
+                DeveloperSettingsView(
+                    appState: appState,
+                    verboseLogging: $verboseLogging,
+                    onBack: { showDeveloperSettings = false }
                 )
             } else {
                 settingsContent
@@ -202,10 +209,17 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
 
                 if showDeveloperTools {
-                    Toggle(isOn: $verboseLogging) {
-                        Label("settings.verboseLogging", systemImage: "text.magnifyingglass")
-                            .labelStyle(SettingsRowLabelStyle())
+                    Button(action: { showDeveloperSettings = true }) {
+                        HStack {
+                            Label("settings.developerTools", systemImage: "hammer")
+                                .labelStyle(SettingsRowLabelStyle())
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                        }
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -257,15 +271,6 @@ struct SettingsView: View {
                             Text(profile.account?.displayName ?? "–")
                                 .font(.system(size: 13, weight: .medium))
                             if let org = profile.organization {
-                                if org.organizationType != nil {
-                                    Text(org.orgTypeDisplayName)
-                                        .font(.system(size: 10, weight: .medium))
-                                        .foregroundStyle(.secondary)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Color.gray.opacity(0.1))
-                                        .clipShape(Capsule())
-                                }
                                 Text(org.tierDisplayName)
                                     .font(.system(size: 10, weight: .semibold))
                                     .foregroundStyle(.blue)
@@ -886,6 +891,127 @@ private struct HotKeyRecorderRow: View {
     }
 }
 
+private struct DeveloperSettingsView: View {
+    @ObservedObject var appState: AppState
+    @Binding var verboseLogging: Bool
+    let onBack: () -> Void
+    @State private var pendingRebuildProvider: ProviderKind?
+    @State private var statusMessage: String?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Button(action: onBack) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chevron.left")
+                        Text("settings.back")
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Text("settings.developerTools")
+                    .font(.system(size: 13, weight: .semibold))
+
+                Spacer().frame(width: 60)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            Form {
+                Section("settings.diagnostics") {
+                    Toggle(isOn: $verboseLogging) {
+                        Label("settings.verboseLogging", systemImage: "text.magnifyingglass")
+                            .labelStyle(SettingsRowLabelStyle())
+                    }
+
+                    Button(action: openDiagnosticLog) {
+                        HStack {
+                            Label("settings.exportLog", systemImage: "doc.text.magnifyingglass")
+                                .labelStyle(SettingsRowLabelStyle())
+                            Spacer()
+                            Image(systemName: "arrow.up.forward.square")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Section("settings.developer.rebuildIndexes") {
+                    ForEach(ProviderRegistry.supportedProviders, id: \.self) { kind in
+                        Button(action: { pendingRebuildProvider = kind }) {
+                            HStack(spacing: 8) {
+                                SettingsRowIcon(name: "arrow.triangle.2.circlepath")
+                                    .foregroundStyle(kind.accentColor)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(String(format: LanguageManager.localizedString("settings.developer.rebuildProviderIndex"), kind.displayName))
+                                        .font(.system(size: 12, weight: .medium))
+                                    Text("settings.developer.rebuildProviderIndexHint")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if let statusMessage {
+                        Text(statusMessage)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+        }
+        .confirmationDialog(
+            "settings.developer.rebuildConfirmTitle",
+            isPresented: Binding(
+                get: { pendingRebuildProvider != nil },
+                set: { if !$0 { pendingRebuildProvider = nil } }
+            )
+        ) {
+            if let pendingRebuildProvider {
+                Button(
+                    String(format: LanguageManager.localizedString("settings.developer.rebuildConfirmButton"), pendingRebuildProvider.displayName),
+                    role: .destructive
+                ) {
+                    rebuild(provider: pendingRebuildProvider)
+                }
+            }
+            Button("settings.cancel", role: .cancel) {
+                pendingRebuildProvider = nil
+            }
+        } message: {
+            if let pendingRebuildProvider {
+                Text(String(format: LanguageManager.localizedString("settings.developer.rebuildConfirmMessage"), pendingRebuildProvider.displayName))
+            }
+        }
+    }
+
+    private func rebuild(provider: ProviderKind) {
+        appState.rebuildSessionCache(for: provider)
+        statusMessage = String(format: LanguageManager.localizedString("settings.developer.rebuildStarted"), provider.displayName)
+        pendingRebuildProvider = nil
+    }
+
+    private func openDiagnosticLog() {
+        let logPath = DiagnosticLogger.shared.logFilePath
+        if FileManager.default.fileExists(atPath: logPath) {
+            NSWorkspace.shared.selectFile(logPath, inFileViewerRootedAtPath: "")
+        } else {
+            FileManager.default.createFile(atPath: logPath, contents: nil)
+            NSWorkspace.shared.selectFile(logPath, inFileViewerRootedAtPath: "")
+        }
+    }
+}
+
 private struct KeyboardShortcutsSettingsView: View {
     let onBack: () -> Void
 
@@ -1022,14 +1148,19 @@ private struct TerminalFocusSettingsView: View {
             Form {
                 Section(preferredOptionID == TerminalPreferences.autoOptionID ? "Current Terminal" : effectiveDisplayName) {
                     HStack(alignment: .top, spacing: 10) {
-                        SettingsRowIcon(name: terminalReadiness.isReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                            .foregroundStyle(terminalReadiness.isReady ? Color.green : Color.orange)
+                        SettingsRowIcon(name: displayReadiness.isReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .foregroundStyle(displayReadiness.isReady ? Color.green : Color.orange)
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(terminalReadiness.summary)
+                            Text(displayReadiness.summary)
                                 .font(.system(size: 12, weight: .medium))
                             Text(selectionSummary)
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
+                            if requiresAccessibilityPermission && !AccessibilityPermissionSupport.isTrusted {
+                                Text("Precise focus for this terminal uses macOS Accessibility APIs.")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                            }
                             if let detail = setupProvider?.setupConfigURL?.path {
                                 Text(detail)
                                     .font(.system(size: 10, design: .monospaced))
@@ -1046,9 +1177,9 @@ private struct TerminalFocusSettingsView: View {
                         Spacer()
                     }
 
-                    if !terminalReadiness.unmetRequirements.isEmpty {
+                    if !displayReadiness.unmetRequirements.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
-                            ForEach(terminalReadiness.unmetRequirements) { requirement in
+                            ForEach(displayReadiness.unmetRequirements) { requirement in
                                 HStack(alignment: .top, spacing: 8) {
                                     Image(systemName: "minus")
                                         .font(.system(size: 8, weight: .bold))
@@ -1124,18 +1255,54 @@ private struct TerminalFocusSettingsView: View {
         return "Selected in Settings: \(requestedDisplayName)."
     }
 
+    private var displayReadiness: TerminalReadiness {
+        var unmetRequirements = terminalReadiness.unmetRequirements
+        var actions = terminalReadiness.actions
+
+        if requiresAccessibilityPermission && !AccessibilityPermissionSupport.isTrusted {
+            if !unmetRequirements.contains(.accessibilityPermission) {
+                unmetRequirements.append(.accessibilityPermission)
+            }
+
+            if !actions.contains(where: { $0.id == "accessibility.openSettings" }) {
+                actions.append(
+                    TerminalSetupAction(
+                        id: "accessibility.openSettings",
+                        title: "Open Accessibility Settings",
+                        kind: .openSettings,
+                        perform: {
+                            AccessibilityPermissionSupport.openSystemSettings()
+                            return .none
+                        }
+                    )
+                )
+            }
+        }
+
+        return TerminalReadiness(
+            installation: terminalReadiness.installation,
+            unmetRequirements: unmetRequirements,
+            actions: actions
+        )
+    }
+
     private var primaryActions: [TerminalSetupAction] {
-        let actions = terminalReadiness.actions
+        let actions = displayReadiness.actions
         let filtered = actions.filter { action in
             action.kind == .runAutomaticFix
                 || action.kind == .openConfigFile
                 || action.kind == .openApp
+                || action.kind == .openSettings
         }
         return filtered.isEmpty ? actions : filtered
     }
 
     private var supportsPreciseFocus: Bool {
         effectiveCapability is any TerminalDirectFocusing
+    }
+
+    private var requiresAccessibilityPermission: Bool {
+        effectiveCapability?.route == .accessibility
     }
 
     private var preciseFocusDetail: String {
@@ -1210,7 +1377,7 @@ private struct FocusBehaviorRow: View {
 private struct AccessibilityStatusRow: View {
     // Re-check on appear + every 2s while this settings pane is visible, so
     // flipping the switch in System Settings is reflected without relaunch.
-    @State private var trusted = AXIsProcessTrusted()
+    @State private var trusted = AccessibilityPermissionSupport.isTrusted
     private let tick = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -1234,37 +1401,11 @@ private struct AccessibilityStatusRow: View {
             }
         }
         .padding(.leading, 28) // Align under the primary row's text column.
-        .onReceive(tick) { _ in trusted = AXIsProcessTrusted() }
+        .onReceive(tick) { _ in trusted = AccessibilityPermissionSupport.isTrusted }
     }
 
     private func handleOpenAccessibilitySettings() {
-        // Force this process to register with TCC so the app appears in the
-        // Accessibility list. A CGEventTap creation attempt is the canonical
-        // way to trigger that registration — it fails when untrusted (which
-        // is exactly our state), and the failure is what makes TCC remember
-        // us and add an entry to System Settings. Tap is discarded.
-        let mask = (1 << CGEventType.keyDown.rawValue)
-        let noopCallback: CGEventTapCallBack = { _, _, event, _ in
-            Unmanaged.passUnretained(event)
-        }
-        if let tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: CGEventMask(mask),
-            callback: noopCallback,
-            userInfo: nil
-        ) {
-            CGEvent.tapEnable(tap: tap, enable: false)
-            CFMachPortInvalidate(tap)
-        }
-
-        // Dismiss the popover so the user can see the System Settings window.
-        NotificationCenter.default.post(name: .closeStatusBarPanel, object: nil)
-
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-            NSWorkspace.shared.open(url)
-        }
+        AccessibilityPermissionSupport.openSystemSettings()
     }
 }
 
@@ -2051,6 +2192,14 @@ struct NotchNotificationsSection: View {
         )
     }
 
+    private var titleText: String {
+        String(
+            format: LanguageManager.localizedString("notch.settings.title.provider"),
+            locale: LanguageManager.currentLocale,
+            provider.displayName
+        )
+    }
+
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
             ZStack {
@@ -2063,7 +2212,7 @@ struct NotchNotificationsSection: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("notch.settings.title")
+                Text(titleText)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(available && isHovered ? Color.white.opacity(0.95) : .primary)
                 Text(available ? summaryText : LanguageManager.localizedString("notch.settings.provider.comingSoon"))
@@ -2116,11 +2265,20 @@ private struct NotchNotificationsDetailView: View {
 
     @AppStorage("notch.sound.enabled") private var soundEnabled: Bool = true
     @AppStorage("notch.focusSilence.enabled") private var focusSilenceEnabled: Bool = true
+    @AppStorage(NotchPreferences.idlePeekDetailedRowsKey) private var idlePeekDetailedRows: Bool = false
     @State private var preferencesRevision = 0
 
     private var isProviderEnabled: Bool {
         let _ = preferencesRevision
         return NotchPreferences.isEnabled(provider)
+    }
+
+    private var titleText: String {
+        String(
+            format: LanguageManager.localizedString("notch.settings.title.provider"),
+            locale: LanguageManager.currentLocale,
+            provider.displayName
+        )
     }
 
     private var masterBinding: Binding<Bool> {
@@ -2174,7 +2332,7 @@ private struct NotchNotificationsDetailView: View {
                 Section("notch.settings.detailSection.global") {
                     HStack(spacing: 10) {
                         SettingsRowIcon(name: "bell.badge")
-                        Text("notch.settings.title")
+                        Text(titleText)
                             .font(.system(size: 12, weight: .medium))
                         Spacer()
                         Toggle("", isOn: masterBinding).labelsHidden()
@@ -2202,6 +2360,19 @@ private struct NotchNotificationsDetailView: View {
                         Toggle("", isOn: $focusSilenceEnabled).labelsHidden()
                     }
                     .disabled(!isProviderEnabled)
+
+                    HStack(spacing: 10) {
+                        SettingsRowIcon(name: "list.bullet.rectangle")
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("notch.settings.detailedRows")
+                                .font(.system(size: 12, weight: .medium))
+                            Text("notch.settings.detailedRows.hint")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Toggle("", isOn: $idlePeekDetailedRows).labelsHidden()
+                    }
 
                     if isProviderEnabled {
                         NotchScreenPickerRow()
@@ -2327,4 +2498,3 @@ private struct NotchScreenPickerRow: View {
 private extension NSScreen {
     var notchSettingsID: String { notchScreenIdentifier(self) }
 }
-

@@ -31,8 +31,13 @@ enum JSONValue: Codable, Equatable, Sendable {
     }
 }
 
+enum ApprovalRequestInteraction: String, Equatable, Sendable {
+    case actionable
+    case passive
+}
+
 enum AttentionKind: Equatable {
-    case permissionRequest(tool: String, input: [String: JSONValue], toolUseId: String)
+    case permissionRequest(tool: String, input: [String: JSONValue], toolUseId: String, interaction: ApprovalRequestInteraction)
     case taskFailed(summary: String?)
     case waitingInput(message: String?)
     case taskDone(summary: String?)
@@ -93,6 +98,7 @@ struct AttentionEvent: Identifiable, Equatable {
     let message: String?
     let sessionId: String
     let projectPath: String?
+    let transcriptPath: String?
     let tty: String?
     let pid: Int32?
     let terminalName: String?
@@ -101,6 +107,22 @@ struct AttentionEvent: Identifiable, Equatable {
     let terminalTabID: String?
     let terminalStableID: String?
     let receivedAt: Date
+    /// The user's typed prompt — set ONLY on UserPromptSubmit. Consumed by
+    /// `livePrompt`. Kept in its own field so writes on one semantic lane
+    /// (A: prompt) can never leak into another (B: commentary / C: status).
+    let promptText: String?
+    /// Claude's assistant text from the transcript tail-scan (semantic B).
+    /// Written on any event whose normalizer has access to the transcript
+    /// (PreToolUse / PostToolUse / Stop / StopFailure / Notification /
+    /// PreCompact / PostCompact / Subagent* / SessionStart). Consumed by
+    /// `liveProgressNote` — no `rawEventName` gating needed because the
+    /// normalizer already decided when to populate it.
+    let commentaryText: String?
+    /// Transcript-native timestamp for `commentaryText`, letting the tracker
+    /// write `latestProgressNoteAt` at when the text was actually written,
+    /// not when the hook fired. Without this the triptych ordering collapses
+    /// — PreToolUse's `receivedAt` equals the following tool's startedAt.
+    let commentaryAt: Date?
     let kind: AttentionKind
     var pending: PendingResponse?
 
@@ -111,7 +133,7 @@ struct AttentionEvent: Identifiable, Equatable {
 
 extension AttentionEvent {
     func withResolvedPermissionToolUseId(_ resolvedToolUseId: String) -> AttentionEvent {
-        guard case .permissionRequest(let tool, let input, let currentToolUseId) = kind,
+        guard case .permissionRequest(let tool, let input, let currentToolUseId, let interaction) = kind,
               currentToolUseId.isEmpty,
               !resolvedToolUseId.isEmpty else {
             return self
@@ -129,6 +151,7 @@ extension AttentionEvent {
             message: message,
             sessionId: sessionId,
             projectPath: projectPath,
+            transcriptPath: transcriptPath,
             tty: tty,
             pid: pid,
             terminalName: terminalName,
@@ -137,14 +160,43 @@ extension AttentionEvent {
             terminalTabID: terminalTabID,
             terminalStableID: terminalStableID,
             receivedAt: receivedAt,
-            kind: .permissionRequest(tool: tool, input: input, toolUseId: resolvedToolUseId),
+            promptText: promptText,
+            commentaryText: commentaryText,
+            commentaryAt: commentaryAt,
+            kind: .permissionRequest(tool: tool, input: input, toolUseId: resolvedToolUseId, interaction: interaction),
             pending: pending
         )
     }
 
+    var approvalInteraction: ApprovalRequestInteraction? {
+        guard case .permissionRequest(_, _, _, let interaction) = kind else { return nil }
+        return interaction
+    }
+
+    var isActionableApproval: Bool { approvalInteraction == .actionable }
+
+    var isPassiveApproval: Bool { approvalInteraction == .passive }
+
     var livePrompt: String? {
-        guard rawEventName == "UserPromptSubmit" else { return nil }
-        return Self.normalizePreview(message)
+        // Single source: `promptText`. The normalizer writes it ONLY on
+        // UserPromptSubmit, so we don't need a rawEventName guard here.
+        Self.normalizePreview(promptText)
+    }
+
+    var liveProgressNote: String? {
+        // Single source: `commentaryText`. The normalizer writes it on
+        // every event that can carry an assistant text block, and NOT on
+        // UserPromptSubmit (so a fresh user turn can't accidentally carry
+        // the previous turn's commentary). No rawEventName branching here.
+        Self.normalizePreview(commentaryText)
+    }
+
+    /// Transcript-native timestamp for `liveProgressNote`. nil when either
+    /// the commentary field is empty or the normalizer had no better source
+    /// than `receivedAt`; in that case the tracker falls back to receivedAt.
+    var liveProgressNoteAt: Date? {
+        guard liveProgressNote != nil else { return nil }
+        return commentaryAt
     }
 
     var livePreview: String? {
@@ -173,7 +225,7 @@ extension AttentionEvent {
         case .waitingInput, .taskDone, .taskFailed, .sessionEnd:
             return true
         case .permissionRequest, .sessionStart, .activityPulse:
-            return rawEventName == "Notification" && notificationType == "idle_prompt"
+            return false
         }
     }
 

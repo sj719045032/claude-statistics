@@ -79,7 +79,7 @@ struct WaitingInputCard: View {
     @State private var now = Date()
     @State private var hoveredAction: EventCardAction?
     private let maxPreviewScroll: CGFloat = 260
-    private let tick = Timer.publish(every: 0.2, on: .main, in: .common).autoconnect()
+    private let tick = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
         EventCardShell(
@@ -158,8 +158,9 @@ struct WaitingInputCard: View {
 
     private var title: String {
         switch event.kind {
-        case .permissionRequest(let tool, _, _):
-            return String(format: LanguageManager.localizedString("notch.permission.title"), tool)
+        case .permissionRequest(let tool, _, _, let interaction):
+            let key = interaction == .passive ? "notch.permission.externalTitle" : "notch.permission.title"
+            return String(format: LanguageManager.localizedString(key), tool)
         case .waitingInput(let msg):
             if let msg, !msg.isEmpty { return msg }
             return String(format: LanguageManager.localizedString("notch.waiting.title"), event.provider.displayName)
@@ -186,7 +187,7 @@ struct WaitingInputCard: View {
     }
 
     private var previewLine: String? {
-        if case .permissionRequest(let tool, let input, _) = event.kind {
+        if case .permissionRequest(let tool, let input, _, _) = event.kind {
             return PermissionInputFormatter.summary(tool: tool, input: input)
         }
         let preferredPreview = event.livePreview ?? lastPreview
@@ -220,9 +221,15 @@ struct WaitingInputCard: View {
 
     private static func isGenericActivity(_ text: String) -> Bool {
         let normalized = text.lowercased()
+        let localizedGeneric = [
+            LanguageManager.localizedString("notch.operation.thinking"),
+            LanguageManager.localizedString("notch.operation.working"),
+            LanguageManager.localizedString("notch.operation.starting")
+        ].map { $0.lowercased() }
         return normalized.hasPrefix("waiting for approval")
             || normalized.hasPrefix("waiting for your input")
             || normalized.hasPrefix("waiting for input")
+            || localizedGeneric.contains(normalized)
             || normalized == "thinking…"
             || normalized == "thinking..."
             || normalized == "working…"

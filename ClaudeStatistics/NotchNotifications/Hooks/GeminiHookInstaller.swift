@@ -18,6 +18,7 @@ struct GeminiHookInstaller: HookInstalling {
         "SessionEnd",
         "PreCompress",
         "Notification",
+        "ToolPermission",
     ]
 
     private var geminiDir: String {

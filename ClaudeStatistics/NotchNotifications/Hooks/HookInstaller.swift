@@ -59,9 +59,11 @@ enum HookInstallerUtils {
     }
 
     static func managedHookExecutablePath() -> String {
-        let bundleID = Bundle.main.bundleIdentifier ?? ""
-        let executableName = bundleID.hasSuffix(".debug") ? "claude-stats-hook-debug" : "claude-stats-hook"
-        return (AppRuntimePaths.binDirectory as NSString).appendingPathComponent(executableName)
+        // Debug vs release isolation is handled at the root-directory layer
+        // (`.claude-statistics` vs `.claude-statistics-debug`), so the symlink
+        // name can stay simple here — each build's bin/ already lives in its
+        // own root.
+        (AppRuntimePaths.binDirectory as NSString).appendingPathComponent("claude-stats-hook")
     }
 
     @discardableResult
@@ -99,7 +101,10 @@ enum HookInstallerUtils {
             ?? Bundle.main.executablePath
             ?? ProcessInfo.processInfo.arguments.first
             ?? ""
-        return "\(shellQuoted(executablePath)) --claude-stats-hook-provider \(provider.rawValue)"
+        
+        // Only quote if the path contains spaces
+        let formattedPath = executablePath.contains(" ") ? shellQuoted(executablePath) : executablePath
+        return "\(formattedPath) --claude-stats-hook-provider \(provider.rawValue)"
     }
 
     static func removeScript(at path: String) {

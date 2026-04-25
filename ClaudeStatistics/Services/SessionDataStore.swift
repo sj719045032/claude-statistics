@@ -288,7 +288,7 @@ final class SessionDataStore: ObservableObject {
 
     private func handleFileChanges(_ changedPaths: Set<String>) {
         let changedIds = provider.changedSessionIds(for: changedPaths)
-        let needsRescan = provider.alwaysRescanOnFileChanges
+        let needsRescan = provider.shouldRescanSessions(for: changedPaths)
         guard needsRescan || !changedIds.isEmpty else { return }
 
         // Keep background session metadata fresh for the notch/island even when the
@@ -312,6 +312,9 @@ final class SessionDataStore: ObservableObject {
         let provider = self.provider
         let providerKind = provider.kind
         let db = self.db
+        DiagnosticLogger.shared.verbose(
+            "Session dirty process provider=\(providerKind.rawValue) ids=\(ids.count) forceRescan=\(forceRescan)"
+        )
         Task.detached { [weak self] in
             guard let self else { return }
 
@@ -332,6 +335,9 @@ final class SessionDataStore: ObservableObject {
                     cache: cache
                 ))
             }
+            DiagnosticLogger.shared.verbose(
+                "Session dirty matched provider=\(providerKind.rawValue) dirty=\(dirtySessions.count) scanned=\(scannedSessions.count)"
+            )
 
             // Quick-parse + full-parse + index changed sessions
             let total = dirtySessions.count
@@ -594,6 +600,7 @@ final class SessionDataStore: ObservableObject {
 
         var buckets: [Date: PeriodStats] = [:]
         var periodSessionIds: [Date: Set<String>] = [:]
+        var periodModelSessionIds: [Date: [String: Set<String>]] = [:]
 
         let resetDate = weeklyResetDate
         // Use fiveMinSlices when weekly period has non-midnight boundary for accurate attribution
@@ -613,6 +620,13 @@ final class SessionDataStore: ObservableObject {
                     }
                     buckets[periodStart]?.accumulate(daySlice: slice)
                     periodSessionIds[periodStart, default: []].insert(sessionId)
+                    for model in slice.modelBreakdown.keys {
+                        var modelDict = periodModelSessionIds[periodStart] ?? [:]
+                        var idSet = modelDict[model] ?? []
+                        idSet.insert(sessionId)
+                        modelDict[model] = idSet
+                        periodModelSessionIds[periodStart] = modelDict
+                    }
                 }
             } else {
                 // Fallback for sessions without day slices
@@ -628,12 +642,34 @@ final class SessionDataStore: ObservableObject {
                 }
                 buckets[periodStart]?.accumulate(stats: stats)
                 periodSessionIds[periodStart, default: []].insert(sessionId)
+                for model in stats.modelBreakdown.keys {
+                    var modelDict = periodModelSessionIds[periodStart] ?? [:]
+                    var idSet = modelDict[model] ?? []
+                    idSet.insert(sessionId)
+                    modelDict[model] = idSet
+                    periodModelSessionIds[periodStart] = modelDict
+                }
+                if stats.modelBreakdown.isEmpty {
+                    var modelDict = periodModelSessionIds[periodStart] ?? [:]
+                    var idSet = modelDict[stats.model] ?? []
+                    idSet.insert(sessionId)
+                    modelDict[stats.model] = idSet
+                    periodModelSessionIds[periodStart] = modelDict
+                }
             }
         }
 
         // Set accurate session counts (one session counted once per period)
         for (period, ids) in periodSessionIds {
             buckets[period]?.sessionCount = ids.count
+            if let modelDict = periodModelSessionIds[period] {
+                for (model, modelIds) in modelDict {
+                    if var usage = buckets[period]?.modelBreakdown[model] {
+                        usage.sessionCount = modelIds.count
+                        buckets[period]?.modelBreakdown[model] = usage
+                    }
+                }
+            }
         }
 
         periodStats = buckets.values.sorted { $0.period > $1.period }
@@ -657,19 +693,35 @@ final class SessionDataStore: ObservableObject {
     private func rebucketAllTime() {
         let label = LanguageManager.localizedString("period.all")
         var agg = PeriodStats(period: Date.distantPast, periodLabel: label, chartLabel: label)
+        var modelSessionIds: [String: Set<String>] = [:]
 
         // Accumulate every five-minute slice from every session; fall back to session-level
         // aggregation when a session has no slices (older cached data).
-        for (_, stats) in parsedStats {
+        for (sessionId, stats) in parsedStats {
             if stats.fiveMinSlices.isEmpty {
                 agg.accumulate(stats: stats)
+                for model in stats.modelBreakdown.keys {
+                    modelSessionIds[model, default: []].insert(sessionId)
+                }
+                if stats.modelBreakdown.isEmpty {
+                    modelSessionIds[stats.model, default: []].insert(sessionId)
+                }
             } else {
                 for (_, slice) in stats.fiveMinSlices {
                     agg.accumulate(daySlice: slice)
+                    for model in slice.modelBreakdown.keys {
+                        modelSessionIds[model, default: []].insert(sessionId)
+                    }
                 }
             }
         }
         agg.sessionCount = parsedStats.count
+        for (model, ids) in modelSessionIds {
+            if var usage = agg.modelBreakdown[model] {
+                usage.sessionCount = ids.count
+                agg.modelBreakdown[model] = usage
+            }
+        }
 
         periodStats = [agg]
 
@@ -772,7 +824,7 @@ final class SessionDataStore: ObservableObject {
         dirtySessionIds.removeAll()
         parseQueue.cancelAllOperations()
         isFullParseComplete = false
-        db.resetDatabase()
+        db.resetProviderCache(provider: provider.kind)
         quickStats.removeAll()
         parsedStats.removeAll()
         initialLoad()
@@ -1037,6 +1089,7 @@ final class SessionDataStore: ObservableObject {
                     cacheCreationTotalTokens: mts.cacheCreationTotalTokens,
                     cacheReadTokens: mts.cacheReadTokens
                 )
+                usage.messageCount += mts.messageCount
                 usage.sessionCount += 1
                 combined[model] = usage
             }
@@ -1048,8 +1101,9 @@ final class SessionDataStore: ObservableObject {
         guard start < end else { return [] }
 
         var combined: [String: ModelUsage] = [:]
+        var modelSessionIds: [String: Set<String>] = [:]
 
-        for stats in parsedStats.values {
+        for (sessionId, stats) in parsedStats {
             for (sliceTime, slice) in stats.fiveMinSlices {
                 // Exclusive start: data at exact boundary belongs to previous period
                 guard sliceTime > start, sliceTime < end else { continue }
@@ -1074,9 +1128,18 @@ final class SessionDataStore: ObservableObject {
                     )
                     existing.messageCount += modelStats.messageCount
                     combined[model] = existing
+                    modelSessionIds[model, default: []].insert(sessionId)
                 }
             }
         }
+
+        for (model, ids) in modelSessionIds {
+            if var usage = combined[model] {
+                usage.sessionCount = ids.count
+                combined[model] = usage
+            }
+        }
+
         return combined.values.sorted { $0.totalTokens > $1.totalTokens }
     }
 
