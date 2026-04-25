@@ -45,6 +45,7 @@
 		3984119891F7BF33DEFA170B /* CodexAccountManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 684978AF102DA512FCD3D129 /* CodexAccountManager.swift */; };
 		3A28E84ED0B7490923FA86B0 /* ShareMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA8B62A57C9E8AD16345458A /* ShareMetrics.swift */; };
 		3AD8ED72F8D42B9DB0614F77 /* UpdaterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7AD5E89B648F5018E34233A /* UpdaterService.swift */; };
+		3B999876C754DFF2C3409CF8 /* UsageVMRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB7C0918B3E022C679ECD9CD /* UsageVMRegistry.swift */; };
 		3BED6D466169435AA6DCE604 /* PermissionRequestCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7159F0102A6FC05DC3F187A2 /* PermissionRequestCard.swift */; };
 		3EB9F1EB0E5CCFFEB816D80D /* GlobalHotKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B4066C394B5E23322D32189 /* GlobalHotKeyManager.swift */; };
 		3EFB09CA9B06B024D797832B /* UsageAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32FE333B9AD0368698B9A39F /* UsageAPIService.swift */; };
@@ -167,6 +168,7 @@
 		E0DB60E0DF083742C57F76C8 /* ActiveToolsAggregatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 947363ADD9A5EBADB39651B2 /* ActiveToolsAggregatorTests.swift */; };
 		E19C7F4107E38E4F014A9A27 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 7803032F49F6D004A094939E /* libsqlite3.tbd */; };
 		E26C6870A1E9540BCA9E7045 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 011E707E6F2F284A99ECF925 /* SettingsView.swift */; };
+		E3520EEEBFD2FB2FACC19D45 /* ProviderContextRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AD3D99C9F42189EFF639E71 /* ProviderContextRegistry.swift */; };
 		E45AD6199CAB1661300675D6 /* SessionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0415091A24EBCDA6840A49 /* SessionDetailView.swift */; };
 		E58B6A3A03084C0705C450F5 /* ProviderRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AE7C2A2D6731BCD2D826C90 /* ProviderRegistry.swift */; };
 		E6EFB7589EEC1AFD2C58C748 /* SmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EBE4F4448DEBA3C067FBC16 /* SmokeTests.swift */; };
@@ -215,6 +217,7 @@
 		044319D72CE45477BDDCBE97 /* AttentionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionBridge.swift; sourceTree = "<group>"; };
 		08D0262FC6126091E6321EE0 /* EditorTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorTerminalCapability.swift; sourceTree = "<group>"; };
 		0A1B35CE39EF2CA012E3BAC2 /* ProviderSettingsSectionProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderSettingsSectionProviding.swift; sourceTree = "<group>"; };
+		0AD3D99C9F42189EFF639E71 /* ProviderContextRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderContextRegistry.swift; sourceTree = "<group>"; };
 		0AF9820A8A06DCCE5C35C294 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		0B6504163929CC0E60E99B3E /* NotchPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchPreferences.swift; sourceTree = "<group>"; };
 		0B84A6ED09B77E2974C0629A /* AccessibilityFocuser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityFocuser.swift; sourceTree = "<group>"; };
@@ -380,6 +383,7 @@
 		EA6D16472FCD12FE7A8C1891 /* CredentialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialService.swift; sourceTree = "<group>"; };
 		EAB0C3E8C901FF061718EB35 /* NotchContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchContainerView.swift; sourceTree = "<group>"; };
 		EAB51505E677DA60C3533985 /* NotchAutoAllowRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchAutoAllowRules.swift; sourceTree = "<group>"; };
+		EB7C0918B3E022C679ECD9CD /* UsageVMRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageVMRegistry.swift; sourceTree = "<group>"; };
 		EDE6D238094644B3E5ECD8C9 /* ClaudePKCE.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudePKCE.swift; sourceTree = "<group>"; };
 		EEDC6DF1C15355DC5AE2FCF9 /* TrendChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendChartView.swift; sourceTree = "<group>"; };
 		EF76C0BD045510B9035C9733 /* ToolActivityFormatter+Completion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ToolActivityFormatter+Completion.swift"; sourceTree = "<group>"; };
@@ -759,8 +763,10 @@
 				68083922F93D555879FAD90B /* ClaudeStatisticsApp.swift */,
 				BF23C58F1F4E3E5605623ECE /* Info.plist */,
 				15809DA1BE38EFE9D002FB73 /* main.swift */,
+				0AD3D99C9F42189EFF639E71 /* ProviderContextRegistry.swift */,
 				C3374C538E77CED126DE3016 /* StatusBarController.swift */,
 				F5486873DBEC29739725E366 /* StatusBarPanel.swift */,
+				EB7C0918B3E022C679ECD9CD /* UsageVMRegistry.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -1029,6 +1035,7 @@
 				0BD1DED6EC1DFF9326A1CAE5 /* ProfileViewModel.swift in Sources */,
 				1DD56466FA2EB5FEF570FF9B /* ProjectAnalyticsView.swift in Sources */,
 				8F439312E3BFA84853019A27 /* ProviderBadge.swift in Sources */,
+				E3520EEEBFD2FB2FACC19D45 /* ProviderContextRegistry.swift in Sources */,
 				34A9401E132F4ABEA53988D7 /* ProviderKind.swift in Sources */,
 				E58B6A3A03084C0705C450F5 /* ProviderRegistry.swift in Sources */,
 				96D2B9CEB77BDF55C7714A50 /* ProviderSessionDisplayFormatter+Candidates.swift in Sources */,
@@ -1093,6 +1100,7 @@
 				FDBE2C2C6B6D044072235F42 /* UsageData.swift in Sources */,
 				5BB6284456AC6029BBF8DE0D /* UsageHistoryStore.swift in Sources */,
 				831EA76C2D78A3EB01923445 /* UsageTrendChartView.swift in Sources */,
+				3B999876C754DFF2C3409CF8 /* UsageVMRegistry.swift in Sources */,
 				F7761B0329D579925F2DB98E /* UsageView.swift in Sources */,
 				C48BDE19A5E58235BAB61F51 /* UsageViewModel.swift in Sources */,
 				663E5EC2269BC72FDE27ADB5 /* WaitingInputCard.swift in Sources */,

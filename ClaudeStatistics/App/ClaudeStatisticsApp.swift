@@ -25,22 +25,20 @@ final class AppState: ObservableObject {
     @Published private(set) var store: SessionDataStore
     @Published private(set) var sessionViewModel: SessionViewModel
     @Published private(set) var isPopoverVisible = false
-    let usageViewModel = UsageViewModel()
-    /// Per-provider usage view models for providers that are *not* currently
-    /// selected. Keeps the menu bar strip able to show every enabled
-    /// provider's usage without interfering with `usageViewModel`'s single
-    /// active-provider contract. The current provider is always served via
-    /// `usageViewModel` (see `usageViewModel(for:)`).
-    @Published private(set) var secondaryUsageViewModels: [ProviderKind: UsageViewModel] = [:]
     let profileViewModel = ProfileViewModel()
     let updaterService = UpdaterService()
     let notchCenter = NotchNotificationCenter()
-    lazy var activeSessionsTracker = ActiveSessionsTracker()
+    let activeSessionsTracker: ActiveSessionsTracker
     let accounts = AccountManagers()
+    let providerContexts: ProviderContextRegistry
+    let usageVMs: UsageVMRegistry
+
+    /// Convenience: the primary usage VM (bound to the current
+    /// provider). Many existing call sites still reference
+    /// `appState.usageViewModel`; the registry is the source of truth.
+    var usageViewModel: UsageViewModel { usageVMs.primary }
+
     private var cancellables: Set<AnyCancellable> = []
-    private var runtimeBridgeCancellables: [ProviderKind: AnyCancellable] = [:]
-    private var storesByProvider: [ProviderKind: SessionDataStore] = [:]
-    private var sessionViewModelsByProvider: [ProviderKind: SessionViewModel] = [:]
 
     init() {
         DefaultSettings.register()
@@ -53,34 +51,21 @@ final class AppState: ObservableObject {
             availableKinds.contains(kind) || kind == selectedKind
         }
 
-        var storesByProvider: [ProviderKind: SessionDataStore] = [:]
-        var sessionViewModelsByProvider: [ProviderKind: SessionViewModel] = [:]
-        for kind in startupKinds {
-            let provider = ProviderRegistry.provider(for: kind)
-            let store = SessionDataStore(provider: provider)
-            let viewModel = SessionViewModel(store: store)
-            storesByProvider[kind] = store
-            sessionViewModelsByProvider[kind] = viewModel
-            store.start()
-        }
+        let tracker = ActiveSessionsTracker()
+        self.activeSessionsTracker = tracker
+        let contexts = ProviderContextRegistry(activeSessionsTracker: tracker)
+        self.providerContexts = contexts
+        contexts.bootstrap(startupKinds)
+        self.usageVMs = UsageVMRegistry(lookupStore: { [weak contexts] in contexts?.store(for: $0) })
 
-        self.storesByProvider = storesByProvider
-        self.sessionViewModelsByProvider = sessionViewModelsByProvider
-
-        let store = storesByProvider[selectedKind]!
+        let store = contexts.store(for: selectedKind)!
         self.store = store
-        self.sessionViewModel = sessionViewModelsByProvider[selectedKind]!
-        usageViewModel.store = store
+        self.sessionViewModel = contexts.sessionViewModel(for: selectedKind)!
+        usageVMs.primary.store = store
         configureUsageState(for: store.provider)
 
-        for kind in startupKinds {
-            if let store = storesByProvider[kind] {
-                bindRuntimeBridge(for: kind, store: store)
-            }
-        }
-
         // Sync subscription weekly reset date to SessionDataStore
-        usageViewModel.$usageData
+        usageVMs.primary.$usageData
             .map { $0?.sevenDay?.resetsAtDate }
             .removeDuplicates()
             .sink { [weak self] resetDate in
@@ -93,7 +78,7 @@ final class AppState: ObservableObject {
         // parallel, using the same refresh cadence as the single-provider
         // path.
         for kind in startupKinds where kind != selectedKind {
-            secondaryUsageViewModels[kind] = makeSecondaryUsageViewModel(for: kind)
+            usageVMs.bootSecondary(for: kind)
         }
     }
 
@@ -101,32 +86,7 @@ final class AppState: ObservableObject {
     /// Current provider → the primary `usageViewModel` singleton;
     /// others → the per-provider secondary VMs.
     func usageViewModel(for kind: ProviderKind) -> UsageViewModel? {
-        if kind == providerKind { return usageViewModel }
-        return secondaryUsageViewModels[kind]
-    }
-
-    private func makeSecondaryUsageViewModel(for kind: ProviderKind) -> UsageViewModel {
-        let vm = UsageViewModel()
-        guard let store = storesByProvider[kind] else { return vm }
-        vm.store = store
-        let provider = ProviderRegistry.provider(for: kind)
-        vm.configure(source: provider.usageSource, usagePresentation: provider.usagePresentation)
-        if provider.capabilities.supportsUsage {
-            vm.loadCache()
-            if UserDefaults.standard.bool(forKey: AppPreferences.autoRefreshEnabled) {
-                vm.startAutoRefresh()
-            }
-        } else {
-            vm.clearForUnsupportedProvider()
-        }
-        vm.$usageData
-            .map { $0?.sevenDay?.resetsAtDate }
-            .removeDuplicates()
-            .sink { [weak self] resetDate in
-                self?.storesByProvider[kind]?.weeklyResetDate = resetDate
-            }
-            .store(in: &cancellables)
-        return vm
+        usageVMs.viewModel(for: kind, currentProvider: providerKind)
     }
 
     var provider: any SessionProvider { store.provider }
@@ -143,7 +103,7 @@ final class AppState: ObservableObject {
         ProviderRegistry.persistSelectedProvider(kind)
         providerKind = kind
 
-        let context = ensureProviderContext(for: kind)
+        let context = providerContexts.ensureContext(for: kind)
         let nextStore = context.store
         nextStore.weeklyResetDate = usageViewModel.usageData?.sevenDay?.resetsAtDate
 
@@ -156,12 +116,7 @@ final class AppState: ObservableObject {
         // served by the primary `usageViewModel`) and demote the outgoing
         // kind into the secondary pool so the menu bar strip keeps its
         // usage fresh in the background.
-        if let promoted = secondaryUsageViewModels.removeValue(forKey: kind) {
-            promoted.stopAutoRefresh()
-        }
-        if storesByProvider[oldKind] != nil {
-            secondaryUsageViewModels[oldKind] = makeSecondaryUsageViewModel(for: oldKind)
-        }
+        usageVMs.swap(from: oldKind, to: kind)
 
         if isPopoverVisible {
             nextStore.popoverDidOpen()
@@ -179,12 +134,8 @@ final class AppState: ObservableObject {
     }
 
     func stopAllStores() {
-        for store in storesByProvider.values {
-            store.stop()
-        }
-        for vm in secondaryUsageViewModels.values {
-            vm.stopAutoRefresh()
-        }
+        providerContexts.stopAll()
+        usageVMs.stopAllSecondaries()
     }
 
     func purgeNotchRuntime(for providers: [ProviderKind]) {
@@ -202,7 +153,7 @@ final class AppState: ObservableObject {
 
     func restoreNotchRuntime(for providers: [ProviderKind]) {
         for kind in providers {
-            let store = storesByProvider[kind]
+            let store = providerContexts.store(for: kind)
             let sessions = store?.sessions
             let restoredSource: [Session]
             if let sessions, !sessions.isEmpty {
@@ -226,23 +177,15 @@ final class AppState: ObservableObject {
     func refreshProviderAfterAccountChange(_ kind: ProviderKind) {
         accounts.reload(for: kind)
 
-        if let existingStore = storesByProvider[kind] {
-            existingStore.stop()
-        }
-
-        let provider = ProviderRegistry.provider(for: kind)
-        let rebuiltStore = SessionDataStore(provider: provider)
-        let rebuiltViewModel = SessionViewModel(store: rebuiltStore)
-        storesByProvider[kind] = rebuiltStore
-        sessionViewModelsByProvider[kind] = rebuiltViewModel
-        rebuiltStore.start()
-        bindRuntimeBridge(for: kind, store: rebuiltStore)
+        let rebuilt = providerContexts.rebuild(for: kind)
+        let rebuiltStore = rebuilt.store
+        let rebuiltViewModel = rebuilt.viewModel
 
         if providerKind == kind {
             store = rebuiltStore
             sessionViewModel = rebuiltViewModel
             usageViewModel.store = rebuiltStore
-            configureUsageState(for: provider)
+            configureUsageState(for: rebuiltStore.provider)
 
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -256,15 +199,12 @@ final class AppState: ObservableObject {
         } else {
             // Non-current provider — rebuild its secondary VM so the menu bar
             // strip reflects the account change.
-            if let old = secondaryUsageViewModels.removeValue(forKey: kind) {
-                old.stopAutoRefresh()
-            }
-            secondaryUsageViewModels[kind] = makeSecondaryUsageViewModel(for: kind)
+            usageVMs.bootSecondary(for: kind)
         }
     }
 
     func rebuildSessionCache(for kind: ProviderKind) {
-        let context = ensureProviderContext(for: kind)
+        let context = providerContexts.ensureContext(for: kind)
         context.viewModel.selectedSession = nil
         context.viewModel.selectedSessionStats = nil
         context.viewModel.showTranscript = false
@@ -278,7 +218,7 @@ final class AppState: ObservableObject {
 
     func buildAllProvidersShareRoleResult() -> ShareRoleResult? {
         let availableKinds = ProviderRegistry.availableProviders()
-        let stores = availableKinds.map { ensureProviderContext(for: $0).store }
+        let stores = availableKinds.map { providerContexts.ensureContext(for: $0).store }
         let scopeLabel = LanguageManager.localizedString("share.scope.allProviders")
         let metrics = stores.compactMap { store in
             store.buildAllTimeShareMetrics(scopeLabel: scopeLabel)
@@ -326,46 +266,6 @@ final class AppState: ObservableObject {
         profileViewModel.configure(loader: { await provider.fetchProfile() })
     }
 
-    @discardableResult
-    private func ensureProviderContext(for kind: ProviderKind) -> (store: SessionDataStore, viewModel: SessionViewModel) {
-        if let store = storesByProvider[kind], let viewModel = sessionViewModelsByProvider[kind] {
-            return (store, viewModel)
-        }
-
-        let provider = ProviderRegistry.provider(for: kind)
-        let store = SessionDataStore(provider: provider)
-        let viewModel = SessionViewModel(store: store)
-        storesByProvider[kind] = store
-        sessionViewModelsByProvider[kind] = viewModel
-        store.start()
-        bindRuntimeBridge(for: kind, store: store)
-        return (store, viewModel)
-    }
-
-    private func bindRuntimeBridge(for kind: ProviderKind, store: SessionDataStore) {
-        runtimeBridgeCancellables[kind]?.cancel()
-
-        guard kind == .codex else {
-            runtimeBridgeCancellables[kind] = nil
-            return
-        }
-
-        runtimeBridgeCancellables[kind] = Publishers.CombineLatest3(
-            store.$sessions,
-            store.$quickStats,
-            store.$parsedStats
-        )
-        .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
-        .sink { [weak self] sessions, quickStats, parsedStats in
-            guard let self, NotchPreferences.isEnabled(kind) else { return }
-            self.activeSessionsTracker.syncTranscriptSignals(
-                provider: kind,
-                sessions: sessions,
-                quickStats: quickStats,
-                parsedStats: parsedStats
-            )
-        }
-    }
 }
 
 @MainActor
