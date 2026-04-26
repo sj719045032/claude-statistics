@@ -1286,6 +1286,11 @@ graph LR
 - ✅ `TerminalReadinessProviding` / `TerminalSetupProviding` 协议搬到 SDK（含 `readiness()` 默认实现）
 - ✅ `TerminalPlugin` 加 `makeReadinessProvider()` / `makeSetupWizard()` 工厂；8 个 builtin terminal plugin wrapper 通过 cast 暴露 capability 上的实现
 
+**阶段 3++ Provider plugin 工厂闭环**
+- ✅ SDK 加 `BundledSessionProvider` typealias（5 个窄协议组合）
+- ✅ `ProviderPlugin` 加 `makeProvider() -> (any BundledSessionProvider)?` 工厂，默认 nil
+- ✅ 3 个 dogfood wrapper override 返回 `ClaudeProvider.shared` / `CodexProvider.shared` / `GeminiProvider.shared`，第三方 provider plugin 可端到端实现完整 SessionProvider
+
 #### v4.0-alpha 视角下已完成
 
 **SDK 接口面已全部就位**（48 文件 / 2882 行）：第三方 plugin 可在 SDK 接口面上端到端编写完整 provider plugin（descriptor + 5 窄协议 + 所有数据模型），并可声明完整的 terminal readiness/setup 行为。
@@ -1328,6 +1333,7 @@ graph LR
 - **实现 `SessionLauncher`**（new session / resume / 工作目录派生）
 - **实现 `HookInstalling` + `HookProvider`**（notch hook + statusline 安装；`providerId: String` 标识）
 - 现在第三方 provider plugin 已可独立编写完整 5 个窄协议中的 4 个（`SessionDataProvider` / `SessionLauncher` / `AccountProvider` / `HookProvider`），仅 `UsageProvider` 因依赖 host `UsageHistoryStore`/`ModelPricing.Pricing` 仍需 host 协助
+- 通过 `ProviderPlugin.makeProvider()` 把组合实例（`any BundledSessionProvider`）一次性交给 host，PluginRegistry lookup 可立即拿到完整 SessionProvider
 
 ---
 

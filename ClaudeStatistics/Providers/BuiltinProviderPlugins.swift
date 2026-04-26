@@ -25,6 +25,7 @@ final class ClaudePluginDogfood: ProviderPlugin {
         principalClass: "ClaudePluginDogfood"
     )
     var descriptor: ProviderDescriptor { .claude }
+    func makeProvider() -> (any BundledSessionProvider)? { ClaudeProvider.shared }
     init() {}
 }
 
@@ -39,6 +40,7 @@ final class CodexPluginDogfood: ProviderPlugin {
         principalClass: "CodexPluginDogfood"
     )
     var descriptor: ProviderDescriptor { .codex }
+    func makeProvider() -> (any BundledSessionProvider)? { CodexProvider.shared }
     init() {}
 }
 
@@ -53,5 +55,6 @@ final class GeminiPluginDogfood: ProviderPlugin {
         principalClass: "GeminiPluginDogfood"
     )
     var descriptor: ProviderDescriptor { .gemini }
+    func makeProvider() -> (any BundledSessionProvider)? { GeminiProvider.shared }
     init() {}
 }
