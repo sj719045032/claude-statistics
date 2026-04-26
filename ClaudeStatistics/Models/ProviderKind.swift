@@ -102,15 +102,11 @@ enum MenuBarPreferences {
     }
 }
 
-struct ProviderCapabilities: Codable, Equatable {
-    let supportsCost: Bool
-    let supportsUsage: Bool
-    let supportsProfile: Bool
-    let supportsStatusLine: Bool
-    let supportsExactPricing: Bool
-    let supportsResume: Bool
-    let supportsNewSession: Bool
-
+/// Builtin provider capability constants. The `ProviderCapabilities`
+/// type itself lives in `ClaudeStatisticsKit`; only these three
+/// host-bundled instances stay here. Stage 4 moves each into its
+/// corresponding `*Plugin` package.
+extension ProviderCapabilities {
     static let claude = ProviderCapabilities(
         supportsCost: true,
         supportsUsage: true,
