@@ -131,23 +131,21 @@ enum HookInstallerUtils {
             APP_PATH=$(/usr/bin/mdfind "kMDItemCFBundleIdentifier == '$BUNDLE_ID'" 2>/dev/null | head -n 1)
         fi
 
-        if [ -n "$APP_PATH" ] && [ -x "$APP_PATH/Contents/MacOS/$EXEC_NAME" ]; then
-            # Guard against exec'ing into a binary whose framework dependencies
-            # were swept away mid-rebuild (xcodebuild clean removes
-            # PackageFrameworks before the new build is installed). Without this
-            # check dyld crashes the hook process with SIGABRT, producing a
-            # non-zero exit and no stderr — Claude Code then reports
-            # "Stop hook error: Failed with non-blocking status code: No stderr output".
-            if [ -d "$APP_PATH/Contents/Frameworks/ClaudeStatisticsKit.framework" ]; then
-                exec "$APP_PATH/Contents/MacOS/$EXEC_NAME" "$@"
-            fi
-        fi
-        if [ -x "$FALLBACK" ]; then
-            exec "$FALLBACK" "$@"
-        fi
-        # No app binary available (uninstalled / DerivedData wiped / .app
-        # moved). Exit silently so the host CLI does not surface a hook
-        # error every turn — the hook is purely best-effort telemetry.
+        # Try each candidate in priority order. Skip any whose
+        # ClaudeStatisticsKit.framework is absent — during a mid-rebuild window
+        # xcodebuild clean removes PackageFrameworks/ before the new build
+        # installs it, causing a dyld SIGABRT (non-zero exit, no stderr) that
+        # Claude Code surfaces as "Stop hook error: Failed with non-blocking
+        # status code: No stderr output". Same guard covers the FALLBACK so a
+        # partially-installed stable copy also exits cleanly instead of crashing.
+        for binary in "$APP_PATH/Contents/MacOS/$EXEC_NAME" "$FALLBACK"; do
+            [ -x "$binary" ] || continue
+            contents=$(dirname "$(dirname "$binary")")
+            [ -d "$contents/Frameworks/ClaudeStatisticsKit.framework" ] || continue
+            exec "$binary" "$@"
+        done
+        # No viable binary found (uninstalled / all copies mid-rebuild / .app
+        # moved). Exit silently — the hook is purely best-effort telemetry.
         exit 0
         """
     }
