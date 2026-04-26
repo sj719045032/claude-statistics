@@ -154,6 +154,96 @@ final class PluginManifestTests: XCTestCase {
     }
 }
 
+/// Marketplace catalog entry — wire format for `index.json`'s
+/// `entries[]`. Pinning the schema down with tests so a sloppy edit
+/// to PluginCatalogEntry would block before any catalog repo eats it.
+final class PluginCatalogEntryTests: XCTestCase {
+    private let sampleJSON = """
+    {
+      "schemaVersion": 1,
+      "updatedAt": "2026-04-26T10:00:00Z",
+      "entries": [
+        {
+          "id": "com.anthropic.claudefordesktop",
+          "name": "Claude (chat app)",
+          "description": "Focus Claude.app sessions via deep-link.",
+          "author": "Stone",
+          "homepage": "https://github.com/sj719045032/claude-statistics",
+          "category": "chat-app",
+          "version": "1.0.0",
+          "minHostAPIVersion": "0.1.0",
+          "downloadURL": "https://github.com/example/releases/ClaudeAppPlugin-1.0.0.csplugin.zip",
+          "sha256": "abc123def456",
+          "iconURL": "https://raw.githubusercontent.com/example/icons/claude.png",
+          "permissions": []
+        }
+      ]
+    }
+    """
+
+    private func makeDecoder() -> JSONDecoder {
+        let dec = JSONDecoder()
+        dec.dateDecodingStrategy = .iso8601
+        return dec
+    }
+
+    func testIndexDecodesFromIndexJsonShape() throws {
+        let data = Data(sampleJSON.utf8)
+        let index = try makeDecoder().decode(PluginCatalogIndex.self, from: data)
+        XCTAssertEqual(index.schemaVersion, 1)
+        XCTAssertEqual(index.entries.count, 1)
+        let entry = index.entries[0]
+        XCTAssertEqual(entry.id, "com.anthropic.claudefordesktop")
+        XCTAssertEqual(entry.category, "chat-app")
+        XCTAssertEqual(entry.version, SemVer(major: 1, minor: 0, patch: 0))
+        XCTAssertEqual(entry.sha256, "abc123def456")
+        XCTAssertNotNil(entry.homepage)
+        XCTAssertNotNil(entry.iconURL)
+        XCTAssertTrue(entry.permissions.isEmpty)
+    }
+
+    func testEntryIsIdentifiableById() {
+        let entry = PluginCatalogEntry(
+            id: "com.example.foo",
+            name: "Foo",
+            description: "x",
+            author: "y",
+            homepage: nil,
+            category: "utility",
+            version: SemVer(major: 1, minor: 0, patch: 0),
+            minHostAPIVersion: SemVer(major: 0, minor: 1, patch: 0),
+            downloadURL: URL(string: "https://example.com/foo.csplugin.zip")!,
+            sha256: "0",
+            iconURL: nil,
+            permissions: []
+        )
+        // SwiftUI ForEach uses `.id` to diff rows.
+        XCTAssertEqual(entry.id, "com.example.foo")
+    }
+
+    func testSupportedSchemaVersionMatchesDocs() {
+        // Bumping the constant has marketplace-wide consequences (every
+        // catalog repo). Pin the current value in a test so an
+        // accidental change has to be intentional.
+        XCTAssertEqual(PluginCatalogIndex.supportedSchemaVersion, 1)
+    }
+
+    func testIndexRoundTripsViaCodable() throws {
+        let original = try makeDecoder().decode(
+            PluginCatalogIndex.self,
+            from: Data(sampleJSON.utf8)
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let encoded = try encoder.encode(original)
+        let redecoded = try makeDecoder().decode(
+            PluginCatalogIndex.self,
+            from: encoded
+        )
+        XCTAssertEqual(original, redecoded)
+    }
+}
+
 @MainActor
 final class PluginRegistryTests: XCTestCase {
     private final class FakeProviderPlugin: NSObject, Plugin {
