@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 /// Pure functions that fold an `AttentionEvent` (or transcript-derived
 /// signals) into a `RuntimeSession`. The tracker owns lifecycle, focus

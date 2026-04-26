@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 import XCTest
 
 @testable import Claude_Statistics
