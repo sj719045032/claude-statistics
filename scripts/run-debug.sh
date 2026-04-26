@@ -109,12 +109,13 @@ if [[ "${ENSURE_DEBUG_CODE_SIGN_IDENTITY}" == "1" ]] && \
   fi
 fi
 
+ENTITLEMENTS_PATH="${SCRIPT_DIR}/../ClaudeStatistics/App/ClaudeStatistics.entitlements"
 if /usr/bin/security find-identity -v -p codesigning | grep -Fq "\"${DEBUG_CODE_SIGN_IDENTITY}\""; then
   echo "==> Re-signing debug app with ${DEBUG_CODE_SIGN_IDENTITY}..."
-  codesign --force --deep --sign "${DEBUG_CODE_SIGN_IDENTITY}" "${APP_PATH}"
+  codesign --force --deep --sign "${DEBUG_CODE_SIGN_IDENTITY}" --entitlements "${ENTITLEMENTS_PATH}" "${APP_PATH}"
 else
   echo "==> Stable debug signing identity not found; falling back to ad-hoc signing..."
-  codesign --force --deep --sign - "${APP_PATH}"
+  codesign --force --deep --sign - --entitlements "${ENTITLEMENTS_PATH}" "${APP_PATH}"
 fi
 
 # 6. Copy to ~/Applications for stable TCC registration. Apps in /tmp are not

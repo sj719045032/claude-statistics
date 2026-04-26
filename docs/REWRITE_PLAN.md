@@ -1314,8 +1314,9 @@ graph LR
 - ⏸️ Terminal plugin behavior 第二波协议接口已搬完（readiness + setup wizard）；8 个 builtin terminal capability 的具体行为代码下沉到独立 plugin target 仍待阶段 4 完成
 - ⏸️ 删除 `TerminalFocusRoute` enum + `TerminalFocusRouteRegistry`：当前 plugin 工厂仍通过 `TerminalFocusRouteRegistry.handler(for: capability.route)` 查 strategy，第三方 plugin 加载（M2）后可直接持有自己的 strategy 实例，届时 route layer 即可退役
 - ⏸️ Share role plugin（拆分 1177 行 `ShareRoleEngine` 为 9 个独立 RoleScorer，搬到 `OfficialShareRolesPlugin`）— 阶段 4 子任务
-- ⏸️ Bundle (`.csplugin`) 加载机制 + `disable-library-validation` entitlement — 阶段 5 (M2)。M2 第一个样本：`ClaudeAppPlugin` / `CodexAppPlugin`（已是独立 framework target，最接近 plugin 形态）抽出为 `.csplugin`；之后 8 terminal + 3 provider 跟进。**不强制签名**（见 Q2）
-- ⏸️ Plugin permission prompt + `trust.json` UI — 阶段 5 (M3)，但因 Q2 选了"不强制签名"，trust prompt 提前到 M2（loader 落地时同步实现，否则未签名 plugin 直接拒装等于把决策推回去）
+- ✅ Bundle (`.csplugin`) 加载机制 + `disable-library-validation` entitlement — M2 第一波样本（`ClaudeAppPlugin` + `CodexAppPlugin`）已切换为 bundle target，输出 `Contents/PlugIns/<Name>.csplugin`，主 App 启动期 `PluginLoader.loadAll(...)` 扫两路（Bundle.main.builtInPlugInsURL + `~/Library/.../Claude Statistics/Plugins`）成功加载注册；entitlement 已加进 `ClaudeStatistics.entitlements` 并由 `run-debug.sh` 在 ad-hoc 重签时透传
+- ✅ Plugin trust gate 落地（`TrustStore` + SHA-256 of Info.plist + `trust.json` 持久化）；首次加载 prompt UI 仍是 ⏸️（S5b），当前 user-installed plugin 走 allow-by-default + record，等 prompt sheet 上线后再翻 default
+- ⏸️ 8 terminal + 3 provider 内置插件抽出为 `.csplugin`：M2 模板已成熟，按 chat-app 样本逐个搬可逐项独立 PR
 - ✅ `ProviderRegistry.provider(for:)` switch → plugin lookup（NSLock-guarded dynamic store；switch 保留为 fallback）
 
 **结论**：v4.0-alpha 协议表面工作圆满收尾。核心成就 — 第三方开发者已可基于 `ClaudeStatisticsKit` 构建完整 provider plugin，无需任何 host 类型依赖。下一步重点转向 Terminal/Share plugin 拆分（阶段 4）和 bundle 加载（阶段 5）。
