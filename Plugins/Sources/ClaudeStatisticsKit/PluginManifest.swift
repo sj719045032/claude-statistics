@@ -36,6 +36,41 @@ public enum PluginPermission: String, Codable, Sendable, Hashable {
     case keychain
 }
 
+/// User-facing categorisation orthogonal to `PluginKind`. The Settings
+/// → Plugins → Discover panel groups catalog entries by this field —
+/// users browse by "what does this do for me" rather than by which
+/// runtime protocol the plugin implements. See
+/// `docs/PLUGIN_MARKETPLACE.md` §3 for the full rationale.
+///
+/// Modeled as plain string constants instead of an enum so third-party
+/// plugins (and a future catalog) can introduce categories without an
+/// SDK release. The host UI maps each known string to a localized
+/// display name and SF Symbol; unknown strings fall back to
+/// `utility`.
+public enum PluginCatalogCategory {
+    /// Vendor adapter for an AI coding CLI (Claude / Codex / Gemini /
+    /// Aider / …).
+    public static let vendor = "vendor"
+    /// Terminal-emulator adapter (focus return + launching).
+    public static let terminal = "terminal"
+    /// Desktop chat-app integration with deep-link focus
+    /// (Claude.app / Codex.app / …).
+    public static let chatApp = "chat-app"
+    /// Share-card role scorers and visual themes.
+    public static let shareCard = "share-card"
+    /// Editor integration (VSCode / Cursor / Zed deep-link).
+    public static let editorIntegration = "editor-integration"
+    /// Catch-all for tools that don't fit the buckets above.
+    public static let utility = "utility"
+
+    /// Every category recognised by the bundled host. Marketplace
+    /// catalogs may publish additional values; the UI handles unknown
+    /// strings by falling back to `utility`.
+    public static let known: [String] = [
+        vendor, terminal, chatApp, shareCard, editorIntegration, utility
+    ]
+}
+
 /// Static metadata every plugin must publish. Loaded from
 /// `manifest.json` inside the `.csplugin` bundle; for builtin plugins the
 /// host reads the plugin type's `manifest` static directly without
@@ -60,6 +95,13 @@ public struct PluginManifest: Codable, Sendable, Equatable {
     /// (24x24 template PDF preferred). `nil` falls back to a generic
     /// puzzle-piece glyph in the host UI.
     public let iconAsset: String?
+    /// Optional user-facing category for the marketplace Discover
+    /// panel. Conventionally one of `PluginCatalogCategory`'s
+    /// constants, but third-party catalogs can ship arbitrary
+    /// strings — unknown values fall back to `utility` in the UI.
+    /// Backwards-compatible: existing `.csplugin` bundles without
+    /// this field decode fine and show up under `utility`.
+    public let category: String?
 
     public init(
         id: String,
@@ -69,7 +111,8 @@ public struct PluginManifest: Codable, Sendable, Equatable {
         minHostAPIVersion: SemVer,
         permissions: [PluginPermission] = [],
         principalClass: String,
-        iconAsset: String? = nil
+        iconAsset: String? = nil,
+        category: String? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -79,5 +122,6 @@ public struct PluginManifest: Codable, Sendable, Equatable {
         self.permissions = permissions
         self.principalClass = principalClass
         self.iconAsset = iconAsset
+        self.category = category
     }
 }

@@ -97,6 +97,61 @@ final class PluginManifestTests: XCTestCase {
         let manifest = PluginManifest(bundle: Bundle.main)
         XCTAssertNil(manifest)
     }
+
+    func testCategoryDefaultsToNil() {
+        // Backwards-compat: existing .csplugin bundles (and the
+        // `sample` here) don't set category, decoding must succeed
+        // and yield nil.
+        XCTAssertNil(sample.category)
+    }
+
+    func testCategoryRoundTripsThroughPlist() throws {
+        let withCategory = PluginManifest(
+            id: "com.example.cat",
+            kind: .terminal,
+            displayName: "Cat",
+            version: SemVer(major: 1, minor: 0, patch: 0),
+            minHostAPIVersion: SemVer(major: 0, minor: 1, patch: 0),
+            principalClass: "CatPlugin",
+            category: PluginCatalogCategory.chatApp
+        )
+        let dict = try withCategory.encodedAsPlistDictionary()
+        XCTAssertEqual(dict["category"] as? String, "chat-app")
+        let data = try PropertyListSerialization.data(
+            fromPropertyList: dict, format: .binary, options: 0
+        )
+        let decoded = try PluginManifest(plistData: data)
+        XCTAssertEqual(decoded, withCategory)
+        XCTAssertEqual(decoded.category, "chat-app")
+    }
+
+    func testCategoryDecodesMissingKeyAsNil() throws {
+        // A manifest emitted before this field existed must still
+        // decode — the loader can't reject "old" .csplugin bundles
+        // just because they don't carry a category.
+        let json = """
+        {
+          "id": "com.example.legacy",
+          "kind": "terminal",
+          "displayName": "Legacy",
+          "version": "1.0.0",
+          "minHostAPIVersion": "0.1.0",
+          "permissions": [],
+          "principalClass": "LegacyPlugin"
+        }
+        """
+        let decoded = try JSONDecoder().decode(
+            PluginManifest.self, from: Data(json.utf8)
+        )
+        XCTAssertNil(decoded.category)
+    }
+
+    func testKnownCategoriesContainAllSixDocumentedValues() {
+        XCTAssertEqual(
+            Set(PluginCatalogCategory.known),
+            ["vendor", "terminal", "chat-app", "share-card", "editor-integration", "utility"]
+        )
+    }
 }
 
 @MainActor
