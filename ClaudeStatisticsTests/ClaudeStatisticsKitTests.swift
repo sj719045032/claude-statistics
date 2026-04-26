@@ -564,6 +564,181 @@ final class PluginInstallerStageTests: XCTestCase {
     }
 }
 
+/// `PluginInstaller.install` end-to-end. Goes past `stageBundle`'s
+/// remit (which only validates) and exercises the side-effects:
+/// atomic move into destination, TrustStore write, hand-off to
+/// PluginLoader.loadOne. The fake bundle here has no Mach-O so
+/// `loadOne` will return `.bundleLoadFailed` and `install` throws
+/// `.loadFailed(.bundleLoadFailed)` — but every step BEFORE that
+/// must have already happened, and these tests pin those down.
+@MainActor
+final class PluginInstallerIntegrationTests: XCTestCase {
+    private var sandbox: URL!
+    private var destinationDir: URL!
+    private var trustStoreURL: URL!
+
+    override func setUpWithError() throws {
+        sandbox = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("PluginInstallerIntegrationTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: sandbox, withIntermediateDirectories: true)
+        destinationDir = sandbox.appendingPathComponent("Plugins", isDirectory: true)
+        trustStoreURL = sandbox.appendingPathComponent("trust.json")
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: sandbox)
+    }
+
+    private func buildFakeZip(
+        id: String = "com.example.integration",
+        bundleName: String = "Integration.csplugin"
+    ) throws -> (zipData: Data, sha256: String) {
+        let manifest = PluginManifest(
+            id: id,
+            kind: .terminal,
+            displayName: "Integration",
+            version: SemVer(major: 1, minor: 0, patch: 0),
+            minHostAPIVersion: SemVer(major: 0, minor: 1, patch: 0),
+            principalClass: "IntegrationPlugin"
+        )
+        let manifestDict = try manifest.encodedAsPlistDictionary()
+        let infoDict: [String: Any] = [
+            "CFBundleIdentifier": id,
+            "CFBundleName": bundleName,
+            "CFBundleExecutable": "Integration",
+            "CFBundlePackageType": "BNDL",
+            "NSPrincipalClass": "IntegrationPlugin",
+            PluginManifest.infoDictionaryKey: manifestDict
+        ]
+
+        let bundleDir = sandbox.appendingPathComponent(bundleName, isDirectory: true)
+        let contentsDir = bundleDir.appendingPathComponent("Contents", isDirectory: true)
+        try FileManager.default.createDirectory(at: contentsDir, withIntermediateDirectories: true)
+        let plistData = try PropertyListSerialization.data(
+            fromPropertyList: infoDict, format: .xml, options: 0
+        )
+        try plistData.write(to: contentsDir.appendingPathComponent("Info.plist"))
+
+        let zipURL = sandbox.appendingPathComponent("\(bundleName).zip")
+        let zip = Process()
+        zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        zip.arguments = ["-rq", zipURL.path, bundleName]
+        zip.currentDirectoryURL = sandbox
+        try zip.run()
+        zip.waitUntilExit()
+        XCTAssertEqual(zip.terminationStatus, 0)
+
+        let data = try Data(contentsOf: zipURL)
+        try FileManager.default.removeItem(at: bundleDir)
+        try FileManager.default.removeItem(at: zipURL)
+        return (data, PluginInstaller.sha256(of: data))
+    }
+
+    private func makeEntry(id: String, sha256: String) -> PluginCatalogEntry {
+        PluginCatalogEntry(
+            id: id, name: "Integration", description: "x", author: "y",
+            homepage: nil, category: "utility",
+            version: SemVer(major: 1, minor: 0, patch: 0),
+            minHostAPIVersion: SemVer(major: 0, minor: 1, patch: 0),
+            downloadURL: URL(string: "https://example.com/x.zip")!,
+            sha256: sha256, iconURL: nil, permissions: []
+        )
+    }
+
+    func testInstallMovesFileTrustsAndThrowsLoadFailedOnNoMachO() async throws {
+        let (zipData, hash) = try buildFakeZip()
+        let entry = makeEntry(id: "com.example.integration", sha256: hash)
+        let registry = PluginRegistry()
+        let trustStore = TrustStore(storeURL: trustStoreURL)
+        let destURL = destinationDir!
+
+        do {
+            _ = try await PluginInstaller.install(
+                entry: entry,
+                into: registry,
+                trustStore: trustStore,
+                destination: { destURL },
+                loader: { _ in zipData }
+            )
+            XCTFail("Expected loadFailed because the fake bundle has no Mach-O")
+        } catch let error as PluginInstaller.InstallError {
+            // Pin down that bundle.load() is what blew up — not
+            // something earlier in the pipeline.
+            if case .loadFailed(let reason) = error {
+                XCTAssertEqual(reason, .bundleLoadFailed)
+            } else {
+                XCTFail("Wrong error: \(error)")
+            }
+        }
+
+        // Even though loadOne failed, every prior side-effect must
+        // have happened — so a future fix or a working binary just
+        // needs the load to succeed; the file/trust state is already
+        // correct.
+
+        // 1. The bundle moved to destination/<bundleName>.csplugin
+        let installedURL = destURL.appendingPathComponent("Integration.csplugin")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: installedURL.path))
+
+        // 2. TrustStore got the .allowed pre-record (catalog install
+        //    is explicit user intent — no first-launch prompt).
+        let manifest = PluginManifest(bundle: Bundle(url: installedURL)!)
+        XCTAssertNotNil(manifest)
+        XCTAssertEqual(
+            trustStore.decision(for: manifest!, bundleURL: installedURL),
+            .allowed
+        )
+
+        // 3. PluginRegistry stayed empty — because loadOne failed,
+        //    register was never called. Critical: a halfway install
+        //    must NOT leave a phantom row in the registry.
+        XCTAssertTrue(registry.terminals.isEmpty)
+        XCTAssertTrue(registry.providers.isEmpty)
+    }
+
+    func testInstallReplacesExistingBundleAtSameID() async throws {
+        // Pre-populate the destination with a stale copy of the
+        // bundle. Install must atomically overwrite — not error
+        // out, not append a `-2` suffix.
+        let (zipData, hash) = try buildFakeZip()
+        let entry = makeEntry(id: "com.example.integration", sha256: hash)
+        let registry = PluginRegistry()
+        let trustStore = TrustStore(storeURL: trustStoreURL)
+        let destURL = destinationDir!
+        try FileManager.default.createDirectory(at: destURL, withIntermediateDirectories: true)
+        let staleBundle = destURL.appendingPathComponent("Integration.csplugin", isDirectory: true)
+        try FileManager.default.createDirectory(at: staleBundle, withIntermediateDirectories: true)
+        try "stale".write(
+            to: staleBundle.appendingPathComponent("STALE_MARKER"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        do {
+            _ = try await PluginInstaller.install(
+                entry: entry,
+                into: registry,
+                trustStore: trustStore,
+                destination: { destURL },
+                loader: { _ in zipData }
+            )
+        } catch PluginInstaller.InstallError.loadFailed {
+            // expected — fake bundle has no Mach-O
+        }
+
+        // The stale marker must be gone; the new bundle's Info.plist
+        // must be present.
+        let installedURL = destURL.appendingPathComponent("Integration.csplugin")
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: installedURL.appendingPathComponent("STALE_MARKER").path),
+            "Stale bundle should have been replaced atomically"
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: installedURL.appendingPathComponent("Contents/Info.plist").path)
+        )
+    }
+}
+
 @MainActor
 final class PluginRegistryTests: XCTestCase {
     private final class FakeProviderPlugin: NSObject, Plugin {
