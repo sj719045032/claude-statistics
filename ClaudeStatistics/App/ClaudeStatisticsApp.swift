@@ -72,6 +72,24 @@ final class AppState: ObservableObject {
         return registry
     }()
 
+    /// Caches every `ProviderPlugin.makeProvider()` result into
+    /// `ProviderRegistry`'s dynamic store so `provider(for:)` prefers
+    /// plugin-supplied instances over the legacy `switch`. Builtin
+    /// dogfood wrappers return the existing `*.shared` singletons so
+    /// this is behaviour-preserving today; once bundle loading lands in
+    /// M2, a third-party plugin can override a builtin by registering
+    /// with the same provider id.
+    private func wirePluginProviderInstances() {
+        for (_, plugin) in pluginRegistry.providers {
+            guard let providerPlugin = plugin as? any ProviderPlugin,
+                  let provider = providerPlugin.makeProvider() else { continue }
+            ProviderRegistry.registerDynamicProvider(
+                provider,
+                for: providerPlugin.descriptor.id
+            )
+        }
+    }
+
     /// Wires the focus coordinator to consult `pluginRegistry` before
     /// falling back to `TerminalFocusRouteRegistry`. Phase 4 of the
     /// terminal-plugin migration: in v4.0-alpha all 8 builtins return
@@ -152,10 +170,10 @@ final class AppState: ObservableObject {
             usageVMs.bootSecondary(for: kind)
         }
 
-        // Wire focus dispatcher to consult the plugin registry. Must
-        // run after all stored properties are initialized so the
-        // closure inside `wirePluginFocusStrategyResolver` can read
-        // `pluginRegistry`.
+        // Wire plugin-driven dispatch on top of the legacy registries.
+        // Must run after all stored properties are initialized so the
+        // closures can read `pluginRegistry`.
+        wirePluginProviderInstances()
         wirePluginFocusStrategyResolver()
     }
 

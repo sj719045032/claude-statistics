@@ -1295,6 +1295,12 @@ graph LR
 - ✅ 5 个 `TerminalFocusRouteHandler` 实现（AppleScript / CLI / Accessibility / Activate）改 internal 可见
 - ✅ 8 个 builtin terminal plugin wrapper 的 `makeFocusStrategy()` 直接 instantiate 对应 strategy（不再经 `TerminalFocusRouteRegistry.handler(for: capability.route)` 反查）— 第三方 plugin 不再依赖 host 的 route registry，可独立持有 strategy 实例
 
+**阶段 3++ Provider lookup 走 plugin 路径**
+- ✅ `ProviderRegistry` 加 NSLock-guarded `ProviderInstanceStore`（dynamicProviders）+ `registerDynamicProvider(_:for:)` 静态接口
+- ✅ `provider(for:)` 改：先查 dynamic store（按 descriptor.id），未命中回退到原 switch
+- ✅ `AppState.wirePluginProviderInstances()` 在 init 末尾遍历 `pluginRegistry.providers`，把每个 `ProviderPlugin.makeProvider()` 实例缓存进 `ProviderRegistry`（dogfood wrapper 返回 `*.shared` singleton，行为完全等价）
+- M2 bundle 加载就绪后，第三方 plugin 注册同样的 provider id 即可覆盖 builtin behaviour
+
 #### v4.0-alpha 视角下已完成
 
 **SDK 接口面已全部就位**（48 文件 / 2882 行）：第三方 plugin 可在 SDK 接口面上端到端编写完整 provider plugin（descriptor + 5 窄协议 + 所有数据模型），并可声明完整的 terminal readiness/setup 行为。
@@ -1310,7 +1316,7 @@ graph LR
 - ⏸️ Share role plugin（拆分 1177 行 `ShareRoleEngine` 为 9 个独立 RoleScorer，搬到 `OfficialShareRolesPlugin`）— 阶段 4 子任务
 - ⏸️ Bundle (`.csplugin`) 加载机制 + `disable-library-validation` entitlement — 阶段 5 (M2)
 - ⏸️ Plugin permission prompt + `trust.json` UI — 阶段 5 (M3)
-- ⏸️ `ProviderRegistry.provider(for:)` switch → PluginRegistry lookup — host 内部清理，不阻塞 plugin 系统
+- ✅ `ProviderRegistry.provider(for:)` switch → plugin lookup（NSLock-guarded dynamic store；switch 保留为 fallback）
 
 **结论**：v4.0-alpha 协议表面工作圆满收尾。核心成就 — 第三方开发者已可基于 `ClaudeStatisticsKit` 构建完整 provider plugin，无需任何 host 类型依赖。下一步重点转向 Terminal/Share plugin 拆分（阶段 4）和 bundle 加载（阶段 5）。
 
