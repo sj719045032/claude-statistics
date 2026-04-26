@@ -149,4 +149,109 @@ final class PluginRegistryTests: XCTestCase {
     func testHostAPIVersionExposed() {
         XCTAssertEqual(SDKInfo.apiVersion, SemVer(major: 0, minor: 1, patch: 0))
     }
+
+    private final class FakeProviderPluginImpl: ProviderPlugin {
+        static let manifest = PluginManifest(
+            id: "com.test.provider",
+            kind: .provider,
+            displayName: "Test Provider",
+            version: SemVer(major: 1, minor: 0, patch: 0),
+            minHostAPIVersion: SemVer(major: 0, minor: 1, patch: 0),
+            permissions: [],
+            principalClass: "FakeProviderPluginImpl"
+        )
+        let descriptor = ProviderDescriptor(
+            id: "com.test.provider",
+            displayName: "Test Provider",
+            iconAssetName: "test",
+            accentColor: .gray,
+            notchEnabledDefaultsKey: "notch.enabled.test",
+            resolveToolAlias: { _ in nil }
+        )
+        init() {}
+    }
+
+    private final class FakeTerminalPluginImpl: TerminalPlugin {
+        static let manifest = PluginManifest(
+            id: "com.test.terminal",
+            kind: .terminal,
+            displayName: "Test Terminal",
+            version: SemVer(major: 1, minor: 0, patch: 0),
+            minHostAPIVersion: SemVer(major: 0, minor: 1, patch: 0),
+            permissions: [],
+            principalClass: "FakeTerminalPluginImpl"
+        )
+        let descriptor = TerminalDescriptor(
+            id: "com.test.terminal",
+            displayName: "Test Terminal",
+            category: .terminal,
+            bundleIdentifiers: ["com.test"],
+            terminalNameAliases: ["test"],
+            processNameHints: ["test"],
+            focusPrecision: .appOnly,
+            autoLaunchPriority: nil
+        )
+        init() {}
+    }
+
+    func testTypedLookupsReturnConcretePlugin() throws {
+        let registry = PluginRegistry()
+        try registry.register(FakeProviderPluginImpl())
+        try registry.register(FakeTerminalPluginImpl())
+
+        XCTAssertNotNil(registry.providerPlugin(id: "com.test.provider"))
+        XCTAssertNotNil(registry.terminalPlugin(id: "com.test.terminal"))
+        XCTAssertNil(registry.providerPlugin(id: "com.test.terminal"))
+        XCTAssertNil(registry.terminalPlugin(id: "com.test.provider"))
+        XCTAssertNil(registry.providerPlugin(id: "missing"))
+    }
+}
+
+final class TerminalLaunchRequestTests: XCTestCase {
+    func testCommandOnlyEscapesArgs() {
+        let request = TerminalLaunchRequest(
+            executable: "/bin/echo",
+            arguments: ["hello world", "it's me"],
+            cwd: "/tmp"
+        )
+        XCTAssertEqual(request.commandOnly, "'/bin/echo' 'hello world' 'it'\\''s me'")
+    }
+
+    func testCommandInWorkingDirectoryPrependsCd() {
+        let request = TerminalLaunchRequest(
+            executable: "/bin/ls",
+            arguments: [],
+            cwd: "/Users/test"
+        )
+        XCTAssertEqual(request.commandInWorkingDirectory, "cd '/Users/test' && '/bin/ls'")
+    }
+
+    func testEnvironmentPrefixSorted() {
+        let request = TerminalLaunchRequest(
+            executable: "node",
+            arguments: ["app.js"],
+            cwd: "/x",
+            environment: ["FOO": "1", "BAR": "2"]
+        )
+        // env vars sorted alphabetically
+        XCTAssertEqual(request.commandOnly, "env BAR='2' FOO='1' 'node' 'app.js'")
+    }
+
+    func testEscapeAppleScript() {
+        XCTAssertEqual(TerminalShellCommand.escapeAppleScript("a\"b\\c"), "a\\\"b\\\\c")
+    }
+}
+
+final class ShareDescriptorTests: XCTestCase {
+    func testRoleDescriptorEquality() {
+        let a = ShareRoleDescriptor(id: "id", displayName: "Display")
+        let b = ShareRoleDescriptor(id: "id", displayName: "Display")
+        XCTAssertEqual(a, b)
+    }
+
+    func testThemeDescriptorEquality() {
+        let a = ShareCardThemeDescriptor(id: "id", displayName: "Theme")
+        let b = ShareCardThemeDescriptor(id: "id", displayName: "Theme")
+        XCTAssertEqual(a, b)
+    }
 }

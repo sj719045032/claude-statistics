@@ -44,6 +44,32 @@ public final class PluginRegistry {
         }
     }
 
+    // MARK: - Typed look-ups
+
+    /// Returns the registered Provider plugin for the given id, or
+    /// `nil` if no plugin claims it.
+    public func providerPlugin(id: String) -> (any ProviderPlugin)? {
+        providers[id] as? any ProviderPlugin
+    }
+
+    /// Returns the registered Terminal plugin for the given id, or
+    /// `nil` if no plugin claims it.
+    public func terminalPlugin(id: String) -> (any TerminalPlugin)? {
+        terminals[id] as? any TerminalPlugin
+    }
+
+    /// Returns the registered Share-role plugin for the given id, or
+    /// `nil` if no plugin claims it.
+    public func shareRolePlugin(id: String) -> (any ShareRolePlugin)? {
+        shareRoles[id] as? any ShareRolePlugin
+    }
+
+    /// Returns the registered Share-card-theme plugin for the given
+    /// id, or `nil` if no plugin claims it.
+    public func shareThemePlugin(id: String) -> (any ShareCardThemePlugin)? {
+        shareThemes[id] as? any ShareCardThemePlugin
+    }
+
     /// Snapshot of every loaded plugin's manifest. Useful for the
     /// Settings → Plugins panel and the load-report log.
     public func loadedManifests() -> [PluginManifest] {

@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 enum TerminalRegistry {
     private static let appCapabilities: [any TerminalCapability] = [

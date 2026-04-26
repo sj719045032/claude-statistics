@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 struct ClaudeAuthIdentity: Equatable, Sendable {
     let email: String?

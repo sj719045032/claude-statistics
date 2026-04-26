@@ -103,6 +103,7 @@
 		6BA90267FC02621878E80D2A /* TrendChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEDC6DF1C15355DC5AE2FCF9 /* TrendChartView.swift */; };
 		6CB15E196B0E4A38B471E499 /* ProviderDescriptor+Builtins.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A3763EF17B80F22CAE77EB0 /* ProviderDescriptor+Builtins.swift */; };
 		6CB9AC028D3C2D548F717E01 /* NotchContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAB0C3E8C901FF061718EB35 /* NotchContainerView.swift */; };
+		6D53771D8F61F6149FD50D46 /* ShareRolePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CF4AF3083144F9E8BD8D7B0 /* ShareRolePlugin.swift */; };
 		6D56C0EAAF4175166391D7EA /* KittyFocuser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 387E20F7F962C004AD38B92C /* KittyFocuser.swift */; };
 		6E325B8FC27E2BCE88033FAA /* AlacrittyPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0591709AD1369CB163770EC0 /* AlacrittyPlugin.swift */; };
 		6E50954F02E729F9586DC3E4 /* HookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 711926C1469F96FC6CF23888 /* HookInstaller.swift */; };
@@ -153,6 +154,7 @@
 		A2F1B0B01CE980A41F32D377 /* ActiveSessionsTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1E190E276266D2300756D4 /* ActiveSessionsTracker.swift */; };
 		A5B9E8F4EA41FC8313BF3228 /* ClaudeHookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9503F292FA4FB52DDDF97355 /* ClaudeHookInstaller.swift */; };
 		A63890A01AF570ADBA7E4E11 /* AttentionEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F675DD2E08BB0AC4ADBB101 /* AttentionEvent.swift */; };
+		A830A50BBE76ECD3E3990820 /* ShareCardThemePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0398E20299823326D6ED583C /* ShareCardThemePlugin.swift */; };
 		AB0DFD87C29996F0C42D5E5D /* RuntimeStatePersistorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9210B3A2B673F785B3BEC07 /* RuntimeStatePersistorTests.swift */; };
 		ABD9E24D7183BFE4F589B9E4 /* NotchNotificationCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03DF8D6D8A1022EF2721BE82 /* NotchNotificationCenter.swift */; };
 		AC04F7B90669B03A4D8B3551 /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6749A9BF125AC2A04C7043D5 /* DatabaseService.swift */; };
@@ -178,6 +180,7 @@
 		C48BDE19A5E58235BAB61F51 /* UsageViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5306E49F4AF08425229312F0 /* UsageViewModel.swift */; };
 		C4EEDE0F0236FE4680A1B5CC /* NotchAutoAllowRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAB51505E677DA60C3533985 /* NotchAutoAllowRules.swift */; };
 		C823AB056D6A7D684FBCD644 /* TerminalIdentityResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F041A00EBEFC1AF58EEE0C78 /* TerminalIdentityResolverTests.swift */; };
+		C8359F096BA8063C42EBC8BD /* TerminalLaunchRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44B525D19903D64B4730721F /* TerminalLaunchRequest.swift */; };
 		CB71D274EA08799E1FA3256D /* ToolActivityFormatter+Completion.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF76C0BD045510B9035C9733 /* ToolActivityFormatter+Completion.swift */; };
 		CC7AF3F07B3E4B31E0EE90B7 /* ProviderSessionDisplayFormatter+Dialogue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B9428940D02A06281875655 /* ProviderSessionDisplayFormatter+Dialogue.swift */; };
 		CD199764729FDA8146948C4C /* ShareImageExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C220944581C7418B7B1797F3 /* ShareImageExporter.swift */; };
@@ -214,7 +217,6 @@
 		F033B4012C3FDB70B0DA893D /* ClaudeOAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E2B51B9EC984248C05583D1 /* ClaudeOAuthClient.swift */; };
 		F10B232939253D7B0F56D1ED /* AppPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE1124931992403EA0EBD95E /* AppPreferences.swift */; };
 		F26A77813CEED46677E6F756 /* StatusLineInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF2A749714584E4976171E9D /* StatusLineInstaller.swift */; };
-		F2DB839C76264FE914DC1B28 /* TerminalLaunchRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = F807CA9217105B9A2E3C11F1 /* TerminalLaunchRequest.swift */; };
 		F319BEBA588C70528472E710 /* DisplayTextClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1585E37EA4FB0491BA86CA2B /* DisplayTextClassifier.swift */; };
 		F324566F7B85AFF3C7E1EEAC /* CalendarHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1390435247ECA654A169EB3C /* CalendarHeatmap.swift */; };
 		F3272760285AF18F519D8E80 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41054FA7DE043B7E25B4A88E /* MenuBarView.swift */; };
@@ -287,6 +289,7 @@
 		00B22ECE4D683B12838FAF26 /* ToolActivityFormatter+Permissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ToolActivityFormatter+Permissions.swift"; sourceTree = "<group>"; };
 		011E707E6F2F284A99ECF925 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		027CDBE36D6D9439DB32C0AE /* HookCLI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookCLI.swift; sourceTree = "<group>"; };
+		0398E20299823326D6ED583C /* ShareCardThemePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardThemePlugin.swift; sourceTree = "<group>"; };
 		03DF8D6D8A1022EF2721BE82 /* NotchNotificationCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchNotificationCenter.swift; sourceTree = "<group>"; };
 		044319D72CE45477BDDCBE97 /* AttentionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionBridge.swift; sourceTree = "<group>"; };
 		0591709AD1369CB163770EC0 /* AlacrittyPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlacrittyPlugin.swift; sourceTree = "<group>"; };
@@ -342,12 +345,14 @@
 		40D1CDF1FEEF8397DDFDBBDC /* ClaudeAccountSourcePickerRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeAccountSourcePickerRow.swift; sourceTree = "<group>"; };
 		41054FA7DE043B7E25B4A88E /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		42AB2ACAC763533BC9654BE5 /* TranscriptEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptEntry.swift; sourceTree = "<group>"; };
+		44B525D19903D64B4730721F /* TerminalLaunchRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalLaunchRequest.swift; sourceTree = "<group>"; };
 		450392F75EF01359109269C9 /* DisplayTextClassifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayTextClassifierTests.swift; sourceTree = "<group>"; };
 		488C2018A8681C6E971CF6A8 /* GeminiTranscriptParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiTranscriptParser.swift; sourceTree = "<group>"; };
 		49C9349BA491065487D09AA0 /* CodexTranscriptParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexTranscriptParser.swift; sourceTree = "<group>"; };
 		4ADE3FEF920338C79B20E30F /* TerminalFocusRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalFocusRoute.swift; sourceTree = "<group>"; };
 		4B25F37B9C36D1D2F5361123 /* ClaudeStatisticsKitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatisticsKitTests.swift; sourceTree = "<group>"; };
 		4B842A348C3909C8D98C92B1 /* SessionDisplayDialogueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDisplayDialogueTests.swift; sourceTree = "<group>"; };
+		4CF4AF3083144F9E8BD8D7B0 /* ShareRolePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRolePlugin.swift; sourceTree = "<group>"; };
 		4D7AC12A966340D54D712D4B /* NotchAutoAllowRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchAutoAllowRulesTests.swift; sourceTree = "<group>"; };
 		4E1858F23256C6FEBB750A08 /* ShareRole.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRole.swift; sourceTree = "<group>"; };
 		52FF7E2030D328036A1F8F6D /* SharePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharePreviewView.swift; sourceTree = "<group>"; };
@@ -500,7 +505,6 @@
 		F4387E440942DCAE1B61C97F /* ITermTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ITermTerminalCapability.swift; sourceTree = "<group>"; };
 		F5486873DBEC29739725E366 /* StatusBarPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarPanel.swift; sourceTree = "<group>"; };
 		F67265718ACB26BE5322C36F /* MenuBarFooter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarFooter.swift; sourceTree = "<group>"; };
-		F807CA9217105B9A2E3C11F1 /* TerminalLaunchRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalLaunchRequest.swift; sourceTree = "<group>"; };
 		F81931C824888B412AEA051E /* TerminalPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPlugin.swift; sourceTree = "<group>"; };
 		F9BE6119BE603D9EB8BB22C7 /* SessionQuickStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionQuickStats.swift; sourceTree = "<group>"; };
 		FA8B62A57C9E8AD16345458A /* ShareMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareMetrics.swift; sourceTree = "<group>"; };
@@ -658,7 +662,10 @@
 				D7A55E899B9748E80EF1CA53 /* ProviderDescriptor.swift */,
 				62572A1901D430E3E24CB02D /* ProviderPlugin.swift */,
 				DBBEE45A24DCB72DA07ECD79 /* SemVer.swift */,
+				0398E20299823326D6ED583C /* ShareCardThemePlugin.swift */,
+				4CF4AF3083144F9E8BD8D7B0 /* ShareRolePlugin.swift */,
 				0ECBB3BD210EF8857D8C47D5 /* TerminalDescriptor.swift */,
+				44B525D19903D64B4730721F /* TerminalLaunchRequest.swift */,
 				F81931C824888B412AEA051E /* TerminalPlugin.swift */,
 			);
 			name = ClaudeStatisticsKit;
@@ -728,7 +735,6 @@
 				B2F24500B4C9F3F375B97402 /* TerminalAppleScriptRunner.swift */,
 				66851A558CEC1E024AAC87E6 /* TerminalCapability.swift */,
 				18342117EBD4967AC7F2B564 /* TerminalDescriptor+Synthesis.swift */,
-				F807CA9217105B9A2E3C11F1 /* TerminalLaunchRequest.swift */,
 				CA7D5709A13CDC7751084AAF /* TerminalPreferences.swift */,
 				AD9EAD578F58BF668BBBFC13 /* TerminalReadiness.swift */,
 				A337A8A5F00CF27D753FA581 /* TerminalRegistry.swift */,
@@ -1279,7 +1285,6 @@
 				871E27060B953A2929FB1580 /* TerminalFocusRouteHandler.swift in Sources */,
 				56242266D3D70E01E2A22FCA /* TerminalFocusTarget.swift in Sources */,
 				7E48B08D0513149CA87ADE4C /* TerminalIdentityResolver.swift in Sources */,
-				F2DB839C76264FE914DC1B28 /* TerminalLaunchRequest.swift in Sources */,
 				BE4FDED4356AA89774DF4B8A /* TerminalPreferences.swift in Sources */,
 				28BC2444287AB7D7A32B68A3 /* TerminalReadiness.swift in Sources */,
 				7843151598D9561667E57EF3 /* TerminalRegistry.swift in Sources */,
@@ -1327,7 +1332,10 @@
 				81C19CCA48AB5D51EFE62459 /* ProviderDescriptor.swift in Sources */,
 				205CC763247D474FFE1ED691 /* ProviderPlugin.swift in Sources */,
 				1FFDAA9375AEB76CB9862CF3 /* SemVer.swift in Sources */,
+				A830A50BBE76ECD3E3990820 /* ShareCardThemePlugin.swift in Sources */,
+				6D53771D8F61F6149FD50D46 /* ShareRolePlugin.swift in Sources */,
 				958399C6649B42239B5909AE /* TerminalDescriptor.swift in Sources */,
+				C8359F096BA8063C42EBC8BD /* TerminalLaunchRequest.swift in Sources */,
 				7A6DC1B86241A8A90AB91897 /* TerminalPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

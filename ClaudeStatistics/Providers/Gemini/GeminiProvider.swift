@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 final class GeminiProvider: SessionProvider, @unchecked Sendable {
     static let shared = GeminiProvider()

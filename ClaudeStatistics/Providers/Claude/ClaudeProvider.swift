@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 final class ClaudeProvider: SessionProvider, @unchecked Sendable {
     static let shared = ClaudeProvider()

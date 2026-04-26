@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 struct GeminiAuthIdentity: Equatable, Sendable {
     let email: String?
