@@ -46,9 +46,11 @@
 		2605B8EACB69A1FD335D21AC /* RuntimeSessionEventApplierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D7D7759B0623FB3A0EFA15 /* RuntimeSessionEventApplierTests.swift */; };
 		278FAA854F5697F99EB34F5A /* GeminiPricingFetchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 398009672C963C1E8B72A03E /* GeminiPricingFetchService.swift */; };
 		28BC2444287AB7D7A32B68A3 /* TerminalReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD9EAD578F58BF668BBBFC13 /* TerminalReadiness.swift */; };
+		2D03585C91016BBA7C5E390C /* SessionStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 563283ED216FE68D0E3B11EA /* SessionStats.swift */; };
 		2EB570758BE9F11F6E15AE78 /* TerminalSetupCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 808F166AA1B5F781858856E1 /* TerminalSetupCoordinator.swift */; };
 		3055EFB90B07E9A7824E77EB /* CodexStatusLineInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = C069BA3F5161E12CD1295E1B /* CodexStatusLineInstaller.swift */; };
 		30F89B07F29815CD8F866B46 /* ClaudeStatisticsKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		32F0A0C3AC1BB4D4422EA5D9 /* SessionStats+Pricing.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF82F2AEB2D29D2F8EE3391F /* SessionStats+Pricing.swift */; };
 		3366C73918A1592DAF515CAF /* RuntimeSessionEventApplier.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8D22D6E017B129B416B5A0E /* RuntimeSessionEventApplier.swift */; };
 		34A9401E132F4ABEA53988D7 /* ProviderKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF5BCA9439BEAF2D53992A0 /* ProviderKind.swift */; };
 		37869D180C4DB3C69261C9F4 /* StatusLineLegend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674E66F9A30A6F1F06738D75 /* StatusLineLegend.swift */; };
@@ -376,6 +378,7 @@
 		5306E49F4AF08425229312F0 /* UsageViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageViewModel.swift; sourceTree = "<group>"; };
 		54DA495D7C6105F8AD37FD7D /* SessionScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionScanner.swift; sourceTree = "<group>"; };
 		563272C01660D2FA4FBCBE13 /* NotificationTimerStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationTimerStoreTests.swift; sourceTree = "<group>"; };
+		563283ED216FE68D0E3B11EA /* SessionStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStats.swift; sourceTree = "<group>"; };
 		5657C95B75EDEA0DA7660426 /* InformationalEventGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InformationalEventGateTests.swift; sourceTree = "<group>"; };
 		5751B5879E1EAFCE00A80DAC /* DaySlice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaySlice.swift; sourceTree = "<group>"; };
 		58B71B5593D63536AB462D70 /* SessionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionViewModel.swift; sourceTree = "<group>"; };
@@ -518,6 +521,7 @@
 		EDE6D238094644B3E5ECD8C9 /* ClaudePKCE.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudePKCE.swift; sourceTree = "<group>"; };
 		EEDC6DF1C15355DC5AE2FCF9 /* TrendChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendChartView.swift; sourceTree = "<group>"; };
 		EF76C0BD045510B9035C9733 /* ToolActivityFormatter+Completion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ToolActivityFormatter+Completion.swift"; sourceTree = "<group>"; };
+		EF82F2AEB2D29D2F8EE3391F /* SessionStats+Pricing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SessionStats+Pricing.swift"; sourceTree = "<group>"; };
 		EFDF211CE0556F7AFC14399A /* GeminiSessionScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiSessionScanner.swift; sourceTree = "<group>"; };
 		F041A00EBEFC1AF58EEE0C78 /* TerminalIdentityResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalIdentityResolverTests.swift; sourceTree = "<group>"; };
 		F06F5996862455AE5ED7AD2B /* ToolActivityFormatterPermissionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolActivityFormatterPermissionsTests.swift; sourceTree = "<group>"; };
@@ -693,6 +697,7 @@
 				A9F4A8499C7CCC383E405EB7 /* SearchIndexMessage.swift */,
 				DBBEE45A24DCB72DA07ECD79 /* SemVer.swift */,
 				D758CE8D0B6780C973E35221 /* SessionQuickStats.swift */,
+				563283ED216FE68D0E3B11EA /* SessionStats.swift */,
 				0398E20299823326D6ED583C /* ShareCardThemePlugin.swift */,
 				4CF4AF3083144F9E8BD8D7B0 /* ShareRolePlugin.swift */,
 				674E66F9A30A6F1F06738D75 /* StatusLineLegend.swift */,
@@ -974,6 +979,7 @@
 				5CE65D192C24051486ABF875 /* DaySlice+Pricing.swift */,
 				FFF5BCA9439BEAF2D53992A0 /* ProviderKind.swift */,
 				36F9BBB23CB057720EA99A7B /* Session.swift */,
+				EF82F2AEB2D29D2F8EE3391F /* SessionStats+Pricing.swift */,
 				FA8B62A57C9E8AD16345458A /* ShareMetrics.swift */,
 				4E1858F23256C6FEBB750A08 /* ShareRole.swift */,
 				630E94D819F3948CF3D57365 /* TranscriptDisplayMessage.swift */,
@@ -1294,6 +1300,7 @@
 				9BE83C21285426ACBCAE6024 /* SessionListView.swift in Sources */,
 				43F77DC1A91245709B224E22 /* SessionProvider.swift in Sources */,
 				1835A993B30EC7AE040F7829 /* SessionScanner.swift in Sources */,
+				32F0A0C3AC1BB4D4422EA5D9 /* SessionStats+Pricing.swift in Sources */,
 				D64171EFA61052FC0A315681 /* SessionViewModel.swift in Sources */,
 				E26C6870A1E9540BCA9E7045 /* SettingsView.swift in Sources */,
 				19BCF9602F4555F5E007C0EA /* ShareCardView.swift in Sources */,
@@ -1374,6 +1381,7 @@
 				FE1A98E363F439309F7B1F6E /* SearchIndexMessage.swift in Sources */,
 				1FFDAA9375AEB76CB9862CF3 /* SemVer.swift in Sources */,
 				EC812B09D005001919618FB5 /* SessionQuickStats.swift in Sources */,
+				2D03585C91016BBA7C5E390C /* SessionStats.swift in Sources */,
 				A830A50BBE76ECD3E3990820 /* ShareCardThemePlugin.swift in Sources */,
 				6D53771D8F61F6149FD50D46 /* ShareRolePlugin.swift in Sources */,
 				37869D180C4DB3C69261C9F4 /* StatusLineLegend.swift in Sources */,

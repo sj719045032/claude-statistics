@@ -1,4 +1,5 @@
 import SwiftUI
+import ClaudeStatisticsKit
 
 struct MenuBarView: View {
     @ObservedObject var appState: AppState

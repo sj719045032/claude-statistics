@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 struct ShareMetricsBuilder {
     static func build(
