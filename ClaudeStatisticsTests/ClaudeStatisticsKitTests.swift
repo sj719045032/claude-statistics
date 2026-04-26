@@ -244,6 +244,138 @@ final class PluginCatalogEntryTests: XCTestCase {
     }
 }
 
+/// `PluginCatalog` is the actor that fetches index.json and falls
+/// back to disk when offline. These tests exercise the four code
+/// paths (live success / network fail with cache / network fail
+/// without cache / schema version too new) through a stubbed
+/// `DataLoader` so the suite stays hermetic — no real network.
+final class PluginCatalogTests: XCTestCase {
+    private var sandbox: URL!
+    private var cacheURL: URL!
+
+    private static let liveJSON = """
+    {
+      "schemaVersion": 1,
+      "updatedAt": "2026-04-26T10:00:00Z",
+      "entries": [
+        {
+          "id": "com.example.foo",
+          "name": "Foo",
+          "description": "test",
+          "author": "tester",
+          "homepage": null,
+          "category": "utility",
+          "version": "1.0.0",
+          "minHostAPIVersion": "0.1.0",
+          "downloadURL": "https://example.com/foo.zip",
+          "sha256": "abc",
+          "iconURL": null,
+          "permissions": []
+        }
+      ]
+    }
+    """
+
+    override func setUpWithError() throws {
+        sandbox = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("PluginCatalogTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: sandbox, withIntermediateDirectories: true)
+        cacheURL = sandbox.appendingPathComponent("catalog-cache.json")
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: sandbox)
+    }
+
+    func testLiveFetchReturnsDecodedIndexAndWritesCache() async throws {
+        let catalog = PluginCatalog(
+            remoteURL: URL(string: "https://example.com/index.json")!,
+            cacheURL: cacheURL,
+            loader: { _ in Data(Self.liveJSON.utf8) }
+        )
+        let outcome = try await catalog.fetch()
+        XCTAssertEqual(outcome.kind, .live)
+        XCTAssertEqual(outcome.index.entries.count, 1)
+        XCTAssertEqual(outcome.index.entries.first?.id, "com.example.foo")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: cacheURL.path))
+    }
+
+    func testNetworkFailureFallsBackToCache() async throws {
+        // Pre-populate the cache with a previous live response.
+        try Data(Self.liveJSON.utf8).write(to: cacheURL)
+        let catalog = PluginCatalog(
+            remoteURL: URL(string: "https://example.com/index.json")!,
+            cacheURL: cacheURL,
+            loader: { _ in throw URLError(.notConnectedToInternet) }
+        )
+        let outcome = try await catalog.fetch()
+        XCTAssertEqual(outcome.kind, .offlineFallback)
+        XCTAssertEqual(outcome.index.entries.first?.id, "com.example.foo")
+    }
+
+    func testNetworkFailureWithNoCacheThrowsOfflineNoCache() async throws {
+        let catalog = PluginCatalog(
+            remoteURL: URL(string: "https://example.com/index.json")!,
+            cacheURL: cacheURL,
+            loader: { _ in throw URLError(.notConnectedToInternet) }
+        )
+        do {
+            _ = try await catalog.fetch()
+            XCTFail("Expected offlineNoCache to be thrown")
+        } catch let error as PluginCatalog.FetchError {
+            XCTAssertEqual(error, .offlineNoCache)
+        }
+    }
+
+    func testSchemaVersionTooNewThrowsRatherThanFallingBackSilently() async throws {
+        let futureJSON = """
+        {
+          "schemaVersion": 99,
+          "updatedAt": "2026-04-26T10:00:00Z",
+          "entries": []
+        }
+        """
+        let catalog = PluginCatalog(
+            remoteURL: URL(string: "https://example.com/index.json")!,
+            cacheURL: cacheURL,
+            loader: { _ in Data(futureJSON.utf8) }
+        )
+        do {
+            _ = try await catalog.fetch()
+            XCTFail("Expected schemaVersionTooNew")
+        } catch let error as PluginCatalog.FetchError {
+            if case .schemaVersionTooNew(let remote, let supported) = error {
+                XCTAssertEqual(remote, 99)
+                XCTAssertEqual(supported, PluginCatalogIndex.supportedSchemaVersion)
+            } else {
+                XCTFail("Wrong FetchError case: \(error)")
+            }
+        }
+    }
+
+    func testMalformedJSONThrowsDecodingNotFallback() async throws {
+        // A garbage live response should NOT silently land us on the
+        // cache — the user (or a catalog reviewer) needs to see the
+        // real cause.
+        try Data(Self.liveJSON.utf8).write(to: cacheURL)
+        let catalog = PluginCatalog(
+            remoteURL: URL(string: "https://example.com/index.json")!,
+            cacheURL: cacheURL,
+            loader: { _ in Data("{ not json }".utf8) }
+        )
+        do {
+            _ = try await catalog.fetch()
+            XCTFail("Expected decoding error")
+        } catch let error as PluginCatalog.FetchError {
+            if case .decoding = error {
+                // expected
+            } else {
+                XCTFail("Wrong FetchError case: \(error)")
+            }
+        }
+    }
+}
+
 @MainActor
 final class PluginRegistryTests: XCTestCase {
     private final class FakeProviderPlugin: NSObject, Plugin {
