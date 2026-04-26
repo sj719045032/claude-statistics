@@ -282,6 +282,95 @@ final class ShareDescriptorTests: XCTestCase {
     }
 }
 
+/// `PluginTrustGate` is the host's glue between `TrustStore`'s
+/// persisted decision and the loader's synchronous `trustEvaluator`
+/// callback. Allowed plugins load, denied ones are silently skipped,
+/// and unknown ones queue for a post-launch prompt while the current
+/// boot leaves them out of the registry. This test pins down all
+/// three branches plus the prompt-then-record flow without actually
+/// presenting an NSAlert.
+@MainActor
+final class PluginTrustGateTests: XCTestCase {
+    private var sandbox: URL!
+    private var bundleURL: URL!
+    private var trustStoreURL: URL!
+
+    private let manifest = PluginManifest(
+        id: "com.example.gate",
+        kind: .terminal,
+        displayName: "Gate Test",
+        version: SemVer(major: 1, minor: 0, patch: 0),
+        minHostAPIVersion: SemVer(major: 0, minor: 1, patch: 0),
+        permissions: [.network],
+        principalClass: "GatePlugin"
+    )
+
+    override func setUpWithError() throws {
+        sandbox = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("PluginTrustGateTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: sandbox, withIntermediateDirectories: true)
+        bundleURL = sandbox.appendingPathComponent("Gate.csplugin", isDirectory: true)
+        let contentsDir = bundleURL.appendingPathComponent("Contents", isDirectory: true)
+        try FileManager.default.createDirectory(at: contentsDir, withIntermediateDirectories: true)
+        try "<plist>v1</plist>".write(
+            to: contentsDir.appendingPathComponent("Info.plist"),
+            atomically: true, encoding: .utf8
+        )
+        trustStoreURL = sandbox.appendingPathComponent("trust.json")
+        PluginTrustGate._resetForTesting(trustStore: TrustStore(storeURL: trustStoreURL))
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: sandbox)
+    }
+
+    func testKnownAllowedReturnsTrueWithoutPending() {
+        PluginTrustGate.trustStore.record(.allowed, for: manifest, bundleURL: bundleURL)
+        XCTAssertTrue(PluginTrustGate.evaluate(manifest: manifest, bundleURL: bundleURL))
+        XCTAssertTrue(PluginTrustGate.snapshotPending().isEmpty)
+    }
+
+    func testKnownDeniedReturnsFalseWithoutPending() {
+        PluginTrustGate.trustStore.record(.denied, for: manifest, bundleURL: bundleURL)
+        XCTAssertFalse(PluginTrustGate.evaluate(manifest: manifest, bundleURL: bundleURL))
+        XCTAssertTrue(PluginTrustGate.snapshotPending().isEmpty)
+    }
+
+    func testUnknownDefersAndQueues() {
+        XCTAssertFalse(PluginTrustGate.evaluate(manifest: manifest, bundleURL: bundleURL))
+        XCTAssertEqual(PluginTrustGate.snapshotPending().count, 1)
+    }
+
+    func testRepeatedUnknownDoesNotDuplicateInQueue() {
+        _ = PluginTrustGate.evaluate(manifest: manifest, bundleURL: bundleURL)
+        _ = PluginTrustGate.evaluate(manifest: manifest, bundleURL: bundleURL)
+        XCTAssertEqual(PluginTrustGate.snapshotPending().count, 1)
+    }
+
+    func testProcessPendingPersistsDecisionAndDrainsQueue() {
+        _ = PluginTrustGate.evaluate(manifest: manifest, bundleURL: bundleURL)
+        PluginTrustGate.processPending(prompter: { _ in .allowed })
+        XCTAssertTrue(PluginTrustGate.snapshotPending().isEmpty)
+        XCTAssertEqual(
+            PluginTrustGate.trustStore.decision(for: manifest, bundleURL: bundleURL),
+            .allowed
+        )
+    }
+
+    func testProcessPendingHonoursDenyDecision() {
+        _ = PluginTrustGate.evaluate(manifest: manifest, bundleURL: bundleURL)
+        PluginTrustGate.processPending(prompter: { _ in .denied })
+        XCTAssertEqual(
+            PluginTrustGate.trustStore.decision(for: manifest, bundleURL: bundleURL),
+            .denied
+        )
+        // After the user answered, the next evaluate must respect the
+        // recorded decision — no re-queueing.
+        XCTAssertFalse(PluginTrustGate.evaluate(manifest: manifest, bundleURL: bundleURL))
+        XCTAssertTrue(PluginTrustGate.snapshotPending().isEmpty)
+    }
+}
+
 /// `TrustStore` is the only gate between "plugin binary on disk" and
 /// "plugin code running in our process" (Q2 chose no mandatory
 /// signing). These tests pin down the contract so a regression

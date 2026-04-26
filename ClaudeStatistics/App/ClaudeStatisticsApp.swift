@@ -69,10 +69,10 @@ final class AppState: ObservableObject {
         // Discover .csplugin bundles. Bundled samples live in
         // Contents/PlugIns (shipped inside the .app, implicitly trusted);
         // user-installed plugins live under
-        // ~/Library/Application Support/Claude Statistics/Plugins (gated
-        // by TrustStore — currently allow-by-default until S5b lands the
-        // first-run prompt UI).
-        let trustStore = TrustStore()
+        // ~/Library/Application Support/Claude Statistics/Plugins and
+        // are gated by `PluginTrustGate`: previously-allowed plugins
+        // load, previously-denied plugins are skipped, and unknown
+        // plugins are queued for the post-launch NSAlert prompt.
         if let pluginsDir = Bundle.main.builtInPlugInsURL {
             let report = PluginLoader.loadAll(
                 from: pluginsDir,
@@ -91,23 +91,10 @@ final class AppState: ObservableObject {
         let userReport = PluginLoader.loadAll(
             from: PluginLoader.defaultDirectory,
             into: registry,
-            trustEvaluator: { manifest, url in
-                switch trustStore.decision(for: manifest, bundleURL: url) {
-                case .allowed: return true
-                case .denied: return false
-                case .none:
-                    // S5b TODO: prompt the user. Until the UI lands, an
-                    // unknown user-installed plugin is auto-allowed AND
-                    // recorded so the file accumulates real decisions
-                    // even before the prompt exists. Flip this default
-                    // to false the moment the prompt sheet ships.
-                    trustStore.record(.allowed, for: manifest, bundleURL: url)
-                    return true
-                }
-            }
+            trustEvaluator: PluginTrustGate.evaluate
         )
         DiagnosticLogger.shared.info(
-            "PluginLoader (user): loaded=\(userReport.loaded.count) skipped=\(userReport.skipped.count)"
+            "PluginLoader (user): loaded=\(userReport.loaded.count) skipped=\(userReport.skipped.count) pending=\(PluginTrustGate.snapshotPending().count)"
         )
         // Teach `TerminalRegistry` about every terminal plugin's bundle
         // ids and `terminalNameAliases`. Bundle ids let `ProcessTreeWalker`
@@ -240,6 +227,14 @@ final class AppState: ObservableObject {
         // closures can read `pluginRegistry`.
         wirePluginProviderInstances()
         wirePluginFocusStrategyResolver()
+
+        // Drain the trust queue collected during plugin discovery. Run
+        // off the current call stack so the menu-bar / status panel
+        // finishes its first layout before any modal NSAlert appears —
+        // a modal during stored-property init blocks AppKit setup.
+        DispatchQueue.main.async {
+            PluginTrustGate.processPending()
+        }
     }
 
     /// VM getter that maps a provider kind to its live UsageViewModel.
