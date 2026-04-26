@@ -284,6 +284,89 @@ final class ShareDescriptorTests: XCTestCase {
     }
 }
 
+/// `TrustStore` is the only gate between "plugin binary on disk" and
+/// "plugin code running in our process" (Q2 chose no mandatory
+/// signing). These tests pin down the contract so a regression
+/// quietly losing the file or skipping the hash would surface.
+final class TrustStoreTests: XCTestCase {
+    private var sandbox: URL!
+    private var storeURL: URL!
+
+    override func setUpWithError() throws {
+        sandbox = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("TrustStoreTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: sandbox, withIntermediateDirectories: true)
+        storeURL = sandbox.appendingPathComponent("trust.json")
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: sandbox)
+    }
+
+    private func makeBundle(infoPlist contents: String, name: String = "sample") throws -> URL {
+        let bundleURL = sandbox.appendingPathComponent("\(name).csplugin", isDirectory: true)
+        let contentsDir = bundleURL.appendingPathComponent("Contents", isDirectory: true)
+        try FileManager.default.createDirectory(at: contentsDir, withIntermediateDirectories: true)
+        try contents.write(
+            to: contentsDir.appendingPathComponent("Info.plist"),
+            atomically: true,
+            encoding: .utf8
+        )
+        return bundleURL
+    }
+
+    private let sampleManifest = PluginManifest(
+        id: "com.example.sample",
+        kind: .terminal,
+        displayName: "Sample",
+        version: SemVer(major: 1, minor: 0, patch: 0),
+        minHostAPIVersion: SemVer(major: 0, minor: 1, patch: 0),
+        permissions: [],
+        principalClass: "SamplePlugin"
+    )
+
+    func testFreshStoreReturnsNilDecision() throws {
+        let bundle = try makeBundle(infoPlist: "<plist>v1</plist>")
+        let store = TrustStore(storeURL: storeURL)
+        XCTAssertNil(store.decision(for: sampleManifest, bundleURL: bundle))
+    }
+
+    func testRecordedDecisionPersistsAcrossInstances() throws {
+        let bundle = try makeBundle(infoPlist: "<plist>v1</plist>")
+        let store = TrustStore(storeURL: storeURL)
+        store.record(.allowed, for: sampleManifest, bundleURL: bundle)
+
+        let reopened = TrustStore(storeURL: storeURL)
+        XCTAssertEqual(reopened.decision(for: sampleManifest, bundleURL: bundle), .allowed)
+    }
+
+    func testHashChangeInvalidatesDecision() throws {
+        // A swapped Info.plist (e.g. plugin upgrade) yields a different
+        // hash, so the previously-recorded decision should not apply.
+        let bundle = try makeBundle(infoPlist: "<plist>v1</plist>")
+        let store = TrustStore(storeURL: storeURL)
+        store.record(.allowed, for: sampleManifest, bundleURL: bundle)
+
+        // Overwrite the Info.plist contents to simulate an update.
+        let infoURL = bundle.appendingPathComponent("Contents/Info.plist")
+        try "<plist>v2</plist>".write(to: infoURL, atomically: true, encoding: .utf8)
+
+        let reopened = TrustStore(storeURL: storeURL)
+        XCTAssertNil(reopened.decision(for: sampleManifest, bundleURL: bundle))
+    }
+
+    func testClearAllRemovesFile() throws {
+        let bundle = try makeBundle(infoPlist: "<plist>v1</plist>")
+        let store = TrustStore(storeURL: storeURL)
+        store.record(.denied, for: sampleManifest, bundleURL: bundle)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: storeURL.path))
+
+        store.clearAll()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: storeURL.path))
+        XCTAssertNil(store.decision(for: sampleManifest, bundleURL: bundle))
+    }
+}
+
 /// Coverage for `PluginLoader`'s discovery + skip paths. The happy
 /// path (a bundle that actually loads via `dlopen`) lives in S3's
 /// integration test once `.csplugin` build products exist; here we
