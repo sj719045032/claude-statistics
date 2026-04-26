@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-04-26T10:00:00Z",
+  "entries": [
+    {
+      "id": "com.anthropic.claudefordesktop",
+      "name": "Claude (chat app)",
+      "description": "Focus Claude.app sessions via claude://claude.ai/resume deep-link, so the notch click lands on the matching conversation instead of just activating the app.",
+      "author": "Stone",
+      "homepage": "https://github.com/sj719045032/claude-statistics",
+      "category": "chat-app",
+      "version": "1.0.0",
+      "minHostAPIVersion": "0.1.0",
+      "downloadURL": "https://github.com/sj719045032/claude-statistics/releases/download/v3.1.0/ClaudeAppPlugin-1.0.0.csplugin.zip",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "iconURL": "https://raw.githubusercontent.com/sj719045032/claude-statistics-plugins/main/icons/claude-app.png",
+      "permissions": []
+    },
+    {
+      "id": "com.openai.codex",
+      "name": "Codex (chat app)",
+      "description": "Focus Codex.app threads via codex://threads/<uuid> deep-link, plus a session filter that suppresses the host app's synthetic Ambient Suggestions prompts.",
+      "author": "Stone",
+      "homepage": "https://github.com/sj719045032/claude-statistics",
+      "category": "chat-app",
+      "version": "1.0.0",
+      "minHostAPIVersion": "0.1.0",
+      "downloadURL": "https://github.com/sj719045032/claude-statistics/releases/download/v3.1.0/CodexAppPlugin-1.0.0.csplugin.zip",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "iconURL": "https://raw.githubusercontent.com/sj719045032/claude-statistics-plugins/main/icons/codex-app.png",
+      "permissions": []
+    }
+  ]
+}
