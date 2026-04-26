@@ -33,6 +33,7 @@
 		1C9EA99BDDFA0B81024BBB99 /* NotificationTimerStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2292302272EF00BEA6426BAA /* NotificationTimerStore.swift */; };
 		1D84A21259B5673F6ABDFCC1 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36F9BBB23CB057720EA99A7B /* Session.swift */; };
 		1DD56466FA2EB5FEF570FF9B /* ProjectAnalyticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E61FA41EAFBAE59342A3A526 /* ProjectAnalyticsView.swift */; };
+		1E2CC52AB7A8D46F89D80409 /* ModelUsage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70F462C9C11FCDC4B51D2D3 /* ModelUsage.swift */; };
 		1EC241EE092A30A2D08C2328 /* CodexHookNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 144DFB7A5B248A8375CDA9EE /* CodexHookNormalizer.swift */; };
 		1FFDAA9375AEB76CB9862CF3 /* SemVer.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBBEE45A24DCB72DA07ECD79 /* SemVer.swift */; };
 		205CC763247D474FFE1ED691 /* ProviderPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62572A1901D430E3E24CB02D /* ProviderPlugin.swift */; };
@@ -465,6 +466,7 @@
 		B2F24500B4C9F3F375B97402 /* TerminalAppleScriptRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalAppleScriptRunner.swift; sourceTree = "<group>"; };
 		B466FB316C76AB0C39E12E7B /* DiagnosticLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogger.swift; sourceTree = "<group>"; };
 		B5C4223D247CA4D681A19D53 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B70F462C9C11FCDC4B51D2D3 /* ModelUsage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelUsage.swift; sourceTree = "<group>"; };
 		B71EA214A4CBCF6BFE070E4A /* TerminalIdentityResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalIdentityResolver.swift; sourceTree = "<group>"; };
 		B781AB1E0AD0CC70F783E1F7 /* ActiveToolsAggregator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveToolsAggregator.swift; sourceTree = "<group>"; };
 		B7AD5E89B648F5018E34233A /* UpdaterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdaterService.swift; sourceTree = "<group>"; };
@@ -686,6 +688,7 @@
 				5751B5879E1EAFCE00A80DAC /* DaySlice.swift */,
 				27777E73284A897EEB72F952 /* MenuBarStrip.swift */,
 				52E462E75817E26A0FBF0558 /* ModelTokenStats.swift */,
+				B70F462C9C11FCDC4B51D2D3 /* ModelUsage.swift */,
 				4AE5B40BC767A244E2DA372A /* NotchEventKind.swift */,
 				33BC12E3CC3D917EBF49D537 /* Plugin.swift */,
 				1D22B04AA6887462F066799E /* PluginManifest.swift */,
@@ -1370,6 +1373,7 @@
 				21492C1C67351582F64D20A1 /* DaySlice.swift in Sources */,
 				CD37F1D530329EE443219A6B /* MenuBarStrip.swift in Sources */,
 				64F04CD80957EA08D6B2B1C7 /* ModelTokenStats.swift in Sources */,
+				1E2CC52AB7A8D46F89D80409 /* ModelUsage.swift in Sources */,
 				735FD3D1F37B307E1FCAAC53 /* NotchEventKind.swift in Sources */,
 				165267DE9A01FBED2611E29F /* Plugin.swift in Sources */,
 				D0AA811ABFBE719E0E045FAB /* PluginManifest.swift in Sources */,

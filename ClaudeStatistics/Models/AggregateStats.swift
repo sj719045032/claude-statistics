@@ -264,19 +264,4 @@ struct PeriodStats: Identifiable {
     }
 }
 
-struct ModelUsage: Identifiable {
-    let model: String
-    var inputTokens: Int = 0
-    var outputTokens: Int = 0
-    var cacheCreation5mTokens: Int = 0
-    var cacheCreation1hTokens: Int = 0
-    var cacheCreationTotalTokens: Int = 0
-    var cacheReadTokens: Int = 0
-    var cost: Double = 0
-    var sessionCount: Int = 0
-    var messageCount: Int = 0
-    var isEstimated: Bool = false
-
-    var id: String { model }
-    var totalTokens: Int { inputTokens + outputTokens + cacheCreationTotalTokens + cacheReadTokens }
-}
+// ModelUsage lives in ClaudeStatisticsKit.
