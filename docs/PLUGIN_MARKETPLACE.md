@@ -399,4 +399,95 @@ Marketplace 让"发现 + 安装 + 升级 + 删除"四件事变成 GUI 操作。M
 
 ---
 
-**文档终**。Phase 1 启动信号：用户确认本文档后，从 Phase 1.1 (`PluginManifest.category` 字段) 开始。
+## 12. 运营 Runbook
+
+主作者按 §9 推完代码后，marketplace 真正运转还差三件事：把 catalog repo 推上去（一次性）、把 `.csplugin.zip` 发布到 GitHub Releases（每次 release）、合并第三方提交的 PR（持续）。
+
+### 12.1 首次启动 catalog repo（一次性）
+
+```bash
+# 1. 在 GitHub 上手动创建空 repo: github.com/sj719045032/claude-statistics-plugins
+#    （public，不要 init README，因为模板自带）
+
+# 2. 把主仓 marketplace-template/ 内容推到独立 repo
+cd marketplace-template
+git init -b main
+git add .
+git commit -m "init: catalog v1 with ClaudeAppPlugin and CodexAppPlugin samples"
+git remote add origin git@github.com:sj719045032/claude-statistics-plugins.git
+git push -u origin main
+
+# 3. 验证主 App 端能拉到
+curl -fsSL https://raw.githubusercontent.com/sj719045032/claude-statistics-plugins/main/index.json | python3 -m json.tool
+
+# 4. 启动 Claude Statistics → Settings → Plugins → Discover
+#    应看到两个 entry，Status bar 显示 "Live"
+```
+
+完成后 `marketplace-template/` 在主仓中**不再需要更新** —— 后续 catalog 维护直接在独立 repo 上做。可以选择 `git rm -r marketplace-template/` 把模板从主仓删除（保留在 git history），或者保留作为对照。
+
+### 12.2 每次 release 时同步发布 .csplugin.zip
+
+`scripts/release.sh <version>` 当前不打包 `.csplugin`。直到加进去之前，手动一次（每个 builtin .csplugin 走一遍）：
+
+```bash
+VERSION=3.1.0
+APP_PATH="$(realpath build/Release/Claude\ Statistics.app)"
+
+cd "$APP_PATH/Contents/PlugIns"
+for plugin in *.csplugin; do
+    name="${plugin%.csplugin}"
+    zip -rq "/tmp/${name}-${VERSION}.csplugin.zip" "$plugin"
+    echo "$name"
+    shasum -a 256 "/tmp/${name}-${VERSION}.csplugin.zip"
+done
+
+# 把 zip 上传到 v$VERSION 的 GitHub Release
+gh release upload "v$VERSION" \
+    /tmp/ClaudeAppPlugin-${VERSION}.csplugin.zip \
+    /tmp/CodexAppPlugin-${VERSION}.csplugin.zip
+```
+
+记下每个 zip 的 sha256，到 catalog repo 更新 `index.json`：
+
+```bash
+# 在 catalog repo
+git pull
+# 编辑 index.json，把对应 entry 的:
+#   - downloadURL 替换成 https://github.com/sj719045032/claude-statistics/releases/download/v$VERSION/<name>-$VERSION.csplugin.zip
+#   - sha256 替换成上一步打印的实际值
+#   - version 跟 release 对齐
+#   - updatedAt 改成当前 ISO-8601
+git diff  # 校验
+git commit -am "release: bump <plugin> to v$VERSION"
+git push
+```
+
+24h 内（或用户点 Discover Refresh）所有用户的 Discover 会看到新版本，已安装的会显示 "Update to v$VERSION" 按钮。
+
+### 12.3 合并第三方 PR
+
+PR 进来时主作者按 `marketplace-template/submissions-template.md` 的 check-list 走：
+
+1. **下载** entry.downloadURL，校验 `shasum -a 256` 匹配 entry.sha256
+2. **解压**，验证 `<id>.csplugin/Contents/Info.plist` 中 `CSPluginManifest.id` 等于 entry.id（防 ID 串号）
+3. **本地装载**：拷到 `~/Library/Application Support/Claude Statistics/Plugins/`，重启 → Allow → 验证功能
+4. **声明的 permissions** 是否合理 —— 没有声明却使用 keychain / 网络的应被拒
+5. **作者身份** —— 通过 PR 作者 GitHub profile 大致判断；不强求实名
+6. **license** —— PR 描述里要附 plugin 自身 license（Marketplace 不限制 license 类型，但要透明）
+
+合并即生效（GitHub raw CDN ≤ 5 分钟）。撤回机制：发现恶意 plugin 时直接 revert PR + 在主仓发 GitHub Security Advisory；用户下次打开 Discover 会看到该 entry 消失，但**已安装的 plugin 不会自动卸载**（macOS 限制）—— 安全公告会指引用户手动 Uninstall。
+
+### 12.4 future 自动化
+
+值得在 `scripts/release.sh` 中集成的事（按优先级）：
+
+1. **打包 `.csplugin.zip` + 算 sha256 + 写到一个 release 摘要文件**（每次 release 自动）
+2. **把摘要文件转成 `index.json` patch + 在 catalog repo 自动 PR**（半自动）
+3. **catalog repo 的 GitHub Action 校验 PR**（自动跑 12.3 第 1-2 步）
+
+目前都是手动，等 marketplace dogfood 几个月后再决定是否值得做。
+
+---
+
+**文档终**。Phase 1 启动信号已发：本文档作为运营手册持续维护。
