@@ -182,6 +182,7 @@
 		B94C016E1EDF5D5940A78026 /* TrendDataPoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5CD3EF8FA91298047B26D20 /* TrendDataPoint.swift */; };
 		B98C3A36B759BBAD6E398BCA /* DaySlice+Pricing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CE65D192C24051486ABF875 /* DaySlice+Pricing.swift */; };
 		BB9902B8A5E35FB7C78F63F0 /* SharePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52FF7E2030D328036A1F8F6D /* SharePreviewView.swift */; };
+		BC186868FB56DC3ED72EC57E /* StatusLineInstalling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDE956A15BE7200F87C51D4 /* StatusLineInstalling.swift */; };
 		BC65FB4B58BE9FD0EBB88C70 /* AppleScriptFocuser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 645A6AB9436D7D2577DAE9D8 /* AppleScriptFocuser.swift */; };
 		BDBBC60B4BA024F4BF03D8EF /* BuiltinProviderPlugins.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2365B90C4B9B32DEA0C8687B /* BuiltinProviderPlugins.swift */; };
 		BE4FDED4356AA89774DF4B8A /* TerminalPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7D5709A13CDC7751084AAF /* TerminalPreferences.swift */; };
@@ -412,6 +413,7 @@
 		6A32D01DDF055A652F2C104D /* ProcessTreeWalker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessTreeWalker.swift; sourceTree = "<group>"; };
 		6A3763EF17B80F22CAE77EB0 /* ProviderDescriptor+Builtins.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProviderDescriptor+Builtins.swift"; sourceTree = "<group>"; };
 		6AE7C2A2D6731BCD2D826C90 /* ProviderRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderRegistry.swift; sourceTree = "<group>"; };
+		6BDE956A15BE7200F87C51D4 /* StatusLineInstalling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusLineInstalling.swift; sourceTree = "<group>"; };
 		6E1B839DD5F15A6A55AE3727 /* StatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsView.swift; sourceTree = "<group>"; };
 		6EF25B053D417EBE841F89B8 /* CodexHookNormalizerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexHookNormalizerTests.swift; sourceTree = "<group>"; };
 		6F0F61EEF95C517CC0B363C3 /* ShareMetricsBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareMetricsBuilder.swift; sourceTree = "<group>"; };
@@ -713,6 +715,7 @@
 				5CD1ED6FFA7F2E34B7D30B11 /* SessionWatcher.swift */,
 				0398E20299823326D6ED583C /* ShareCardThemePlugin.swift */,
 				4CF4AF3083144F9E8BD8D7B0 /* ShareRolePlugin.swift */,
+				6BDE956A15BE7200F87C51D4 /* StatusLineInstalling.swift */,
 				674E66F9A30A6F1F06738D75 /* StatusLineLegend.swift */,
 				0ECBB3BD210EF8857D8C47D5 /* TerminalDescriptor.swift */,
 				44B525D19903D64B4730721F /* TerminalLaunchRequest.swift */,
@@ -1401,6 +1404,7 @@
 				FECA968C6FFB6D03649EB114 /* SessionWatcher.swift in Sources */,
 				A830A50BBE76ECD3E3990820 /* ShareCardThemePlugin.swift in Sources */,
 				6D53771D8F61F6149FD50D46 /* ShareRolePlugin.swift in Sources */,
+				BC186868FB56DC3ED72EC57E /* StatusLineInstalling.swift in Sources */,
 				37869D180C4DB3C69261C9F4 /* StatusLineLegend.swift in Sources */,
 				958399C6649B42239B5909AE /* TerminalDescriptor.swift in Sources */,
 				C8359F096BA8063C42EBC8BD /* TerminalLaunchRequest.swift in Sources */,

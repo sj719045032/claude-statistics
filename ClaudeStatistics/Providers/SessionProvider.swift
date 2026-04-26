@@ -32,24 +32,7 @@ protocol ProviderPricingFetching {
 
 // StatusLineLegendItem and StatusLineLegendSection live in ClaudeStatisticsKit.
 
-/// Encapsulates statusline install/restore operations for a specific provider.
-/// Title and description localization keys are plain strings to avoid SwiftUI import.
-protocol StatusLineInstalling {
-    var isInstalled: Bool { get }
-    /// Whether a restore/rollback option is available
-    var hasRestoreOption: Bool { get }
-    var titleLocalizationKey: String { get }
-    var descriptionLocalizationKey: String { get }
-    var legendSections: [StatusLineLegendSection] { get }
-    func install() throws
-    func restore() throws
-}
-
-extension StatusLineInstalling {
-    var hasRestoreOption: Bool { false }
-    var legendSections: [StatusLineLegendSection] { [] }
-    func restore() throws {}
-}
+// StatusLineInstalling lives in ClaudeStatisticsKit.
 
 // MARK: - Capability protocols
 //
