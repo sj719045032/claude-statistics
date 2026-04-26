@@ -1314,8 +1314,8 @@ graph LR
 - ⏸️ Terminal plugin behavior 第二波协议接口已搬完（readiness + setup wizard）；8 个 builtin terminal capability 的具体行为代码下沉到独立 plugin target 仍待阶段 4 完成
 - ⏸️ 删除 `TerminalFocusRoute` enum + `TerminalFocusRouteRegistry`：当前 plugin 工厂仍通过 `TerminalFocusRouteRegistry.handler(for: capability.route)` 查 strategy，第三方 plugin 加载（M2）后可直接持有自己的 strategy 实例，届时 route layer 即可退役
 - ⏸️ Share role plugin（拆分 1177 行 `ShareRoleEngine` 为 9 个独立 RoleScorer，搬到 `OfficialShareRolesPlugin`）— 阶段 4 子任务
-- ⏸️ Bundle (`.csplugin`) 加载机制 + `disable-library-validation` entitlement — 阶段 5 (M2)
-- ⏸️ Plugin permission prompt + `trust.json` UI — 阶段 5 (M3)
+- ⏸️ Bundle (`.csplugin`) 加载机制 + `disable-library-validation` entitlement — 阶段 5 (M2)。M2 第一个样本：`ClaudeAppPlugin` / `CodexAppPlugin`（已是独立 framework target，最接近 plugin 形态）抽出为 `.csplugin`；之后 8 terminal + 3 provider 跟进。**不强制签名**（见 Q2）
+- ⏸️ Plugin permission prompt + `trust.json` UI — 阶段 5 (M3)，但因 Q2 选了"不强制签名"，trust prompt 提前到 M2（loader 落地时同步实现，否则未签名 plugin 直接拒装等于把决策推回去）
 - ✅ `ProviderRegistry.provider(for:)` switch → plugin lookup（NSLock-guarded dynamic store；switch 保留为 fallback）
 
 **结论**：v4.0-alpha 协议表面工作圆满收尾。核心成就 — 第三方开发者已可基于 `ClaudeStatisticsKit` 构建完整 provider plugin，无需任何 host 类型依赖。下一步重点转向 Terminal/Share plugin 拆分（阶段 4）和 bundle 加载（阶段 5）。
@@ -1423,10 +1423,10 @@ graph LR
 
 需要在动手前拍板的关键问题：
 
-| ID | 决策 | 影响 | 倾向 |
+| ID | 决策 | 影响 | 当前结论 |
 |---|---|---|---|
-| **Q1** | 主 App 是否加 entitlement `com.apple.security.cs.disable-library-validation`？ | 是动态加载第三方 plugin 的前提；放弃苹果库校验保护 | 倾向"是"，里程碑 M2 启用 |
-| **Q2** | 第三方 plugin 是否强制 Developer ID 签名 + Notarization？ | 强制 = 用户体验好；不强制 = 社区门槛低 | 倾向"强制 + 开发者模式开关豁免" |
+| **Q1** | 主 App 是否加 entitlement `com.apple.security.cs.disable-library-validation`？ | 是动态加载第三方 plugin 的前提；放弃苹果库校验保护 | ✅ **是**：M2 实施 `.csplugin` 加载时启用。Debug 不强制（hardened runtime OFF）；Release 进 notarization 流程时同步打开 hardened runtime 并加该 entitlement |
+| **Q2** | 第三方 plugin 是否强制 Developer ID 签名 + Notarization？ | 强制 = 用户体验好；不强制 = 社区门槛低 | ✅ **不强制**：plugin 可以未签名。安全模型由 (a) plugin 目录隔离 (`~/Library/Application Support/Claude Statistics/Plugins/`) (b) `PluginManifest.permissions` 声明 (c) 首次加载 trust prompt + `trust.json` 共同承担。签名只是显示给用户的额外信任信号，不是强制条件 |
 | **Q3** | 是否需要 `.cspluginx`（独立进程 + JSON-RPC）模式？ | 工程量翻倍但社区可用任意语言写 | 倾向"M3 之后再做"，不阻塞 M1-M2 |
 | **Q4** | `ClaudeStatisticsKit.xcframework` 是否独立成 GitHub 仓库？ | 独立 = 第三方易发现、版本清晰；同仓 = 维护简单 | 倾向"独立仓库 + 主仓 submodule"，M3 时迁移 |
 | **Q5** | Plugin permission prompt 的粒度？文件系统是否细到子目录？ | 细 = 安全；粗 = 体验好 | 倾向"粗粒度（home/any 二级）+ 显示 plugin 自报用途" |
