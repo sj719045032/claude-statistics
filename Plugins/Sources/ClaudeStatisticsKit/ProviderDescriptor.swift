@@ -30,6 +30,11 @@ public struct ProviderDescriptor: Sendable {
     public let accentColor: Color
     /// `UserDefaults` key for this provider's notch master switch.
     public let notchEnabledDefaultsKey: String
+    /// Capability flags the host uses to gate UI. Defaulted to a
+    /// conservative all-`false` so plugins that don't care can omit
+    /// the parameter; the host treats these as "feature unsupported"
+    /// rather than "feature not yet declared".
+    public let capabilities: ProviderCapabilities
     /// Maps the provider's raw tool name (already lower-cased and
     /// underscore-normalized) to the shared canonical vocabulary
     /// (`edit`, `bash`, `read`, …). Returning `nil` lets the kernel
@@ -43,6 +48,15 @@ public struct ProviderDescriptor: Sendable {
         iconAssetName: String,
         accentColor: Color,
         notchEnabledDefaultsKey: String,
+        capabilities: ProviderCapabilities = ProviderCapabilities(
+            supportsCost: false,
+            supportsUsage: false,
+            supportsProfile: false,
+            supportsStatusLine: false,
+            supportsExactPricing: false,
+            supportsResume: false,
+            supportsNewSession: false
+        ),
         resolveToolAlias: @escaping @Sendable (String) -> String?
     ) {
         self.id = id
@@ -50,6 +64,7 @@ public struct ProviderDescriptor: Sendable {
         self.iconAssetName = iconAssetName
         self.accentColor = accentColor
         self.notchEnabledDefaultsKey = notchEnabledDefaultsKey
+        self.capabilities = capabilities
         self.resolveToolAlias = resolveToolAlias
     }
 }
