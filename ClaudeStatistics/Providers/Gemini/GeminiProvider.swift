@@ -5,6 +5,7 @@ final class GeminiProvider: SessionProvider, @unchecked Sendable {
     static let shared = GeminiProvider()
 
     let kind: ProviderKind = .gemini
+    var providerId: String { kind.rawValue }
     let displayName = ProviderKind.gemini.displayName
     let capabilities = ProviderCapabilities.gemini
     let usageSource: (any ProviderUsageSource)? = GeminiUsageService.shared

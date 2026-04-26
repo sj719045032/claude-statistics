@@ -1,7 +1,8 @@
 import Foundation
+import ClaudeStatisticsKit
 
 struct GeminiHookInstaller: HookInstalling {
-    let provider: ProviderKind = .gemini
+    let providerId: String = ProviderKind.gemini.rawValue
 
     private static let scriptName = "claude-stats-gemini-hook"
     private static let managedMarkers = [
@@ -44,7 +45,7 @@ struct GeminiHookInstaller: HookInstalling {
     }
 
     private var commandPath: String {
-        HookInstallerUtils.currentHookCommand(provider: provider)
+        HookInstallerUtils.currentHookCommand(providerId: providerId)
     }
 
     var isInstalled: Bool {

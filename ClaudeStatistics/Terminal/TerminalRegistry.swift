@@ -61,8 +61,8 @@ enum TerminalRegistry {
         appCapabilities.compactMap { $0 as? any TerminalCapability & TerminalSetupProviding }
     }
 
-    static var launchingProviders: [any TerminalCapability & TerminalLaunching] {
-        appCapabilities.compactMap { $0 as? any TerminalCapability & TerminalLaunching }
+    static var launchingProviders: [any TerminalCapability & TerminalLauncher] {
+        appCapabilities.compactMap { $0 as? any TerminalCapability & TerminalLauncher }
     }
 
     static var directFocusProviders: [any TerminalCapability & TerminalDirectFocusing] {
@@ -189,7 +189,7 @@ enum TerminalRegistry {
 
     private static func launchCapability(
         for preferredOptionID: String
-    ) -> (any TerminalCapability & TerminalLaunching)? {
+    ) -> (any TerminalCapability & TerminalLauncher)? {
         if preferredOptionID != TerminalPreferences.autoOptionID {
             if let selected = launchingProviders.first(where: { $0.optionID == preferredOptionID }),
                selected.isInstalled {
@@ -202,9 +202,9 @@ enum TerminalRegistry {
         return autoLaunchCapability()
     }
 
-    private static func autoLaunchCapability() -> (any TerminalCapability & TerminalLaunching)? {
+    private static func autoLaunchCapability() -> (any TerminalCapability & TerminalLauncher)? {
         return launchingProviders
-            .compactMap { capability -> (priority: Int, capability: any TerminalCapability & TerminalLaunching)? in
+            .compactMap { capability -> (priority: Int, capability: any TerminalCapability & TerminalLauncher)? in
                 guard let priority = capability.autoLaunchPriority,
                       capability.isInstalled else {
                     return nil

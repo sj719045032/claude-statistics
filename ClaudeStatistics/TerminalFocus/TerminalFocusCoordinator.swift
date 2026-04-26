@@ -1,10 +1,39 @@
 import AppKit
 import Foundation
+import ClaudeStatisticsKit
 
 actor TerminalFocusCoordinator {
     static let shared = TerminalFocusCoordinator()
 
     private var cachedTargets: [String: TerminalFocusTarget] = [:]
+
+    /// Plugin-keyed focus-strategy resolver, populated at app launch by
+    /// `AppState`. When set, the coordinator consults the host's
+    /// `PluginRegistry` first — letting third-party terminal plugins
+    /// override the legacy route registry. When `nil` or when the
+    /// resolver returns `nil`, the coordinator falls back to the
+    /// builtin `TerminalFocusRouteRegistry`.
+    ///
+    /// In v4.0-alpha all builtin plugins forward to the route handler
+    /// for their bundle id, so plugin lookup and route lookup return
+    /// the same handler instance — Phase 4's purpose is to establish
+    /// the seam, not change behaviour.
+    private var pluginStrategyResolver: ((String?) async -> (any TerminalFocusStrategy)?)?
+
+    /// Called once by `AppState` after the plugin registry has finished
+    /// loading.
+    func setPluginStrategyResolver(_ resolver: @escaping (String?) async -> (any TerminalFocusStrategy)?) {
+        self.pluginStrategyResolver = resolver
+    }
+
+    private func resolveFocusStrategy(for target: TerminalFocusTarget) async -> (any TerminalFocusStrategy)? {
+        if let resolver = pluginStrategyResolver,
+           let strategy = await resolver(target.bundleId) {
+            return strategy
+        }
+        let route = TerminalRegistry.route(for: target.bundleId)
+        return TerminalFocusRouteRegistry.handler(for: route)
+    }
 
     nonisolated static func requestFocus(
         cacheKey: String,
@@ -158,8 +187,8 @@ actor TerminalFocusCoordinator {
             "Terminal focus direct route=\(String(describing: route)) key=\(cacheKey) bundle=\(target.bundleId ?? "?") pid=\(target.terminalPid.map(String.init) ?? "-") tty=\(target.tty ?? "-") cwd=\(target.projectPath ?? "-") socket=\(target.terminalSocket ?? "-") tabID=\(target.terminalTabID ?? "-") stableID=\(target.terminalStableID ?? "-")"
         )
 
-        guard let handler = TerminalFocusRouteRegistry.handler(for: route),
-              let result = await handler.directFocus(target: target) else {
+        guard let strategy = await resolveFocusStrategy(for: target),
+              let result = await strategy.directFocus(target: target) else {
             recoverCachedIdentityAfterDirectFocusFailure(target: target, cacheKey: cacheKey)
             DiagnosticLogger.shared.warning("Terminal focus direct miss key=\(cacheKey) bundle=\(target.bundleId ?? "?")")
             return nil
@@ -182,8 +211,8 @@ actor TerminalFocusCoordinator {
             "Terminal focus route=\(String(describing: route)) key=\(cacheKey) bundle=\(target.bundleId ?? "?") pid=\(target.terminalPid.map(String.init) ?? "-") tty=\(target.tty ?? "-") cwd=\(target.projectPath ?? "-") socket=\(target.terminalSocket ?? "-") tabID=\(target.terminalTabID ?? "-") stableID=\(target.terminalStableID ?? "-")"
         )
 
-        guard let handler = TerminalFocusRouteRegistry.handler(for: route),
-              let result = await handler.resolvedFocus(target: target) else {
+        guard let strategy = await resolveFocusStrategy(for: target),
+              let result = await strategy.resolvedFocus(target: target) else {
             return nil
         }
         guard acceptsResolvedStableID(result.resolvedStableID, target: target, cacheKey: cacheKey) else {

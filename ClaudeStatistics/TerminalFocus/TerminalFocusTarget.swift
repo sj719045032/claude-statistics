@@ -1,81 +1,18 @@
 import Foundation
+import ClaudeStatisticsKit
 
-enum TerminalFocusCapability: Equatable, Sendable {
-    case ready
-    case appOnly
-    case requiresAccessibility
-    case unresolved
-}
-
-struct TerminalFocusTarget: Equatable, Sendable {
-    let terminalPid: pid_t?
-    let bundleId: String?
-    let tty: String?
-    let projectPath: String?
-    let terminalName: String?
-    let terminalSocket: String?
-    let terminalWindowID: String?
-    let terminalTabID: String?
-    let terminalStableID: String?
-    let capability: TerminalFocusCapability
-    let capturedAt: Date
-
-    var hasStableLocator: Bool {
-        bundleId != nil && (terminalStableID != nil || terminalTabID != nil || terminalWindowID != nil || projectPath != nil)
-    }
-
-    func isUsable(pidKnown: Bool) -> Bool {
-        let age = Date().timeIntervalSince(capturedAt)
-        if pidKnown {
-            return age < 30
-        }
-        return age < (hasStableLocator ? 1800 : 30)
-    }
-
-    func withStableTerminalID(
-        _ stableTerminalID: String?,
-        capturedAt: Date = Date()
-    ) -> TerminalFocusTarget {
-        TerminalFocusTarget(
-            terminalPid: terminalPid,
-            bundleId: bundleId,
-            tty: tty,
-            projectPath: projectPath,
-            terminalName: terminalName,
-            terminalSocket: terminalSocket,
-            terminalWindowID: terminalWindowID,
-            terminalTabID: terminalTabID,
-            terminalStableID: terminalStableID,
-            capability: capability,
-            capturedAt: capturedAt
-        )
-    }
-
-    func clearingTerminalIdentity(
-        capturedAt: Date = Date()
-    ) -> TerminalFocusTarget {
-        TerminalFocusTarget(
-            terminalPid: terminalPid,
-            bundleId: bundleId,
-            tty: tty,
-            projectPath: projectPath,
-            terminalName: terminalName,
-            terminalSocket: terminalSocket,
-            terminalWindowID: nil,
-            terminalTabID: nil,
-            terminalStableID: nil,
-            capability: capability,
-            capturedAt: capturedAt
-        )
-    }
-}
-
-struct TerminalProcess: Equatable, Sendable {
-    let pid: pid_t
-    let bundleId: String?
-}
+// `TerminalFocusTarget` / `TerminalFocusCapability` /
+// `TerminalProcess` / `TerminalFocusExecutionResult` all live in
+// `ClaudeStatisticsKit` so plugins implementing focus strategies can
+// reference them without depending on the host bundle. Host-only
+// extensions (like the legacy `withResolvedCapability` route lookup)
+// stay below.
 
 extension TerminalFocusTarget {
+    /// Host-only convenience that probes the registered route handler
+    /// and returns a copy stamped with the freshly resolved capability.
+    /// Used by code paths that captured a target at hook-fire time
+    /// before the strategy registry was warmed up.
     func withResolvedCapability() -> TerminalFocusTarget {
         let resolvedCapability = TerminalFocusRouteRegistry.handler(for: self)?
             .capability(for: self) ?? capability

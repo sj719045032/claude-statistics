@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 final class SessionScanner {
     static let shared = SessionScanner()
@@ -56,7 +57,7 @@ final class SessionScanner {
                 sessions.append(Session(
                     id: uniqueSessionId,
                     externalID: sessionId,
-                    provider: .claude,
+                    provider: ProviderKind.claude.rawValue,
                     projectPath: projectDir,
                     filePath: filePath,
                     startTime: nil,
@@ -82,50 +83,50 @@ final class SessionScanner {
         return uniqueSessionId(projectDirectory: projectDir, transcriptFileName: fileName)
     }
 
-    /// Read cwd from the transcript payload. In practice `cwd` is usually near
-    /// the start of the JSONL, so we scan the early bytes in small chunks first,
-    /// then keep reading to EOF only when needed to avoid false negatives.
+    /// Read cwd from the transcript payload. We stream the file in fixed chunks
+    /// and search a rolling window (previous tail + new chunk) for the
+    /// `"cwd":"` byte marker — never re-decoding the accumulated buffer. This
+    /// is O(file size) regardless of where cwd lives; the previous accumulate-
+    /// and-redecode-everything approach was O(N²) for files where cwd isn't in
+    /// the first 8 KB, which dominated CPU when 270 sessions get rescanned.
     private func readCwd(from path: String) -> String? {
         guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
         defer { handle.closeFile() }
 
-        var buffer = Data()
-        let initialChunkSize = 8192
-        let initialScanLimit = 131072
-        let fallbackChunkSize = 65536
+        let marker = Data("\"cwd\":\"".utf8)
+        let quote: UInt8 = 0x22  // "
+        let chunkSize = 16384
+        // Keep marker.count - 1 bytes from the previous chunk so a marker that
+        // straddles the chunk boundary is still found.
+        let overlap = marker.count - 1
+        // Cap the cwd value at 8 KB. Real paths are well under 1 KB; this just
+        // bounds memory if the closing quote is missing on a malformed line.
+        let valueLengthCap = 8192
 
-        func extractCwd(from buffer: Data) -> String? {
-            guard let content = String(data: buffer, encoding: .utf8),
-                  let range = content.range(of: "\"cwd\":\"") else {
-                return nil
-            }
-            let start = range.upperBound
-            guard let end = content[start...].firstIndex(of: "\"") else {
-                return nil
-            }
-            return String(content[start..<end])
-        }
-
-        while buffer.count < initialScanLimit {
-            let chunk = handle.readData(ofLength: initialChunkSize)
-            if chunk.isEmpty { break }
-            buffer.append(chunk)
-
-            if let cwd = extractCwd(from: buffer) {
-                return cwd
-            }
-        }
-
+        var window = Data()
         while true {
-            let chunk = handle.readData(ofLength: fallbackChunkSize)
-            if chunk.isEmpty { break }
-            buffer.append(chunk)
+            let chunk = handle.readData(ofLength: chunkSize)
+            if chunk.isEmpty { return nil }
+            window.append(chunk)
 
-            if let cwd = extractCwd(from: buffer) {
-                return cwd
+            if let markerRange = window.range(of: marker) {
+                let valueStart = markerRange.upperBound
+                var valueBuffer = Data(window[valueStart...])
+                while true {
+                    if let endOffset = valueBuffer.firstIndex(of: quote) {
+                        let valueData = valueBuffer[..<endOffset]
+                        return String(data: Data(valueData), encoding: .utf8)
+                    }
+                    if valueBuffer.count > valueLengthCap { return nil }
+                    let more = handle.readData(ofLength: chunkSize)
+                    if more.isEmpty { return nil }
+                    valueBuffer.append(more)
+                }
+            }
+
+            if window.count > overlap {
+                window.removeFirst(window.count - overlap)
             }
         }
-
-        return extractCwd(from: buffer)
     }
 }

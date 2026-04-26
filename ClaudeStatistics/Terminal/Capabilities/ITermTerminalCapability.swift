@@ -2,7 +2,7 @@ import AppKit
 import ClaudeStatisticsKit
 import Foundation
 
-struct ITermTerminalCapability: TerminalCapability, TerminalLaunching, TerminalFocusCapabilityProviding, TerminalDirectFocusing, TerminalReadinessProviding {
+struct ITermTerminalCapability: TerminalCapability, TerminalLauncher, TerminalFocusCapabilityProviding, TerminalDirectFocusing, TerminalReadinessProviding {
     let optionID: String? = TerminalPreferences.iTermOptionID
     let category: TerminalCapabilityCategory = .terminal
     let displayName = "iTerm2"

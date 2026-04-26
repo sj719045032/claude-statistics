@@ -314,20 +314,44 @@ struct AiderStatusLineAdapter: StatusLineInstalling {
 }
 ```
 
-### Data emission contract (still host-side in v4.0-alpha)
+### Data emission contract (now SDK-resident)
 
-Your provider also needs to emit session / usage / transcript data,
-but the protocols carrying those (`SessionDataProvider`,
-`UsageProvider`, `SessionLauncher`, `HookProvider`) currently still
-live in the host bundle. Stage-4 migrates them to the SDK. Until then,
-write the data-emission side as host-internal types referenced from
-your plugin's wrapper — see how the builtin `BuiltinProviderPlugins`
-forward `descriptor` while the heavy lifting stays in
-`Providers/<Name>/`.
+Your provider's session-data, launcher and hook integration all live in
+the SDK. Implement the relevant protocol on a host-internal type (or
+your plugin's wrapper) and return it from your `ProviderPlugin`.
 
-The neutral data types you'll produce are SDK-only:
+```swift
+public protocol SessionDataProvider: Sendable {
+    var providerId: String { get }              // matches manifest.id
+    var capabilities: ProviderCapabilities { get }
+    var configDirectory: String { get }
+    func scanSessions() -> [Session]
+    func makeWatcher(onChange: @escaping (Set<String>) -> Void) -> (any SessionWatcher)?
+    func parseQuickStats(at path: String) -> SessionQuickStats
+    func parseSession(at path: String) -> SessionStats
+    func parseMessages(at path: String) -> [TranscriptDisplayMessage]
+    func parseTrendData(from filePath: String, granularity: TrendGranularity) -> [TrendDataPoint]
+    // …+ overrideable defaults for changedSessionIds / parseSearchIndexMessages
+}
 
-- `Session` (still host-side; will move to SDK in stage 4)
+public protocol SessionLauncher: Sendable {
+    var displayName: String { get }
+    func openNewSession(_ session: Session)
+    func resumeSession(_ session: Session)
+    func openNewSession(inDirectory path: String)
+    func resumeCommand(for session: Session) -> String
+}
+
+public protocol HookProvider: Sendable {
+    var statusLineInstaller: (any StatusLineInstalling)? { get }
+    var notchHookInstaller: (any HookInstalling)? { get }
+    var supportedNotchEvents: Set<NotchEventKind> { get }
+}
+```
+
+Neutral data types you'll produce (all SDK-resident now):
+
+- `Session` ✓
 - `SessionStats` / `DaySlice` / `ModelTokenStats` ✓
 - `SessionQuickStats` ✓
 - `TranscriptDisplayMessage` ✓
@@ -578,35 +602,36 @@ for (id, plugin) in registry.terminals { ... }
 
 ## 11. Current limitations
 
-**v4.0-alpha is a metadata-and-data-model release.** What's stable today:
+**v4.0-alpha** ships the full behaviour-protocol surface for all five
+narrow capabilities. What's stable today:
 
 - ✅ `Plugin` / `PluginManifest` / `PluginRegistry` (full)
 - ✅ `ProviderDescriptor` / `TerminalDescriptor` / `ShareRoleDescriptor` /
   `ShareCardThemeDescriptor` (full)
+- ✅ `Session` struct (provider field is `String descriptor.id`)
 - ✅ `AccountProvider` / `StatusLineInstalling` / `SessionWatcher` (full)
+- ✅ `SessionDataProvider` (`providerId: String` identity, no `ProviderKind`)
+- ✅ `SessionLauncher` (open / resume / spawn-in-directory)
+- ✅ `HookInstalling` + `HookInstallResult` (`providerId: String` field)
+- ✅ `HookProvider` (statusline + notch hook installer factories)
+- ✅ `UsageProvider` (quota windows + pricing + menu-bar strip)
+- ✅ `ProviderUsageSource` (live API quota fetching)
+- ✅ `ProviderPricingFetching` (remote pricing refresh)
+- ✅ `ModelPricingRates` (per-million-token rate struct)
 - ✅ All neutral data models (full)
 
-What's still host-side, scheduled for stage-4:
+What's still host-side, last item on the cleanup list:
 
-- ⏳ `SessionDataProvider` protocol (the `scanSessions` / `parseSession`
-  / `parseMessages` / `makeWatcher` factory)
-- ⏳ `UsageProvider` protocol (the `usageSource` / `pricingFetcher` /
-  `menuBarStripSegments` factory) — `ProviderUsageSource` and
-  `ProviderPricingFetching` it depends on are also still host-side
-- ⏳ `HookProvider` protocol — `HookInstalling` it references is also
-  host-side and currently has a `provider: ProviderKind` field that
-  blocks SDK migration
-- ⏳ `SessionLauncher` protocol — references `Session`
-- ⏳ `Session` struct — has a `provider: ProviderKind` field; will
-  migrate after `ProviderKind` enum is demoted to `String descriptor.id`
-- ⏳ `HookPayload` / `HookAction` types
+- ⏳ `ProviderKind` enum demotion — the closed enum is no longer
+  required by any SDK protocol, but ~30 host call sites still
+  `switch` on it (HookCLI dispatch, Settings UI, several ViewModels).
+  Pure host cleanup; doesn't block third-party plugins.
 
-**Practical impact**: today you can ship a plugin that contributes
-descriptor + account + statusline data, but the heavy session-scanning /
-parsing / hook installation has to live as a host-internal type that
-your plugin's `descriptor`-only wrapper points the host at. Once
-stage-4 lands, you'll be able to author a fully self-contained plugin
-that compiles against `ClaudeStatisticsKit` only.
+**Practical impact**: today you can author a fully self-contained
+provider plugin against `ClaudeStatisticsKit` end-to-end. Session
+scanning, parsing, launching (new / resume), hook installation,
+statusline integration, account profile fetching, quota window
+tracking, pricing — all SDK-resident.
 
 The **`PluginPermission` system itself isn't enforced yet**. Permissions
 declared in the manifest are recorded but the host doesn't gate

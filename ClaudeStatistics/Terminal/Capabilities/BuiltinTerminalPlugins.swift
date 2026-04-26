@@ -25,6 +25,12 @@ final class ITermPlugin: TerminalPlugin {
     private let capability = ITermTerminalCapability()
     var descriptor: TerminalDescriptor { capability.descriptor }
     func detectInstalled() -> Bool { capability.isInstalled }
+    func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
+        TerminalFocusRouteRegistry.handler(for: capability.route)
+    }
+    func makeLauncher() -> (any TerminalLauncher)? {
+        capability as? any TerminalLauncher
+    }
     init() {}
 }
 
@@ -41,6 +47,12 @@ final class AppleTerminalPlugin: TerminalPlugin {
     private let capability = AppleTerminalCapability()
     var descriptor: TerminalDescriptor { capability.descriptor }
     func detectInstalled() -> Bool { capability.isInstalled }
+    func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
+        TerminalFocusRouteRegistry.handler(for: capability.route)
+    }
+    func makeLauncher() -> (any TerminalLauncher)? {
+        capability as? any TerminalLauncher
+    }
     init() {}
 }
 
@@ -57,6 +69,12 @@ final class GhosttyPlugin: TerminalPlugin {
     private let capability = GhosttyTerminalCapability()
     var descriptor: TerminalDescriptor { capability.descriptor }
     func detectInstalled() -> Bool { capability.isInstalled }
+    func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
+        TerminalFocusRouteRegistry.handler(for: capability.route)
+    }
+    func makeLauncher() -> (any TerminalLauncher)? {
+        capability as? any TerminalLauncher
+    }
     init() {}
 }
 
@@ -73,6 +91,12 @@ final class KittyPlugin: TerminalPlugin {
     private let capability = KittyTerminalCapability()
     var descriptor: TerminalDescriptor { capability.descriptor }
     func detectInstalled() -> Bool { capability.isInstalled }
+    func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
+        TerminalFocusRouteRegistry.handler(for: capability.route)
+    }
+    func makeLauncher() -> (any TerminalLauncher)? {
+        capability as? any TerminalLauncher
+    }
     init() {}
 }
 
@@ -89,6 +113,12 @@ final class WezTermPlugin: TerminalPlugin {
     private let capability = WezTermTerminalCapability()
     var descriptor: TerminalDescriptor { capability.descriptor }
     func detectInstalled() -> Bool { capability.isInstalled }
+    func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
+        TerminalFocusRouteRegistry.handler(for: capability.route)
+    }
+    func makeLauncher() -> (any TerminalLauncher)? {
+        capability as? any TerminalLauncher
+    }
     init() {}
 }
 
@@ -105,6 +135,12 @@ final class WarpPlugin: TerminalPlugin {
     private let capability = WarpTerminalCapability()
     var descriptor: TerminalDescriptor { capability.descriptor }
     func detectInstalled() -> Bool { capability.isInstalled }
+    func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
+        TerminalFocusRouteRegistry.handler(for: capability.route)
+    }
+    func makeLauncher() -> (any TerminalLauncher)? {
+        capability as? any TerminalLauncher
+    }
     init() {}
 }
 
@@ -121,5 +157,11 @@ final class EditorPlugin: TerminalPlugin {
     private let capability = EditorTerminalCapability()
     var descriptor: TerminalDescriptor { capability.descriptor }
     func detectInstalled() -> Bool { capability.isInstalled }
+    func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
+        TerminalFocusRouteRegistry.handler(for: capability.route)
+    }
+    func makeLauncher() -> (any TerminalLauncher)? {
+        capability as? any TerminalLauncher
+    }
     init() {}
 }

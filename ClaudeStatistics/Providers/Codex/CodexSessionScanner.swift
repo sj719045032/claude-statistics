@@ -1,5 +1,7 @@
 import Foundation
+import Darwin
 import SQLite3
+import ClaudeStatisticsKit
 
 final class CodexSessionScanner {
     static let shared = CodexSessionScanner()
@@ -7,18 +9,27 @@ final class CodexSessionScanner {
     static let codexRootPath = (NSHomeDirectory() as NSString).appendingPathComponent(".codex")
     static let codexStateDBPath = (codexRootPath as NSString).appendingPathComponent("state_5.sqlite")
 
+    /// Cached SQLite handle to `state_5.sqlite`. Codex writes in WAL mode, so
+    /// sqlite WAL appends never bump the main DB file's mtime — keeping a
+    /// reader handle open across scans is safe (the read-only lock doesn't
+    /// block Codex's PASSIVE checkpoints) and lets us skip the per-scan
+    /// `openCodexDB` + `canQueryThreads` schema-prepare cost, which the perf
+    /// sample showed dominating after we eliminated the `attributesOfItem`
+    /// hot path. Invalidated when the main DB file is replaced (size or
+    /// mtime change), e.g. when Codex CLI starts fresh.
+    private let dbLock = NSLock()
+    private var cachedDB: OpaquePointer?
+    private var cachedDBFingerprint: String?
+
     private init() {}
+
+    deinit {
+        if let cachedDB { sqlite3_close(cachedDB) }
+    }
 
     func scanSessions() -> [Session] {
         let dbPath = Self.codexStateDBPath
-        guard FileManager.default.fileExists(atPath: dbPath) else {
-            DiagnosticLogger.shared.warning("Codex state DB not found at \(dbPath)")
-            return []
-        }
-
-        let db: OpaquePointer? = Self.openCodexDB(path: dbPath)
-        guard let db else { return [] }
-        defer { sqlite3_close(db) }
+        guard let db = openOrReuseDB(path: dbPath) else { return [] }
 
         let sql = """
             SELECT id, rollout_path, title, cwd, created_at, updated_at
@@ -37,14 +48,12 @@ final class CodexSessionScanner {
         defer { sqlite3_finalize(stmt) }
 
         var sessions: [Session] = []
-        let fm = FileManager.default
 
         while sqlite3_step(stmt) == SQLITE_ROW {
             guard let id = columnText(stmt, at: 0),
                   let filePath = columnText(stmt, at: 1),
                   !filePath.isEmpty,
-                  fm.fileExists(atPath: filePath),
-                  let attrs = try? fm.attributesOfItem(atPath: filePath) else {
+                  let stat = Self.fileStat(at: filePath) else {
                 continue
             }
 
@@ -53,19 +62,19 @@ final class CodexSessionScanner {
             let createdAt = sqlite3_column_int64(stmt, 4)
             let updatedAt = sqlite3_column_int64(stmt, 5)
 
-            let fileSize = attrs[.size] as? Int64 ?? 0
+            let fileSize = stat.size
             guard fileSize > 0 else { continue }
 
             let startTime = createdAt > 0 ? Date(timeIntervalSince1970: TimeInterval(createdAt)) : nil
             let fallbackModified = updatedAt > 0 ? Date(timeIntervalSince1970: TimeInterval(updatedAt)) : Date.distantPast
-            let lastModified = attrs[.modificationDate] as? Date ?? fallbackModified
+            let lastModified = stat.mtime ?? fallbackModified
             let trimmedCwd = cwd.trimmingCharacters(in: .whitespacesAndNewlines)
             let projectPath = !trimmedCwd.isEmpty ? trimmedCwd : fallbackProjectPath(title: title, filePath: filePath, sessionId: id)
 
             sessions.append(Session(
                 id: id,
                 externalID: id,
-                provider: .codex,
+                provider: ProviderKind.codex.rawValue,
                 projectPath: projectPath,
                 filePath: filePath,
                 startTime: startTime,
@@ -81,6 +90,49 @@ final class CodexSessionScanner {
     private func columnText(_ stmt: OpaquePointer?, at index: Int32) -> String? {
         guard let ptr = sqlite3_column_text(stmt, index) else { return nil }
         return String(cString: ptr)
+    }
+
+    /// Return a SQLite handle for the Codex DB, reusing the cached one when the
+    /// main DB file's size+mtime fingerprint is unchanged. Reopens (closing the
+    /// stale handle) when the file has been replaced.
+    private func openOrReuseDB(path: String) -> OpaquePointer? {
+        guard let stat = Self.fileStat(at: path) else {
+            DiagnosticLogger.shared.warning("Codex state DB not found at \(path)")
+            return nil
+        }
+        let fingerprint = "\(stat.size)-\(stat.mtime?.timeIntervalSince1970 ?? 0)"
+
+        dbLock.lock()
+        defer { dbLock.unlock() }
+
+        if let existing = cachedDB, cachedDBFingerprint == fingerprint {
+            return existing
+        }
+        if let stale = cachedDB {
+            sqlite3_close(stale)
+            cachedDB = nil
+            cachedDBFingerprint = nil
+        }
+        guard let fresh = Self.openCodexDB(path: path) else { return nil }
+        cachedDB = fresh
+        cachedDBFingerprint = fingerprint
+        return fresh
+    }
+
+    /// One POSIX syscall returning size + mtime. Replaces
+    /// `FileManager.attributesOfItem(atPath:)` which on macOS internally walks
+    /// extended attributes and `URLResourceValues` — measured at 67% of
+    /// `CodexSessionScanner.scanSessions()` CPU per the perf sample. We only
+    /// need size + mtime, so a single syscall is ~30× cheaper. Uses `lstat`
+    /// (same behaviour as `stat` for non-symlink files) to dodge the Darwin
+    /// `stat`-the-struct vs `stat`-the-function name clash.
+    fileprivate static func fileStat(at path: String) -> (size: Int64, mtime: Date?)? {
+        var st = Darwin.stat()
+        guard path.withCString({ lstat($0, &st) }) == 0 else { return nil }
+        let size = Int64(st.st_size)
+        let secs = TimeInterval(st.st_mtimespec.tv_sec)
+        let nsecs = TimeInterval(st.st_mtimespec.tv_nsec) / 1_000_000_000
+        return (size, Date(timeIntervalSince1970: secs + nsecs))
     }
 
     /// Open Codex's state DB read-only, with fallback for WAL mode.

@@ -28,9 +28,7 @@ extension TerminalCapability {
     var autoLaunchPriority: Int? { nil }
 }
 
-protocol TerminalLaunching {
-    func launch(_ request: TerminalLaunchRequest)
-}
+// `TerminalLauncher` lives in `ClaudeStatisticsKit`.
 
 protocol TerminalFocusing {
     func contains(_ target: TerminalFocusTarget) -> Bool

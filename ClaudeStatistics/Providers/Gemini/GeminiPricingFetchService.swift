@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 final class GeminiPricingFetchService: ProviderPricingFetching {
     static let shared = GeminiPricingFetchService()

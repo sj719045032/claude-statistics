@@ -72,6 +72,32 @@ final class AppState: ObservableObject {
         return registry
     }()
 
+    /// Wires the focus coordinator to consult `pluginRegistry` before
+    /// falling back to `TerminalFocusRouteRegistry`. Phase 4 of the
+    /// terminal-plugin migration: in v4.0-alpha all 8 builtins return
+    /// the same handler instance the route registry would have, so this
+    /// is a no-op behaviour-wise — but it lets a third-party plugin
+    /// (when bundle loading lands in M2) override focus dispatch by
+    /// declaring its bundle id and a `makeFocusStrategy()` factory.
+    private func wirePluginFocusStrategyResolver() {
+        let registry = pluginRegistry
+        Task { [registry] in
+            await TerminalFocusCoordinator.shared.setPluginStrategyResolver { [registry] bundleId in
+                guard let bundleId else { return nil }
+                return await MainActor.run {
+                    for (_, plugin) in registry.terminals {
+                        guard let terminal = plugin as? any TerminalPlugin else { continue }
+                        if terminal.descriptor.bundleIdentifiers.contains(bundleId),
+                           let strategy = terminal.makeFocusStrategy() {
+                            return strategy
+                        }
+                    }
+                    return nil
+                }
+            }
+        }
+    }
+
     /// Convenience: the primary usage VM (bound to the current
     /// provider). Many existing call sites still reference
     /// `appState.usageViewModel`; the registry is the source of truth.
@@ -125,6 +151,12 @@ final class AppState: ObservableObject {
         for kind in startupKinds where kind != selectedKind {
             usageVMs.bootSecondary(for: kind)
         }
+
+        // Wire focus dispatcher to consult the plugin registry. Must
+        // run after all stored properties are initialized so the
+        // closure inside `wirePluginFocusStrategyResolver` can read
+        // `pluginRegistry`.
+        wirePluginFocusStrategyResolver()
     }
 
     /// VM getter that maps a provider kind to its live UsageViewModel.

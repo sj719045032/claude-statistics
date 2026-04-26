@@ -1,15 +1,15 @@
 import Foundation
+import ClaudeStatisticsKit
 
-struct TerminalFocusExecutionResult {
-    let capability: TerminalFocusCapability
-    let resolvedStableID: String?
-}
-
-protocol TerminalFocusRouteHandler {
+// `TerminalFocusExecutionResult` and `TerminalFocusStrategy` live in
+// `ClaudeStatisticsKit`. `TerminalFocusRouteHandler` is the host-side
+// refinement that adds a `route` field so the legacy
+// `TerminalFocusRouteRegistry` can dispatch by route; once Phase 4
+// migrates the coordinator to plugin-keyed dispatch, the `route`
+// requirement disappears and handlers collapse to pure
+// `TerminalFocusStrategy` conformance.
+protocol TerminalFocusRouteHandler: TerminalFocusStrategy {
     var route: TerminalFocusRoute { get }
-    func capability(for target: TerminalFocusTarget) -> TerminalFocusCapability
-    func directFocus(target: TerminalFocusTarget) async -> TerminalFocusExecutionResult?
-    func resolvedFocus(target: TerminalFocusTarget) async -> TerminalFocusExecutionResult?
 }
 
 enum TerminalFocusRouteRegistry {

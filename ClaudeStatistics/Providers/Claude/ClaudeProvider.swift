@@ -5,6 +5,7 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
     static let shared = ClaudeProvider()
 
     let kind: ProviderKind = .claude
+    var providerId: String { kind.rawValue }
     let displayName = ProviderKind.claude.displayName
     let capabilities = ProviderCapabilities.claude
     let usageSource: (any ProviderUsageSource)? = UsageAPIService.shared

@@ -2,7 +2,7 @@ import AppKit
 import ClaudeStatisticsKit
 import Foundation
 
-struct AlacrittyTerminalCapability: TerminalCapability, TerminalLaunching, TerminalReadinessProviding {
+struct AlacrittyTerminalCapability: TerminalCapability, TerminalLauncher, TerminalReadinessProviding {
     let optionID: String? = TerminalPreferences.alacrittyOptionID
     let category: TerminalCapabilityCategory = .terminal
     let displayName = "Alacritty"

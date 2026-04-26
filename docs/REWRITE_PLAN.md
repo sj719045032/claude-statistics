@@ -1210,7 +1210,7 @@ graph LR
 
 > 最后同步：2026-04-26
 
-#### 已完成（24 个 commit / SDK 32 个文件 / 1893 行）
+#### 已完成（SDK 42 个文件 / 2404 行）
 
 **B0 准备**
 - `Plugins/Sources/ClaudeStatisticsKit/` 目录骨架
@@ -1257,21 +1257,47 @@ graph LR
 - ✅ `AppState.pluginRegistry` 双轨运行（与 legacy `ProviderRegistry` / `TerminalRegistry` 共存）
 - ✅ 启动日志验证：`PluginRegistry: providers=3 terminals=8`
 
-#### 仍未完成（按改面排序）
+**阶段 3+ 行为协议批量解锁**
+- ✅ `Session.provider` 降级 `ProviderKind` → `String`（descriptor.id），3 个 scanner 初始化器 + 1 个 `ActiveSessionsTracker` caller 同步更新；host 端 `Session.providerKind` extension 提供 legacy enum 映射
+- ✅ `Session` struct 整体搬到 SDK
+- ✅ `HookInstalling.provider` 降级 `ProviderKind` → `providerId: String`，`HookInstallerUtils.currentHookCommand(providerId:)` 同步重命名；3 个 hook installer 实现同步
+- ✅ `HookInstalling` + `HookInstallResult` 搬到 SDK
+- ✅ `SessionLauncher` 协议搬到 SDK
+- ✅ `HookProvider` 协议搬到 SDK（默认实现一并搬迁）
+- ✅ `SessionDataProvider` 协议搬到 SDK；`var kind: ProviderKind` 改为 `var providerId: String`；host extension 提供 legacy `kind` 计算属性以保 30+ callsite 兼容；3 个 builtin provider 同步加 `providerId` 计算属性
+- ✅ `ModelPricing.Pricing` 嵌套结构体抽取到 SDK 顶层 `ModelPricingRates`（Codable + Sendable）；host 内 `typealias Pricing = ModelPricingRates` 保 callsite 兼容
+- ✅ `ProviderUsageSource` 协议搬到 SDK；`historyStore` 依赖 host-only `UsageHistoryStore`，留 host extension
+- ✅ `ProviderPricingFetching` 协议搬到 SDK
+- ✅ `UsageProvider` 协议搬到 SDK（含 `menuBarStripSegments` 默认实现）
+- ✅ host `SessionProvider.swift` 207 行 → 62 行，仅剩 typealias + 2 个 host-only extension（`historyStore` / `kind` / `parseSearchIndexMessages`）
+- ✅ `ProviderDescriptor.badgeColor` 字段加入 SDK；`ProviderKind.badgeColor` 转发 descriptor，`ProviderBadge.swift` 内 `switch self` 移除
 
-| 项 | 主要阻塞 | 估改面 |
-|---|---|---|
-| `Session` struct | provider 字段 `ProviderKind` 类型 → 需改为 `String descriptor.id` | 30+ 文件（25+ 处 `session.provider` 比较语义改动） |
-| `SessionDataProvider` 窄协议 | 引用 `Session` | 同 Session 链锁 |
-| `SessionLauncher` 窄协议 | 引用 `Session` | 同 Session 链锁 |
-| `ProviderUsageSource` 协议 | 引用 host `UsageHistoryStore` | 中（`UsageHistoryStore` 留 host，仅协议表面搬） |
-| `UsageProvider` 窄协议 | 引用 `ProviderUsageSource` + `ModelPricing.Pricing` 嵌套 | 链锁 |
-| `HookInstalling` 协议 | `var provider: ProviderKind` 字段 | 链锁 ProviderKind |
-| `HookProvider` 窄协议 | 引用 `HookInstalling` | 链锁 |
-| `HookPayload` / `HookAction` | 主要 host 内部用 | 中 |
-| `ProviderKind` enum 降级 | 30+ 处 `switch case .claude/.codex/.gemini` 改 String 比较；DB 写入语义已 OK | **整批最大改面，预计 50+ 文件** |
+**阶段 3++ Terminal plugin behavior 协议第一波**
+- ✅ `TerminalLauncher` 协议搬到 SDK（重命名自 host `TerminalLaunching`）
+- ✅ Terminal focus 数据类型 4 个搬到 SDK：`TerminalFocusTarget` / `TerminalFocusCapability` / `TerminalProcess` / `TerminalFocusExecutionResult`
+- ✅ `TerminalFocusStrategy` 协议在 SDK 就位（`capability(for:)` / `directFocus(target:)` / `resolvedFocus(target:)`）
+- ✅ `TerminalFocusRouteHandler` 改为 refine SDK `TerminalFocusStrategy`，5 个 handler 自动满足 SDK 协议
+- ✅ `TerminalPlugin` 加 `makeFocusStrategy()` / `makeLauncher()` 工厂；8 个 builtin terminal plugin 实现工厂返回 route registry handler
+- ✅ `TerminalFocusCoordinator` Phase 4 派发改造：优先 plugin 查找，回退 route registry — 通过 `setPluginStrategyResolver` 钩子由 `AppState` 注入
 
-**关键路径**：`ProviderKind` enum 降级是其余项的根阻塞。一旦 `ProviderKind` 改为 String typealias 或废弃，`Session` / `HookInstalling` / 5 个窄协议、`HookPayload` 全部解锁。
+#### v4.0-alpha 视角下已完成
+
+**SDK 接口面已全部就位**（42 文件 / 2404 行）：第三方 plugin 可在 SDK 接口面上端到端编写完整 provider plugin（descriptor + 5 窄协议 + 所有数据模型）。
+
+**`ProviderKind` enum 状态**：按 §12.3 原决策保留为 host-only 兼容 shim — 所有 SDK 协议已不依赖它，`switch self` 也已全部转发到 descriptor。host-internal 的 `switch case .claude/.codex/.gemini` 模式保留（HookCLI hook normalizer dispatch / AccountManagers / DisplayTextClassifier 等），这些是 provider-specific 行为分发，enum-based dispatch 是合适的内部抽象。
+
+**`HookAction` / `HookPayload` 决定保留 host 侧** — pipeline 类型（含 `[String: Any]` 与闭包，不可 Sendable），不暴露给 plugin。
+
+#### 余下工作（不在 v4.0-alpha 范围内）
+
+- ⏸️ Terminal plugin behavior 第二波协议（`TerminalSetupWizard` / `TerminalContextProbe`）+ 8 个 builtin terminal capability 行为代码搬迁到独立 plugin target — 阶段 4 子任务（数据/接口已就绪，仅剩具体行为代码下沉）
+- ⏸️ 删除 `TerminalFocusRoute` enum + `TerminalFocusRouteRegistry`：当前 plugin 工厂仍通过 `TerminalFocusRouteRegistry.handler(for: capability.route)` 查 strategy，第三方 plugin 加载（M2）后可直接持有自己的 strategy 实例，届时 route layer 即可退役
+- ⏸️ Share role plugin（拆分 1177 行 `ShareRoleEngine` 为 9 个独立 RoleScorer，搬到 `OfficialShareRolesPlugin`）— 阶段 4 子任务
+- ⏸️ Bundle (`.csplugin`) 加载机制 + `disable-library-validation` entitlement — 阶段 5 (M2)
+- ⏸️ Plugin permission prompt + `trust.json` UI — 阶段 5 (M3)
+- ⏸️ `ProviderRegistry.provider(for:)` switch → PluginRegistry lookup — host 内部清理，不阻塞 plugin 系统
+
+**结论**：v4.0-alpha 协议表面工作圆满收尾。核心成就 — 第三方开发者已可基于 `ClaudeStatisticsKit` 构建完整 provider plugin，无需任何 host 类型依赖。下一步重点转向 Terminal/Share plugin 拆分（阶段 4）和 bundle 加载（阶段 5）。
 
 #### 当前 runtime 状态
 
@@ -1292,6 +1318,10 @@ graph LR
 - 输出全套数据模型（SessionStats / DaySlice / ModelTokenStats / SessionQuickStats / UsageData / UsageWindow / ProviderUsageBucket / ExtraUsage / UserProfile / TranscriptDisplayMessage / SearchIndexMessage / TrendDataPoint / ModelUsage）
 - 用 `SessionWatcher` 协议接入文件监听
 - 通过 `PluginRegistry` 完成注册（typed lookup 4 bucket）
+- **实现 `SessionDataProvider`**（scan / watch / parse 全套数据流入口；`providerId: String` 即插即用）
+- **实现 `SessionLauncher`**（new session / resume / 工作目录派生）
+- **实现 `HookInstalling` + `HookProvider`**（notch hook + statusline 安装；`providerId: String` 标识）
+- 现在第三方 provider plugin 已可独立编写完整 5 个窄协议中的 4 个（`SessionDataProvider` / `SessionLauncher` / `AccountProvider` / `HookProvider`），仅 `UsageProvider` 因依赖 host `UsageHistoryStore`/`ModelPricing.Pricing` 仍需 host 协助
 
 ---
 

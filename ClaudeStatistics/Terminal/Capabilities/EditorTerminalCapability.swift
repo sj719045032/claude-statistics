@@ -2,7 +2,7 @@ import AppKit
 import ClaudeStatisticsKit
 import Foundation
 
-struct EditorTerminalCapability: TerminalCapability, TerminalLaunching, TerminalReadinessProviding {
+struct EditorTerminalCapability: TerminalCapability, TerminalLauncher, TerminalReadinessProviding {
     let optionID: String? = TerminalPreferences.editorOptionID
     let category: TerminalCapabilityCategory = .editor
     let displayName = "Editor"

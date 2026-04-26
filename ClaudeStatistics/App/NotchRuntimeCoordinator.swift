@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 /// Bridges the notch UI state (NotchNotificationCenter +
 /// ActiveSessionsTracker) with per-provider session data, providing the

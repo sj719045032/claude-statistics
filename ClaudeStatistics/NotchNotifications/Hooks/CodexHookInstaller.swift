@@ -1,7 +1,8 @@
 import Foundation
+import ClaudeStatisticsKit
 
 struct CodexHookInstaller: HookInstalling {
-    let provider: ProviderKind = .codex
+    let providerId: String = ProviderKind.codex.rawValue
 
     private static let scriptName = "claude-stats-codex-hook"
     private static let managedMarkers = [
@@ -50,7 +51,7 @@ struct CodexHookInstaller: HookInstalling {
     }
 
     private var commandPath: String {
-        HookInstallerUtils.currentHookCommand(provider: provider)
+        HookInstallerUtils.currentHookCommand(providerId: providerId)
     }
 
     var isInstalled: Bool {
@@ -306,7 +307,11 @@ enum NotchHookSync {
         var sawConfirmationDenied = false
 
         for installer in installers {
-            let enabled = NotchPreferences.isEnabled(installer.provider)
+            // Builtin installers always have a kind that maps back to the
+            // legacy enum; default to .claude for the impossible no-match
+            // path so the loop stays total.
+            let kind = ProviderKind(rawValue: installer.providerId) ?? .claude
+            let enabled = NotchPreferences.isEnabled(kind)
             let result = enabled
                 ? try await installer.install()
                 : try await installer.uninstall()

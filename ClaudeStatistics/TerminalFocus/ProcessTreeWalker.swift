@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ClaudeStatisticsKit
 
 enum ProcessTreeWalker {
     static func findTerminalProcess(startingAt pid: pid_t) async -> TerminalProcess? {

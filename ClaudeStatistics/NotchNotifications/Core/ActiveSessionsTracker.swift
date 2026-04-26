@@ -146,8 +146,9 @@ final class ActiveSessionsTracker: ObservableObject {
     ) {
         let now = Date()
         let cutoff = now.addingTimeInterval(-activeWindow)
+        let providerId = provider.rawValue
         let recentSessions = sourceSessions
-            .filter { $0.provider == provider && $0.lastModified > cutoff }
+            .filter { $0.provider == providerId && $0.lastModified > cutoff }
             .sorted { $0.lastModified > $1.lastModified }
 
         guard !recentSessions.isEmpty else { return }
@@ -646,7 +647,8 @@ final class ActiveSessionsTracker: ObservableObject {
     }
 
     private static func runtimeSessionID(for session: Session) -> String {
-        canonicalSessionID(provider: session.provider, sessionId: session.externalID.nilIfEmpty ?? session.id)
+        let kind = ProviderKind(rawValue: session.provider) ?? .claude
+        return canonicalSessionID(provider: kind, sessionId: session.externalID.nilIfEmpty ?? session.id)
     }
 
     private static func canonicalSessionID(provider: ProviderKind, sessionId: String) -> String {

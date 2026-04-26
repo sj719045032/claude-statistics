@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import ClaudeStatisticsKit
 
 final class GeminiSessionScanner {
     static let shared = GeminiSessionScanner()
@@ -56,7 +57,7 @@ final class GeminiSessionScanner {
                 let session = Session(
                     id: stored.sessionId,
                     externalID: stored.sessionId,
-                    provider: .gemini,
+                    provider: ProviderKind.gemini.rawValue,
                     projectPath: projectPath,
                     filePath: chatFile.path,
                     startTime: stored.startTime,

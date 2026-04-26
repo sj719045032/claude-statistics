@@ -2,7 +2,7 @@ import AppKit
 import ClaudeStatisticsKit
 import Foundation
 
-struct WarpTerminalCapability: TerminalCapability, TerminalLaunching, TerminalReadinessProviding {
+struct WarpTerminalCapability: TerminalCapability, TerminalLauncher, TerminalReadinessProviding {
     let optionID: String? = TerminalPreferences.warpOptionID
     let category: TerminalCapabilityCategory = .terminal
     let displayName = "Warp"

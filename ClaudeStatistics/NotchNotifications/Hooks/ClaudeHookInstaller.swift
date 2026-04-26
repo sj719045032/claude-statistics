@@ -1,7 +1,8 @@
 import Foundation
+import ClaudeStatisticsKit
 
 struct ClaudeHookInstaller: HookInstalling {
-    let provider: ProviderKind = .claude
+    let providerId: String = ProviderKind.claude.rawValue
 
     private static let scriptName     = "claude-stats-claude-hook"
     private static let managedMarkers = ["claude-stats-", "--claude-stats-hook-provider"]
@@ -19,7 +20,7 @@ struct ClaudeHookInstaller: HookInstalling {
     }
 
     private var commandPath: String {
-        HookInstallerUtils.currentHookCommand(provider: provider)
+        HookInstallerUtils.currentHookCommand(providerId: providerId)
     }
 
     // Event list — install both notification events and silent tracking events so

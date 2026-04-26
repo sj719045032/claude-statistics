@@ -27,6 +27,12 @@ final class AlacrittyPlugin: TerminalPlugin {
 
     var descriptor: TerminalDescriptor { capability.descriptor }
     func detectInstalled() -> Bool { capability.isInstalled }
+    func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
+        TerminalFocusRouteRegistry.handler(for: capability.route)
+    }
+    func makeLauncher() -> (any TerminalLauncher)? {
+        capability as? any TerminalLauncher
+    }
 
     init() {}
 }

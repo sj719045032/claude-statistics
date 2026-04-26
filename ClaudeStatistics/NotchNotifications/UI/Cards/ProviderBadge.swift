@@ -1,4 +1,5 @@
 import SwiftUI
+import ClaudeStatisticsKit
 
 struct ProviderBadge: View {
     let provider: ProviderKind
@@ -15,11 +16,10 @@ struct ProviderBadge: View {
 }
 
 extension ProviderKind {
-    var badgeColor: Color {
-        switch self {
-        case .claude: return Color(red: 0.89, green: 0.55, blue: 0.36) // claude orange
-        case .gemini: return Color(red: 0.27, green: 0.51, blue: 0.96) // google blue
-        case .codex:  return Color(red: 0.18, green: 0.80, blue: 0.44) // openai green
-        }
-    }
+    /// Notch-island badge palette. Forwards to the descriptor's
+    /// `badgeColor` field; the per-case literal palette used to live
+    /// here as a `switch self`. Plugins can ship their own
+    /// `descriptor.badgeColor` so this dispatcher no longer hard-codes
+    /// the three builtin colours.
+    var badgeColor: Color { descriptor.badgeColor }
 }

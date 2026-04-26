@@ -15,6 +15,7 @@ extension ProviderDescriptor {
         displayName: "Claude",
         iconAssetName: "ClaudeProviderIcon",
         accentColor: Color(red: 0.83, green: 0.40, blue: 0.25),
+        badgeColor: Color(red: 0.89, green: 0.55, blue: 0.36),
         notchEnabledDefaultsKey: "notch.enabled.claude",
         capabilities: .claude,
         resolveToolAlias: { ClaudeToolNames.canonical($0) }
@@ -25,6 +26,7 @@ extension ProviderDescriptor {
         displayName: "Codex",
         iconAssetName: "CodexProviderIcon",
         accentColor: Color(red: 0.10, green: 0.66, blue: 0.50),
+        badgeColor: Color(red: 0.18, green: 0.80, blue: 0.44),
         notchEnabledDefaultsKey: "notch.enabled.codex",
         capabilities: .codex,
         resolveToolAlias: { CodexToolNames.canonical($0) }
@@ -35,6 +37,7 @@ extension ProviderDescriptor {
         displayName: "Gemini",
         iconAssetName: "GeminiProviderIcon",
         accentColor: Color(red: 0.26, green: 0.52, blue: 0.96),
+        badgeColor: Color(red: 0.27, green: 0.51, blue: 0.96),
         notchEnabledDefaultsKey: "notch.enabled.gemini",
         capabilities: .gemini,
         resolveToolAlias: { GeminiToolNames.canonical($0) }

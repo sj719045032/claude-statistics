@@ -1,34 +1,15 @@
 import Foundation
 import ClaudeStatisticsKit
 
-struct Session: Identifiable, Hashable {
-    let id: String
-    let externalID: String
-    let provider: ProviderKind
-    let projectPath: String
-    let filePath: String
-    let startTime: Date?
-    let lastModified: Date
-    let fileSize: Int64
+// `Session` lives in `ClaudeStatisticsKit` (SDK). Host code keeps only the
+// host-side helpers below that depend on the still-host-side `ProviderKind`.
 
-    /// Real project directory read from JSONL cwd field
-    var cwd: String?
-
-    var displayName: String {
-        if let cwd, !cwd.isEmpty {
-            return cwd
-        }
-        // Fallback: show project folder name as-is (can't reliably convert - to /)
-        return (projectPath as NSString).lastPathComponent
-    }
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(provider)
-        hasher.combine(id)
-    }
-
-    static func == (lhs: Session, rhs: Session) -> Bool {
-        lhs.provider == rhs.provider && lhs.id == rhs.id
+extension Session {
+    /// Best-effort mapping back to the legacy `ProviderKind` enum for code
+    /// paths that still depend on host-side branching. Returns `nil` when
+    /// `provider` is a third-party plugin id outside the builtin trio.
+    var providerKind: ProviderKind? {
+        ProviderKind(rawValue: provider)
     }
 }
 
@@ -44,21 +25,11 @@ struct Session: Identifiable, Hashable {
 final class ModelPricing {
     static let shared = ModelPricing()
 
-    struct Pricing: Codable {
-        let input: Double
-        let output: Double
-        let cacheWrite5m: Double    // 5-min cache write (1.25x base input)
-        let cacheWrite1h: Double    // 1-hour cache write (2x base input)
-        let cacheRead: Double       // cache hit (0.1x base input)
-
-        enum CodingKeys: String, CodingKey {
-            case input
-            case output
-            case cacheWrite5m = "cache_write_5m"
-            case cacheWrite1h = "cache_write_1h"
-            case cacheRead = "cache_read"
-        }
-    }
+    /// Legacy alias — the rate struct now lives in `ClaudeStatisticsKit`
+    /// as `ModelPricingRates` so plugins emit it directly. Existing host
+    /// call sites of the form `ModelPricing.Pricing(...)` keep working
+    /// via this typealias.
+    typealias Pricing = ModelPricingRates
 
     private(set) var models: [String: Pricing] = [:]
     private(set) var defaultPricing = Pricing(input: 3.0, output: 15.0, cacheWrite5m: 3.75, cacheWrite1h: 6.0, cacheRead: 0.30)

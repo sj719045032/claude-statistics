@@ -1,11 +1,9 @@
 import Foundation
+import ClaudeStatisticsKit
 
-// Result of a hook install/uninstall operation
-enum HookInstallResult {
-    case success
-    case confirmationDenied
-    case failure(Error)
-}
+// `HookInstallResult` and the `HookInstalling` protocol live in
+// `ClaudeStatisticsKit`. Only the host-internal helpers — file snapshot,
+// command rendering, install-orchestration — remain here.
 
 // Snapshot of a file before mutation (for rollback)
 struct FileSnapshot {
@@ -43,13 +41,6 @@ struct FileSnapshot {
             try? fm.removeItem(atPath: path)
         }
     }
-}
-
-protocol HookInstalling {
-    var provider: ProviderKind { get }
-    var isInstalled: Bool { get }
-    func install() async throws -> HookInstallResult
-    func uninstall() async throws -> HookInstallResult
 }
 
 // Shared utilities for all HookInstaller implementations
@@ -150,7 +141,7 @@ enum HookInstallerUtils {
         """
     }
 
-    static func currentHookCommand(provider: ProviderKind) -> String {
+    static func currentHookCommand(providerId: String) -> String {
         // The wrapper path lives under ~/.claude-statistics{,-debug}/bin/ so it
         // never contains spaces — no quoting needed in the hook command string.
         let wrapperPath = ensureManagedHookExecutableLink()
@@ -158,7 +149,7 @@ enum HookInstallerUtils {
             ?? ProcessInfo.processInfo.arguments.first
             ?? ""
         let formattedPath = wrapperPath.contains(" ") ? shellQuoted(wrapperPath) : wrapperPath
-        return "\(formattedPath) --claude-stats-hook-provider \(provider.rawValue)"
+        return "\(formattedPath) --claude-stats-hook-provider \(providerId)"
     }
 
     static func removeScript(at path: String) {

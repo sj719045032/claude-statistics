@@ -28,6 +28,11 @@ public struct ProviderDescriptor: Sendable {
     /// a SwiftUI/AppKit-neutral form may follow if non-SwiftUI plugin
     /// hosts ever ship.
     public let accentColor: Color
+    /// Notch-island badge colour. Brighter than `accentColor` so it
+    /// reads against the dark island chrome. Defaults to `accentColor`
+    /// when omitted — third-party plugins that don't need a separate
+    /// palette can leave the dim accent in.
+    public let badgeColor: Color
     /// `UserDefaults` key for this provider's notch master switch.
     public let notchEnabledDefaultsKey: String
     /// Capability flags the host uses to gate UI. Defaulted to a
@@ -47,6 +52,7 @@ public struct ProviderDescriptor: Sendable {
         displayName: String,
         iconAssetName: String,
         accentColor: Color,
+        badgeColor: Color? = nil,
         notchEnabledDefaultsKey: String,
         capabilities: ProviderCapabilities = ProviderCapabilities(
             supportsCost: false,
@@ -63,6 +69,7 @@ public struct ProviderDescriptor: Sendable {
         self.displayName = displayName
         self.iconAssetName = iconAssetName
         self.accentColor = accentColor
+        self.badgeColor = badgeColor ?? accentColor
         self.notchEnabledDefaultsKey = notchEnabledDefaultsKey
         self.capabilities = capabilities
         self.resolveToolAlias = resolveToolAlias

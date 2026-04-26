@@ -5,6 +5,7 @@ final class CodexProvider: SessionProvider, @unchecked Sendable {
     static let shared = CodexProvider()
 
     let kind: ProviderKind = .codex
+    var providerId: String { kind.rawValue }
     let displayName = ProviderKind.codex.displayName
     let capabilities = ProviderCapabilities.codex
     let usageSource: (any ProviderUsageSource)? = CodexUsageService.shared

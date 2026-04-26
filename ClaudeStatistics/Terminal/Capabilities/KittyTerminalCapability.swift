@@ -2,7 +2,7 @@ import AppKit
 import ClaudeStatisticsKit
 import Foundation
 
-struct KittyTerminalCapability: TerminalCapability, TerminalLaunching, TerminalFocusing, TerminalFocusCapabilityProviding, TerminalDirectFocusing, TerminalSetupProviding, TerminalReadinessProviding {
+struct KittyTerminalCapability: TerminalCapability, TerminalLauncher, TerminalFocusing, TerminalFocusCapabilityProviding, TerminalDirectFocusing, TerminalSetupProviding, TerminalReadinessProviding {
     let optionID: String? = TerminalPreferences.kittyOptionID
     let category: TerminalCapabilityCategory = .terminal
     let displayName = "Kitty"
