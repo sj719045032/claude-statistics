@@ -7,18 +7,29 @@ import Foundation
 /// and cannot block on user input, so a fresh plugin's first encounter
 /// is recorded as "pending" and **denied** for that boot. After
 /// `AppState.init` finishes, the host calls `processPending(...)` to
-/// prompt for each pending plugin and the user's decision applies on
-/// the next launch.
+/// prompt for each pending plugin.
 ///
-/// Future direction (post-M2): swap the deferred reload for a hot path
-/// that loads the plugin in-process the moment the user picks Allow.
-/// Stable seam: replace `defaultPrompter` body and call
-/// `PluginLoader.loadAll(...)` with a one-shot evaluator.
+/// Hot-load: when `pluginRegistry` is wired up via `setPluginRegistry`,
+/// allowed plugins are dlopen'd + registered immediately and the
+/// `onPluginHotLoaded` hook fires so host glue (terminal alias map,
+/// provider lookup, focus resolver) can re-derive its caches without
+/// a restart. If the registry isn't wired (tests / first launch
+/// edge), the user has to relaunch — same behaviour as before.
 @MainActor
 enum PluginTrustGate {
     /// Singleton trust store. Tests can swap it out via `setTrustStore`.
     private(set) static var trustStore = TrustStore()
     private static var pending: [PendingEntry] = []
+    private static weak var pluginRegistry: PluginRegistry?
+    /// Fired after a plugin is hot-loaded into `pluginRegistry`. The
+    /// host wires this to its dynamic-registry refreshers so the new
+    /// plugin's bundle ids / aliases / strategies become live without
+    /// a restart.
+    static var onPluginHotLoaded: ((PluginManifest, URL) -> Void)?
+
+    static func setPluginRegistry(_ registry: PluginRegistry) {
+        pluginRegistry = registry
+    }
 
     struct PendingEntry: Equatable {
         let manifest: PluginManifest
@@ -52,9 +63,9 @@ enum PluginTrustGate {
     }
 
     /// Drain the pending queue, prompt for each plugin, and persist
-    /// the user's decision to the trust store. Plugins the user
-    /// allowed will be loaded on the next launch — first-version
-    /// behaviour, see the type doc-comment for the hot-load follow-up.
+    /// the user's decision to the trust store. Allowed plugins are
+    /// hot-loaded into `pluginRegistry` immediately when it's wired;
+    /// `onPluginHotLoaded` fires per success so host glue refreshes.
     static func processPending(
         prompter: (PendingEntry) -> TrustStore.Decision = defaultPrompter
     ) {
@@ -67,6 +78,18 @@ enum PluginTrustGate {
                 for: entry.manifest,
                 bundleURL: entry.bundleURL
             )
+            guard decision == .allowed,
+                  let registry = pluginRegistry else { continue }
+            switch PluginLoader.loadOne(at: entry.bundleURL, into: registry) {
+            case .success(let manifest):
+                onPluginHotLoaded?(manifest, entry.bundleURL)
+            case .failure(let reason):
+                NSLog(
+                    "[PluginTrustGate] hot-load failed for %@: %@",
+                    entry.bundleURL.lastPathComponent,
+                    String(describing: reason)
+                )
+            }
         }
     }
 
@@ -89,7 +112,6 @@ enum PluginTrustGate {
             Declared permissions: \(permissions)
 
             Plugins are not signed-checked. Only allow plugins you trust.
-            Restart Claude Statistics for the decision to take effect.
             """
         alert.addButton(withTitle: "Allow")
         alert.addButton(withTitle: "Deny")

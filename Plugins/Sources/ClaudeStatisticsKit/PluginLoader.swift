@@ -87,6 +87,12 @@ public enum PluginLoader {
             case .success(let manifest):
                 loaded.append(manifest)
             case .failure(let reason):
+                // `notACSplugin` for non-bundle entries is just noise
+                // when iterating a directory shared with other content
+                // (PlugIns/ holds .xctest at build time, etc.). Drop
+                // it here so callers don't get a SkippedEntry per
+                // unrelated file.
+                if case .notACSplugin = reason { continue }
                 skipped.append(SkippedEntry(url: url, reason: reason))
             }
         }
@@ -94,10 +100,17 @@ public enum PluginLoader {
         return Report(loaded: loaded, skipped: skipped)
     }
 
-    private static func loadOne(
+    /// Load a single `.csplugin` bundle. Used by `loadAll` while
+    /// walking a directory and by the host's hot-load path
+    /// (`PluginTrustGate.processPending` calling here once the user
+    /// picks Allow). The trust evaluator can be a no-op `{ _, _ in true }`
+    /// in the hot-load case because the user just answered the prompt
+    /// — `TrustStore` is updated separately.
+    @discardableResult
+    public static func loadOne(
         at url: URL,
         into registry: PluginRegistry,
-        trustEvaluator: TrustEvaluator
+        trustEvaluator: TrustEvaluator = { _, _ in true }
     ) -> Result<PluginManifest, SkipReason> {
         guard url.pathExtension == "csplugin" else {
             return .failure(.notACSplugin)

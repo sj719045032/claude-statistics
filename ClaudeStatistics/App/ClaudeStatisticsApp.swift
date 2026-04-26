@@ -96,15 +96,27 @@ final class AppState: ObservableObject {
         DiagnosticLogger.shared.info(
             "PluginLoader (user): loaded=\(userReport.loaded.count) skipped=\(userReport.skipped.count) pending=\(PluginTrustGate.snapshotPending().count)"
         )
-        // Teach `TerminalRegistry` about every terminal plugin's bundle
-        // ids and `terminalNameAliases`. Bundle ids let `ProcessTreeWalker`
-        // accept external plugins (e.g. the chat-app plugins above) as focus
-        // targets while ascending the parent process chain. Alias mappings
-        // let `bundleId(forTerminalName:)` resolve hook `terminal_name`
-        // strings (e.g. "claude", "codex") to the plugin's bundle id when
-        // no host-side `TerminalCapability` claims that name. Builtin
-        // identifiers/aliases are also covered by `appCapabilities`; the
-        // union here is harmless.
+        AppState.refreshDynamicTerminalRegistries(from: registry)
+        DiagnosticLogger.shared.info(
+            "PluginRegistry dogfood: providers=\(registry.providers.count) terminals=\(registry.terminals.count)"
+        )
+        return registry
+    }()
+
+    /// Teach `TerminalRegistry` about every terminal plugin's bundle
+    /// ids and `terminalNameAliases`. Bundle ids let `ProcessTreeWalker`
+    /// accept external plugins (e.g. the chat-app plugins above) as focus
+    /// targets while ascending the parent process chain. Alias mappings
+    /// let `bundleId(forTerminalName:)` resolve hook `terminal_name`
+    /// strings (e.g. "claude", "codex") to the plugin's bundle id when
+    /// no host-side `TerminalCapability` claims that name. Builtin
+    /// identifiers/aliases are also covered by `appCapabilities`; the
+    /// union here is harmless.
+    ///
+    /// Idempotent — `TerminalRegistry`'s dynamic stores accumulate, so
+    /// the hot-load path can call this again after registering a new
+    /// plugin without dropping anything that was already known.
+    static func refreshDynamicTerminalRegistries(from registry: PluginRegistry) {
         var pluginBundleIds: Set<String> = []
         var pluginNameAliases: [String: String] = [:]
         for plugin in registry.terminals.values {
@@ -118,11 +130,7 @@ final class AppState: ObservableObject {
         }
         TerminalRegistry.registerDynamicBundleIdentifiers(pluginBundleIds)
         TerminalRegistry.registerDynamicTerminalNames(pluginNameAliases)
-        DiagnosticLogger.shared.info(
-            "PluginRegistry dogfood: providers=\(registry.providers.count) terminals=\(registry.terminals.count)"
-        )
-        return registry
-    }()
+    }
 
     /// Caches every `ProviderPlugin.makeProvider()` result into
     /// `ProviderRegistry`'s dynamic store so `provider(for:)` prefers
@@ -227,6 +235,21 @@ final class AppState: ObservableObject {
         // closures can read `pluginRegistry`.
         wirePluginProviderInstances()
         wirePluginFocusStrategyResolver()
+
+        // Wire hot-load: when the user clicks Allow on the prompt, the
+        // plugin is dlopen'd into pluginRegistry immediately, then the
+        // host re-derives every dynamic registry it owns so the new
+        // plugin's bundle ids / aliases / provider instances become
+        // live without a restart.
+        let registry = pluginRegistry
+        PluginTrustGate.setPluginRegistry(registry)
+        PluginTrustGate.onPluginHotLoaded = { [weak self] manifest, _ in
+            Self.refreshDynamicTerminalRegistries(from: registry)
+            self?.wirePluginProviderInstances()
+            DiagnosticLogger.shared.info(
+                "Plugin hot-loaded: \(manifest.id) v\(manifest.version)"
+            )
+        }
 
         // Drain the trust queue collected during plugin discovery. Run
         // off the current call stack so the menu-bar / status panel

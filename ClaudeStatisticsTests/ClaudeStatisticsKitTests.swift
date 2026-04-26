@@ -318,6 +318,7 @@ final class PluginTrustGateTests: XCTestCase {
         )
         trustStoreURL = sandbox.appendingPathComponent("trust.json")
         PluginTrustGate._resetForTesting(trustStore: TrustStore(storeURL: trustStoreURL))
+        PluginTrustGate.onPluginHotLoaded = nil
     }
 
     override func tearDownWithError() throws {
@@ -368,6 +369,45 @@ final class PluginTrustGateTests: XCTestCase {
         // recorded decision — no re-queueing.
         XCTAssertFalse(PluginTrustGate.evaluate(manifest: manifest, bundleURL: bundleURL))
         XCTAssertTrue(PluginTrustGate.snapshotPending().isEmpty)
+    }
+
+    func testHotLoadCallbackFiresOnAllowWhenRegistryWired() {
+        // Stand up a real PluginRegistry; the bundle here has no
+        // executable so PluginLoader.loadOne will fail at bundle.load,
+        // which means onPluginHotLoaded should NOT fire — the seam
+        // should still be invoked, just with the loadOne result
+        // dictating success. Negative case: callback stays nil.
+        let registry = PluginRegistry()
+        PluginTrustGate.setPluginRegistry(registry)
+        var hotLoaded: PluginManifest?
+        PluginTrustGate.onPluginHotLoaded = { manifest, _ in
+            hotLoaded = manifest
+        }
+        _ = PluginTrustGate.evaluate(manifest: manifest, bundleURL: bundleURL)
+        PluginTrustGate.processPending(prompter: { _ in .allowed })
+        // Hot-load attempted but failed (no Mach-O in our fake bundle);
+        // callback must NOT fire on failure.
+        XCTAssertNil(hotLoaded)
+        // TrustStore must still record the user's allow — the failure
+        // was at load time, not at the trust decision.
+        XCTAssertEqual(
+            PluginTrustGate.trustStore.decision(for: manifest, bundleURL: bundleURL),
+            .allowed
+        )
+    }
+
+    func testHotLoadSkippedWhenRegistryNotWired() {
+        // No setPluginRegistry call ⇒ deferred-reload behaviour: trust
+        // is recorded, but no hot-load attempt and no callback fire.
+        var fired = false
+        PluginTrustGate.onPluginHotLoaded = { _, _ in fired = true }
+        _ = PluginTrustGate.evaluate(manifest: manifest, bundleURL: bundleURL)
+        PluginTrustGate.processPending(prompter: { _ in .allowed })
+        XCTAssertFalse(fired)
+        XCTAssertEqual(
+            PluginTrustGate.trustStore.decision(for: manifest, bundleURL: bundleURL),
+            .allowed
+        )
     }
 }
 
@@ -483,13 +523,17 @@ final class PluginLoaderTests: XCTestCase {
         XCTAssertTrue(registry.providers.isEmpty)
     }
 
-    func testNonCspluginEntriesAreSkipped() throws {
+    func testNonCspluginEntriesAreSilentlyIgnored() throws {
+        // Non-.csplugin entries are dropped from the report entirely
+        // because PlugIns/ legitimately contains other content at
+        // build time (.xctest etc.) and surfacing each one as a
+        // SkippedEntry is just noise. They still cannot load — they
+        // just don't show up in the report.
         try "noise".write(to: sandbox.appendingPathComponent("readme.txt"), atomically: true, encoding: .utf8)
         let registry = PluginRegistry()
         let report = PluginLoader.loadAll(from: sandbox, into: registry)
         XCTAssertTrue(report.loaded.isEmpty)
-        XCTAssertEqual(report.skipped.count, 1)
-        XCTAssertEqual(report.skipped.first?.reason, .notACSplugin)
+        XCTAssertTrue(report.skipped.isEmpty)
     }
 
     func testCspluginWithMissingManifestIsSkipped() throws {
