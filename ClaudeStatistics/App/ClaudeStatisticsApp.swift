@@ -38,10 +38,39 @@ final class AppState: ObservableObject {
     /// Stage-3D dogfood: the v4.0 plugin registry runs alongside the
     /// legacy `ProviderRegistry` / `TerminalRegistry` (which still drive
     /// the kernel's switch-based dispatch). Stage 4 migrates the kernel
-    /// over and the legacy registries are retired. Until then this is a
-    /// no-op slot — instantiated so the API surface is exercised but no
-    /// builtin plugins are registered yet.
-    let pluginRegistry = PluginRegistry()
+    /// over and the legacy registries are retired. All 11 builtin
+    /// plugins (3 Provider + 8 Terminal) register here as an end-to-end
+    /// smoke test of the registration path; share-card role/theme
+    /// plugins land in stage 4.
+    let pluginRegistry: PluginRegistry = {
+        let registry = PluginRegistry()
+        let plugins: [any Plugin] = [
+            ClaudePluginDogfood(),
+            CodexPluginDogfood(),
+            GeminiPluginDogfood(),
+            AlacrittyPlugin(),
+            ITermPlugin(),
+            AppleTerminalPlugin(),
+            GhosttyPlugin(),
+            KittyPlugin(),
+            WezTermPlugin(),
+            WarpPlugin(),
+            EditorPlugin()
+        ]
+        for plugin in plugins {
+            do {
+                try registry.register(plugin)
+            } catch {
+                DiagnosticLogger.shared.warning(
+                    "PluginRegistry dogfood register failed for \(type(of: plugin)): \(error)"
+                )
+            }
+        }
+        DiagnosticLogger.shared.info(
+            "PluginRegistry dogfood: providers=\(registry.providers.count) terminals=\(registry.terminals.count)"
+        )
+        return registry
+    }()
 
     /// Convenience: the primary usage VM (bound to the current
     /// provider). Many existing call sites still reference

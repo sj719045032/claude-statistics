@@ -37,6 +37,7 @@
 		1FFDAA9375AEB76CB9862CF3 /* SemVer.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBBEE45A24DCB72DA07ECD79 /* SemVer.swift */; };
 		205CC763247D474FFE1ED691 /* ProviderPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62572A1901D430E3E24CB02D /* ProviderPlugin.swift */; };
 		210DC649418A456D2C8EF659 /* ToolActivityFormatter+Operations.swift in Sources */ = {isa = PBXBuildFile; fileRef = E61F28658E15A7FF33F16BB3 /* ToolActivityFormatter+Operations.swift */; };
+		214F20AF91CD6C235C1C86F9 /* BuiltinTerminalPlugins.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF4F05A7A269AFD18AC995DF /* BuiltinTerminalPlugins.swift */; };
 		22A9355E56C02E23E2843566 /* RuntimeSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7CDF939858DF7A343D5387F /* RuntimeSession.swift */; };
 		22DCBBBC8A4BACCCD9C961F7 /* NotchStateMachineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB1DFC6E058CCC6A5552A8DD /* NotchStateMachineTests.swift */; };
 		2358E4D59FFEFE0FCAFE1042 /* TerminalSetupSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17F2AED2ECC53E6BF8F6A40D /* TerminalSetupSheetView.swift */; };
@@ -168,6 +169,7 @@
 		BB9902B8A5E35FB7C78F63F0 /* SharePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52FF7E2030D328036A1F8F6D /* SharePreviewView.swift */; };
 		BC65FB4B58BE9FD0EBB88C70 /* AppleScriptFocuser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 645A6AB9436D7D2577DAE9D8 /* AppleScriptFocuser.swift */; };
 		BC876DE9A69A88B6272F0842 /* TrendDataPoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CA29EE31F9DA05A4CB0442F /* TrendDataPoint.swift */; };
+		BDBBC60B4BA024F4BF03D8EF /* BuiltinProviderPlugins.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2365B90C4B9B32DEA0C8687B /* BuiltinProviderPlugins.swift */; };
 		BE4FDED4356AA89774DF4B8A /* TerminalPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7D5709A13CDC7751084AAF /* TerminalPreferences.swift */; };
 		BF1EFAB27138847B92339836 /* AppRuntimePaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA072464D4CA170B290FA84E /* AppRuntimePaths.swift */; };
 		C096DD401EB0F2A1E31EFFB9 /* GeminiProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6470B331BB31EF4AE6E5CF51 /* GeminiProvider.swift */; };
@@ -317,6 +319,7 @@
 		1D22B04AA6887462F066799E /* PluginManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginManifest.swift; sourceTree = "<group>"; };
 		1EBE034854D1539811ED0D5F /* SearchUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchUtils.swift; sourceTree = "<group>"; };
 		2292302272EF00BEA6426BAA /* NotificationTimerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationTimerStore.swift; sourceTree = "<group>"; };
+		2365B90C4B9B32DEA0C8687B /* BuiltinProviderPlugins.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuiltinProviderPlugins.swift; sourceTree = "<group>"; };
 		24A2B4F377370E1969E00AD7 /* SharePreviewWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharePreviewWindowController.swift; sourceTree = "<group>"; };
 		25FAD30C4ED3FB7C010C8E96 /* ClaudeStatisticsKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatisticsKit.swift; sourceTree = "<group>"; };
 		2C1C75DCADED926320D04BC3 /* CodexTranscriptParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexTranscriptParserTests.swift; sourceTree = "<group>"; };
@@ -429,6 +432,7 @@
 		A872F99484F4F48F8F878E49 /* ShareRoleEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRoleEngineTests.swift; sourceTree = "<group>"; };
 		AD9EAD578F58BF668BBBFC13 /* TerminalReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalReadiness.swift; sourceTree = "<group>"; };
 		AED35908F8D6A2C41A2A6E59 /* MenuBarBanners.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarBanners.swift; sourceTree = "<group>"; };
+		AF4F05A7A269AFD18AC995DF /* BuiltinTerminalPlugins.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuiltinTerminalPlugins.swift; sourceTree = "<group>"; };
 		B2F24500B4C9F3F375B97402 /* TerminalAppleScriptRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalAppleScriptRunner.swift; sourceTree = "<group>"; };
 		B466FB316C76AB0C39E12E7B /* DiagnosticLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogger.swift; sourceTree = "<group>"; };
 		B5C4223D247CA4D681A19D53 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -786,6 +790,7 @@
 				0591709AD1369CB163770EC0 /* AlacrittyPlugin.swift */,
 				A5E2079B7A7714C7BC618C2A /* AlacrittyTerminalCapability.swift */,
 				61361192CBF13D3D64E6E20A /* AppleTerminalCapability.swift */,
+				AF4F05A7A269AFD18AC995DF /* BuiltinTerminalPlugins.swift */,
 				08D0262FC6126091E6321EE0 /* EditorTerminalCapability.swift */,
 				A7538BF07592B7D765AF1C22 /* ExternalTerminalCapability.swift */,
 				89661CA17E93D43C4B68FC23 /* GhosttyTerminalCapability.swift */,
@@ -844,6 +849,7 @@
 		926902BA5B36203AE5F72598 /* Providers */ = {
 			isa = PBXGroup;
 			children = (
+				2365B90C4B9B32DEA0C8687B /* BuiltinProviderPlugins.swift */,
 				93CE07D7E98CD2B87F87C0E0 /* PricingFetchService.swift */,
 				6A3763EF17B80F22CAE77EB0 /* ProviderDescriptor+Builtins.swift */,
 				6AE7C2A2D6731BCD2D826C90 /* ProviderRegistry.swift */,
@@ -1149,6 +1155,8 @@
 				EE3493DDFB2070C49ADD989F /* AttentionBridgeAuth.swift in Sources */,
 				A63890A01AF570ADBA7E4E11 /* AttentionEvent.swift in Sources */,
 				4A69484840B48CDE187957E0 /* AutoRefreshCoordinator.swift in Sources */,
+				BDBBC60B4BA024F4BF03D8EF /* BuiltinProviderPlugins.swift in Sources */,
+				214F20AF91CD6C235C1C86F9 /* BuiltinTerminalPlugins.swift in Sources */,
 				F324566F7B85AFF3C7E1EEAC /* CalendarHeatmap.swift in Sources */,
 				F34E915FE87F63D8BB7181BD /* ClaudeAccountManager.swift in Sources */,
 				B872C0AE8B54239EEA84509E /* ClaudeAccountModeController.swift in Sources */,
@@ -1543,7 +1551,7 @@
 				INFOPLIST_FILE = ClaudeStatistics/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MARKETING_VERSION = 3.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.ClaudeStatistics.debug;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.ClaudeStatistics;
 				PRODUCT_NAME = "Claude Statistics";
 				SDKROOT = macosx;
 				SWIFT_STRICT_CONCURRENCY = minimal;
