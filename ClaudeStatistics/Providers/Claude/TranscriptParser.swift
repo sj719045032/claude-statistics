@@ -221,7 +221,7 @@ final class TranscriptParser {
         for (_, accum) in messageData {
             if let ts = accum.timestamp {
                 let sliceKey = fiveMinKey(for: ts)
-                var slice = stats.fiveMinSlices[sliceKey] ?? SessionStats.DaySlice()
+                var slice = stats.fiveMinSlices[sliceKey] ?? DaySlice()
                 slice.totalInputTokens += accum.inputTokens
                 slice.totalOutputTokens += accum.outputTokens
                 slice.cacheCreationTotalTokens += accum.cacheCreationTotalTokens
@@ -244,11 +244,11 @@ final class TranscriptParser {
 
         // Assign user messages and tool uses to fiveMin slices
         for time in userMessageTimes {
-            stats.fiveMinSlices[time, default: SessionStats.DaySlice()].messageCount += 1
+            stats.fiveMinSlices[time, default: DaySlice()].messageCount += 1
         }
         for (time, toolName) in toolUseTimes {
-            stats.fiveMinSlices[time, default: SessionStats.DaySlice()].toolUseCounts[toolName, default: 0] += 1
-            stats.fiveMinSlices[time, default: SessionStats.DaySlice()].messageCount += 1
+            stats.fiveMinSlices[time, default: DaySlice()].toolUseCounts[toolName, default: 0] += 1
+            stats.fiveMinSlices[time, default: DaySlice()].messageCount += 1
         }
 
         DiagnosticLogger.shared.parsingSummary(

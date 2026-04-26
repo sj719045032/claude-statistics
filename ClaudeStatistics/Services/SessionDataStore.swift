@@ -960,7 +960,7 @@ final class SessionDataStore: ObservableObject {
         let resetDate = weeklyResetDate
 
         for (sessionId, stats) in parsedStats {
-            let slices: [Date: SessionStats.DaySlice] = useFineSlices ? stats.fiveMinSlices : stats.daySlices
+            let slices: [Date: DaySlice] = useFineSlices ? stats.fiveMinSlices : stats.daySlices
             if !slices.isEmpty {
                 for (sliceTime, slice) in slices {
                     let slicePeriodStart = periodType.startOfPeriod(for: sliceTime, weeklyResetDate: resetDate)
@@ -1024,7 +1024,7 @@ final class SessionDataStore: ObservableObject {
         var buckets: [Date: (tokens: Int, cost: Double)] = [:]
 
         for stats in parsedStats.values {
-            let slices: [Date: SessionStats.DaySlice] = useFineSlices ? stats.fiveMinSlices : stats.daySlices
+            let slices: [Date: DaySlice] = useFineSlices ? stats.fiveMinSlices : stats.daySlices
             for (sliceTime, slice) in slices {
                 // Exclusive start: data at exact boundary belongs to previous period
                 guard sliceTime > start, sliceTime < end else { continue }

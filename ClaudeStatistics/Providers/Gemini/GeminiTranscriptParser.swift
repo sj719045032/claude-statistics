@@ -118,7 +118,7 @@ final class GeminiTranscriptParser {
                 stats.lastPrompt = truncate(cleaned, limit: 200)
                 stats.lastPromptAt = message.timestamp
                 if let timestamp = message.timestamp {
-                    stats.fiveMinSlices[fiveMinuteKey(for: timestamp), default: SessionStats.DaySlice()].messageCount += 1
+                    stats.fiveMinSlices[fiveMinuteKey(for: timestamp), default: DaySlice()].messageCount += 1
                 }
 
             case "gemini":
@@ -143,7 +143,7 @@ final class GeminiTranscriptParser {
                         stats.contextTokens = contextTokens
                     }
 
-                    var slice = stats.fiveMinSlices[sliceKey] ?? SessionStats.DaySlice()
+                    var slice = stats.fiveMinSlices[sliceKey] ?? DaySlice()
                     slice.totalInputTokens += tokens.inputTokens
                     slice.totalOutputTokens += outputTokens
                     slice.cacheReadTokens += tokens.cachedTokens
@@ -157,13 +157,13 @@ final class GeminiTranscriptParser {
                     slice.modelBreakdown[activeModel] = modelStats
                     stats.fiveMinSlices[sliceKey] = slice
                 } else if let sliceKey {
-                    stats.fiveMinSlices[sliceKey, default: SessionStats.DaySlice()].messageCount += 1
+                    stats.fiveMinSlices[sliceKey, default: DaySlice()].messageCount += 1
                 }
 
                 if let sliceKey {
                     for toolCall in message.toolCalls {
                         let toolName = normalizedToolName(toolCall)
-                        stats.fiveMinSlices[sliceKey, default: SessionStats.DaySlice()].toolUseCounts[toolName, default: 0] += 1
+                        stats.fiveMinSlices[sliceKey, default: DaySlice()].toolUseCounts[toolName, default: 0] += 1
                     }
                 }
                 if let toolCall = message.toolCalls.last {

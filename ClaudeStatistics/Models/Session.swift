@@ -249,62 +249,9 @@ struct SessionStats: Codable {
 
     init() {}
 
-    struct DaySlice: Codable {
-        var totalInputTokens: Int = 0
-        var totalOutputTokens: Int = 0
-        var cacheCreation5mTokens: Int = 0
-        var cacheCreation1hTokens: Int = 0
-        var cacheCreationTotalTokens: Int = 0
-        var cacheReadTokens: Int = 0
-        var messageCount: Int = 0
-        var toolUseCounts: [String: Int] = [:]
-        var modelBreakdown: [String: ModelTokenStats] = [:]
-
-        var toolUseTotal: Int { toolUseCounts.values.reduce(0, +) }
-        var totalTokens: Int { totalInputTokens + totalOutputTokens + cacheCreationTotalTokens + cacheReadTokens }
-
-        var estimatedCost: Double {
-            modelBreakdown.reduce(0.0) { total, entry in
-                total + ModelPricing.estimateCost(
-                    model: entry.key,
-                    inputTokens: entry.value.inputTokens,
-                    outputTokens: entry.value.outputTokens,
-                    cacheCreation5mTokens: entry.value.cacheCreation5mTokens,
-                    cacheCreation1hTokens: entry.value.cacheCreation1hTokens,
-                    cacheCreationTotalTokens: entry.value.cacheCreationTotalTokens,
-                    cacheReadTokens: entry.value.cacheReadTokens
-                )
-            }
-        }
-
-        var isCostEstimated: Bool {
-            modelBreakdown.keys.contains { !ModelPricing.shared.isExactMatch(for: $0) }
-        }
-
-        mutating func merge(_ other: DaySlice) {
-            totalInputTokens += other.totalInputTokens
-            totalOutputTokens += other.totalOutputTokens
-            cacheCreation5mTokens += other.cacheCreation5mTokens
-            cacheCreation1hTokens += other.cacheCreation1hTokens
-            cacheCreationTotalTokens += other.cacheCreationTotalTokens
-            cacheReadTokens += other.cacheReadTokens
-            messageCount += other.messageCount
-            for (tool, count) in other.toolUseCounts {
-                toolUseCounts[tool, default: 0] += count
-            }
-            for (model, mts) in other.modelBreakdown {
-                var existing = modelBreakdown[model, default: ModelTokenStats()]
-                existing.inputTokens += mts.inputTokens
-                existing.outputTokens += mts.outputTokens
-                existing.cacheCreation5mTokens += mts.cacheCreation5mTokens
-                existing.cacheCreation1hTokens += mts.cacheCreation1hTokens
-                existing.cacheCreationTotalTokens += mts.cacheCreationTotalTokens
-                existing.cacheReadTokens += mts.cacheReadTokens
-                existing.messageCount += mts.messageCount
-                modelBreakdown[model] = existing
-            }
-        }
-    }
+    // DaySlice is defined in ClaudeStatisticsKit (top-level type, no
+    // longer nested under SessionStats). The host-side extension below
+    // adds the ModelPricing-driven cost helpers.
 
     var sortedToolUses: [(name: String, count: Int)] {
         toolUseCounts.sorted { $0.value > $1.value }.map { (name: $0.key, count: $0.value) }

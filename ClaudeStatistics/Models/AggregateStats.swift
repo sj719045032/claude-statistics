@@ -1,4 +1,5 @@
 import SwiftUI
+import ClaudeStatisticsKit
 
 enum StatsPeriod: String, CaseIterable {
     case all = "All"
@@ -160,7 +161,7 @@ struct PeriodStats: Identifiable {
         totalInputTokens + totalOutputTokens + cacheCreationTotalTokens + cacheReadTokens
     }
 
-    mutating func accumulate(daySlice slice: SessionStats.DaySlice) {
+    mutating func accumulate(daySlice slice: DaySlice) {
         totalInputTokens += slice.totalInputTokens
         totalOutputTokens += slice.totalOutputTokens
         cacheCreation5mTokens += slice.cacheCreation5mTokens

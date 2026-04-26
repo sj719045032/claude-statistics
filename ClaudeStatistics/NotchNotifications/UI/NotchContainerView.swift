@@ -2179,7 +2179,7 @@ private struct ActiveSessionRow: View {
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.78))
                         .lineLimit(1)
-                        .truncationMode(.middle)
+                        .truncationMode(.tail)
                     if let elapsed = session.currentToolElapsedText(at: context.date) {
                         Text(elapsed)
                             .font(.system(size: 10, weight: .regular, design: .monospaced))

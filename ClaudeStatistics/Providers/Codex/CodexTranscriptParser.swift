@@ -195,7 +195,7 @@ final class CodexTranscriptParser {
                 guard delta.totalTokens > 0, let timestamp = event.timestamp else { continue }
 
                 let sliceKey = fiveMinuteKey(for: timestamp)
-                var slice = stats.fiveMinSlices[sliceKey] ?? SessionStats.DaySlice()
+                var slice = stats.fiveMinSlices[sliceKey] ?? DaySlice()
                 slice.totalInputTokens += delta.inputTokens
                 slice.totalOutputTokens += delta.outputTokens
                 slice.cacheReadTokens += delta.cachedInputTokens
@@ -215,11 +215,11 @@ final class CodexTranscriptParser {
         }
 
         for time in userMessageTimes {
-            stats.fiveMinSlices[time, default: SessionStats.DaySlice()].messageCount += 1
+            stats.fiveMinSlices[time, default: DaySlice()].messageCount += 1
         }
 
         for (time, toolName) in toolUseTimes {
-            stats.fiveMinSlices[time, default: SessionStats.DaySlice()].toolUseCounts[toolName, default: 0] += 1
+            stats.fiveMinSlices[time, default: DaySlice()].toolUseCounts[toolName, default: 0] += 1
         }
 
         if let note = stats.latestProgressNote?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
