@@ -332,6 +332,8 @@
 "transcript.search" = "Search in conversation...";
 "transcript.loading" = "Loading messages...";
 "transcript.noMatch" = "No match";
+"transcript.scrollToBottom" = "Scroll to bottom";
+"transcript.scrollToTop" = "Scroll to top";
 
 /* Period Names */
 "period.all" = "All";

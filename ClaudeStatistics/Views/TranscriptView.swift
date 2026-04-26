@@ -151,6 +151,10 @@ struct TranscriptView: View {
     @State private var scrollPosition: String?
     @State private var roleFilters: Set<String> = []  // empty = show all
     @State private var toolFilters: Set<String> = []  // empty = show all tools
+    /// `true` when the visible anchor is within the last few messages —
+    /// flips the floating jump button from "go to bottom" to "go to top".
+    @State private var atBottom: Bool = false
+    @State private var scrollButtonHovered: Bool = false
 
     private var roleOptions: [(key: String, label: String, icon: String)] {
         [
@@ -331,40 +335,89 @@ struct TranscriptView: View {
             Divider()
 
             // Messages — LazyVStack always present, loading as overlay
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(filteredMessages) { msg in
-                        Group {
-                            if msg.role == "tool" {
-                                ToolCallRow(message: msg, searchText: searchText,
-                                            isCurrentMatch: isCurrentMatch(msg.id),
-                                            providerDisplayName: viewModel.providerDisplayName,
-                                            sessionFilePath: session.filePath,
-                                            loadMessagesAtPath: viewModel.loadMessages(at:))
-                            } else {
-                                MessageRow(message: msg, searchText: searchText,
-                                           isCurrentMatch: isCurrentMatch(msg.id),
-                                           assistantName: viewModel.providerDisplayName)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(filteredMessages) { msg in
+                            Group {
+                                if msg.role == "tool" {
+                                    ToolCallRow(message: msg, searchText: searchText,
+                                                isCurrentMatch: isCurrentMatch(msg.id),
+                                                providerDisplayName: viewModel.providerDisplayName,
+                                                sessionFilePath: session.filePath,
+                                                loadMessagesAtPath: viewModel.loadMessages(at:))
+                                } else {
+                                    MessageRow(message: msg, searchText: searchText,
+                                               isCurrentMatch: isCurrentMatch(msg.id),
+                                               assistantName: viewModel.providerDisplayName)
+                                }
+                            }
+                            .id(msg.id)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                    .textSelection(.enabled)
+                }
+                .overlay {
+                    if isLoading {
+                        VStack(spacing: 8) {
+                            ProgressView().scaleEffect(0.8)
+                            Text("transcript.loading")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(.ultraThinMaterial)
+                    }
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    if filteredMessages.count > 1 {
+                        Button {
+                            let targetId: String? = atBottom ? filteredMessages.first?.id : filteredMessages.last?.id
+                            let anchor: UnitPoint = atBottom ? .top : .bottom
+                            guard let id = targetId else { return }
+                            withAnimation(.easeOut(duration: 0.25)) {
+                                proxy.scrollTo(id, anchor: anchor)
+                            }
+                            scrollPosition = id
+                        } label: {
+                            Image(systemName: atBottom ? "arrow.up" : "arrow.down")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 28, height: 28)
+                                .background(
+                                    Circle()
+                                        .fill(Color.blue.opacity(scrollButtonHovered ? 1.0 : 0.85))
+                                )
+                                .scaleEffect(scrollButtonHovered ? 1.08 : 1.0)
+                                .shadow(
+                                    color: .black.opacity(scrollButtonHovered ? 0.28 : 0.2),
+                                    radius: scrollButtonHovered ? 5 : 3,
+                                    y: 1
+                                )
+                                .contentTransition(.symbolEffect(.replace))
+                        }
+                        .buttonStyle(.plain)
+                        .help(atBottom ? "transcript.scrollToTop" : "transcript.scrollToBottom")
+                        .onHover { hovering in
+                            withAnimation(Theme.quickSpring) {
+                                scrollButtonHovered = hovering
                             }
                         }
-                        .id(msg.id)
+                        .padding(.trailing, 14)
+                        .padding(.bottom, 14)
                     }
                 }
-                .padding(.vertical, 4)
-                .textSelection(.enabled)
-            }
-            .overlay {
-                if isLoading {
-                    VStack(spacing: 8) {
-                        ProgressView().scaleEffect(0.8)
-                        Text("transcript.loading")
-                            .font(.caption).foregroundStyle(.secondary)
+                .scrollPosition(id: $scrollPosition, anchor: .top)
+                .onChange(of: scrollPosition) { _, newId in
+                    guard let newId else { return }
+                    let endZone = max(0, filteredMessages.count - 5)
+                    guard let idx = filteredMessages.firstIndex(where: { $0.id == newId }) else { return }
+                    let nowAtBottom = idx >= endZone
+                    if nowAtBottom != atBottom {
+                        withAnimation(Theme.quickSpring) { atBottom = nowAtBottom }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(.ultraThinMaterial)
                 }
             }
-            .scrollPosition(id: $scrollPosition, anchor: .top)
         }
         .task {
             await loadMessages()
