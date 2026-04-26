@@ -1,0 +1,131 @@
+import SwiftUI
+import ClaudeStatisticsKit
+
+/// Settings sub-panel listing every plugin currently registered with
+/// the host's `PluginRegistry` and exposing a single management action:
+/// reset all `trust.json` decisions so user-installed plugins re-prompt
+/// on the next launch. Bundled `.csplugin` samples in `Contents/PlugIns`
+/// are unaffected by the reset because they're implicitly trusted.
+struct PluginsSettingsView: View {
+    let pluginRegistry: PluginRegistry
+    let onBack: () -> Void
+
+    @State private var showResetConfirmation = false
+    @State private var resetMessage: String?
+
+    private var manifests: [PluginManifest] {
+        pluginRegistry.loadedManifests().sorted { $0.id < $1.id }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button(action: onBack) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                        Text("settings.back")
+                    }
+                }
+                .buttonStyle(.plain)
+                Spacer()
+                Text("settings.plugins")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                // Symmetric spacer to keep the title centered.
+                Color.clear.frame(width: 60, height: 1)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            Form {
+                Section {
+                    if manifests.isEmpty {
+                        Text("settings.plugins.empty")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(manifests, id: \.id) { manifest in
+                            pluginRow(manifest)
+                        }
+                    }
+                } header: {
+                    Text(String(format: NSLocalizedString("settings.plugins.loaded.count", comment: ""), manifests.count))
+                }
+
+                Section("settings.plugins.trust") {
+                    Button(action: { showResetConfirmation = true }) {
+                        HStack {
+                            Label("settings.plugins.resetTrust", systemImage: "arrow.counterclockwise.circle")
+                                .labelStyle(SettingsRowLabelStyle())
+                            Spacer()
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    if let resetMessage {
+                        Text(resetMessage)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .formStyle(.grouped)
+        }
+        .alert("settings.plugins.resetTrust.confirmTitle", isPresented: $showResetConfirmation) {
+            Button("settings.cancel", role: .cancel) {}
+            Button("settings.plugins.resetTrust.confirmButton", role: .destructive) {
+                TrustStore().clearAll()
+                resetMessage = NSLocalizedString("settings.plugins.resetTrust.done", comment: "")
+            }
+        } message: {
+            Text("settings.plugins.resetTrust.confirmMessage")
+        }
+    }
+
+    @ViewBuilder
+    private func pluginRow(_ manifest: PluginManifest) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Image(systemName: kindGlyph(manifest.kind))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Text(manifest.displayName)
+                    .font(.system(size: 12, weight: .semibold))
+                Spacer()
+                Text("v\(manifest.version)")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+            Text(manifest.id)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.tertiary)
+            HStack(spacing: 6) {
+                Text(manifest.kind.rawValue)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                if !manifest.permissions.isEmpty {
+                    Text("·").foregroundStyle(.tertiary)
+                    Text(manifest.permissions.map(\.rawValue).joined(separator: ", "))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func kindGlyph(_ kind: PluginKind) -> String {
+        switch kind {
+        case .provider: return "shippingbox"
+        case .terminal: return "terminal"
+        case .shareRole: return "person.crop.square"
+        case .shareCardTheme: return "paintpalette"
+        case .both: return "rectangle.connected.to.line.below"
+        }
+    }
+}

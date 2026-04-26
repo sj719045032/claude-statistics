@@ -33,6 +33,7 @@ struct SettingsView: View {
     @State private var showKeyboardShortcuts = false
     @State private var showTerminalFocusSettings = false
     @State private var showDeveloperSettings = false
+    @State private var showPluginSettings = false
     @State private var hasToken: Bool?
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var isTabOrderExpanded = false
@@ -58,6 +59,11 @@ struct SettingsView: View {
                     appState: appState,
                     verboseLogging: $verboseLogging,
                     onBack: { showDeveloperSettings = false }
+                )
+            } else if showPluginSettings {
+                PluginsSettingsView(
+                    pluginRegistry: appState.pluginRegistry,
+                    onBack: { showPluginSettings = false }
                 )
             } else {
                 settingsContent
@@ -203,6 +209,21 @@ struct SettingsView: View {
                             .labelStyle(SettingsRowLabelStyle())
                         Spacer()
                         Image(systemName: "arrow.up.forward.square")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Button(action: { showPluginSettings = true }) {
+                    HStack {
+                        Label("settings.plugins", systemImage: "puzzlepiece.extension")
+                            .labelStyle(SettingsRowLabelStyle())
+                        Spacer()
+                        Text("\(appState.pluginRegistry.loadedManifests().count)")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right")
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                     }

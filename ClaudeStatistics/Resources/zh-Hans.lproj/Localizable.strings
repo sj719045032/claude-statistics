@@ -252,6 +252,15 @@
 "settings.verboseLogging" = "详细日志（调试用）";
 "settings.exportLogHint" = "反馈问题时请附带此日志。路径：~/.claude/claude-statistics-diagnostic.log";
 "settings.developerTools" = "开发人员工具";
+"settings.plugins" = "插件";
+"settings.plugins.empty" = "未加载任何插件。";
+"settings.plugins.loaded.count" = "已加载插件（%d）";
+"settings.plugins.trust" = "信任";
+"settings.plugins.resetTrust" = "重置所有插件信任决定";
+"settings.plugins.resetTrust.confirmTitle" = "重置信任决定？";
+"settings.plugins.resetTrust.confirmMessage" = "下次启动时所有用户安装的插件都会重新提示。App 内捆绑的插件不受影响。";
+"settings.plugins.resetTrust.confirmButton" = "重置";
+"settings.plugins.resetTrust.done" = "信任文件已清空。重启 Claude Statistics 让已安装插件重新提示。";
 "settings.developer.rebuildIndexes" = "重建数据";
 "settings.developer.rebuildProviderIndex" = "重建 %@ 索引";
 "settings.developer.rebuildProviderIndexHint" = "删除该 provider 的解析缓存，并重新构建搜索索引。";

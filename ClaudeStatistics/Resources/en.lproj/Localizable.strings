@@ -239,6 +239,15 @@
 "settings.verboseLogging" = "Verbose Logging (debug)";
 "settings.exportLogHint" = "Share this log when reporting issues. Path: ~/.claude/claude-statistics-diagnostic.log";
 "settings.developerTools" = "Developer Tools";
+"settings.plugins" = "Plugins";
+"settings.plugins.empty" = "No plugins loaded.";
+"settings.plugins.loaded.count" = "Loaded plugins (%d)";
+"settings.plugins.trust" = "Trust";
+"settings.plugins.resetTrust" = "Reset all plugin trust decisions";
+"settings.plugins.resetTrust.confirmTitle" = "Reset trust decisions?";
+"settings.plugins.resetTrust.confirmMessage" = "Every user-installed plugin will be re-prompted on the next launch. Bundled plugins inside the app are not affected.";
+"settings.plugins.resetTrust.confirmButton" = "Reset";
+"settings.plugins.resetTrust.done" = "Trust file cleared. Restart Claude Statistics to re-prompt for installed plugins.";
 "settings.developer.rebuildIndexes" = "Rebuild Data";
 "settings.developer.rebuildProviderIndex" = "Rebuild %@ Index";
 "settings.developer.rebuildProviderIndexHint" = "Deletes cached parsed data and rebuilds the search index for this provider.";
