@@ -913,6 +913,156 @@ final class PluginTrustGateTests: XCTestCase {
     }
 }
 
+/// `PluginUninstaller.uninstall` must (1) reject host/bundled
+/// sources, (2) drop the plugin from the registry, (3) delete the
+/// .csplugin file, (4) clear the trust record so a future reinstall
+/// behaves like brand-new. Tests pin all four down.
+@MainActor
+final class PluginUninstallerTests: XCTestCase {
+    private var sandbox: URL!
+    private var trustStoreURL: URL!
+    private var bundleURL: URL!
+
+    private final class FakeTerminalPlugin: NSObject, TerminalPlugin {
+        static let manifest = PluginManifest(
+            id: "com.example.uninstall-target",
+            kind: .terminal,
+            displayName: "Uninstall Target",
+            version: SemVer(major: 1, minor: 0, patch: 0),
+            minHostAPIVersion: SemVer(major: 0, minor: 1, patch: 0),
+            permissions: [],
+            principalClass: "FakeTerminalPlugin"
+        )
+        var descriptor = TerminalDescriptor(
+            id: "com.example.uninstall-target",
+            displayName: "Uninstall Target",
+            category: .terminal,
+            bundleIdentifiers: ["com.example.uninstall-target"],
+            terminalNameAliases: [],
+            processNameHints: [],
+            focusPrecision: .appOnly,
+            autoLaunchPriority: nil
+        )
+        override init() { super.init() }
+    }
+
+    private var manifest: PluginManifest { FakeTerminalPlugin.manifest }
+
+    override func setUpWithError() throws {
+        sandbox = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("PluginUninstallerTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: sandbox, withIntermediateDirectories: true)
+
+        // Materialise a fake .csplugin on disk so the file-removal
+        // step has something to delete.
+        bundleURL = sandbox.appendingPathComponent("uninstall.csplugin", isDirectory: true)
+        let contentsDir = bundleURL.appendingPathComponent("Contents", isDirectory: true)
+        try FileManager.default.createDirectory(at: contentsDir, withIntermediateDirectories: true)
+        try "<plist>v1</plist>".write(
+            to: contentsDir.appendingPathComponent("Info.plist"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        trustStoreURL = sandbox.appendingPathComponent("trust.json")
+        // Reset PluginTrustGate so its singleton TrustStore points at
+        // our sandbox — otherwise disable() would write `.denied`
+        // into the real ~/Library/.../trust.json.
+        PluginTrustGate._resetForTesting(trustStore: TrustStore(storeURL: trustStoreURL))
+    }
+
+    override func tearDownWithError() throws {
+        PluginTrustGate.onPluginDisabled = nil
+        try? FileManager.default.removeItem(at: sandbox)
+    }
+
+    func testUninstallRejectsHostSource() throws {
+        let registry = PluginRegistry()
+        try registry.register(FakeTerminalPlugin(), source: .host)
+        do {
+            try PluginUninstaller.uninstall(
+                manifest: manifest,
+                source: .host,
+                registry: registry
+            )
+            XCTFail("Expected sourceNotUserInstalled")
+        } catch PluginUninstaller.UninstallError.sourceNotUserInstalled {
+            // expected
+        }
+    }
+
+    func testUninstallRejectsBundledSource() throws {
+        let registry = PluginRegistry()
+        try registry.register(FakeTerminalPlugin(), source: .bundled(url: bundleURL))
+        do {
+            try PluginUninstaller.uninstall(
+                manifest: manifest,
+                source: .bundled(url: bundleURL),
+                registry: registry
+            )
+            XCTFail("Expected sourceNotUserInstalled")
+        } catch PluginUninstaller.UninstallError.sourceNotUserInstalled {
+            // expected
+        }
+    }
+
+    func testUninstallUserPluginRemovesFromRegistryDeletesFileAndClearsTrust() throws {
+        let registry = PluginRegistry()
+        let plugin = FakeTerminalPlugin()
+        try registry.register(plugin, source: .user(url: bundleURL))
+        // Pre-conditions: plugin registered, file exists, decision recorded.
+        XCTAssertNotNil(registry.terminals[manifest.id])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: bundleURL.path))
+        PluginTrustGate.trustStore.record(.allowed, for: manifest, bundleURL: bundleURL)
+        XCTAssertEqual(
+            PluginTrustGate.trustStore.decision(for: manifest, bundleURL: bundleURL),
+            .allowed
+        )
+        // Wire registry into the gate so disable() can unregister.
+        PluginTrustGate.setPluginRegistry(registry)
+        var disableCallbackFired = false
+        PluginTrustGate.onPluginDisabled = { id in
+            XCTAssertEqual(id, "com.example.uninstall-target")
+            disableCallbackFired = true
+        }
+
+        let returned = try PluginUninstaller.uninstall(
+            manifest: manifest,
+            source: .user(url: bundleURL),
+            registry: registry
+        )
+
+        XCTAssertEqual(returned, bundleURL)
+        // 1. dropped from registry
+        XCTAssertNil(registry.terminals[manifest.id])
+        XCTAssertNil(registry.source(for: manifest.id))
+        // 2. file deleted
+        XCTAssertFalse(FileManager.default.fileExists(atPath: bundleURL.path))
+        // 3. trust entry cleared (NOT left as `.denied`)
+        XCTAssertNil(PluginTrustGate.trustStore.decision(for: manifest, bundleURL: bundleURL))
+        // 4. host glue notified
+        XCTAssertTrue(disableCallbackFired)
+    }
+
+    func testUninstallSurfacesFileRemovalError() throws {
+        // Hand the uninstaller a bundleURL that doesn't exist on disk.
+        let registry = PluginRegistry()
+        try registry.register(FakeTerminalPlugin(), source: .user(url: bundleURL))
+        PluginTrustGate.setPluginRegistry(registry)
+        let missingURL = sandbox.appendingPathComponent("missing.csplugin")
+        do {
+            try PluginUninstaller.uninstall(
+                manifest: manifest,
+                source: .user(url: missingURL),
+                registry: registry
+            )
+            XCTFail("Expected fileRemovalFailed")
+        } catch PluginUninstaller.UninstallError.fileRemovalFailed {
+            // expected
+        }
+    }
+}
+
 /// `TrustStore` is the only gate between "plugin binary on disk" and
 /// "plugin code running in our process" (Q2 chose no mandatory
 /// signing). These tests pin down the contract so a regression

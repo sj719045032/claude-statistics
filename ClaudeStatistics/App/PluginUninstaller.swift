@@ -23,13 +23,23 @@ enum PluginUninstaller {
         case fileRemovalFailed(String)
     }
 
+    /// `trustStore` defaults to `PluginTrustGate.trustStore` (resolved
+    /// at call-time, not at parameter-default-evaluation, since that
+    /// runs in a non-isolated context). The `.denied` write that
+    /// `disable(...)` performs and the `removeEntry(...)` call below
+    /// must land on **the same** json file — passing a different
+    /// `TrustStore` instance would split the writes and corrupt
+    /// state. The test suite injects via
+    /// `PluginTrustGate._resetForTesting` to keep the singleton in
+    /// sync.
     @discardableResult
     static func uninstall(
         manifest: PluginManifest,
         source: PluginSource,
         registry: PluginRegistry,
-        trustStore: TrustStore = TrustStore()
+        trustStore: TrustStore? = nil
     ) throws -> URL {
+        let resolvedTrustStore = trustStore ?? PluginTrustGate.trustStore
         // 1. Sanity-gate: only `.user(...)` is allowed. host plugins
         //    come back next launch, bundled plugins ship with the
         //    .app — uninstalling either is a no-op the user
@@ -59,7 +69,7 @@ enum PluginUninstaller {
         //    and Info.plist hash means even a re-prompt would only
         //    match the old record, but cleaning up here makes the
         //    intent explicit.
-        trustStore.removeEntry(for: manifest, bundleURL: bundleURL)
+        resolvedTrustStore.removeEntry(for: manifest, bundleURL: bundleURL)
 
         return bundleURL
     }
