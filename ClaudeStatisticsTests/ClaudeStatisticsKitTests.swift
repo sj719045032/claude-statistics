@@ -73,6 +73,32 @@ final class PluginManifestTests: XCTestCase {
             XCTAssertEqual(decoded, kind)
         }
     }
+
+    func testPlistRoundTrip() throws {
+        let dict = try sample.encodedAsPlistDictionary()
+        XCTAssertEqual(dict["id"] as? String, "com.example.aider")
+        XCTAssertEqual(dict["principalClass"] as? String, "AiderProviderPlugin")
+        // Re-encode the dictionary and decode through `init(plistData:)`
+        // — the path the loader follows when reading a `.csplugin`'s
+        // Info.plist.
+        let data = try PropertyListSerialization.data(
+            fromPropertyList: dict, format: .binary, options: 0
+        )
+        let decoded = try PluginManifest(plistData: data)
+        XCTAssertEqual(decoded, sample)
+    }
+
+    func testInfoDictionaryKey() {
+        XCTAssertEqual(PluginManifest.infoDictionaryKey, "CSPluginManifest")
+    }
+
+    func testBundleInitMissingKeyReturnsNil() {
+        // A bundle that has no CSPluginManifest entry should yield nil
+        // rather than throwing — the loader treats that as "not a
+        // Claude Statistics plugin" and skips it.
+        let manifest = PluginManifest(bundle: Bundle.main)
+        XCTAssertNil(manifest)
+    }
 }
 
 @MainActor
