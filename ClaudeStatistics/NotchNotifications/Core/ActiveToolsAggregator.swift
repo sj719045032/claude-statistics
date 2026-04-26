@@ -36,7 +36,7 @@ enum ActiveToolsAggregator {
     /// are hard-coded English in `ToolActivityFormatter`, so prefix
     /// matching is locale-stable.
     static func bucketKey(toolName: String, detail: String?) -> String {
-        let canonical = CanonicalToolName.resolve(toolName)
+        let canonical = HostCanonicalToolName.resolve(toolName)
         guard canonical == "bash" || canonical == "bashoutput", let detail else {
             return canonical
         }

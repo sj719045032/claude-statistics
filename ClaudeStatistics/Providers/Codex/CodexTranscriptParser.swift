@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 final class CodexTranscriptParser {
     static let shared = CodexTranscriptParser()

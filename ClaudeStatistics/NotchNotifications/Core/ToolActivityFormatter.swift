@@ -16,7 +16,7 @@ enum ToolActivityFormatter {
     /// `preferredKeys`, …) that don't receive a provider but still need a
     /// stable canonical form.
     static func canonicalToolName(_ raw: String?) -> String {
-        CanonicalToolName.resolve(raw)
+        HostCanonicalToolName.resolve(raw)
     }
 
     static func currentOperation(

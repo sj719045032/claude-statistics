@@ -152,6 +152,7 @@
 		9E3796619AF97F841CB57663 /* ClaudeStatisticsKitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B25F37B9C36D1D2F5361123 /* ClaudeStatisticsKitTests.swift */; };
 		A134E80F31ECEE35EA36D455 /* TerminalAppleScriptRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F24500B4C9F3F375B97402 /* TerminalAppleScriptRunner.swift */; };
 		A2F1B0B01CE980A41F32D377 /* ActiveSessionsTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1E190E276266D2300756D4 /* ActiveSessionsTracker.swift */; };
+		A2F7960601060A4F2D8BE790 /* CanonicalToolName.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F23EB1047050D22FF96E2B2 /* CanonicalToolName.swift */; };
 		A5B9E8F4EA41FC8313BF3228 /* ClaudeHookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9503F292FA4FB52DDDF97355 /* ClaudeHookInstaller.swift */; };
 		A63890A01AF570ADBA7E4E11 /* AttentionEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F675DD2E08BB0AC4ADBB101 /* AttentionEvent.swift */; };
 		A830A50BBE76ECD3E3990820 /* ShareCardThemePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0398E20299823326D6ED583C /* ShareCardThemePlugin.swift */; };
@@ -304,6 +305,7 @@
 		0C1E190E276266D2300756D4 /* ActiveSessionsTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveSessionsTracker.swift; sourceTree = "<group>"; };
 		0EBE4F4448DEBA3C067FBC16 /* SmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeTests.swift; sourceTree = "<group>"; };
 		0ECBB3BD210EF8857D8C47D5 /* TerminalDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalDescriptor.swift; sourceTree = "<group>"; };
+		0F23EB1047050D22FF96E2B2 /* CanonicalToolName.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalToolName.swift; sourceTree = "<group>"; };
 		0F813A6B005F1C5B011C3A98 /* WireEventTranslator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WireEventTranslator.swift; sourceTree = "<group>"; };
 		109BA2D83C763E18D01DF5F8 /* UsageVMRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageVMRegistryTests.swift; sourceTree = "<group>"; };
 		10E8B731850ABEECA18B111F /* TerminalFocusTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalFocusTarget.swift; sourceTree = "<group>"; };
@@ -655,6 +657,7 @@
 		2489CD3BC5CC01CED948DEAF /* ClaudeStatisticsKit */ = {
 			isa = PBXGroup;
 			children = (
+				0F23EB1047050D22FF96E2B2 /* CanonicalToolName.swift */,
 				25FAD30C4ED3FB7C010C8E96 /* ClaudeStatisticsKit.swift */,
 				33BC12E3CC3D917EBF49D537 /* Plugin.swift */,
 				1D22B04AA6887462F066799E /* PluginManifest.swift */,
@@ -1325,6 +1328,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A2F7960601060A4F2D8BE790 /* CanonicalToolName.swift in Sources */,
 				452CF0878A952AAF60319431 /* ClaudeStatisticsKit.swift in Sources */,
 				165267DE9A01FBED2611E29F /* Plugin.swift in Sources */,
 				D0AA811ABFBE719E0E045FAB /* PluginManifest.swift in Sources */,

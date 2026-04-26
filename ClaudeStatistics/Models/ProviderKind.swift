@@ -62,53 +62,15 @@ extension ProviderKind {
     }
 }
 
-/// Canonical tool-name vocabulary shared across providers. Each provider's
-/// alias table funnels its raw names into these values, and consumers that
-/// need a UI label use `displayName(for:)` here — keeping pretty capitalization
-/// in one place instead of duplicated across transcript parsers and formatters.
-enum CanonicalToolName {
-    /// Tool-name fallback used by callers that lack a `ProviderKind` context.
-    /// Tries every registered provider's alias table in turn; returns the
-    /// lower-cased normalized name when no provider recognizes the alias.
+/// Convenience for kernel callers that want the legacy registry-free
+/// resolve flavour (no plugin id required, just walks every builtin
+/// provider's alias table). New code should prefer
+/// `ClaudeStatisticsKit.CanonicalToolName.resolve(_:descriptors:)`
+/// directly with the desired descriptor set.
+enum HostCanonicalToolName {
     static func resolve(_ raw: String?) -> String {
-        guard let raw else { return "" }
-        let normalized = raw
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-            .replacingOccurrences(of: "-", with: "_")
-            .replacingOccurrences(of: " ", with: "_")
-        guard !normalized.isEmpty else { return "" }
-        for kind in ProviderKind.allCases {
-            if let mapped = kind.descriptor.resolveToolAlias(normalized) {
-                return mapped
-            }
-        }
-        return normalized
+        CanonicalToolName.resolve(raw, descriptors: ProviderKind.allCases.map(\.descriptor))
     }
-
-    /// Pretty label for a canonical tool name (e.g. `"edit"` → `"Edit"`).
-    /// Used by transcript parsers and any UI that wants a consistent verb
-    /// across providers. Unknown canonicals get a title-cased fallback.
-    static func displayName(for canonical: String) -> String {
-        switch canonical {
-        case "bash": return "Bash"
-        case "read": return "Read"
-        case "write": return "Write"
-        case "edit", "multiedit": return "Edit"
-        case "grep": return "Grep"
-        case "glob": return "Glob"
-        case "ls": return "List"
-        case "webfetch": return "Fetch"
-        case "websearch": return "Search"
-        case "task", "agent": return "Agent"
-        case "help": return "Help"
-        case "todowrite": return "Todo"
-        default:
-            guard let first = canonical.first else { return canonical }
-            return String(first).uppercased() + canonical.dropFirst()
-        }
-    }
-
 }
 
 /// Controls which providers' usage cells are shown in the status bar strip.
