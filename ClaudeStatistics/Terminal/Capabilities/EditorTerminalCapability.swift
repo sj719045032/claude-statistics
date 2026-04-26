@@ -2,31 +2,26 @@ import AppKit
 import ClaudeStatisticsKit
 import Foundation
 
-/// Legacy umbrella editor capability. Per-vendor editor plugins
-/// (VSCodePlugin already extracted; Cursor / Windsurf / Trae / Zed
-/// follow) own VSCode + Insiders themselves; once all five are
-/// extracted this whole struct + the EditorPlugin wrapper +
-/// EditorApp + the TerminalPreferences.editorOptionID seam can be
-/// deleted in one go.
+/// Legacy umbrella editor capability — fully drained of per-vendor
+/// metadata now that VSCode / Cursor / Windsurf / Trae / Zed each
+/// ship as their own `.csplugin`. Kept temporarily so the existing
+/// "Editor" Settings UI option (`TerminalPreferences.editorOptionID`)
+/// keeps launching `EditorApp.preferred` until Phase A.6 replaces
+/// that umbrella choice with five distinct entries — one per plugin.
+/// At that point this struct + EditorPlugin wrapper + EditorApp
+/// enum + the editorOptionID itself all get deleted together.
+///
+/// Empty `bundleIdentifiers` / `terminalNameAliases` /
+/// `processNameHints` mean ProcessTreeWalker + bundleId-aware
+/// dispatch never land here; those paths now resolve through the
+/// per-vendor plugins instead.
 struct EditorTerminalCapability: TerminalCapability, TerminalLauncher, TerminalReadinessProviding {
     let optionID: String? = TerminalPreferences.editorOptionID
     let category: TerminalCapabilityCategory = .editor
     let displayName = "Editor"
-    let bundleIdentifiers: Set<String> = [
-        "com.todesktop.230313mzl4w4u92",
-        "com.exafunction.windsurf",
-        "com.trae.app",
-        "dev.zed.Zed"
-    ]
-    let terminalNameAliases: Set<String> = [
-        "cursor", "windsurf", "trae", "zed"
-    ]
-    let processNameHints: Set<String> = [
-        "cursor",
-        "windsurf",
-        "trae",
-        "zed"
-    ]
+    let bundleIdentifiers: Set<String> = []
+    let terminalNameAliases: Set<String> = []
+    let processNameHints: Set<String> = []
     let route: TerminalFocusRoute = .activate
 
     var isInstalled: Bool { EditorApp.preferred.isInstalled }
