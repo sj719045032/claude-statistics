@@ -1,0 +1,140 @@
+import Foundation
+
+/// Discovers and loads `.csplugin` bundles into a `PluginRegistry`.
+///
+/// The loader walks a directory of plugin bundles, reads each one's
+/// `Info.plist` to recover its `PluginManifest`, asks the host whether
+/// it trusts the plugin (Q2: signing not required, decision is the
+/// host's), and on approval `dlopen`s the bundle and instantiates the
+/// `principalClass` via the Objective-C runtime.
+///
+/// Builtin plugins skip this path — they're registered directly during
+/// app launch. The loader exists for the M2 third-party path: drop a
+/// `Plugins/Sources/<Name>Plugin/` build product into the per-user
+/// plugins directory and the host picks it up on next launch.
+@MainActor
+public enum PluginLoader {
+    /// Default per-user plugin directory:
+    /// `~/Library/Application Support/Claude Statistics/Plugins/`. Host
+    /// callers may pass a different URL (e.g. `Contents/PlugIns/` for
+    /// builtin samples shipped inside the app).
+    public static var defaultDirectory: URL {
+        let support = FileManager.default.urls(
+            for: .applicationSupportDirectory, in: .userDomainMask
+        ).first!
+        return support
+            .appendingPathComponent("Claude Statistics", isDirectory: true)
+            .appendingPathComponent("Plugins", isDirectory: true)
+    }
+
+    public struct Report: Sendable {
+        public let loaded: [PluginManifest]
+        public let skipped: [SkippedEntry]
+
+        public init(loaded: [PluginManifest], skipped: [SkippedEntry]) {
+            self.loaded = loaded
+            self.skipped = skipped
+        }
+    }
+
+    public struct SkippedEntry: Sendable {
+        public let url: URL
+        public let reason: SkipReason
+
+        public init(url: URL, reason: SkipReason) {
+            self.url = url
+            self.reason = reason
+        }
+    }
+
+    public enum SkipReason: Sendable, Equatable, Error {
+        case notACSplugin
+        case manifestMissing
+        case incompatibleAPIVersion(required: SemVer, host: SemVer)
+        case trustDenied
+        case bundleLoadFailed
+        case principalClassMissing(name: String)
+        case principalClassWrongType(name: String)
+        case duplicateId(id: String, bucket: String)
+    }
+
+    /// Trust callback. Returns `true` to load the plugin, `false` to
+    /// skip. Host wires this to its `TrustStore` + first-run prompt.
+    /// Default `{ _, _ in true }` is intentional — the loader is a
+    /// mechanism, the policy lives in the host.
+    public typealias TrustEvaluator =
+        @MainActor (_ manifest: PluginManifest, _ bundleURL: URL) -> Bool
+
+    @discardableResult
+    public static func loadAll(
+        from directory: URL,
+        into registry: PluginRegistry,
+        trustEvaluator: TrustEvaluator = { _, _ in true }
+    ) -> Report {
+        var loaded: [PluginManifest] = []
+        var skipped: [SkippedEntry] = []
+
+        guard let entries = try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else {
+            return Report(loaded: [], skipped: [])
+        }
+
+        for url in entries.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+            switch loadOne(at: url, into: registry, trustEvaluator: trustEvaluator) {
+            case .success(let manifest):
+                loaded.append(manifest)
+            case .failure(let reason):
+                skipped.append(SkippedEntry(url: url, reason: reason))
+            }
+        }
+
+        return Report(loaded: loaded, skipped: skipped)
+    }
+
+    private static func loadOne(
+        at url: URL,
+        into registry: PluginRegistry,
+        trustEvaluator: TrustEvaluator
+    ) -> Result<PluginManifest, SkipReason> {
+        guard url.pathExtension == "csplugin" else {
+            return .failure(.notACSplugin)
+        }
+        guard let bundle = Bundle(url: url),
+              let manifest = PluginManifest(bundle: bundle) else {
+            return .failure(.manifestMissing)
+        }
+        guard manifest.minHostAPIVersion <= SDKInfo.apiVersion else {
+            return .failure(.incompatibleAPIVersion(
+                required: manifest.minHostAPIVersion,
+                host: SDKInfo.apiVersion
+            ))
+        }
+        guard trustEvaluator(manifest, url) else {
+            return .failure(.trustDenied)
+        }
+        guard bundle.load() else {
+            return .failure(.bundleLoadFailed)
+        }
+        guard let cls = bundle.classNamed(manifest.principalClass) else {
+            return .failure(.principalClassMissing(name: manifest.principalClass))
+        }
+        guard let pluginType = cls as? (NSObject & Plugin).Type else {
+            return .failure(.principalClassWrongType(name: manifest.principalClass))
+        }
+        let plugin = pluginType.init()
+        do {
+            try registry.register(plugin)
+            return .success(manifest)
+        } catch let PluginRegistryError.duplicateId(id, bucket) {
+            return .failure(.duplicateId(id: id, bucket: bucket))
+        } catch {
+            // PluginRegistry currently only throws duplicateId; future
+            // error cases land here and are reported as a generic
+            // bundleLoadFailed so the loader stays resilient.
+            return .failure(.bundleLoadFailed)
+        }
+    }
+}

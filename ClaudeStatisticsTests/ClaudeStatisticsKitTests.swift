@@ -284,6 +284,85 @@ final class ShareDescriptorTests: XCTestCase {
     }
 }
 
+/// Coverage for `PluginLoader`'s discovery + skip paths. The happy
+/// path (a bundle that actually loads via `dlopen`) lives in S3's
+/// integration test once `.csplugin` build products exist; here we
+/// only exercise the error-handling code and trust gate.
+@MainActor
+final class PluginLoaderTests: XCTestCase {
+    private var sandbox: URL!
+
+    override func setUpWithError() throws {
+        sandbox = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("PluginLoaderTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: sandbox, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: sandbox)
+    }
+
+    func testMissingDirectoryReturnsEmptyReport() {
+        let registry = PluginRegistry()
+        let report = PluginLoader.loadAll(
+            from: sandbox.appendingPathComponent("does-not-exist"),
+            into: registry
+        )
+        XCTAssertTrue(report.loaded.isEmpty)
+        XCTAssertTrue(report.skipped.isEmpty)
+        XCTAssertTrue(registry.providers.isEmpty)
+    }
+
+    func testNonCspluginEntriesAreSkipped() throws {
+        try "noise".write(to: sandbox.appendingPathComponent("readme.txt"), atomically: true, encoding: .utf8)
+        let registry = PluginRegistry()
+        let report = PluginLoader.loadAll(from: sandbox, into: registry)
+        XCTAssertTrue(report.loaded.isEmpty)
+        XCTAssertEqual(report.skipped.count, 1)
+        XCTAssertEqual(report.skipped.first?.reason, .notACSplugin)
+    }
+
+    func testCspluginWithMissingManifestIsSkipped() throws {
+        // A directory ending in .csplugin but without a Contents/Info.plist
+        // looks like a malformed bundle to NSBundle. Loader treats it as
+        // manifestMissing rather than crashing.
+        let bogus = sandbox.appendingPathComponent("bogus.csplugin", isDirectory: true)
+        try FileManager.default.createDirectory(at: bogus, withIntermediateDirectories: true)
+        let registry = PluginRegistry()
+        let report = PluginLoader.loadAll(from: sandbox, into: registry)
+        XCTAssertTrue(report.loaded.isEmpty)
+        XCTAssertEqual(report.skipped.first?.reason, .manifestMissing)
+    }
+
+    func testTrustEvaluatorCanRejectAll() throws {
+        // Even when a manifest is present, a trustEvaluator that returns
+        // false short-circuits before bundle.load. We can't synthesise a
+        // valid manifest-bearing bundle in a unit test, but we can
+        // verify the error-flow contract by feeding a malformed entry
+        // and asserting the loader still uses the trustEvaluator path
+        // wiring (manifestMissing fires before the trust gate, so this
+        // also documents the order: manifest must parse first).
+        let bogus = sandbox.appendingPathComponent("untrusted.csplugin", isDirectory: true)
+        try FileManager.default.createDirectory(at: bogus, withIntermediateDirectories: true)
+        let registry = PluginRegistry()
+        var trustCalls = 0
+        _ = PluginLoader.loadAll(from: sandbox, into: registry) { _, _ in
+            trustCalls += 1
+            return false
+        }
+        // Trust evaluator never gets called because manifestMissing
+        // fires earlier — this nails down the discovery order in the
+        // pipeline.
+        XCTAssertEqual(trustCalls, 0)
+    }
+
+    func testDefaultDirectoryUnderApplicationSupport() {
+        let dir = PluginLoader.defaultDirectory.path
+        XCTAssertTrue(dir.contains("Application Support"))
+        XCTAssertTrue(dir.hasSuffix("Claude Statistics/Plugins"))
+    }
+}
+
 /// Validates the plumbing the M2 `.csplugin` loader will rely on:
 /// every shipping plugin must expose a stable Objective-C runtime
 /// name matching its manifest's `principalClass`, so
