@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 /// Accessors for the per-provider notch master switch, plus one-time migration
 /// from the legacy single `notch.enabled` key. No provider-specific logic lives
@@ -83,23 +84,4 @@ enum NotchPreferences {
     }
 }
 
-/// User-facing event category. Each `SessionProvider` declares the subset of
-/// these it actually emits via `supportedNotchEvents`. The UserDefaults key is
-/// derived from the rawValue so adding a new kind is one-line.
-enum NotchEventKind: String, CaseIterable {
-    case permission
-    case waitingInput
-    case taskDone
-    case taskFailed
-
-    var defaultsKey: String { "notch.events.\(rawValue)" }
-    var titleKey: String { "notch.settings.event.\(rawValue)" }
-    var icon: String {
-        switch self {
-        case .permission:    return "checkmark.seal"
-        case .waitingInput:  return "return"
-        case .taskDone:      return "checkmark.circle"
-        case .taskFailed:    return "exclamationmark.triangle"
-        }
-    }
-}
+// NotchEventKind lives in ClaudeStatisticsKit.

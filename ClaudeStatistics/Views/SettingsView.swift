@@ -1,4 +1,5 @@
 import SwiftUI
+import ClaudeStatisticsKit
 import ServiceManagement
 import Carbon
 import ApplicationServices
