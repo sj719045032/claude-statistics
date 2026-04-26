@@ -287,6 +287,53 @@ P0 主要项已完成。第三方 ProviderPlugin 装上 `.csplugin` 后，Settin
 
 - 状态栏 strip cell 渲染——`appState.usageViewModel(for: ProviderKind)` 仍按 enum 派发，第三方 plugin descriptor 无对应 ProviderKind case，cell 被过滤掉。需要把这条数据流字符串化（接受 descriptor.id）。
 
+### 2026-04-27 (Disable/Enable + plugin-aware 全局清扫 + per-provider 默认终端)
+
+**已完成**（commit `c8274ff`）：
+
+插件 disable/enable 持久化
+- ✅ `DisabledPluginsStore`（`Plugins/Sources/ClaudeStatisticsKit/DisabledPluginsStore.swift`）—— ID-only sibling of TrustStore，所有源（host/bundled/user）共用同一 kill switch。
+- ✅ `PluginRegistry.disabled` 字典 + `DisabledRecord` —— 记下 disable 时的 manifest+source，让 Settings 面板能显示禁用行。
+- ✅ `PluginLoader.loadOne` 加 `disabledChecker` 回调 + `SkipReason.disabled`，loader 在 manifest 阶段就跳过禁用插件并 record。
+- ✅ `PluginTrustGate.disable / enable` —— enable 同时尝试 host factory + bundled load，覆盖双身份 id 场景；`AppState.hostPluginFactories` 让 host plugin 也能 hot-enable 不需重启。
+- ✅ `PluginsSettingsView` 新增 "Disabled (N)" Section + Enable 按钮，host 行显示"Restart required" badge（hot-enable 失败时）。
+
+P0 + P1 切片：UI/Runtime 全局走 PluginRegistry
+- ✅ `ProviderRegistry.availableProviders(plugins:)` + `allKnownDescriptors(plugins:)` 改成基于 `pluginRegistry.providers` 过滤，禁用 builtin 立即从顶部 strip / 右下 switcher / Settings rebuild loop / notch reconciliation 消失。
+- ✅ Disable 当前 provider 时 `AppState.handleProviderPluginDisabled` 自动切到下一 available kind。
+- ✅ `StatusLineSync.refreshManagedIntegrations(plugins:)` / startup `startupKinds` / `NotchHookSync.syncCurrent(plugins:)` 全部接 PluginRegistry。
+- ✅ `AccountManagers` 改 class，`reloaders: [String: () -> Void]` dict 按 descriptor.id 索引，`reload(for:)` 不再 switch ProviderKind。第三方 ProviderPlugin 通过 `registerReloader(for:_:)` 注入。
+- ✅ `ModelPricing.builtinModels` 合入 `ProviderRegistry.extraPluginPricing`（thread-safe snapshot，由 `wirePluginProviderInstances` 维护）—— 允许非 ProviderKind 的 plugin pricing 并入。
+- ✅ `NotchPreferences.anyProviderEnabled` 走 `allKnownDescriptors(plugins:)`，新增 `isEnabled(descriptor:)` 重载。
+- ✅ `wirePluginProviderInstances` 顺便调 `MenuBarPreferences.registerDefault(forDescriptorID:)`，新装 ProviderPlugin 默认显示。
+- ✅ `SettingsView.providerToggleLabel` 加 `(bundled)` / `(user)` capsule badge，host 不显示 —— 后续 codex/gemini 抽 plugin 后自动出现。
+
+Editor umbrella 清理（已分拆为 5 个 csplugin）
+- ✅ 删 `EditorTerminalCapability` / `EditorPlugin` / `EditorApp` enum / `editorOptionID` / `AppPreferences.preferredEditor` / SettingsView 二级 picker。
+- ✅ `TerminalPreferences.isEditorPreferred` 改用 `capability.category == .editor` 判断；`resumeCopiedToastMessage` 改用 `capability.displayName`。
+
+Codex provider/.app id 拆分
+- ✅ `CodexAppPlugin.manifest.id` & `descriptor.id` `com.openai.codex` → `com.openai.codex.app`；同步改 Info.plist 和 project.yml。修了 sources dict / disabled 字典共享 id 导致的 enable 丢半边的 bug。
+
+默认终端 per-provider 存储
+- ✅ Schema：`preferredTerminal.<descriptorID>`；legacy 单 key 保留作初次迁移 fallback。
+- ✅ `TerminalPreferences.preferredOptionID` 内部走 `ProviderRegistry.selectedProviderKind()` 路由，所有现有 caller（`TerminalRegistry.launch`、`TerminalSetupCoordinator` 等）零改动跟着 active provider 走。新增 `preferredOptionID(forProvider:)` / `setPreferredOptionID(_, forProvider:)` 显式 API。
+- ✅ `TerminalDescriptor.boundProviderID` + `TerminalCapability.boundProviderID` (default nil)：`CodexAppPlugin = "codex"`、`ClaudeAppPlugin = "claude"`，picker 在不同 provider 下隐藏不匹配的条目。`TerminalRegistry.launchOptions(forProvider:)` / `readinessOptions(forProvider:)` 实现过滤。
+- ✅ `SettingsView` terminal picker 用自定义 binding（`preferredTerminalBinding` + `terminalPreferenceRevision @State`），按 `appState.providerKind.descriptor.id` 路由读写。
+
+最后一个 provider 防护 + 兜底
+- ✅ `PluginTrustGate.disable` 拒绝禁用最后一个 provider plugin（status bar 入口会消失）。`PluginsSettingsView.canDisable(row)` 同条件下 disable 按钮变灰 + tooltip。
+- ✅ `AppState` 启动闭包检测 0 active provider 时强制清 Claude disabled flag 并 register `ClaudePluginDogfood`，写 warning 日志。
+
+Chat-app launchers
+- ✅ SDK 加 `ActivateAppLauncher`（NSWorkspace.openApplication）；`CodexAppPlugin.makeLauncher` / `ClaudeAppPlugin.makeLauncher` 用它。修了"切到 Codex.app 唤不起来"的 silent no-op。
+
+**剩余待办**：
+
+- ⏳ Terminal picker 加 `(plugin)` 来源徽章（与 §3.1 / 4.1 收尾）。已有 7 个 csplugin，做这个有意义。
+- ⏳ Chat-app new-session / resume deep-link：当前 `ActivateAppLauncher` 仅拉前台。需要调研 `codex://` / `claude://` 是否有 new-session URL；resume 路径理论上可用 `codex://threads/<id>` / `claude://claude.ai/resume?session=<id>`，但当前 launcher 不读 sessionId。
+- ⏳ `AccountManagers.swift:17-25` 之外的 P1 项（`ProviderContextRegistry.swift:103` Codex-only bridge / `HookCLI.swift:57-64` 三 case switch / `DisplayTextClassifier` 等内部 switch / `WireEventTranslator.swift:67-73` 兜底）。
+
 ### 明天起点：P1 第一刀
 
 **目标**：把 host 里几处 provider-specific behavior 特判（绕开 ProviderKind enum 比较）capability 化到 `ProviderDescriptor`。这些是真正的"行为差异"，不是 routing 派发，做成 capability flag 后插件可选启用。
