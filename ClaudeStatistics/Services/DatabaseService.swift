@@ -209,6 +209,112 @@ final class DatabaseService {
         return result
     }
 
+    /// Lightweight fingerprint of a cached session — `(fileSize, mtime,
+    /// hasStats)` —used by `processDirtyIds` to decide which sessions need
+    /// reparsing without paying the JSON-decode cost for all 270+ entries.
+    struct SessionFingerprint {
+        let fileSize: Int64
+        let mtime: Date
+        let hasStats: Bool
+    }
+
+    /// Return per-session `(fileSize, mtime, hasStats)` for every cached row
+    /// without decoding the JSON bodies. ~10× cheaper than `loadAllCached`
+    /// when caller only needs the staleness check.
+    func loadCacheFingerprints(provider: ProviderKind) -> [String: SessionFingerprint] {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db else { return [:] }
+
+        let sql = """
+            SELECT session_id, file_size, mtime, stats_json IS NOT NULL
+            FROM session_cache
+            WHERE provider = ?
+        """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [:] }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, provider.rawValue, -1, sqliteTransient)
+
+        var result: [String: SessionFingerprint] = [:]
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let sessionId = String(cString: sqlite3_column_text(stmt, 0))
+            let fileSize = sqlite3_column_int64(stmt, 1)
+            let mtime = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 2))
+            let hasStats = sqlite3_column_int(stmt, 3) != 0
+            result[sessionId] = SessionFingerprint(fileSize: fileSize, mtime: mtime, hasStats: hasStats)
+        }
+        return result
+    }
+
+    /// Whether a session's cache fingerprint is stale relative to the on-disk
+    /// file. Same semantics as `needsReparse(_:cache:)` but takes a
+    /// fingerprint dictionary instead of fully decoded `CachedSession`s.
+    func needsReparse(sessionId: String, fileSize: Int64, mtime: Date, fingerprints: [String: SessionFingerprint]) -> Bool {
+        guard let fp = fingerprints[sessionId] else { return true }
+        if !fp.hasStats { return true }
+        return fp.fileSize != fileSize ||
+               abs(fp.mtime.timeIntervalSince(mtime)) > 1.0
+    }
+
+    /// Load cache only for the given session ids. Used on the dirty-event fast
+    /// path to avoid the O(N) JSON decode of every cached session when only a
+    /// handful of files actually changed.
+    func loadCached(provider: ProviderKind, sessionIds: Set<String>) -> [String: CachedSession] {
+        guard !sessionIds.isEmpty else { return [:] }
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db else { return [:] }
+
+        let placeholders = Array(repeating: "?", count: sessionIds.count).joined(separator: ",")
+        let sql = """
+            SELECT session_id, file_size, mtime, quick_json, stats_json
+            FROM session_cache
+            WHERE provider = ? AND session_id IN (\(placeholders))
+        """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [:] }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, provider.rawValue, -1, sqliteTransient)
+        var bindIndex: Int32 = 2
+        for sessionId in sessionIds {
+            sqlite3_bind_text(stmt, bindIndex, sessionId, -1, sqliteTransient)
+            bindIndex += 1
+        }
+
+        let decoder = JSONDecoder()
+        var result: [String: CachedSession] = [:]
+
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let sessionId = String(cString: sqlite3_column_text(stmt, 0))
+            let fileSize = sqlite3_column_int64(stmt, 1)
+            let mtime = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 2))
+
+            var quick: SessionQuickStats?
+            if let ptr = sqlite3_column_text(stmt, 3) {
+                let json = Data(String(cString: ptr).utf8)
+                quick = try? decoder.decode(SessionQuickStats.self, from: json)
+            }
+
+            var stats: SessionStats?
+            if let ptr = sqlite3_column_text(stmt, 4) {
+                let json = Data(String(cString: ptr).utf8)
+                stats = try? decoder.decode(SessionStats.self, from: json)
+            }
+
+            result[sessionId] = CachedSession(
+                provider: provider,
+                sessionId: sessionId,
+                fileSize: fileSize,
+                mtime: mtime,
+                quickStats: quick,
+                sessionStats: stats
+            )
+        }
+
+        return result
+    }
+
     func indexedSessionIds(provider: ProviderKind) -> Set<String> {
         lock.lock()
         defer { lock.unlock() }

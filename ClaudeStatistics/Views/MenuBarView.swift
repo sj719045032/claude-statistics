@@ -10,6 +10,7 @@ struct MenuBarView: View {
     @ObservedObject var updaterService: UpdaterService
     @State private var selectedTab: AppTab = AppTab.loadOrder().first ?? .sessions
     @State private var tabOrder: [AppTab] = AppTab.loadOrder()
+    @State private var showQuitConfirm = false
     @AppStorage(AppPreferences.fontScale) private var fontScale = 1.0
     @AppStorage(AppPreferences.ignoredUpdateVersion) private var ignoredUpdateVersion = ""
     @Namespace private var tabNamespace
@@ -51,6 +52,14 @@ struct MenuBarView: View {
         .onAppear { terminalSetupCoordinator.evaluateStartupHint() }
         .onChange(of: appState.providerKind) { _, _ in
             ensureSelectedTabIsAvailable()
+        }
+        .destructiveConfirmation(
+            isPresented: $showQuitConfirm,
+            title: "app.quit.confirmTitle",
+            warning: "app.quit.confirmMessage",
+            confirmLabel: "app.quit"
+        ) {
+            NSApplication.shared.terminate(nil)
         }
         .sheet(item: $terminalSetupCoordinator.presentedIssue, onDismiss: {
             terminalSetupCoordinator.dismissSheet()
@@ -148,12 +157,22 @@ struct MenuBarView: View {
 
     private var footer: some View {
         HStack {
-            Button("app.quit") {
-                NSApplication.shared.terminate(nil)
+            DestructiveActionButton(
+                action: { skipConfirm in
+                    if skipConfirm {
+                        NSApplication.shared.terminate(nil)
+                    } else {
+                        showQuitConfirm = true
+                    }
+                },
+                helpKey: "app.quit.help",
+                pressedHelpKey: "app.quit.immediate.help"
+            ) { pressed in
+                Text("app.quit")
+                    .font(.system(size: 11 * fontScale))
+                    .foregroundStyle(pressed ? Color.red : Color.secondary)
             }
             .buttonStyle(.plain)
-            .font(.system(size: 11 * fontScale))
-            .foregroundStyle(.secondary)
 
             if let progress = store.parseProgress {
                 ParseProgressBadge(

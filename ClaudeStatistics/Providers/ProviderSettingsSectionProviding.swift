@@ -43,6 +43,7 @@ struct AccountSwitcherAccessory<Account: Identifiable>: View {
 
     @State private var showingAccountsPopover = false
     @State private var pendingDeleteAccount: Account?
+    @State private var pendingSignOutAccount: Account?
 
     var body: some View {
         Group {
@@ -132,6 +133,20 @@ struct AccountSwitcherAccessory<Account: Identifiable>: View {
             }
         } message: { account in
             Text(String(format: NSLocalizedString("settings.accountSwitcher.deleteConfirmMessage %@", comment: ""), accountLabel(account)))
+        }
+        .alert("settings.accountSwitcher.signOutConfirmTitle", isPresented: Binding(
+            get: { pendingSignOutAccount != nil },
+            set: { if !$0 { pendingSignOutAccount = nil } }
+        ), presenting: pendingSignOutAccount) { account in
+            Button("session.cancel", role: .cancel) {
+                pendingSignOutAccount = nil
+            }
+            Button("settings.accountSwitcher.signOut", role: .destructive) {
+                removeAccount(account)
+                pendingSignOutAccount = nil
+            }
+        } message: { account in
+            Text(String(format: NSLocalizedString("settings.accountSwitcher.signOutConfirmMessage %@", comment: ""), accountLabel(account)))
         }
     }
 
@@ -244,18 +259,26 @@ struct AccountSwitcherAccessory<Account: Identifiable>: View {
             .buttonStyle(.plain)
             .disabled(isLiveAccount(account) || isBusy)
 
-            if !isLiveAccount(account) {
-                Button(role: .destructive) {
-                    pendingDeleteAccount = account
-                } label: {
-                    Image(systemName: "trash")
-                        .frame(width: 14, height: 14)
-                }
-                .buttonStyle(.plain)
-                .disabled(isBusy)
-            } else {
-                Spacer().frame(width: 14)
-            }
+            DestructiveIconButton(
+                action: { skipConfirm in
+                    if skipConfirm {
+                        removeAccount(account)
+                    } else if isLiveAccount(account) {
+                        pendingSignOutAccount = account
+                    } else {
+                        pendingDeleteAccount = account
+                    }
+                },
+                size: 12,
+                helpKey: isLiveAccount(account)
+                    ? "settings.accountSwitcher.signOut.help"
+                    : "session.delete.help",
+                pressedHelpKey: isLiveAccount(account)
+                    ? "settings.accountSwitcher.signOut.immediate.help"
+                    : "session.delete.immediate.help"
+            )
+            .buttonStyle(.plain)
+            .disabled(isBusy)
         }
         .font(.system(size: 12, weight: isLiveAccount(account) ? .semibold : .regular))
         .padding(.horizontal, 14)

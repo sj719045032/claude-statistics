@@ -172,6 +172,11 @@ struct TranscriptView: View {
         }
     }
 
+    private var sessionTitle: String? {
+        let qs = viewModel.quickStat(for: session)
+        return qs?.topic ?? qs?.sessionName
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
@@ -187,7 +192,16 @@ struct TranscriptView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(Color.blue)
 
-                Spacer()
+                if let title = sessionTitle {
+                    Text(title)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.primary.opacity(0.75))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                } else {
+                    Spacer()
+                }
 
                 Text("transcript.title \(filteredMessages.count)")
                     .font(.system(size: 11))

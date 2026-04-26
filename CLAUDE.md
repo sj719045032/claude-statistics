@@ -28,19 +28,24 @@ logic lives in shared files (`Models/`, `NotchNotifications/Core/`, etc.).
 **Rule of thumb — per-provider data, shared behaviour:**
 
 - **Provider-owned**: any alias table, format quirk, schema hook, or mapping
-  that only one provider cares about. Example: Codex's raw tool names
-  (`apply_patch`, `exec_command`) → canonical names live in
-  `CodexToolNames.canonical(_:)` inside `CodexProvider.swift`. Gemini's
-  (`run_shell_command`, `read_file`) live in `GeminiToolNames.canonical(_:)`
-  inside `GeminiProvider.swift`.
-- **Shared/common**: the canonical vocabulary itself and how it's rendered.
-  Example: the set of canonical tool names and `CanonicalToolName.displayName
-  (for:)` ("edit" → "Edit", "bash" → "Bash") live in
-  `Models/ProviderKind.swift`.
+  that only one provider cares about. Example: each provider's raw tool
+  names → canonical names live in a `<Provider>ToolNames` enum inside
+  `Providers/<Provider>/<Provider>Provider.swift` (e.g. `CodexToolNames`
+  for `apply_patch` / `exec_command`, `GeminiToolNames` for
+  `run_shell_command` / `read_file`), and are exposed to shared code
+  through `ProviderDescriptor.resolveToolAlias`.
+- **Shared/common**: how the canonical vocabulary gets rendered.
+  `CanonicalToolName.displayName(for:)` ("edit" → "Edit", "bash" → "Bash")
+  lives in `Plugins/Sources/ClaudeStatisticsKit/CanonicalToolName.swift`.
+  The canonical vocabulary itself isn't a central list — each provider's
+  alias table contributes the values it maps to, and the SDK consumes
+  whatever shows up.
 - **Dispatcher**: `ProviderKind.canonicalToolName(_:)` picks the right
-  provider's alias table from `self`. Callers with a `ProviderKind` in scope
-  call this; callers without one use `CanonicalToolName.resolve(_:)` which
-  tries every provider's table.
+  provider's alias table from `self`. Callers with a `ProviderKind` in
+  scope use that; host callers without one use
+  `HostCanonicalToolName.resolve(_:)` (walks all builtin providers); SDK
+  callers use `CanonicalToolName.resolve(_:descriptors:)` directly with
+  whatever descriptor set is in scope.
 
 **Never** put Codex-only or Gemini-only constants inside shared files (e.g.
 `ToolActivityFormatter`). Adding a new alias should touch exactly one
@@ -50,6 +55,50 @@ plus any `switch` case that branches on it.
 When you catch yourself writing `switch providerName { case "apply_patch": … }`
 inside shared code, stop — route it through a provider-owned alias table and
 have the shared code switch on the canonical value instead.
+
+## Implementation Discipline
+
+**Build tools, not patches.** When the same shape of work shows up in
+more than one place — same string cleanup, same state check, same
+event handler — factor it into a named tool *before* adding the
+second copy. Don't fix a parsing bug in three providers by pasting
+three copies of the same `if`; build one function and call it three
+times.
+
+**Plan the interface before sprinkling call sites.** For any new
+cross-cutting need ("filter junk titles", "detect a modifier combo",
+"format a tool name"), decide up front: where does it live, what's
+it called, what's the signature. Thread it through every call site
+in the same change. Discovering the same need a second time and
+bolting it on again is a smell — stop and refactor instead of adding
+a fourth special case.
+
+**Where things live:**
+
+- Cross-provider shared behaviour (parsing, sanitizing, formatting)
+  → SDK (`Plugins/Sources/ClaudeStatisticsKit/`). Examples:
+  `TitleSanitizer`, `CanonicalToolName`, `SessionQuickStats`.
+- Cross-view UI state / monitors → `ClaudeStatistics/Utilities/` for
+  the state + storage, plus a reusable component under
+  `ClaudeStatistics/Views/` for the UI. Example:
+  `SkipConfirmKeyMonitor` + `SkipConfirmShortcut` (state + storage),
+  `ModifierRecorderRow` (UI).
+- Provider-specific quirks → the provider's own folder, behind an
+  alias table or hook (see *Provider Code Organization* above).
+
+**"Stop and factor" smells:**
+
+- A third copy of `if text.hasPrefix("<system-reminder>")` heading
+  into a third parser.
+- A new `switch` on a magic string sitting in shared code.
+- Two views each installing their own `NSEvent.addLocalMonitor` for
+  the same key state.
+- A `// TODO: also do this in CodexX` because only one provider got
+  the treatment.
+
+The answer is almost always "extract a small named tool with a clear
+signature and replace every site at once" — not "drop another
+special case in".
 
 ## Release a New Version
 

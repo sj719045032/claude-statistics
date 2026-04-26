@@ -33,31 +33,61 @@ public struct SessionStats: Codable, Sendable {
     /// modelBreakdown) are derived from this.
     public var fiveMinSlices: [Date: DaySlice]
 
-    // MARK: - Derived from fiveMinSlices
+    // MARK: - Stored aggregates (precomputed)
+    //
+    // These were O(slices) computed properties — re-walked `fiveMinSlices`
+    // on every access. SwiftUI views like `StatisticsView` and
+    // `AllTimeView` read several of them per render per session, which
+    // dominated CPU when many sessions were loaded. Now they are stored
+    // and populated once by `precomputeAggregates()` (called at the end
+    // of every `parseSession` and the end of `init(from:)`). They are
+    // **not** part of `Codable` — derived purely from `fiveMinSlices`,
+    // so we recompute on decode rather than bloat `stats_json`.
+    //
+    // Mutators of `fiveMinSlices` MUST call `precomputeAggregates()`
+    // before publishing the value. The provided `init()` /
+    // `init(from:)` already do this; parsers call it at the end of
+    // `parseSession`.
 
-    public var totalInputTokens: Int { fiveMinSlices.values.reduce(0) { $0 + $1.totalInputTokens } }
-    public var totalOutputTokens: Int { fiveMinSlices.values.reduce(0) { $0 + $1.totalOutputTokens } }
-    public var cacheCreation5mTokens: Int { fiveMinSlices.values.reduce(0) { $0 + $1.cacheCreation5mTokens } }
-    public var cacheCreation1hTokens: Int { fiveMinSlices.values.reduce(0) { $0 + $1.cacheCreation1hTokens } }
-    public var cacheCreationTotalTokens: Int { fiveMinSlices.values.reduce(0) { $0 + $1.cacheCreationTotalTokens } }
-    public var cacheReadTokens: Int { fiveMinSlices.values.reduce(0) { $0 + $1.cacheReadTokens } }
-    public var messageCount: Int { fiveMinSlices.values.reduce(0) { $0 + $1.messageCount } }
+    public private(set) var totalInputTokens: Int = 0
+    public private(set) var totalOutputTokens: Int = 0
+    public private(set) var cacheCreation5mTokens: Int = 0
+    public private(set) var cacheCreation1hTokens: Int = 0
+    public private(set) var cacheCreationTotalTokens: Int = 0
+    public private(set) var cacheReadTokens: Int = 0
+    public private(set) var messageCount: Int = 0
+    public private(set) var toolUseCounts: [String: Int] = [:]
+    public private(set) var modelBreakdown: [String: ModelTokenStats] = [:]
 
-    public var toolUseCounts: [String: Int] {
-        var merged: [String: Int] = [:]
+    /// Recompute every stored aggregate above from `fiveMinSlices`. Call
+    /// this once after finishing a parse or after decoding from cache.
+    /// O(N) over total slice count — same single pass as the old
+    /// computed-property walks, but only happens once per parse instead
+    /// of per-View-render.
+    public mutating func precomputeAggregates() {
+        var totalInput = 0
+        var totalOutput = 0
+        var cache5m = 0
+        var cache1h = 0
+        var cacheTotal = 0
+        var cacheRead = 0
+        var messages = 0
+        var tools: [String: Int] = [:]
+        var models: [String: ModelTokenStats] = [:]
+
         for slice in fiveMinSlices.values {
+            totalInput += slice.totalInputTokens
+            totalOutput += slice.totalOutputTokens
+            cache5m += slice.cacheCreation5mTokens
+            cache1h += slice.cacheCreation1hTokens
+            cacheTotal += slice.cacheCreationTotalTokens
+            cacheRead += slice.cacheReadTokens
+            messages += slice.messageCount
             for (tool, count) in slice.toolUseCounts {
-                merged[tool, default: 0] += count
+                tools[tool, default: 0] += count
             }
-        }
-        return merged
-    }
-
-    public var modelBreakdown: [String: ModelTokenStats] {
-        var merged: [String: ModelTokenStats] = [:]
-        for slice in fiveMinSlices.values {
             for (model, mts) in slice.modelBreakdown {
-                var existing = merged[model, default: ModelTokenStats()]
+                var existing = models[model, default: ModelTokenStats()]
                 existing.inputTokens += mts.inputTokens
                 existing.outputTokens += mts.outputTokens
                 existing.cacheCreation5mTokens += mts.cacheCreation5mTokens
@@ -65,10 +95,19 @@ public struct SessionStats: Codable, Sendable {
                 existing.cacheCreationTotalTokens += mts.cacheCreationTotalTokens
                 existing.cacheReadTokens += mts.cacheReadTokens
                 existing.messageCount += mts.messageCount
-                merged[model] = existing
+                models[model] = existing
             }
         }
-        return merged
+
+        self.totalInputTokens = totalInput
+        self.totalOutputTokens = totalOutput
+        self.cacheCreation5mTokens = cache5m
+        self.cacheCreation1hTokens = cache1h
+        self.cacheCreationTotalTokens = cacheTotal
+        self.cacheReadTokens = cacheRead
+        self.messageCount = messages
+        self.toolUseCounts = tools
+        self.modelBreakdown = models
     }
 
     /// Per-hour buckets, keyed by the start of each hour.
@@ -200,5 +239,6 @@ public struct SessionStats: Codable, Sendable {
                 return (Date(timeIntervalSince1970: ti), value)
             }
         )
+        precomputeAggregates()
     }
 }

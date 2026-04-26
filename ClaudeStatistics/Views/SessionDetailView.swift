@@ -39,12 +39,17 @@ struct SessionDetailView: View {
 
                 Spacer()
 
-                if onDelete != nil {
-                    Button(action: { showDeleteConfirm = true }) {
-                        Image(systemName: "trash")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.red)
-                    }
+                if let onDelete {
+                    DestructiveIconButton(
+                        action: { skipConfirm in
+                            if skipConfirm {
+                                onDelete()
+                            } else {
+                                showDeleteConfirm = true
+                            }
+                        },
+                        size: 11
+                    )
                     .buttonStyle(.hoverScale)
                 }
 
@@ -145,38 +150,12 @@ struct SessionDetailView: View {
                 .textSelection(.enabled)
             }
         }
-        .overlay(alignment: .bottom) {
-            if showDeleteConfirm {
-                VStack(spacing: 8) {
-                    Text("detail.deleteConfirm")
-                        .font(.system(size: 12))
-                        .multilineTextAlignment(.center)
-                    Text("session.deleteWarning")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                    HStack(spacing: 12) {
-                        Button("session.cancel") {
-                            showDeleteConfirm = false
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        Button("session.delete") {
-                            showDeleteConfirm = false
-                            onDelete?()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.red)
-                        .controlSize(.small)
-                    }
-                }
-                .padding(12)
-                .frame(maxWidth: .infinity)
-                .background(.ultraThickMaterial)
-                .overlay(alignment: .top) { Divider() }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
+        .destructiveConfirmation(
+            isPresented: $showDeleteConfirm,
+            title: "detail.deleteConfirm"
+        ) {
+            onDelete?()
         }
-        .animation(.easeInOut(duration: 0.2), value: showDeleteConfirm)
     }
 
     @ViewBuilder

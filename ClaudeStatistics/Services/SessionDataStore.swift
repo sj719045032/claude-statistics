@@ -31,6 +31,12 @@ final class SessionDataStore: ObservableObject {
     private var retryAttemptCounts: [String: Int] = [:]
     private var retryTask: Task<Void, Never>?
     private var pendingRescan = false
+    /// Pending dirty-id batch for in-flight coalescing. New watcher fires merge
+    /// into this set while a `processDirtyBatch` task is running; the running
+    /// task drains the merged set when it finishes.
+    private var pendingDirtyIds: Set<String> = []
+    private var pendingForceRescan = false
+    private var isProcessingDirtyBatch = false
     private var isPopoverVisible = false
     private var watcher: (any SessionWatcher)?
     let provider: any SessionProvider
@@ -319,32 +325,73 @@ final class SessionDataStore: ObservableObject {
     }
 
     private func processDirtyIds(_ ids: Set<String>, forceRescan: Bool = false) {
+        pendingDirtyIds.formUnion(ids)
+        if forceRescan { pendingForceRescan = true }
+        guard !isProcessingDirtyBatch else { return }
+        runNextDirtyBatch()
+    }
+
+    private func runNextDirtyBatch() {
+        let ids = pendingDirtyIds
+        let forceRescan = pendingForceRescan
+        pendingDirtyIds.removeAll()
+        pendingForceRescan = false
+
+        guard forceRescan || !ids.isEmpty else {
+            isProcessingDirtyBatch = false
+            return
+        }
+
+        isProcessingDirtyBatch = true
+
         let provider = self.provider
         let providerKind = provider.kind
         let db = self.db
+        // Snapshot the known sessions for the fast path. A new file that the
+        // watcher already saw but we haven't scanned yet won't be in here, so
+        // we promote to forceRescan when any dirty id is unknown.
+        let knownSessions = self.sessions
+        let knownIds = Set(knownSessions.map(\.id))
+        let hasUnknownId = ids.contains { !knownIds.contains($0) }
+        let effectiveForceRescan = forceRescan || hasUnknownId
         DiagnosticLogger.shared.verbose(
-            "Session dirty process provider=\(providerKind.rawValue) ids=\(ids.count) forceRescan=\(forceRescan)"
+            "Session dirty process provider=\(providerKind.rawValue) ids=\(ids.count) forceRescan=\(effectiveForceRescan) fastPath=\(!effectiveForceRescan)"
         )
         Task.detached { [weak self] in
             guard let self else { return }
 
-            // Rescan to pick up new/deleted files
-            let scannedSessions = Self.deduplicatedSessions(provider.scanSessions(), provider: providerKind)
-            let cache = db.loadAllCached(provider: providerKind)
-
-            await MainActor.run {
-                self.sessions = scannedSessions
-                self.cleanupDeletedSessions(current: scannedSessions)
+            let scannedSessions: [Session]
+            let dirtySessions: [Session]
+            let cache: [String: DatabaseService.CachedSession]
+            if effectiveForceRescan {
+                // Slow path: pick up new/deleted files and reparse anything whose
+                // fingerprint changed against the cache. Use fingerprint-only
+                // load (no JSON decode) for the staleness filter, then only
+                // decode JSON for the actual dirty sessions as retry fallback.
+                scannedSessions = Self.deduplicatedSessions(provider.scanSessions(), provider: providerKind)
+                let fingerprints = db.loadCacheFingerprints(provider: providerKind)
+                await MainActor.run {
+                    self.sessions = scannedSessions
+                    self.cleanupDeletedSessions(current: scannedSessions)
+                }
+                dirtySessions = scannedSessions.filter {
+                    ids.contains($0.id) || db.needsReparse(
+                        sessionId: $0.id,
+                        fileSize: $0.fileSize,
+                        mtime: $0.lastModified,
+                        fingerprints: fingerprints
+                    )
+                }
+                cache = db.loadCached(provider: providerKind, sessionIds: Set(dirtySessions.map(\.id)))
+            } else {
+                // Fast path: watcher already told us exactly which sessions changed
+                // and they all exist in the snapshot. Skip the full directory walk
+                // and only load the cache rows we need as retry fallbacks.
+                scannedSessions = knownSessions
+                cache = db.loadCached(provider: providerKind, sessionIds: ids)
+                dirtySessions = scannedSessions.filter { ids.contains($0.id) }
             }
 
-            let dirtySessions = scannedSessions.filter {
-                ids.contains($0.id) || (forceRescan && db.needsReparse(
-                    sessionId: $0.id,
-                    fileSize: $0.fileSize,
-                    mtime: $0.lastModified,
-                    cache: cache
-                ))
-            }
             DiagnosticLogger.shared.verbose(
                 "Session dirty matched provider=\(providerKind.rawValue) dirty=\(dirtySessions.count) scanned=\(scannedSessions.count)"
             )
@@ -398,7 +445,13 @@ final class SessionDataStore: ObservableObject {
                 }
             }
 
-            await MainActor.run { self.rebucket() }
+            await MainActor.run {
+                self.rebucket()
+                // Drain anything queued while this batch was running. If nothing
+                // is pending, runNextDirtyBatch() flips isProcessingDirtyBatch
+                // back to false and exits.
+                self.runNextDirtyBatch()
+            }
         }
     }
 
@@ -691,6 +744,7 @@ final class SessionDataStore: ObservableObject {
         allTimeMessages = parsedStats.values.reduce(0) { $0 + $1.messageCount }
         visibleStats = Array(periodStats.prefix(selectedPeriod.displayCount))
         visibleModelBreakdown = modelBreakdown(for: visibleStats)
+        recomputeAllTimeAggregates()
     }
 
     /// Aggregate every session into a single "All Time" PeriodStats.
@@ -742,6 +796,7 @@ final class SessionDataStore: ObservableObject {
         allTimeMessages = agg.messageCount
         visibleStats = [agg]
         visibleModelBreakdown = modelBreakdown(for: [agg])
+        recomputeAllTimeAggregates()
     }
 
     // MARK: - Top projects (all-time aggregation by project path)
@@ -831,12 +886,14 @@ final class SessionDataStore: ObservableObject {
 
     /// Aggregate all sessions by their `cwd` (or projectPath fallback), sorted by estimated cost desc.
     /// Used by the All-Time view's "Top Projects" card.
-    var topProjects: [TopProject] {
-        guard let agg = visibleStats.first(where: { $0.period == .distantPast }) else {
-            return []
-        }
-        return aggregatePeriodTopProjects(for: agg, periodType: .all)
-    }
+    ///
+    /// Now backed by `_topProjectsCache` populated in `rebucket()` /
+    /// `rebucketAllTime()`. Was a O(sessions × slices) computed property —
+    /// AllTimeView read it from `body` so each SwiftUI re-render walked
+    /// every session's full slice map, dominating CPU when entering the
+    /// statistics page.
+    var topProjects: [TopProject] { _topProjectsCache }
+    @Published private var _topProjectsCache: [TopProject] = []
 
     /// Trim/relabel a full path into something compact enough for a list row.
     /// Prefers the last path component (like the basename of a repo).
@@ -850,19 +907,78 @@ final class SessionDataStore: ObservableObject {
 
     /// Per-day aggregated cost + tokens for the heatmap in the All-Time view.
     /// Key is `startOfDay` in the user's local timezone.
-    var dailyHeatmapData: [Date: DailyHeatmapBucket] {
+    ///
+    /// Now backed by `_dailyHeatmapCache` populated in `rebucket()` /
+    /// `rebucketAllTime()`. Was a O(sessions × slices) computed property —
+    /// AllTimeView read it from `body` *twice* per render so each redraw
+    /// walked every session's full slice map twice.
+    var dailyHeatmapData: [Date: DailyHeatmapBucket] { _dailyHeatmapCache }
+    @Published private var _dailyHeatmapCache: [Date: DailyHeatmapBucket] = [:]
+
+    /// Recompute `_dailyHeatmapCache` and `_topProjectsCache`. Single
+    /// O(sessions × slices) walk producing both — the heatmap's daily
+    /// buckets are derived in the same loop as the top-projects per-cwd
+    /// accumulator, so we do one pass instead of two.
+    fileprivate func recomputeAllTimeAggregates() {
         let cal = Calendar.current
-        var buckets: [Date: DailyHeatmapBucket] = [:]
-        for stats in parsedStats.values {
+        var heatmap: [Date: DailyHeatmapBucket] = [:]
+
+        struct ProjectAcc {
+            var cost: Double = 0
+            var tokens: Int = 0
+            var sessionCount: Int = 0
+            var messageCount: Int = 0
+        }
+        var projectAcc: [String: ProjectAcc] = [:]
+        let sessionById = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
+
+        for (sessionId, stats) in parsedStats {
+            // Heatmap bucket
             for (sliceTime, slice) in stats.fiveMinSlices {
                 let day = cal.startOfDay(for: sliceTime)
-                var b = buckets[day, default: DailyHeatmapBucket(date: day, cost: 0, tokens: 0)]
+                var b = heatmap[day, default: DailyHeatmapBucket(date: day, cost: 0, tokens: 0)]
                 b.cost += slice.estimatedCost
                 b.tokens += slice.totalTokens
-                buckets[day] = b
+                heatmap[day] = b
             }
+
+            // Top-projects accumulator
+            guard let session = sessionById[sessionId] else { continue }
+            let key = session.cwd ?? session.projectPath
+            var a = projectAcc[key, default: ProjectAcc()]
+            if stats.fiveMinSlices.isEmpty {
+                a.cost += stats.estimatedCost
+                a.tokens += stats.totalTokens
+                a.messageCount += stats.messageCount
+                a.sessionCount += 1
+            } else {
+                var costInPeriod = 0.0
+                var tokensInPeriod = 0
+                var messagesInPeriod = 0
+                for (_, slice) in stats.fiveMinSlices {
+                    costInPeriod += slice.estimatedCost
+                    tokensInPeriod += slice.totalTokens
+                    messagesInPeriod += slice.messageCount
+                }
+                a.cost += costInPeriod
+                a.tokens += tokensInPeriod
+                a.messageCount += messagesInPeriod
+                a.sessionCount += 1
+            }
+            projectAcc[key] = a
         }
-        return buckets
+
+        _dailyHeatmapCache = heatmap
+        _topProjectsCache = projectAcc.map { key, v in
+            TopProject(
+                path: key,
+                displayName: Self.displayNameForProjectPath(key),
+                cost: v.cost,
+                tokens: v.tokens,
+                sessionCount: v.sessionCount,
+                messageCount: v.messageCount
+            )
+        }.filter { $0.sessionCount > 0 }.sorted { $0.cost > $1.cost }
     }
 
     // MARK: - Delete

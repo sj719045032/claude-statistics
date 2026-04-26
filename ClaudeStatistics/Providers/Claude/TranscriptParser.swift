@@ -251,6 +251,8 @@ final class TranscriptParser {
             stats.fiveMinSlices[time, default: DaySlice()].messageCount += 1
         }
 
+        stats.precomputeAggregates()
+
         DiagnosticLogger.shared.parsingSummary(
             file: path,
             totalLines: messageData.count + stats.userMessageCount,
@@ -487,8 +489,15 @@ final class TranscriptParser {
                     foundOutputPreview = true
                 }
             }
-            quick.sessionName = latestCustomTitle ?? latestSlug
+            quick.sessionName = TitleSanitizer.sanitize(latestCustomTitle ?? latestSlug)
         }  // end do
+
+        // If the initial 16 KB read didn't surface a topic (e.g. the first real user
+        // message was embedded in a large line containing base64 image data), do a
+        // dedicated line-by-line scan that handles oversized lines.
+        if quick.topic == nil {
+            quick.topic = Self.findTopicByLineScan(at: path)
+        }
 
         return quick
     }
@@ -908,14 +917,7 @@ final class TranscriptParser {
     /// Clean up user text into a short topic line
     private static func cleanTopic(_ text: String) -> String? {
         guard let trimmed = cleanUserDisplayText(text) else { return nil }
-
-        // Take the first meaningful line
-        let firstLine = trimmed.components(separatedBy: .newlines)
-            .first(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty })?
-            .trimmingCharacters(in: .whitespaces) ?? trimmed
-
-        if firstLine.isEmpty { return nil }
-        return firstLine
+        return TitleSanitizer.sanitize(trimmed)
     }
 
     private static func cleanUserDisplayText(_ text: String) -> String? {
@@ -927,10 +929,16 @@ final class TranscriptParser {
     private static func isInternalUserMessage(_ text: String) -> Bool {
         guard text.hasPrefix("<") else { return false }
 
+        // Bare standalone tag (e.g. <local-command-stdout>)
         if text.range(
             of: #"^<{1,2}/?[A-Za-z][A-Za-z0-9_-]*(\s+[^>]*)?>{1,2}$"#,
             options: .regularExpression
         ) != nil {
+            return true
+        }
+
+        // Tag with content (e.g. <local-command-stdout>Set model…</local-command-stdout>)
+        if text.range(of: #"^<[a-z][a-z0-9-]*>"#, options: .regularExpression) != nil {
             return true
         }
 
@@ -941,5 +949,91 @@ final class TranscriptParser {
             || text.contains("<task-notification>")
             || text.contains("<task-id>")
             || text.contains("<tool-use-id>")
+    }
+
+    // MARK: - Large-line topic extraction
+
+    /// Read one newline-delimited line from `handle`, using `buffer` for lookahead.
+    private static func readLineData(from handle: FileHandle, buffer: inout Data) -> Data? {
+        let newline = UInt8(ascii: "\n")
+        while true {
+            if let nlIdx = buffer.firstIndex(of: newline) {
+                let line = Data(buffer[..<nlIdx])
+                buffer = Data(buffer[(buffer.index(after: nlIdx)...)])
+                if !line.isEmpty { return line }
+                continue  // skip empty lines
+            }
+            let chunk = handle.readData(ofLength: 16384)
+            if chunk.isEmpty {
+                guard !buffer.isEmpty else { return nil }
+                let remaining = buffer
+                buffer = Data()
+                return remaining
+            }
+            buffer.append(contentsOf: chunk)
+        }
+    }
+
+    /// For lines too large to decode as JSON (e.g. containing base64 image data),
+    /// try to pull the first text field from the leading bytes of the line.
+    private static func extractTextFromLargeUserLine(_ data: Data) -> String? {
+        let headerBytes = data.prefix(512)
+        let header = String(decoding: headerBytes, as: UTF8.self)
+        guard header.contains("\"type\":\"user\"") || header.contains("\"type\":\"human\"") else { return nil }
+
+        let searchStr = String(decoding: data.prefix(8192), as: UTF8.self)
+        let marker = "\"type\":\"text\",\"text\":\""
+        guard let markerRange = searchStr.range(of: marker) else { return nil }
+
+        var result = ""
+        var idx = markerRange.upperBound
+        var escaped = false
+        while idx < searchStr.endIndex, result.count < 500 {
+            let c = searchStr[idx]
+            if escaped {
+                escaped = false
+                if c != "u" { result.append(c) }
+            } else if c == "\\" {
+                escaped = true
+            } else if c == "\"" {
+                break
+            } else {
+                result.append(c)
+            }
+            idx = searchStr.index(after: idx)
+        }
+        return result.isEmpty ? nil : result
+    }
+
+    /// Secondary topic scan used when the initial 16 KB read didn't find a topic.
+    /// Reads the file line-by-line (up to 100 lines) and handles large lines
+    /// (e.g. user messages with embedded base64 images) via regex extraction.
+    private static func findTopicByLineScan(at path: String) -> String? {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
+        defer { handle.closeFile() }
+
+        let decoder = JSONDecoder()
+        var buffer = Data()
+        var lineCount = 0
+
+        while lineCount < 100 {
+            guard let lineData = readLineData(from: handle, buffer: &buffer) else { break }
+            lineCount += 1
+
+            if lineData.count > 65536 {
+                if let text = extractTextFromLargeUserLine(lineData),
+                   let topic = cleanTopic(text) {
+                    return topic
+                }
+                continue
+            }
+
+            guard let entry = try? decoder.decode(TranscriptEntry.self, from: lineData),
+                  entry.type == "user" || entry.type == "human",
+                  let text = extractUserText(from: entry),
+                  let topic = cleanTopic(text) else { continue }
+            return topic
+        }
+        return nil
     }
 }

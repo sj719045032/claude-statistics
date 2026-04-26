@@ -114,13 +114,25 @@ struct SessionListView: View {
                         .buttonStyle(.plain)
                         .foregroundStyle(Color.blue)
 
-                    Button("session.delete") {
-                        deleteTarget = viewModel.selectedIds
-                        showDeleteConfirm = true
+                    DestructiveActionButton(
+                        action: { skipConfirm in
+                            let ids = viewModel.selectedIds
+                            if skipConfirm {
+                                viewModel.deleteSessions(ids)
+                                viewModel.exitSelecting()
+                            } else {
+                                deleteTarget = ids
+                                showDeleteConfirm = true
+                            }
+                        },
+                        helpKey: "session.delete.help",
+                        pressedHelpKey: "session.delete.immediate.help"
+                    ) { pressed in
+                        Text("session.delete")
+                            .font(.system(size: 10))
+                            .skipConfirmTextHighlight(pressed)
                     }
-                    .font(.system(size: 10))
                     .buttonStyle(.plain)
-                    .foregroundStyle(.red)
                     .disabled(viewModel.selectedIds.isEmpty)
 
                     Button("session.cancel") { viewModel.exitSelecting() }
@@ -255,9 +267,13 @@ struct SessionListView: View {
                                             toastCenter.show(EditorApp.resumeCopiedToastMessage)
                                         }
                                     },
-                                    onDelete: {
-                                        deleteTarget = [session.id]
-                                        showDeleteConfirm = true
+                                    onDelete: { skipConfirm in
+                                        if skipConfirm {
+                                            viewModel.deleteSessions([session.id])
+                                        } else {
+                                            deleteTarget = [session.id]
+                                            showDeleteConfirm = true
+                                        }
                                     }
                                 )
                                 .transition(.asymmetric(
@@ -272,39 +288,13 @@ struct SessionListView: View {
                 .padding(.vertical, 4)
             }
         }
-        .overlay(alignment: .bottom) {
-            if showDeleteConfirm {
-                VStack(spacing: 8) {
-                    Text("session.deleteConfirm \(deleteTarget.count)")
-                        .font(.system(size: 12, weight: .medium))
-                    Text("session.deleteWarning")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                    HStack(spacing: 12) {
-                        Button("session.cancel") {
-                            showDeleteConfirm = false
-                            deleteTarget = []
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        Button("session.delete") {
-                            viewModel.deleteSessions(deleteTarget)
-                            showDeleteConfirm = false
-                            deleteTarget = []
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.red)
-                        .controlSize(.small)
-                    }
-                }
-                .padding(12)
-                .frame(maxWidth: .infinity)
-                .background(.ultraThickMaterial)
-                .overlay(alignment: .top) { Divider() }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
+        .destructiveConfirmation(
+            isPresented: $showDeleteConfirm,
+            title: "session.deleteConfirm \(deleteTarget.count)"
+        ) {
+            viewModel.deleteSessions(deleteTarget)
+            deleteTarget = []
         }
-        .animation(.easeInOut(duration: 0.2), value: showDeleteConfirm)
     }
 }
 
@@ -394,12 +384,14 @@ struct SessionRow: View {
     let onTap: () -> Void
     let onNewSession: () -> Void
     let onResume: () -> Void
-    let onDelete: () -> Void
+    let onDelete: (Bool) -> Void
     @State private var isHovered = false
 
     private var primaryTitle: String {
         if grouped {
-            return quickStats?.topic ?? quickStats?.sessionName ?? String(localized: "session.untitled")
+            return TitleSanitizer.sanitize(quickStats?.topic)
+                ?? TitleSanitizer.sanitize(quickStats?.sessionName)
+                ?? String(localized: "session.untitled")
         }
         return session.displayName
     }
@@ -526,13 +518,8 @@ struct SessionRow: View {
                 .buttonStyle(.hoverScale)
                 .help("session.resume.help")
 
-                Button(action: onDelete) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.red)
-                }
-                .buttonStyle(.hoverScale)
-                .help("session.delete.help")
+                DestructiveIconButton(action: onDelete)
+                    .buttonStyle(.hoverScale)
             }
 
             if !isSelecting {
@@ -593,7 +580,9 @@ struct RecentSessionRow: View {
     @State private var isHovered = false
 
     private var title: String {
-        quickStats?.topic ?? quickStats?.sessionName ?? String(localized: "session.untitled")
+        TitleSanitizer.sanitize(quickStats?.topic)
+            ?? TitleSanitizer.sanitize(quickStats?.sessionName)
+            ?? String(localized: "session.untitled")
     }
 
     private var shortPath: String {

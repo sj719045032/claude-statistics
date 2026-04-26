@@ -225,6 +225,7 @@ final class CodexTranscriptParser {
         if let note = stats.latestProgressNote?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
             DiagnosticLogger.shared.verbose("Codex full commentary latest session=\((path as NSString).lastPathComponent) len=\(note.count)")
         }
+        stats.precomputeAggregates()
         return stats
     }
 
@@ -476,7 +477,7 @@ final class CodexTranscriptParser {
             .first
 
         guard let firstLine, !firstLine.isEmpty else { return nil }
-        return firstLine
+        return TitleSanitizer.sanitize(firstLine)
     }
 
     private func cleanSearchText(_ text: String) -> String? {

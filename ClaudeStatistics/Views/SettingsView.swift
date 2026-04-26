@@ -1023,6 +1023,7 @@ private struct KeyboardShortcutsSettingsView: View {
     @AppStorage(GlobalHotKeyShortcut.islandKeyCodeKey) private var islandKeyCode = GlobalHotKeyAction.island.defaultKeyCode
     @AppStorage(GlobalHotKeyShortcut.islandModifiersKey) private var islandModifiers = GlobalHotKeyAction.island.defaultModifiers
     @AppStorage(NotchPreferences.keyboardControlsEnabledKey) private var keyboardControlsEnabled = true
+    @AppStorage(SkipConfirmShortcut.modifiersKey) private var skipConfirmModifiers = SkipConfirmShortcut.defaultModifiers
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1081,6 +1082,15 @@ private struct KeyboardShortcutsSettingsView: View {
                         enabled: $islandEnabled,
                         keyCode: $islandKeyCode,
                         modifiers: $islandModifiers
+                    )
+                }
+
+                Section("settings.shortcut.section.confirmation") {
+                    ModifierRecorderRow(
+                        modifiersRaw: $skipConfirmModifiers,
+                        titleKey: "settings.skipConfirm.title",
+                        subtitleKey: "settings.skipConfirm.subtitle",
+                        iconName: "hand.tap"
                     )
                 }
             }

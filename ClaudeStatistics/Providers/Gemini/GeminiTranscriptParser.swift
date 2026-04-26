@@ -43,7 +43,7 @@ final class GeminiTranscriptParser {
 
         var quick = SessionQuickStats()
         quick.startTime = session.startTime ?? session.messages.compactMap(\.timestamp).min()
-        quick.sessionName = session.summary
+        quick.sessionName = TitleSanitizer.sanitize(session.summary)
 
         var latestModel: String?
         var userCount = 0
@@ -178,6 +178,7 @@ final class GeminiTranscriptParser {
             }
         }
 
+        stats.precomputeAggregates()
         return stats
     }
 
@@ -423,16 +424,7 @@ final class GeminiTranscriptParser {
     }
 
     private func cleanUserText(_ text: String?) -> String? {
-        guard let text else { return nil }
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-
-        let firstLine = trimmed
-            .components(separatedBy: .newlines)
-            .first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? trimmed
-
-        return firstLine.isEmpty ? nil : firstLine
+        TitleSanitizer.sanitize(text)
     }
 
     private func cleanSearchText(_ text: String?) -> String? {
