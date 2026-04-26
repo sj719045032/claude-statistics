@@ -36,7 +36,7 @@
 13. [SDK Framework（ClaudeStatisticsKit）](#13-sdk-frameworkclaudestatisticskit)
 14. [加载机制与目录布局](#14-加载机制与目录布局)
 15. [官方示例插件清单](#15-官方示例插件清单)
-16. [路线图](#16-路线图)
+16. [路线图](#16-路线图)（含 16.4 [实施进度跟踪](#164-实施进度跟踪)）
 17. [验收清单](#17-验收清单)
 18. [决策待定项](#18-决策待定项)
 
@@ -1203,6 +1203,95 @@ graph LR
 - **M1（v4.0-alpha）**：内核已去枚举化，`disable-library-validation` 还**未启用**，行为与 v3.x 完全等价。
 - **M2（v4.0-beta）**：内置 plugin 抽出到 `Plugins/builtins/`，启用 `disable-library-validation`。dogfood 关键节点。
 - **M3（v4.0 GA）**：发布 `ClaudeStatisticsKit.xcframework` + SDK 文档站。开放第三方提交。
+
+---
+
+### 16.4 实施进度跟踪
+
+> 最后同步：2026-04-26
+
+#### 已完成（24 个 commit / SDK 32 个文件 / 1893 行）
+
+**B0 准备**
+- `Plugins/Sources/ClaudeStatisticsKit/` 目录骨架
+- `ClaudeStatisticsKit` framework target（`BUILD_LIBRARY_FOR_DISTRIBUTION = YES`，自动生成 `.swiftinterface`）
+- `scripts/check-plugin-file-size.sh` lint（Plugins/ 严控 ≤ 500 行，ClaudeStatistics/ 仅 warn）
+
+**阶段 1 内核去枚举化**
+- ✅ `ProviderDescriptor` 类型 + 三个内置实例（搬到 SDK，host 通过 `ProviderDescriptor+Builtins.swift` extension 提供）
+- ✅ `TerminalDescriptor` + `TerminalCapabilityCategory` + `TerminalTabFocusPrecision`（搬到 SDK，`TerminalCapability` 协议默认实现合成 descriptor）
+- ✅ `ProviderKind` 内 5 个属性（displayName / iconAsset / accentColor / notchKey / canonicalToolName）全部转发 descriptor，`switch self` 仅剩 descriptor 中央分发自身
+- ✅ `CanonicalToolName` 改 descriptor 数组注入式 resolve（搬到 SDK）
+- ⏸️ DataStore + DB 字段（已是 `String`，schema 层面满足条件，无需改动）
+
+**阶段 2 解耦 + 韧性**
+- ✅ `FSEventsWatcher` 差异化防抖（200ms fast / 2s slow）
+- ✅ `HookCLI` host 心跳 watchdog（`AttentionBridgeAuth.livePid()` + `shutdown(SHUT_RDWR)` 中断 280s 阻塞 read）
+- ✅ `SessionDataStore` 批处理 staging（每批 8 次 `objectWillChange` 降到 1 次）
+- ⏸️ `*Managing` 协议 + DI（按原决策"等真有 mock 需求再做"，当前 769 fixture-based 测试无 mock 需求）
+
+**阶段 3 SDK 抽离**
+- ✅ `ClaudeStatisticsKit.xcframework` 抽出 + `BUILD_LIBRARY_FOR_DISTRIBUTION` 生成 `.swiftinterface`
+- ✅ `Plugin` / `PluginManifest` / `PluginKind` / `PluginPermission` / `SemVer` / `SDKInfo`
+- ✅ `PluginRegistry` + `PluginRegistryError`（4-bucket 注册中心 + typed lookup）
+- ✅ 4 个 plugin 类别协议骨架：`ProviderPlugin` / `TerminalPlugin` / `ShareRolePlugin` / `ShareCardThemePlugin`
+- ✅ `AccountProvider` 窄协议（5 个中第 1 个完整搬到 SDK）
+- ✅ `StatusLineInstalling` 协议
+- ✅ `SessionWatcher` 协议
+- ✅ `ProviderUsageSnapshot` / `ProviderCapabilities` / `ProviderUsagePresentation` 系列（4 个相关类型）
+- ✅ `MenuBarStripFormat` / `MenuBarStripSegment` / `StatusLineLegendItem` / `StatusLineLegendSection`
+
+**阶段 3+ 数据模型完整搬迁**
+- ✅ 时间序列：`TrendDataPoint` / `TrendGranularity`
+- ✅ 工具规范化：`CanonicalToolName`
+- ✅ 搜索索引：`SearchIndexMessage`
+- ✅ 会话数据：`SessionQuickStats` / `ModelTokenStats` / `DaySlice`（提取顶层 + 剥离 ModelPricing）/ `SessionStats`（剥离 cost/asModelUsages 到 host extension）/ `ModelUsage`
+- ✅ 用量数据：`UsageData` / `UsageWindow` / `ProviderUsageBucket` / `ExtraUsage`
+- ✅ 用户档案：`UserProfile` / `ProfileAccount` / `ProfileOrganization`
+- ✅ Transcript：`TranscriptDisplayMessage`（Claude-specific `TranscriptEntry` 系列保留 host）
+- ✅ Notch：`NotchEventKind`
+- ✅ Terminal：`TerminalLaunchRequest` / `TerminalShellCommand`
+
+**阶段 3 dogfood**
+- ✅ 11 个 builtin plugin wrapper（3 Provider + 8 Terminal）注册到 `pluginRegistry`
+- ✅ `AppState.pluginRegistry` 双轨运行（与 legacy `ProviderRegistry` / `TerminalRegistry` 共存）
+- ✅ 启动日志验证：`PluginRegistry: providers=3 terminals=8`
+
+#### 仍未完成（按改面排序）
+
+| 项 | 主要阻塞 | 估改面 |
+|---|---|---|
+| `Session` struct | provider 字段 `ProviderKind` 类型 → 需改为 `String descriptor.id` | 30+ 文件（25+ 处 `session.provider` 比较语义改动） |
+| `SessionDataProvider` 窄协议 | 引用 `Session` | 同 Session 链锁 |
+| `SessionLauncher` 窄协议 | 引用 `Session` | 同 Session 链锁 |
+| `ProviderUsageSource` 协议 | 引用 host `UsageHistoryStore` | 中（`UsageHistoryStore` 留 host，仅协议表面搬） |
+| `UsageProvider` 窄协议 | 引用 `ProviderUsageSource` + `ModelPricing.Pricing` 嵌套 | 链锁 |
+| `HookInstalling` 协议 | `var provider: ProviderKind` 字段 | 链锁 ProviderKind |
+| `HookProvider` 窄协议 | 引用 `HookInstalling` | 链锁 |
+| `HookPayload` / `HookAction` | 主要 host 内部用 | 中 |
+| `ProviderKind` enum 降级 | 30+ 处 `switch case .claude/.codex/.gemini` 改 String 比较；DB 写入语义已 OK | **整批最大改面，预计 50+ 文件** |
+
+**关键路径**：`ProviderKind` enum 降级是其余项的根阻塞。一旦 `ProviderKind` 改为 String typealias 或废弃，`Session` / `HookInstalling` / 5 个窄协议、`HookPayload` 全部解锁。
+
+#### 当前 runtime 状态
+
+- 769 测试全部通过
+- App 启动正常（`run-debug.sh`）
+- Working tree clean
+- Plugin dogfood 链路 end-to-end 跑通
+
+#### 第三方 plugin 已可起步的能力清单
+
+基于当前 SDK 表面，第三方 plugin 开发者已经可以：
+
+- 声明 `PluginManifest`（id / kind / version / permissions / minHostAPIVersion）
+- 实现 `Plugin` + `ProviderPlugin` / `TerminalPlugin` / `ShareRolePlugin` / `ShareCardThemePlugin`
+- 暴露完整 descriptor（`ProviderDescriptor` 含 capabilities + tool aliases；`TerminalDescriptor` 含 bundle ids + focus precision）
+- 实现 `AccountProvider` 协议（profile fetch + credential status）
+- 实现 `StatusLineInstalling`（statusline 安装/恢复 + legend）
+- 输出全套数据模型（SessionStats / DaySlice / ModelTokenStats / SessionQuickStats / UsageData / UsageWindow / ProviderUsageBucket / ExtraUsage / UserProfile / TranscriptDisplayMessage / SearchIndexMessage / TrendDataPoint / ModelUsage）
+- 用 `SessionWatcher` 协议接入文件监听
+- 通过 `PluginRegistry` 完成注册（typed lookup 4 bucket）
 
 ---
 
