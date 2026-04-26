@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleExecutable</key>
+	<string>CursorPlugin</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.tinystone.CursorPlugin</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>CursorPlugin</string>
+	<key>CFBundlePackageType</key>
+	<string>BNDL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>CSPluginManifest</key>
+	<dict>
+		<key>category</key>
+		<string>editor-integration</string>
+		<key>displayName</key>
+		<string>Cursor</string>
+		<key>id</key>
+		<string>com.todesktop.230313mzl4w4u92</string>
+		<key>kind</key>
+		<string>terminal</string>
+		<key>minHostAPIVersion</key>
+		<string>0.1.0</string>
+		<key>permissions</key>
+		<array/>
+		<key>principalClass</key>
+		<string>CursorPlugin</string>
+		<key>version</key>
+		<string>1.0.0</string>
+	</dict>
+	<key>NSPrincipalClass</key>
+	<string>CursorPlugin</string>
+</dict>
+</plist>

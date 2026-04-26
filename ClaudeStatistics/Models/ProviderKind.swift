@@ -74,13 +74,27 @@ enum HostCanonicalToolName {
 }
 
 /// Controls which providers' usage cells are shown in the status bar strip.
-/// Defaults to all three enabled so a fresh install shows every configured
+/// Defaults to all enabled so a fresh install shows every configured
 /// provider; the user can hide individual providers from Settings.
+///
+/// The keying schema is anchored on `descriptor.id` (which equals
+/// `ProviderKind.rawValue` for builtins). Plugin-contributed providers
+/// supply their own descriptor.id and reuse the same `menuBar.visible.<id>`
+/// path — no separate namespace, so existing users' preferences for
+/// `claude/codex/gemini` carry over untouched.
 enum MenuBarPreferences {
-    static func key(for kind: ProviderKind) -> String {
-        "menuBar.visible.\(kind.rawValue)"
+    static func key(forDescriptorID id: String) -> String {
+        "menuBar.visible.\(id)"
     }
 
+    static func key(for kind: ProviderKind) -> String {
+        key(forDescriptorID: kind.rawValue)
+    }
+
+    /// Pre-seed UserDefaults so first-launch reads return `true` instead
+    /// of `false` for the three builtin providers. Plugin descriptors
+    /// register their own default at registration time via
+    /// `registerDefault(forDescriptorID:)` below.
     static func register() {
         var defaults: [String: Any] = [:]
         for kind in ProviderKind.allCases {
@@ -89,12 +103,31 @@ enum MenuBarPreferences {
         UserDefaults.standard.register(defaults: defaults)
     }
 
+    /// Called by `AppState` (or any plugin loader) once a `ProviderPlugin`
+    /// becomes known so the toggle defaults to "on" until the user opts
+    /// out. Idempotent — re-registering the same defaults is harmless.
+    static func registerDefault(forDescriptorID id: String, visible: Bool = true) {
+        UserDefaults.standard.register(defaults: [key(forDescriptorID: id): visible])
+    }
+
+    static func isVisible(descriptorID id: String) -> Bool {
+        // `bool(forKey:)` returns false when the key has never been
+        // touched and no register-defaults entry was ever supplied;
+        // that's why `registerDefault(forDescriptorID:)` exists for
+        // newly-loaded plugin ids.
+        UserDefaults.standard.bool(forKey: key(forDescriptorID: id))
+    }
+
     static func isVisible(_ kind: ProviderKind) -> Bool {
-        UserDefaults.standard.bool(forKey: key(for: kind))
+        isVisible(descriptorID: kind.rawValue)
+    }
+
+    static func setVisible(descriptorID id: String, _ visible: Bool) {
+        UserDefaults.standard.set(visible, forKey: key(forDescriptorID: id))
     }
 
     static func setVisible(_ kind: ProviderKind, _ visible: Bool) {
-        UserDefaults.standard.set(visible, forKey: key(for: kind))
+        setVisible(descriptorID: kind.rawValue, visible)
     }
 
     static func visibleKinds() -> [ProviderKind] {

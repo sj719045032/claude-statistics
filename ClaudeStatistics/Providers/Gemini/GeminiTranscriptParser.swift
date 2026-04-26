@@ -5,18 +5,6 @@ final class GeminiTranscriptParser {
     static let shared = GeminiTranscriptParser()
     private static let assistantPreviewLimit = 4000
 
-    private let isoFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-
-    private let isoFallback: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter
-    }()
-
     private init() {}
 
     func loadSession(at path: String) -> GeminiChatSession? {
@@ -386,8 +374,7 @@ final class GeminiTranscriptParser {
     }
 
     private func parseDate(_ raw: String?) -> Date? {
-        guard let raw, !raw.isEmpty else { return nil }
-        return isoFormatter.date(from: raw) ?? isoFallback.date(from: raw)
+        TranscriptParserCommons.parseISOTimestamp(raw)
     }
 
     private func extractText(from raw: Any?) -> String? {
@@ -429,11 +416,7 @@ final class GeminiTranscriptParser {
 
     private func cleanSearchText(_ text: String?) -> String? {
         guard let text else { return nil }
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count > 2 else { return nil }
-
-        let stripped = SearchUtils.stripMarkdown(trimmed)
-        return stripped.count > 2 ? stripped : nil
+        return TranscriptParserCommons.searchTextClean(text)
     }
 
     private func searchText(for toolCall: GeminiToolCall) -> String? {
@@ -463,13 +446,11 @@ final class GeminiTranscriptParser {
     }
 
     private func truncate(_ text: String, limit: Int) -> String {
-        text.count > limit ? String(text.prefix(limit)) + "…" : text
+        TranscriptParserCommons.truncate(text, limit: limit)
     }
 
     private func fiveMinuteKey(for date: Date) -> Date {
-        var comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date)
-        comps.minute = ((comps.minute ?? 0) / 5) * 5
-        return Calendar.current.date(from: comps) ?? date
+        TranscriptParserCommons.fiveMinuteSliceKey(for: date)
     }
 
     private func estimatedCost(for tokens: GeminiTokenUsage, model: String) -> Double {

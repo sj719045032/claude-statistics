@@ -19,9 +19,13 @@ struct SettingsView: View {
     @AppStorage(AppPreferences.fontScale) private var fontScale = 1.0
     @AppStorage(AppPreferences.customInterval) private var customInterval = false
     @AppStorage(AppPreferences.verboseLogging) private var verboseLogging = false
-    @AppStorage(MenuBarPreferences.key(for: .claude)) private var menuBarClaude = true
-    @AppStorage(MenuBarPreferences.key(for: .codex)) private var menuBarCodex = true
-    @AppStorage(MenuBarPreferences.key(for: .gemini)) private var menuBarGemini = true
+    /// Bumped whenever a menu-bar toggle flips so SwiftUI re-evaluates
+    /// `menuBarDisplaySummary` and other consumers that read the
+    /// underlying UserDefaults via `MenuBarPreferences`. Replaces the
+    /// three hardcoded `@AppStorage` bindings; the toggles iterate
+    /// `ProviderRegistry.allKnownDescriptors(plugins:)` so plugin
+    /// providers appear automatically.
+    @State private var menuBarRevision: Int = 0
     // Developer tools unlocked by tapping the app name 7 times in the About
     // section. Ephemeral (@State) — each app restart re-locks so the
     // verbose-logging toggle can't get forgotten in the "on" state silently.
@@ -148,7 +152,7 @@ struct SettingsView: View {
                     }
                 }
 
-                Button(action: { updaterService.checkForUpdates() }) {
+                SettingsRowButton(action: { updaterService.checkForUpdates() }) {
                     HStack {
                         Label("settings.checkForUpdates", systemImage: "arrow.triangle.2.circlepath")
                             .labelStyle(SettingsRowLabelStyle())
@@ -160,10 +164,9 @@ struct SettingsView: View {
                         }
                     }
                 }
-                .buttonStyle(.plain)
                 .disabled(!updaterService.canCheckForUpdates)
 
-                Button(action: {
+                SettingsRowButton(action: {
                     if let url = URL(string: "https://github.com/sj719045032/claude-statistics") {
                         NSWorkspace.shared.open(url)
                     }
@@ -177,9 +180,8 @@ struct SettingsView: View {
                             .foregroundStyle(.tertiary)
                     }
                 }
-                .buttonStyle(.plain)
 
-                Button(action: {
+                SettingsRowButton(action: {
                     if let url = URL(string: "https://github.com/sj719045032/claude-statistics/issues/new") {
                         NSWorkspace.shared.open(url)
                     }
@@ -193,9 +195,8 @@ struct SettingsView: View {
                             .foregroundStyle(.tertiary)
                     }
                 }
-                .buttonStyle(.plain)
 
-                Button(action: {
+                SettingsRowButton(action: {
                     let logPath = DiagnosticLogger.shared.logFilePath
                     if FileManager.default.fileExists(atPath: logPath) {
                         NSWorkspace.shared.selectFile(logPath, inFileViewerRootedAtPath: "")
@@ -213,9 +214,8 @@ struct SettingsView: View {
                             .foregroundStyle(.tertiary)
                     }
                 }
-                .buttonStyle(.plain)
 
-                Button(action: { showPluginSettings = true }) {
+                SettingsRowButton(action: { showPluginSettings = true }) {
                     HStack {
                         Label("settings.plugins", systemImage: "puzzlepiece.extension")
                             .labelStyle(SettingsRowLabelStyle())
@@ -228,10 +228,9 @@ struct SettingsView: View {
                             .foregroundStyle(.tertiary)
                     }
                 }
-                .buttonStyle(.plain)
 
                 if showDeveloperTools {
-                    Button(action: { showDeveloperSettings = true }) {
+                    SettingsRowButton(action: { showDeveloperSettings = true }) {
                         HStack {
                             Label("settings.developerTools", systemImage: "hammer")
                                 .labelStyle(SettingsRowLabelStyle())
@@ -241,7 +240,6 @@ struct SettingsView: View {
                                 .foregroundStyle(.tertiary)
                         }
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
@@ -421,7 +419,7 @@ struct SettingsView: View {
                 }
             }
 
-            Button(action: { showKeyboardShortcuts = true }) {
+            SettingsRowButton(action: { showKeyboardShortcuts = true }) {
                 HStack {
                     Label("settings.keyboardShortcuts", systemImage: "command")
                         .labelStyle(SettingsRowLabelStyle())
@@ -434,7 +432,6 @@ struct SettingsView: View {
                         .foregroundStyle(.tertiary)
                 }
             }
-            .buttonStyle(.plain)
 
             Picker(selection: $appLanguage) {
                 Text("language.auto").tag("auto")
@@ -579,22 +576,19 @@ struct SettingsView: View {
                 isExpanded: $isMenuBarDisplayExpanded,
                 summary: menuBarDisplaySummary
             ) {
+                let _ = menuBarRevision  // re-render when toggles flip
                 VStack(alignment: .leading, spacing: 6) {
-                    Toggle(isOn: $menuBarClaude) {
-                        providerToggleLabel("Claude", asset: "ClaudeProviderIcon")
-                    }
-                    Toggle(isOn: $menuBarCodex) {
-                        providerToggleLabel("Codex", asset: "CodexProviderIcon")
-                    }
-                    Toggle(isOn: $menuBarGemini) {
-                        providerToggleLabel("Gemini", asset: "GeminiProviderIcon")
+                    ForEach(menuBarDescriptors, id: \.id) { descriptor in
+                        Toggle(isOn: menuBarBinding(forDescriptorID: descriptor.id)) {
+                            providerToggleLabel(descriptor)
+                        }
                     }
                 }
                 .padding(.leading, 4)
             }
 
             if provider.capabilities.supportsCost {
-                Button(action: { showPricing = true }) {
+                SettingsRowButton(action: { showPricing = true }) {
                     HStack {
                         Label("settings.managePricing", systemImage: "dollarsign.circle")
                             .labelStyle(SettingsRowLabelStyle())
@@ -607,7 +601,6 @@ struct SettingsView: View {
                             .foregroundStyle(.tertiary)
                     }
                 }
-                .buttonStyle(.plain)
             }
         }
     }
@@ -634,7 +627,7 @@ struct SettingsView: View {
                 TerminalSetupCoordinator.shared.refreshBanner()
             }
 
-            Button(action: { showTerminalFocusSettings = true }) {
+            SettingsRowButton(action: { showTerminalFocusSettings = true }) {
                 HStack {
                     Label("settings.terminalFocus", systemImage: "scope")
                         .labelStyle(SettingsRowLabelStyle())
@@ -647,7 +640,6 @@ struct SettingsView: View {
                         .foregroundStyle(.tertiary)
                 }
             }
-            .buttonStyle(.plain)
 
             if TerminalPreferences.isEditorPreferred(rawValue: preferredTerminal) {
                 Picker(selection: $preferredEditor) {
@@ -719,11 +711,11 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func providerToggleLabel(_ title: String, asset: String) -> some View {
+    private func providerToggleLabel(_ descriptor: ProviderDescriptor) -> some View {
         Label {
-            Text(title).font(.system(size: 12))
+            Text(descriptor.displayName).font(.system(size: 12))
         } icon: {
-            Image(asset)
+            Image(descriptor.iconAssetName)
                 .resizable()
                 .renderingMode(.template)
                 .aspectRatio(contentMode: .fit)
@@ -733,11 +725,38 @@ struct SettingsView: View {
         }
     }
 
+    /// Sorted list of every provider whose toggle should appear in the
+    /// menu-bar display section. Builtins first (in the canonical
+    /// Claude / Codex / Gemini order), then any plugin-contributed
+    /// providers loaded into `appState.pluginRegistry`.
+    private var menuBarDescriptors: [ProviderDescriptor] {
+        ProviderRegistry.allKnownDescriptors(plugins: appState.pluginRegistry)
+    }
+
+    /// Two-way binding that reads/writes UserDefaults via
+    /// `MenuBarPreferences` and bumps `menuBarRevision` so the summary
+    /// (and any other consumer reading off the state) updates.
+    private func menuBarBinding(forDescriptorID id: String) -> Binding<Bool> {
+        Binding(
+            get: { MenuBarPreferences.isVisible(descriptorID: id) },
+            set: { newValue in
+                MenuBarPreferences.setVisible(descriptorID: id, newValue)
+                menuBarRevision &+= 1
+            }
+        )
+    }
+
     private var menuBarDisplaySummary: String {
-        let count = [menuBarClaude, menuBarCodex, menuBarGemini].filter { $0 }.count
-        if count == 3 { return LanguageManager.localizedString("settings.menuBarDisplay.all") }
-        if count == 0 { return LanguageManager.localizedString("settings.menuBarDisplay.none") }
-        return "\(count)"
+        let _ = menuBarRevision
+        let descriptors = menuBarDescriptors
+        let onCount = descriptors.filter { MenuBarPreferences.isVisible(descriptorID: $0.id) }.count
+        if onCount == descriptors.count {
+            return LanguageManager.localizedString("settings.menuBarDisplay.all")
+        }
+        if onCount == 0 {
+            return LanguageManager.localizedString("settings.menuBarDisplay.none")
+        }
+        return "\(onCount)"
     }
 
     private func applyCustomInterval() {
@@ -809,6 +828,28 @@ struct SettingsRowLabelStyle: LabelStyle {
             configuration.title
                 .font(.system(size: 12))
         }
+    }
+}
+
+/// Full-width settings row that responds to clicks anywhere on the row,
+/// not just the rendered label/icon. Wraps a plain-style button with a
+/// rectangular content shape so the gap between the label and trailing
+/// accessory (chevron, count, status badge, etc.) stays hit-testable.
+///
+/// Use this whenever a Form/Section row is meant to feel like a list
+/// item — e.g. "Plugins ›", "Check for Updates". Inline buttons (back
+/// arrows, small icons inside a row) should keep their tight hit area
+/// and stay on `Button { ... }.buttonStyle(.plain)` directly.
+struct SettingsRowButton<Label: View>: View {
+    let action: () -> Void
+    @ViewBuilder let label: () -> Label
+
+    var body: some View {
+        Button(action: action) {
+            label()
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -950,7 +991,7 @@ private struct DeveloperSettingsView: View {
                             .labelStyle(SettingsRowLabelStyle())
                     }
 
-                    Button(action: openDiagnosticLog) {
+                    SettingsRowButton(action: openDiagnosticLog) {
                         HStack {
                             Label("settings.exportLog", systemImage: "doc.text.magnifyingglass")
                                 .labelStyle(SettingsRowLabelStyle())
@@ -960,12 +1001,11 @@ private struct DeveloperSettingsView: View {
                                 .foregroundStyle(.tertiary)
                         }
                     }
-                    .buttonStyle(.plain)
                 }
 
                 Section("settings.developer.rebuildIndexes") {
                     ForEach(ProviderRegistry.supportedProviders, id: \.self) { kind in
-                        Button(action: { pendingRebuildProvider = kind }) {
+                        SettingsRowButton(action: { pendingRebuildProvider = kind }) {
                             HStack(spacing: 8) {
                                 SettingsRowIcon(name: "arrow.triangle.2.circlepath")
                                     .foregroundStyle(kind.accentColor)
@@ -979,7 +1019,6 @@ private struct DeveloperSettingsView: View {
                                 Spacer()
                             }
                         }
-                        .buttonStyle(.plain)
                     }
 
                     if let statusMessage {
@@ -1537,996 +1576,7 @@ private struct ShortcutSettingGroup: View {
     }
 }
 
-// MARK: - Tab Order Editor
-
-struct TabOrderEditor: View {
-    @Binding var tabOrder: [AppTab]
-    var showsHeader: Bool = true
-    @State private var selectedTab: AppTab?
-    @State private var hoveredTab: AppTab?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if showsHeader {
-                Label("settings.tabOrder", systemImage: "rectangle.3.group")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.primary)
-            }
-
-            Text("settings.tabOrderHint")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-
-            HStack(spacing: 0) {
-                ForEach(tabOrder) { tab in
-                    let isSelected = selectedTab == tab
-
-                    HStack(spacing: 4) {
-                        if isSelected {
-                            arrowButton(direction: -1, tab: tab)
-                        }
-
-                        VStack(spacing: 3) {
-                            Image(systemName: tab.icon)
-                                .font(.system(size: 14))
-                            Text(tab.localizedName)
-                                .font(.system(size: 9))
-                        }
-
-                        if isSelected {
-                            arrowButton(direction: 1, tab: tab)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 5)
-                    .background(isSelected ? Color.blue.opacity(0.2) : Color.clear)
-                    .cornerRadius(6)
-                    .foregroundStyle(isSelected ? .blue : .secondary)
-                    .contentShape(Rectangle())
-                    .scaleEffect(hoveredTab == tab ? 1.15 : 1.0)
-                    .animation(.spring(duration: 0.2, bounce: 0.3), value: hoveredTab)
-                    .onHover { isHovered in
-                        hoveredTab = isHovered ? tab : nil
-                    }
-                    .onTapGesture {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            selectedTab = selectedTab == tab ? nil : tab
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func arrowButton(direction: Int, tab: AppTab) -> some View {
-        let isDisabled = direction < 0 ? tabOrder.first == tab : tabOrder.last == tab
-        let icon = direction < 0 ? "chevron.left" : "chevron.right"
-        return Button(action: { move(tab, direction: direction) }) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .bold))
-                .frame(width: 24, height: 24)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.hoverScale)
-        .foregroundStyle(isDisabled ? Color.gray.opacity(0.3) : .white)
-        .disabled(isDisabled)
-    }
-
-    private func move(_ tab: AppTab, direction: Int) {
-        guard let index = tabOrder.firstIndex(of: tab) else { return }
-        let newIndex = index + direction
-        guard newIndex >= 0, newIndex < tabOrder.count else { return }
-        withAnimation(.easeInOut(duration: 0.2)) {
-            tabOrder.swapAt(index, newIndex)
-        }
-        AppTab.saveOrder(tabOrder)
-    }
-}
-
-// MARK: - Pricing Management View
-
-struct PricingManageView: View {
-    enum ModelScope: String, CaseIterable, Identifiable {
-        case provider
-        case all
-
-        var id: String { rawValue }
-    }
-
-    let provider: any SessionProvider
-    let onBack: () -> Void
-
-    @State private var models: [(id: String, pricing: ModelPricing.Pricing)] = []
-    @State private var isFetching = false
-    @State private var fetchMessage: String?
-    @State private var fetchIsError = false
-    @State private var editingModel: String?
-    @State private var editInput = ""
-    @State private var editOutput = ""
-    @State private var editCache5m = ""
-    @State private var editCache1h = ""
-    @State private var editCacheRead = ""
-    @State private var showAddModel = false
-    @State private var newModelId = ""
-    @State private var modelScope: ModelScope = .provider
-    @State private var listOpacity = 1.0
-    @State private var listOffset: CGFloat = 0
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack(spacing: 8) {
-                Button(action: onBack) {
-                    HStack(spacing: 3) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 11, weight: .semibold))
-                        Text("pricing.back")
-                            .font(.system(size: 12))
-                    }
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(Color.blue)
-
-                Spacer()
-
-                if isFetching {
-                    ProgressView()
-                        .scaleEffect(0.6)
-                }
-
-                Button(action: {
-                    showAddModel = true
-                    newModelId = ""
-                    editInput = "3"; editOutput = "15"
-                    editCache5m = "3.75"; editCache1h = "6"; editCacheRead = "0.3"
-                }) {
-                    Label("pricing.add", systemImage: "plus")
-                        .font(.system(size: 11))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-
-                if provider.pricingFetcher != nil {
-                    Button(action: fetchRemote) {
-                        Label("pricing.fetchLatest", systemImage: "arrow.triangle.2.circlepath")
-                            .font(.system(size: 11))
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(isFetching)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-
-            if let pricingSourceKey = provider.pricingSourceLocalizationKey {
-                Group {
-                    if let pricingSourceURL = provider.pricingSourceURL {
-                        Link(destination: pricingSourceURL) {
-                            Text(LocalizedStringKey(pricingSourceKey))
-                                .underline(false)
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        Text(LocalizedStringKey(pricingSourceKey))
-                    }
-                }
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 4)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-
-            if let msg = fetchMessage {
-                HStack {
-                    Image(systemName: fetchIsError ? "exclamationmark.triangle" : "checkmark.circle")
-                        .font(.system(size: 10))
-                    Text(msg)
-                        .font(.system(size: 11))
-                }
-                .foregroundStyle(fetchIsError ? .red : .green)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 4)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-
-            Divider()
-
-            Picker("", selection: $modelScope) {
-                Text("pricing.scope.provider").tag(ModelScope.provider)
-                Text("pricing.scope.all").tag(ModelScope.all)
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-
-            // Add model form
-            if showAddModel {
-                VStack(spacing: 6) {
-                    HStack {
-                        TextField("pricing.modelId", text: $newModelId)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.system(size: 11, design: .monospaced))
-                    }
-                    HStack(spacing: 4) {
-                        editField("pricing.input", text: $editInput)
-                        editField("pricing.output", text: $editOutput)
-                        editField("pricing.5mW", text: $editCache5m)
-                        editField("pricing.1hW", text: $editCache1h)
-                        editField("pricing.read", text: $editCacheRead)
-                    }
-                    HStack {
-                        Button("session.cancel") {
-                            showAddModel = false
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.secondary)
-                        Spacer()
-                        Button("pricing.save") {
-                            saveNewModel()
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .disabled(newModelId.trimmingCharacters(in: .whitespaces).isEmpty)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color.green.opacity(0.05))
-            }
-
-            // Pricing table
-            ScrollView {
-                VStack(spacing: 0) {
-                    // Table header
-                    HStack(spacing: 0) {
-                        Text("pricing.model")
-                            .frame(width: 140, alignment: .leading)
-                        Text("pricing.input")
-                            .frame(width: 55, alignment: .trailing)
-                        Text("pricing.output")
-                            .frame(width: 55, alignment: .trailing)
-                        Text("pricing.5mW")
-                            .frame(width: 55, alignment: .trailing)
-                        Text("pricing.1hW")
-                            .frame(width: 55, alignment: .trailing)
-                        Text("pricing.read")
-                            .frame(width: 50, alignment: .trailing)
-                        Spacer()
-                    }
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.gray.opacity(0.08))
-
-                    ForEach(Array(models.enumerated()), id: \.element.id) { index, item in
-                        Group {
-                            if editingModel == item.id {
-                                editRow(item)
-                            } else {
-                                displayRow(item)
-                            }
-                        }
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .trailing).combined(with: .opacity),
-                            removal: .move(edge: .leading).combined(with: .opacity)
-                        ))
-                        .animation(Theme.quickSpring.delay(Double(index) * 0.015), value: models.map(\.id))
-                        Divider()
-                    }
-                }
-            }
-            .opacity(listOpacity)
-            .offset(y: listOffset)
-        }
-        .onAppear { refreshModels(animated: false) }
-        .onChange(of: modelScope) { _, _ in refreshModels(animated: true) }
-        .onChange(of: provider.kind) { _, _ in
-            fetchMessage = nil
-            fetchIsError = false
-            editingModel = nil
-            showAddModel = false
-            modelScope = .provider
-            refreshModels(animated: true)
-        }
-        .animation(Theme.quickSpring, value: provider.kind)
-        .animation(Theme.quickSpring, value: modelScope)
-        .animation(Theme.quickSpring, value: fetchMessage != nil)
-    }
-
-    // MARK: - Display row
-
-    private func displayRow(_ item: (id: String, pricing: ModelPricing.Pricing)) -> some View {
-        HStack(spacing: 0) {
-            Text(shortModelName(item.id))
-                .frame(width: 140, alignment: .leading)
-                .lineLimit(1)
-            Text(fmtPrice(item.pricing.input))
-                .frame(width: 55, alignment: .trailing)
-            Text(fmtPrice(item.pricing.output))
-                .frame(width: 55, alignment: .trailing)
-            Text(fmtPrice(item.pricing.cacheWrite5m))
-                .frame(width: 55, alignment: .trailing)
-            Text(fmtPrice(item.pricing.cacheWrite1h))
-                .frame(width: 55, alignment: .trailing)
-            Text(fmtPrice(item.pricing.cacheRead))
-                .frame(width: 50, alignment: .trailing)
-
-            Button(action: { startEditing(item) }) {
-                Image(systemName: "pencil")
-                    .font(.system(size: 9))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            .padding(.leading, 6)
-
-            Button(action: { deleteModel(item.id) }) {
-                Image(systemName: "trash")
-                    .font(.system(size: 9))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.red.opacity(0.6))
-            .padding(.leading, 2)
-        }
-        .font(.system(size: 11, design: .monospaced))
-        .padding(.horizontal, 12)
-        .padding(.vertical, 5)
-        .contentShape(Rectangle())
-        .textSelection(.enabled)
-    }
-
-    // MARK: - Edit row
-
-    private func editRow(_ item: (id: String, pricing: ModelPricing.Pricing)) -> some View {
-        VStack(spacing: 6) {
-            Text(item.id)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(.secondary)
-
-            HStack(spacing: 4) {
-                editField("pricing.input", text: $editInput)
-                editField("pricing.output", text: $editOutput)
-                editField("pricing.5mW", text: $editCache5m)
-                editField("pricing.1hW", text: $editCache1h)
-                editField("pricing.read", text: $editCacheRead)
-            }
-
-            HStack {
-                Button("session.cancel") { editingModel = nil }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button("pricing.save") { saveEditing(item.id) }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.blue.opacity(0.05))
-    }
-
-    private func editField(_ label: LocalizedStringKey, text: Binding<String>) -> some View {
-        VStack(spacing: 2) {
-            Text(label)
-                .font(.system(size: 9))
-                .foregroundStyle(.tertiary)
-            TextField("$", text: text)
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 10, design: .monospaced))
-                .frame(width: 65)
-        }
-    }
-
-    // MARK: - Actions
-
-    private func loadModels() {
-        let preferred = Set(provider.builtinPricingModels.keys)
-        models = ModelPricing.shared.models
-            .sorted {
-                let lhsPreferred = preferred.contains($0.key)
-                let rhsPreferred = preferred.contains($1.key)
-                if lhsPreferred != rhsPreferred {
-                    return lhsPreferred && !rhsPreferred
-                }
-                return $0.key < $1.key
-            }
-            .filter { item in
-                switch modelScope {
-                case .provider:
-                    return preferred.contains(item.key)
-                case .all:
-                    return true
-                }
-            }
-            .map { (id: $0.key, pricing: $0.value) }
-    }
-
-    private func startEditing(_ item: (id: String, pricing: ModelPricing.Pricing)) {
-        editingModel = item.id
-        editInput = fmtPrice(item.pricing.input)
-        editOutput = fmtPrice(item.pricing.output)
-        editCache5m = fmtPrice(item.pricing.cacheWrite5m)
-        editCache1h = fmtPrice(item.pricing.cacheWrite1h)
-        editCacheRead = fmtPrice(item.pricing.cacheRead)
-    }
-
-    private func saveEditing(_ modelId: String) {
-        guard let input = Double(editInput),
-              let output = Double(editOutput),
-              let c5m = Double(editCache5m),
-              let c1h = Double(editCache1h),
-              let cRead = Double(editCacheRead) else { return }
-
-        let pricing = ModelPricing.Pricing(
-            input: input, output: output,
-            cacheWrite5m: c5m, cacheWrite1h: c1h,
-            cacheRead: cRead
-        )
-        ModelPricing.shared.updateModel(id: modelId, pricing: pricing)
-        editingModel = nil
-        loadModels()
-    }
-
-    private func saveNewModel() {
-        let id = newModelId.trimmingCharacters(in: .whitespaces)
-        guard !id.isEmpty,
-              let input = Double(editInput),
-              let output = Double(editOutput),
-              let c5m = Double(editCache5m),
-              let c1h = Double(editCache1h),
-              let cRead = Double(editCacheRead) else { return }
-
-        let pricing = ModelPricing.Pricing(
-            input: input, output: output,
-            cacheWrite5m: c5m, cacheWrite1h: c1h,
-            cacheRead: cRead
-        )
-        ModelPricing.shared.updateModel(id: id, pricing: pricing)
-        showAddModel = false
-        loadModels()
-    }
-
-    private func deleteModel(_ id: String) {
-        ModelPricing.shared.removeModel(id: id)
-        loadModels()
-    }
-
-    private func fetchRemote() {
-        isFetching = true
-        fetchMessage = nil
-
-        Task {
-            do {
-                guard let fetcher = provider.pricingFetcher else {
-                    await MainActor.run {
-                        fetchMessage = "Failed to fetch pricing page"
-                        fetchIsError = true
-                        isFetching = false
-                    }
-                    return
-                }
-
-                let fetched = try await fetcher.fetchPricing()
-                await MainActor.run {
-                    ModelPricing.shared.updateModels(fetched)
-                    loadModels()
-                    if let key = provider.pricingUpdatedLocalizationKey {
-                        let format = NSLocalizedString("\(key) %lld", comment: "")
-                        fetchMessage = String(format: format, locale: Locale.current, fetched.count)
-                    } else {
-                        fetchMessage = nil
-                    }
-                    fetchIsError = false
-                    isFetching = false
-                }
-            } catch {
-                await MainActor.run {
-                    fetchMessage = error.localizedDescription
-                    fetchIsError = true
-                    isFetching = false
-                }
-            }
-        }
-    }
-
-    // MARK: - Helpers
-
-    private func fmtPrice(_ value: Double) -> String {
-        if value >= 1.0 {
-            return value.truncatingRemainder(dividingBy: 1) == 0
-                ? String(format: "%.0f", value)
-                : String(format: "%.2f", value)
-        }
-        // Remove trailing zeros
-        let s = String(format: "%.4f", value)
-        return s.replacingOccurrences(of: "0+$", with: "", options: .regularExpression)
-    }
-
-    private func shortModelName(_ id: String) -> String {
-        id.replacingOccurrences(of: "claude-", with: "")
-    }
-
-    private func refreshModels(animated: Bool) {
-        if !animated {
-            loadModels()
-            listOpacity = 1
-            listOffset = 0
-            return
-        }
-
-        withAnimation(.easeOut(duration: 0.12)) {
-            listOpacity = 0
-            listOffset = 10
-        }
-
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 90_000_000)
-            loadModels()
-            withAnimation(Theme.springAnimation) {
-                listOpacity = 1
-                listOffset = 0
-            }
-        }
-    }
-}
-
-// MARK: - Status Line Integration
-
-struct StatusLineSection: View {
-    let installer: any StatusLineInstalling
-
-    @State private var isInstalled: Bool
-    @State private var showsLegendPopover = false
-    @State private var message: LocalizedStringKey?
-    @State private var isError = false
-
-    init(installer: any StatusLineInstalling) {
-        self.installer = installer
-        _isInstalled = State(initialValue: installer.isInstalled)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center, spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.blue.opacity(0.12))
-                        .frame(width: 32, height: 32)
-                    Image(systemName: "terminal")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.blue)
-                }
-
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(LocalizedStringKey(installer.titleLocalizationKey))
-                            .font(.system(size: 13, weight: .medium))
-
-                        if !installer.legendSections.isEmpty {
-                            Button {
-                                showsLegendPopover.toggle()
-                            } label: {
-                                Image(systemName: "questionmark.circle")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.secondary)
-                            }
-                            .buttonStyle(.plain)
-                            .popover(isPresented: $showsLegendPopover, arrowEdge: .top) {
-                                legendContent
-                                    .frame(width: 330, alignment: .leading)
-                                    .padding(12)
-                            }
-                        }
-                    }
-
-                    Text(LocalizedStringKey(installer.descriptionLocalizationKey))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                Spacer()
-
-                Toggle("", isOn: Binding(
-                    get: { isInstalled },
-                    set: { setEnabled($0) }
-                ))
-                .labelsHidden()
-            }
-
-            if let message, isError {
-                Text(message)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.red)
-                    .padding(.leading, 42)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var legendContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(installer.legendSections) { section in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(LocalizedStringKey(section.titleLocalizationKey))
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
-
-                    ForEach(section.items) { item in
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text(verbatim: item.example)
-                                .font(.system(size: 10, design: .monospaced))
-                                .foregroundStyle(.primary)
-                                .frame(width: 148, alignment: .leading)
-
-                            Text(LocalizedStringKey(item.descriptionLocalizationKey))
-                                .font(.system(size: 10))
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                }
-                .padding(.top, 2)
-            }
-        }
-        .padding(.top, 2)
-    }
-
-    private func setEnabled(_ enabled: Bool) {
-        do {
-            if enabled {
-                try installer.install()
-            } else {
-                try installer.restore()
-            }
-
-            isInstalled = installer.isInstalled
-            message = nil
-            isError = false
-        } catch {
-            isInstalled = installer.isInstalled
-            message = LocalizedStringKey(error.localizedDescription)
-            isError = true
-        }
-    }
-}
-
-// MARK: - Notch Notifications
-
-struct NotchNotificationsSection: View {
-    let provider: ProviderKind
-    let onOpenDetail: () -> Void
-
-    @State private var preferencesRevision = 0
-    @State private var isHovered = false
-
-    private var isEnabled: Bool {
-        let _ = preferencesRevision
-        return NotchPreferences.isEnabled(provider)
-    }
-
-    private var available: Bool {
-        ProviderRegistry.provider(for: provider).notchHookInstaller != nil
-    }
-
-    private var masterBinding: Binding<Bool> {
-        Binding(
-            get: { isEnabled },
-            set: { newValue in
-                NotchPreferences.setEnabled(newValue, for: provider)
-                preferencesRevision += 1
-            }
-        )
-    }
-
-    private var titleText: String {
-        String(
-            format: LanguageManager.localizedString("notch.settings.title.provider"),
-            locale: LanguageManager.currentLocale,
-            provider.displayName
-        )
-    }
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.orange.opacity(isHovered ? 0.22 : 0.14))
-                    .frame(width: 32, height: 32)
-                Image(systemName: "bell.badge")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.orange)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(titleText)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(available && isHovered ? Color.white.opacity(0.95) : .primary)
-                Text(available ? summaryText : LanguageManager.localizedString("notch.settings.provider.comingSoon"))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(available && isHovered ? Color.white.opacity(0.55) : Color.secondary.opacity(0.55))
-                .frame(width: 12, height: 20)
-
-            Toggle("", isOn: masterBinding)
-                .labelsHidden()
-                .buttonStyle(.borderless)
-                .disabled(!available)
-        }
-        .contentShape(Rectangle())
-        .onHover { hovering in
-            guard available else {
-                isHovered = false
-                return
-            }
-            isHovered = hovering
-        }
-        .onTapGesture {
-            if available { onOpenDetail() }
-        }
-    }
-
-    private var summaryText: String {
-        let supported = ProviderRegistry.provider(for: provider).supportedNotchEvents
-        let onCount = supported.filter { event in
-            UserDefaults.standard.object(forKey: event.defaultsKey) == nil
-                || UserDefaults.standard.bool(forKey: event.defaultsKey)
-        }.count
-        if !isEnabled {
-            return LanguageManager.localizedString("notch.settings.summary.off")
-        }
-        return String(format: LanguageManager.localizedString("notch.settings.summary.on"), onCount)
-    }
-}
-
-private struct NotchNotificationsDetailView: View {
-    let provider: ProviderKind
-    let onBack: () -> Void
-
-    @AppStorage(AppPreferences.notchSoundEnabled) private var soundEnabled: Bool = true
-    @AppStorage(AppPreferences.notchFocusSilenceEnabled) private var focusSilenceEnabled: Bool = true
-    @AppStorage(NotchPreferences.idlePeekDetailedRowsKey) private var idlePeekDetailedRows: Bool = false
-    @State private var preferencesRevision = 0
-
-    private var isProviderEnabled: Bool {
-        let _ = preferencesRevision
-        return NotchPreferences.isEnabled(provider)
-    }
-
-    private var titleText: String {
-        String(
-            format: LanguageManager.localizedString("notch.settings.title.provider"),
-            locale: LanguageManager.currentLocale,
-            provider.displayName
-        )
-    }
-
-    private var masterBinding: Binding<Bool> {
-        Binding(
-            get: { isProviderEnabled },
-            set: { newValue in
-                NotchPreferences.setEnabled(newValue, for: provider)
-                preferencesRevision += 1
-            }
-        )
-    }
-
-    private func eventBinding(for kind: NotchEventKind) -> Binding<Bool> {
-        Binding(
-            get: {
-                let _ = preferencesRevision
-                let defaults = UserDefaults.standard
-                return defaults.object(forKey: kind.defaultsKey) == nil || defaults.bool(forKey: kind.defaultsKey)
-            },
-            set: { newValue in
-                UserDefaults.standard.set(newValue, forKey: kind.defaultsKey)
-                preferencesRevision += 1
-            }
-        )
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Button(action: onBack) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "chevron.left")
-                        Text("settings.back")
-                    }
-                }
-                .buttonStyle(.plain)
-
-                Spacer()
-
-                Text(providerTitle)
-                    .font(.system(size: 13, weight: .semibold))
-
-                Spacer().frame(width: 60)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-
-            Divider()
-
-            Form {
-                Section("notch.settings.detailSection.global") {
-                    HStack(spacing: 10) {
-                        SettingsRowIcon(name: "bell.badge")
-                        Text(titleText)
-                            .font(.system(size: 12, weight: .medium))
-                        Spacer()
-                        Toggle("", isOn: masterBinding).labelsHidden()
-                    }
-
-                    HStack(spacing: 10) {
-                        SettingsRowIcon(name: "speaker.wave.2")
-                        Text("notch.settings.sound")
-                            .font(.system(size: 12, weight: .medium))
-                        Spacer()
-                        Toggle("", isOn: $soundEnabled).labelsHidden()
-                    }
-                    .disabled(!isProviderEnabled)
-
-                    HStack(spacing: 10) {
-                        SettingsRowIcon(name: "eye.slash")
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("notch.settings.focusSilence")
-                                .font(.system(size: 12, weight: .medium))
-                            Text("notch.settings.focusSilence.hint")
-                                .font(.system(size: 10))
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Toggle("", isOn: $focusSilenceEnabled).labelsHidden()
-                    }
-                    .disabled(!isProviderEnabled)
-
-                    HStack(spacing: 10) {
-                        SettingsRowIcon(name: "list.bullet.rectangle")
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("notch.settings.detailedRows")
-                                .font(.system(size: 12, weight: .medium))
-                            Text("notch.settings.detailedRows.hint")
-                                .font(.system(size: 10))
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Toggle("", isOn: $idlePeekDetailedRows).labelsHidden()
-                    }
-
-                    if isProviderEnabled {
-                        NotchScreenPickerRow()
-                    }
-                }
-
-                let supported = ProviderRegistry.provider(for: provider).supportedNotchEvents
-                if !supported.isEmpty {
-                    Section(providerTitle) {
-                        ForEach(NotchEventKind.allCases.filter(supported.contains), id: \.self) { kind in
-                            eventToggleRow(
-                                icon: kind.icon,
-                                titleKey: kind.titleKey,
-                                binding: eventBinding(for: kind)
-                            )
-                            .disabled(!isProviderEnabled)
-                        }
-                    }
-                }
-            }
-            .formStyle(.grouped)
-        }
-    }
-
-    private var providerTitle: String {
-        ProviderRegistry.provider(for: provider).displayName
-    }
-
-    private func eventToggleRow(icon: String, titleKey: String, binding: Binding<Bool>) -> some View {
-        HStack(spacing: 10) {
-            SettingsRowIcon(name: icon)
-            Text(LocalizedStringKey(titleKey))
-                .font(.system(size: 12, weight: .medium))
-            Spacer()
-            Toggle("", isOn: binding).labelsHidden()
-        }
-    }
-}
-
-private struct NotchScreenPickerRow: View {
-    @AppStorage(NotchPreferences.screenSelectionKey) private var screenSelection = NotchPreferences.mainScreenSelection
-    @State private var screenRevision = 0
-
-    private var screens: [NSScreen] {
-        let _ = screenRevision
-        return NSScreen.screens
-    }
-
-    private var selectionBinding: Binding<String> {
-        Binding(
-            get: { normalizedSelection },
-            set: { newValue in
-                screenSelection = newValue
-                NotchPreferences.setScreenSelection(newValue)
-            }
-        )
-    }
-
-    private var normalizedSelection: String {
-        if screenSelection == NotchPreferences.mainScreenSelection {
-            return screenSelection
-        }
-        let availableIDs = Set(screens.map(notchScreenIdentifier))
-        return availableIDs.contains(screenSelection) ? screenSelection : NotchPreferences.mainScreenSelection
-    }
-
-    var body: some View {
-        HStack(spacing: 10) {
-            SettingsRowIcon(name: "display")
-            Text("notch.settings.screen")
-                .font(.system(size: 12, weight: .medium))
-
-            Spacer()
-
-            Picker("", selection: selectionBinding) {
-                Text("notch.settings.screen.main")
-                    .tag(NotchPreferences.mainScreenSelection)
-
-                ForEach(screens, id: \.notchSettingsID) { screen in
-                    Text(screenLabel(screen))
-                        .tag(notchScreenIdentifier(screen))
-                }
-            }
-            .labelsHidden()
-            .frame(minWidth: 260, maxWidth: .infinity, alignment: .trailing)
-        }
-        .onAppear {
-            normalizeSelectionIfNeeded()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
-            screenRevision &+= 1
-            normalizeSelectionIfNeeded()
-        }
-    }
-
-    private func screenLabel(_ screen: NSScreen) -> String {
-        let base = screen.localizedName
-        let size = "\(Int(screen.frame.width))x\(Int(screen.frame.height))"
-        let suffix: String
-        if screenHasNotch(screen) {
-            suffix = LanguageManager.localizedString("notch.settings.screen.notch")
-        } else if isSameAsMain(screen) {
-            suffix = LanguageManager.localizedString("notch.settings.screen.currentMain")
-        } else {
-            suffix = size
-        }
-        return "\(base) · \(suffix)"
-    }
-
-    private func isSameAsMain(_ screen: NSScreen) -> Bool {
-        guard let main = NSScreen.main else { return false }
-        return notchScreenIdentifier(screen) == notchScreenIdentifier(main)
-    }
-
-    private func normalizeSelectionIfNeeded() {
-        let normalized = normalizedSelection
-        guard normalized != screenSelection else { return }
-        screenSelection = normalized
-        NotchPreferences.setScreenSelection(normalized)
-    }
-}
-
-private extension NSScreen {
-    var notchSettingsID: String { notchScreenIdentifier(self) }
-}
+// MARK: - Tab Order Editor — moved to Views/Settings/TabOrderEditor.swift
+// MARK: - Pricing Management View — moved to Views/Settings/PricingManageView.swift
+// MARK: - Status Line Integration — moved to Views/Settings/StatusLineSection.swift
+// MARK: - Notch Notifications — moved to Views/Settings/NotchNotificationsSection.swift

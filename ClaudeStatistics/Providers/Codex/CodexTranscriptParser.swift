@@ -5,18 +5,6 @@ final class CodexTranscriptParser {
     static let shared = CodexTranscriptParser()
     private static let assistantPreviewLimit = 4000
 
-    private let isoFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-
-    private let isoFallback: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter
-    }()
-
     private init() {}
 
     func parseSessionQuick(at path: String) -> SessionQuickStats {
@@ -423,14 +411,9 @@ final class CodexTranscriptParser {
                 }
 
                 let payload = json["payload"] as? [String: Any] ?? [:]
-                let timestamp = parseDate(json["timestamp"] as? String)
+                let timestamp = TranscriptParserCommons.parseISOTimestamp(json["timestamp"] as? String)
                 return Event(type: type, timestamp: timestamp, payload: payload)
             }
-    }
-
-    private func parseDate(_ raw: String?) -> Date? {
-        guard let raw, !raw.isEmpty else { return nil }
-        return isoFormatter.date(from: raw) ?? isoFallback.date(from: raw)
     }
 
     private func extractMessageText(from payload: [String: Any]) -> String? {
@@ -481,15 +464,7 @@ final class CodexTranscriptParser {
     }
 
     private func cleanSearchText(_ text: String) -> String? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count > 2 else { return nil }
-
-        if isInjectedInstructionEnvelope(trimmed) {
-            return nil
-        }
-
-        let stripped = SearchUtils.stripMarkdown(trimmed)
-        return stripped.count > 2 ? stripped : nil
+        TranscriptParserCommons.searchTextClean(text, envelopeCheck: isInjectedInstructionEnvelope)
     }
 
     private func isInjectedInstructionEnvelope(_ text: String) -> Bool {
@@ -547,13 +522,11 @@ final class CodexTranscriptParser {
     }
 
     private func truncate(_ text: String, limit: Int) -> String {
-        text.count > limit ? String(text.prefix(limit)) + "…" : text
+        TranscriptParserCommons.truncate(text, limit: limit)
     }
 
     private func fiveMinuteKey(for date: Date) -> Date {
-        var comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date)
-        comps.minute = ((comps.minute ?? 0) / 5) * 5
-        return Calendar.current.date(from: comps) ?? date
+        TranscriptParserCommons.fiveMinuteSliceKey(for: date)
     }
 
     private func tokenUsage(from payload: [String: Any]) -> (total: UsageSnapshot, last: UsageSnapshot)? {

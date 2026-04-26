@@ -4,14 +4,6 @@ import SwiftUI
 
 @MainActor
 final class SessionDataStore: ObservableObject {
-    private struct ParseOutcome {
-        let sessionId: String
-        let committedStats: SessionStats?
-        let displayStats: SessionStats?
-        let searchMessages: [SearchIndexMessage]
-        let shouldRetry: Bool
-    }
-
     // MARK: - Published state (UI binds to these)
 
     @Published var sessions: [Session] = []
@@ -101,7 +93,7 @@ final class SessionDataStore: ObservableObject {
         let db = self.db
         Task.detached { [weak self] in
             guard let self else { return }
-            let scannedSessions = Self.deduplicatedSessions(provider.scanSessions(), provider: providerKind)
+            let scannedSessions = SessionDeduplicator.deduplicate(provider.scanSessions(), provider: providerKind)
             DiagnosticLogger.shared.initialScanStarted(
                 provider: providerKind.rawValue,
                 sessionCount: scannedSessions.count
@@ -201,12 +193,12 @@ final class SessionDataStore: ObservableObject {
                 let batch = Array(dirtyIds[batchStart..<batchEnd])
 
                 // Parse batch in parallel
-                let results = await withTaskGroup(of: ParseOutcome.self) { group in
+                let results = await withTaskGroup(of: SessionParseOutcome.self) { group in
                     for session in batch {
                         let quick = quickBySessionId[session.id] ?? SessionQuickStats()
                         let cachedSession = cache[session.id]
                         group.addTask {
-                            await Self.parseValidatedSession(
+                            await SessionParseValidator.parse(
                                 provider: provider,
                                 session: session,
                                 quick: quick,
@@ -214,7 +206,7 @@ final class SessionDataStore: ObservableObject {
                             )
                         }
                     }
-                    var batchResults: [ParseOutcome] = []
+                    var batchResults: [SessionParseOutcome] = []
                     for await result in group {
                         batchResults.append(result)
                     }
@@ -368,7 +360,7 @@ final class SessionDataStore: ObservableObject {
                 // fingerprint changed against the cache. Use fingerprint-only
                 // load (no JSON decode) for the staleness filter, then only
                 // decode JSON for the actual dirty sessions as retry fallback.
-                scannedSessions = Self.deduplicatedSessions(provider.scanSessions(), provider: providerKind)
+                scannedSessions = SessionDeduplicator.deduplicate(provider.scanSessions(), provider: providerKind)
                 let fingerprints = db.loadCacheFingerprints(provider: providerKind)
                 await MainActor.run {
                     self.sessions = scannedSessions
@@ -409,7 +401,7 @@ final class SessionDataStore: ObservableObject {
                 db.saveQuickStats(provider: providerKind, sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, stats: quick)
                 await MainActor.run { self.quickStats[session.id] = quick }
 
-                let outcome = await Self.parseValidatedSession(
+                let outcome = await SessionParseValidator.parse(
                     provider: provider,
                     session: session,
                     quick: quick,
@@ -453,84 +445,6 @@ final class SessionDataStore: ObservableObject {
                 self.runNextDirtyBatch()
             }
         }
-    }
-
-    nonisolated private static func parseValidatedSession(
-        provider: any SessionProvider,
-        session: Session,
-        quick: SessionQuickStats,
-        cached: DatabaseService.CachedSession?
-    ) async -> ParseOutcome {
-        let firstStats = provider.parseSession(at: session.filePath)
-        if suspiciousParseReason(stats: firstStats, quick: quick, session: session) == nil {
-            let searchMessages = provider.parseSearchIndexMessages(at: session.filePath)
-            return ParseOutcome(
-                sessionId: session.id,
-                committedStats: firstStats,
-                displayStats: firstStats,
-                searchMessages: searchMessages,
-                shouldRetry: false
-            )
-        }
-
-        let firstReason = suspiciousParseReason(stats: firstStats, quick: quick, session: session) ?? "suspicious parse result"
-        DiagnosticLogger.shared.warning("Suspicious \(provider.kind.rawValue) parse for \(session.id); retrying once (\(firstReason))")
-        try? await Task.sleep(nanoseconds: 300_000_000)
-
-        let retryStats = provider.parseSession(at: session.filePath)
-        if suspiciousParseReason(stats: retryStats, quick: quick, session: session) == nil {
-            let searchMessages = provider.parseSearchIndexMessages(at: session.filePath)
-            DiagnosticLogger.shared.info("Recovered \(provider.kind.rawValue) parse for \(session.id) after retry")
-            return ParseOutcome(
-                sessionId: session.id,
-                committedStats: retryStats,
-                displayStats: retryStats,
-                searchMessages: searchMessages,
-                shouldRetry: false
-            )
-        }
-
-        let retryReason = suspiciousParseReason(stats: retryStats, quick: quick, session: session) ?? firstReason
-        DiagnosticLogger.shared.warning("Rejected \(provider.kind.rawValue) parse for \(session.id); keeping last committed cache (\(retryReason))")
-        return ParseOutcome(
-            sessionId: session.id,
-            committedStats: nil,
-            displayStats: cached?.sessionStats,
-            searchMessages: [],
-            shouldRetry: true
-        )
-    }
-
-    nonisolated private static func suspiciousParseReason(
-        stats: SessionStats,
-        quick: SessionQuickStats,
-        session: Session
-    ) -> String? {
-        if let start = stats.startTime, let end = stats.endTime, end < start {
-            return "endTime earlier than startTime"
-        }
-        if quick.messageCount > 0 && stats.messageCount == 0 {
-            return "quick messages=\(quick.messageCount), full messages=0"
-        }
-        if quick.userMessageCount > 0 && stats.userMessageCount == 0 {
-            return "quick user messages=\(quick.userMessageCount), full user messages=0"
-        }
-        if quick.totalTokens > 0 && stats.totalTokens == 0 {
-            return "quick tokens=\(quick.totalTokens), full tokens=0"
-        }
-        let sessionLooksNonEmpty = quick.startTime != nil || quick.messageCount > 0 || quick.totalTokens > 0
-        if session.fileSize >= 4_096 &&
-            sessionLooksNonEmpty &&
-            stats.startTime == nil &&
-            stats.endTime == nil &&
-            stats.messageCount == 0 &&
-            stats.totalTokens == 0 {
-            return "empty full stats for non-empty session"
-        }
-        if stats.messageCount == 0 && (stats.userMessageCount > 0 || stats.assistantMessageCount > 0) {
-            return "message counters exist without time slices"
-        }
-        return nil
     }
 
     private func handleParseRetryState(for sessionId: String, shouldRetry: Bool) {
@@ -601,53 +515,6 @@ final class SessionDataStore: ObservableObject {
             (stats?.totalTokens ?? 0) > 0 ||
             session.fileSize >= 4_096
         return likelySearchable
-    }
-
-    nonisolated private static func deduplicatedSessions(
-        _ sessions: [Session],
-        provider: ProviderKind
-    ) -> [Session] {
-        guard !sessions.isEmpty else { return [] }
-
-        var bestById: [String: Session] = [:]
-        var duplicateCounts: [String: Int] = [:]
-
-        for session in sessions {
-            if let existing = bestById[session.id] {
-                duplicateCounts[session.id, default: 1] += 1
-                if shouldReplace(existing: existing, with: session) {
-                    bestById[session.id] = session
-                }
-            } else {
-                bestById[session.id] = session
-            }
-        }
-
-        if !duplicateCounts.isEmpty {
-            let sample = duplicateCounts
-                .sorted { lhs, rhs in
-                    if lhs.value == rhs.value { return lhs.key < rhs.key }
-                    return lhs.value > rhs.value
-                }
-                .prefix(5)
-                .map { "\($0.key)(x\($0.value))" }
-                .joined(separator: ", ")
-            DiagnosticLogger.shared.warning(
-                "Deduplicated \(provider.rawValue) sessions by id: dropped \(sessions.count - bestById.count) duplicates; sample: \(sample)"
-            )
-        }
-
-        return bestById.values.sorted { $0.lastModified > $1.lastModified }
-    }
-
-    nonisolated private static func shouldReplace(existing: Session, with candidate: Session) -> Bool {
-        if candidate.lastModified != existing.lastModified {
-            return candidate.lastModified > existing.lastModified
-        }
-        if candidate.fileSize != existing.fileSize {
-            return candidate.fileSize > existing.fileSize
-        }
-        return candidate.filePath > existing.filePath
     }
 
     // MARK: - Rebucket
@@ -802,14 +669,13 @@ final class SessionDataStore: ObservableObject {
     // MARK: - Top projects (all-time aggregation by project path)
 
     /// Aggregate projects by their `cwd` (or projectPath fallback) for a specific period.
-    /// Aggregate projects by their `cwd` (or projectPath fallback) for a specific period.
     func aggregatePeriodTopProjects(for period: PeriodStats, periodType: StatsPeriod) async -> [TopProject] {
         // Snapshot main-actor state so the heavy fold runs off the UI thread.
         let currentSessions = sessions.isEmpty ? ProviderRegistry.provider(for: provider.kind).scanSessions() : sessions
         let snapshot = parsedStats
         let resetDate = weeklyResetDate
         return await Task.detached {
-            Self.computePeriodTopProjects(
+            SessionAllTimeAggregator.periodTopProjects(
                 parsedStats: snapshot,
                 sessions: currentSessions,
                 period: period,
@@ -819,193 +685,34 @@ final class SessionDataStore: ObservableObject {
         }.value
     }
 
-    private nonisolated static func computePeriodTopProjects(
-        parsedStats: [String: SessionStats],
-        sessions: [Session],
-        period: PeriodStats,
-        periodType: StatsPeriod,
-        weeklyResetDate: Date?
-    ) -> [TopProject] {
-        struct Acc {
-            var cost: Double = 0
-            var tokens: Int = 0
-            var sessionCount: Int = 0
-            var messageCount: Int = 0
-        }
-        var acc: [String: Acc] = [:]
-        let sessionById = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
-
-        let periodStart = period.period
-        let periodEnd = periodType == .all ? Date.distantFuture : periodType.nextPeriodStart(after: periodStart, weeklyResetDate: weeklyResetDate)
-
-        for (sessionId, stats) in parsedStats {
-            guard let session = sessionById[sessionId] else { continue }
-            let key = session.cwd ?? session.projectPath
-
-            let sStart = stats.startTime ?? session.lastModified
-            let sEnd = stats.endTime ?? session.lastModified
-
-            // Check if session interval [sStart, sEnd] overlaps with [periodStart, periodEnd)
-            let overlaps = sStart < periodEnd && sEnd >= periodStart
-            guard overlaps else { continue }
-
-            var a = acc[key, default: Acc()]
-
-            if stats.fiveMinSlices.isEmpty {
-                // For all-time aggregated stats (Date.distantPast), or if start periods match
-                if periodType == .all || periodType.startOfPeriod(for: sStart, weeklyResetDate: weeklyResetDate) == periodStart {
-                    a.cost += stats.estimatedCost
-                    a.tokens += stats.totalTokens
-                    a.messageCount += stats.messageCount
-                    a.sessionCount += 1
-                }
-            } else {
-                var costInPeriod = 0.0
-                var tokensInPeriod = 0
-                var messagesInPeriod = 0
-                var hasActivityInPeriod = false
-
-                for (sliceTime, slice) in stats.fiveMinSlices {
-                    if sliceTime >= periodStart && sliceTime < periodEnd {
-                        costInPeriod += slice.estimatedCost
-                        tokensInPeriod += slice.totalTokens
-                        messagesInPeriod += slice.messageCount
-                        hasActivityInPeriod = true
-                    }
-                }
-
-                if hasActivityInPeriod {
-                    a.cost += costInPeriod
-                    a.tokens += tokensInPeriod
-                    a.messageCount += messagesInPeriod
-                    a.sessionCount += 1
-                } else if periodType == .all {
-                    // Fallback for .all when slices exist but for some reason aren't matching
-                    a.cost += stats.estimatedCost
-                    a.tokens += stats.totalTokens
-                    a.messageCount += stats.messageCount
-                    a.sessionCount += 1
-                }
-            }
-            acc[key] = a
-        }
-
-        return acc.map { key, v in
-            TopProject(
-                path: key,
-                displayName: Self.displayNameForProjectPath(key),
-                cost: v.cost,
-                tokens: v.tokens,
-                sessionCount: v.sessionCount,
-                messageCount: v.messageCount
-            )
-        }.filter { $0.sessionCount > 0 }.sorted { $0.cost > $1.cost }
-    }
-
     /// Aggregate all sessions by their `cwd` (or projectPath fallback), sorted by estimated cost desc.
     /// Used by the All-Time view's "Top Projects" card.
     ///
-    /// Now backed by `_topProjectsCache` populated in `rebucket()` /
-    /// `rebucketAllTime()`. Was a O(sessions × slices) computed property —
-    /// AllTimeView read it from `body` so each SwiftUI re-render walked
-    /// every session's full slice map, dominating CPU when entering the
-    /// statistics page.
+    /// Backed by `_topProjectsCache` populated in `rebucket()` / `rebucketAllTime()`.
     var topProjects: [TopProject] { _topProjectsCache }
     @Published private var _topProjectsCache: [TopProject] = []
-
-    /// Trim/relabel a full path into something compact enough for a list row.
-    /// Prefers the last path component (like the basename of a repo).
-    nonisolated private static func displayNameForProjectPath(_ path: String) -> String {
-        let expanded = (path as NSString).expandingTildeInPath
-        let last = (expanded as NSString).lastPathComponent
-        return last.isEmpty ? expanded : last
-    }
 
     // MARK: - Daily activity heatmap data
 
     /// Per-day aggregated cost + tokens for the heatmap in the All-Time view.
     /// Key is `startOfDay` in the user's local timezone.
-    ///
-    /// Now backed by `_dailyHeatmapCache` populated in `rebucket()` /
-    /// `rebucketAllTime()`. Was a O(sessions × slices) computed property —
-    /// AllTimeView read it from `body` *twice* per render so each redraw
-    /// walked every session's full slice map twice.
     var dailyHeatmapData: [Date: DailyHeatmapBucket] { _dailyHeatmapCache }
     @Published private var _dailyHeatmapCache: [Date: DailyHeatmapBucket] = [:]
 
     /// Sorted-descending list of calendar years present in `dailyHeatmapData`.
-    /// Cached alongside the heatmap so AllTimeView's scope picker doesn't
-    /// re-run a `Set` build + `sort` over every dictionary key on each body
-    /// pass.
     var availableHeatmapYears: [Int] { _availableHeatmapYearsCache }
     @Published private var _availableHeatmapYearsCache: [Int] = []
 
-    /// Recompute `_dailyHeatmapCache` and `_topProjectsCache`. Single
-    /// O(sessions × slices) walk producing both — the heatmap's daily
-    /// buckets are derived in the same loop as the top-projects per-cwd
-    /// accumulator, so we do one pass instead of two.
+    /// Recompute `_dailyHeatmapCache` and `_topProjectsCache` via a single
+    /// O(sessions × slices) walk shared between heatmap and top-projects.
     fileprivate func recomputeAllTimeAggregates() {
-        let cal = Calendar.current
-        var heatmap: [Date: DailyHeatmapBucket] = [:]
-
-        struct ProjectAcc {
-            var cost: Double = 0
-            var tokens: Int = 0
-            var sessionCount: Int = 0
-            var messageCount: Int = 0
-        }
-        var projectAcc: [String: ProjectAcc] = [:]
-        let sessionById = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
-
-        for (sessionId, stats) in parsedStats {
-            // Heatmap bucket
-            for (sliceTime, slice) in stats.fiveMinSlices {
-                let day = cal.startOfDay(for: sliceTime)
-                var b = heatmap[day, default: DailyHeatmapBucket(date: day, cost: 0, tokens: 0)]
-                b.cost += slice.estimatedCost
-                b.tokens += slice.totalTokens
-                heatmap[day] = b
-            }
-
-            // Top-projects accumulator
-            guard let session = sessionById[sessionId] else { continue }
-            let key = session.cwd ?? session.projectPath
-            var a = projectAcc[key, default: ProjectAcc()]
-            if stats.fiveMinSlices.isEmpty {
-                a.cost += stats.estimatedCost
-                a.tokens += stats.totalTokens
-                a.messageCount += stats.messageCount
-                a.sessionCount += 1
-            } else {
-                var costInPeriod = 0.0
-                var tokensInPeriod = 0
-                var messagesInPeriod = 0
-                for (_, slice) in stats.fiveMinSlices {
-                    costInPeriod += slice.estimatedCost
-                    tokensInPeriod += slice.totalTokens
-                    messagesInPeriod += slice.messageCount
-                }
-                a.cost += costInPeriod
-                a.tokens += tokensInPeriod
-                a.messageCount += messagesInPeriod
-                a.sessionCount += 1
-            }
-            projectAcc[key] = a
-        }
-
-        _dailyHeatmapCache = heatmap
-        let years = Set(heatmap.keys.map { cal.component(.year, from: $0) })
-        _availableHeatmapYearsCache = years.sorted(by: >)
-        _topProjectsCache = projectAcc.map { key, v in
-            TopProject(
-                path: key,
-                displayName: Self.displayNameForProjectPath(key),
-                cost: v.cost,
-                tokens: v.tokens,
-                sessionCount: v.sessionCount,
-                messageCount: v.messageCount
-            )
-        }.filter { $0.sessionCount > 0 }.sorted { $0.cost > $1.cost }
+        let result = SessionAllTimeAggregator.allTimeAggregates(
+            parsedStats: parsedStats,
+            sessions: sessions
+        )
+        _dailyHeatmapCache = result.dailyHeatmap
+        _availableHeatmapYearsCache = result.availableYears
+        _topProjectsCache = result.topProjects
     }
 
     // MARK: - Delete
@@ -1099,7 +806,7 @@ final class SessionDataStore: ObservableObject {
         let snapshotSessions = sessions
         let resetDate = weeklyResetDate
         return await Task.detached {
-            Self.computeTrendData(
+            SessionTrendAggregator.trendData(
                 parsedStats: snapshot,
                 sessions: snapshotSessions,
                 period: period,
@@ -1109,194 +816,24 @@ final class SessionDataStore: ObservableObject {
         }.value
     }
 
-    private nonisolated static func computeTrendData(
-        parsedStats: [String: SessionStats],
-        sessions: [Session],
-        period: PeriodStats,
-        periodType: StatsPeriod,
-        weeklyResetDate: Date?
-    ) -> [TrendDataPoint] {
-        let granularity = periodType.trendGranularity
-        var buckets: [Date: (tokens: Int, cost: Double)] = [:]
-
-        // Use fiveMinSlices for daily view or weekly with non-midnight subscription boundary
-        let useFineSlices = periodType == .daily || (periodType == .weekly && weeklyResetDate != nil)
-
-        let sessionById = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
-
-        for (sessionId, stats) in parsedStats {
-            let slices: [Date: DaySlice] = useFineSlices ? stats.fiveMinSlices : stats.daySlices
-            if !slices.isEmpty {
-                for (sliceTime, slice) in slices {
-                    let slicePeriodStart = periodType.startOfPeriod(for: sliceTime, weeklyResetDate: weeklyResetDate)
-                    guard slicePeriodStart == period.period else { continue }
-
-                    let bucket = granularity.bucketStart(for: sliceTime)
-                    var existing = buckets[bucket, default: (tokens: 0, cost: 0)]
-                    existing.tokens += slice.totalTokens
-                    existing.cost += slice.estimatedCost
-                    buckets[bucket] = existing
-                }
-            } else {
-                // Fallback for sessions without hourSlice data
-                guard let session = sessionById[sessionId] else { continue }
-                let sessionDate = stats.startTime ?? session.lastModified
-                let sessionPeriodStart = periodType.startOfPeriod(for: sessionDate, weeklyResetDate: weeklyResetDate)
-                guard sessionPeriodStart == period.period else { continue }
-
-                let bucket = granularity.bucketStart(for: sessionDate)
-                var existing = buckets[bucket, default: (tokens: 0, cost: 0)]
-                existing.tokens += stats.totalTokens
-                existing.cost += stats.estimatedCost
-                buckets[bucket] = existing
-            }
-        }
-
-        // Sort by time, then accumulate into running totals
-        let sorted = buckets.sorted { $0.key < $1.key }
-        let cal = Calendar.current
-        var result: [TrendDataPoint] = []
-
-        // Zero-origin baseline. For bounded periods (daily/weekly/monthly), `period.period`
-        // is the exact start-of-period. For `.all`, `period.period` is `distantPast` which
-        // would blow up the X-axis, so pin the baseline to the first bucket instead.
-        if !sorted.isEmpty {
-            let origin: Date = (periodType == .all) ? sorted.first!.key : period.period
-            result.append(TrendDataPoint(time: origin, tokens: 0, cost: 0))
-        }
-
-        // Data points at the END of each bucket (cumulative up to that point)
-        var cumTokens = 0
-        var cumCost = 0.0
-        for (i, (time, val)) in sorted.enumerated() {
-            cumTokens += val.tokens
-            cumCost += val.cost
-            // End of bucket = start of next granularity unit
-            // For the last bucket, cap at "now" to avoid showing future time
-            let bucketEnd = cal.date(byAdding: granularity.calendarComponent, value: granularity.stepValue, to: time)!
-            let dataTime = (i == sorted.count - 1) ? min(bucketEnd, Date()) : bucketEnd
-            result.append(TrendDataPoint(time: dataTime, tokens: cumTokens, cost: cumCost))
-        }
-        return result
-    }
-
     /// Aggregate raw token/cost usage for a rolling time window.
     func aggregateWindowTrendData(from start: Date, to end: Date, granularity: TrendGranularity, cumulative: Bool = false, modelFilter: ((String) -> Bool)? = nil) -> [TrendDataPoint] {
-        guard start < end else { return [] }
-
-        let cal = Calendar.current
-        let useFineSlices = granularity == .fiveMinute || granularity == .minute || granularity == .hour
-        var buckets: [Date: (tokens: Int, cost: Double)] = [:]
-
-        for stats in parsedStats.values {
-            let slices: [Date: DaySlice] = useFineSlices ? stats.fiveMinSlices : stats.daySlices
-            for (sliceTime, slice) in slices {
-                // Exclusive start: data at exact boundary belongs to previous period
-                guard sliceTime > start, sliceTime < end else { continue }
-
-                let bucket = granularity.bucketStart(for: sliceTime)
-                var existing = buckets[bucket, default: (tokens: 0, cost: 0)]
-
-                if let filter = modelFilter {
-                    for (model, modelStats) in slice.modelBreakdown where filter(model) {
-                        existing.tokens += modelStats.totalTokens
-                        existing.cost += ModelPricing.estimateCost(
-                            model: model,
-                            inputTokens: modelStats.inputTokens,
-                            outputTokens: modelStats.outputTokens,
-                            cacheCreation5mTokens: modelStats.cacheCreation5mTokens,
-                            cacheCreation1hTokens: modelStats.cacheCreation1hTokens,
-                            cacheCreationTotalTokens: modelStats.cacheCreationTotalTokens,
-                            cacheReadTokens: modelStats.cacheReadTokens
-                        )
-                    }
-                } else {
-                    existing.tokens += slice.totalTokens
-                    existing.cost += slice.estimatedCost
-                }
-                buckets[bucket] = existing
-            }
-        }
-
-        if cumulative {
-            var result: [TrendDataPoint] = [TrendDataPoint(time: start, tokens: 0, cost: 0)]
-            var bucketTime = granularity.bucketStart(for: start)
-            var cumTokens = 0
-            var cumCost = 0.0
-
-            while bucketTime < end {
-                let bucket = buckets[bucketTime, default: (tokens: 0, cost: 0)]
-                cumTokens += bucket.tokens
-                cumCost += bucket.cost
-                // Only add points after the zero-origin to keep x-axis monotonic
-                if bucketTime > start {
-                    result.append(TrendDataPoint(time: bucketTime, tokens: cumTokens, cost: cumCost))
-                }
-                guard let nextBucket = cal.date(byAdding: granularity.calendarComponent, value: granularity.stepValue, to: bucketTime) else { break }
-                bucketTime = nextBucket
-            }
-
-            // Data from the first or current partial bucket was accumulated but not yet plotted 
-            // if the loop ended before the next boundary. Append it at the exact end time.
-            if result.last?.time != end {
-                result.append(TrendDataPoint(time: end, tokens: cumTokens, cost: cumCost))
-            }
-
-            return result
-        }
-
-        // Non-cumulative: per-bucket values
-        var result: [TrendDataPoint] = []
-        var bucketTime = granularity.bucketStart(for: start)
-
-        while bucketTime < end {
-            let bucket = buckets[bucketTime, default: (tokens: 0, cost: 0)]
-            result.append(TrendDataPoint(time: bucketTime, tokens: bucket.tokens, cost: bucket.cost))
-            guard let nextBucket = cal.date(byAdding: granularity.calendarComponent, value: granularity.stepValue, to: bucketTime) else { break }
-            bucketTime = nextBucket
-        }
-
-        return result
+        SessionTrendAggregator.windowTrendData(
+            parsedStats: parsedStats,
+            from: start,
+            to: end,
+            granularity: granularity,
+            cumulative: cumulative,
+            modelFilter: modelFilter
+        )
     }
 
     /// Snapshots parsedStats for the given sessions, then computes trend data off the main thread.
     func aggregateProjectTrendData(sessions: [Session], granularity: TrendGranularity = .day) async -> [TrendDataPoint] {
-        // Snapshot on main actor
         let snapshot: [SessionStats] = sessions.compactMap { parsedStats[$0.id] }
-        // Compute off main thread
         return await Task.detached {
-            Self.computeProjectTrend(stats: snapshot, granularity: granularity)
+            SessionTrendAggregator.projectTrend(stats: snapshot, granularity: granularity)
         }.value
-    }
-
-    private nonisolated static func computeProjectTrend(stats: [SessionStats], granularity: TrendGranularity) -> [TrendDataPoint] {
-        var buckets: [Date: (tokens: Int, cost: Double)] = [:]
-        let cal = Calendar.current
-
-        for stat in stats {
-            for (time, slice) in stat.fiveMinSlices {
-                let bucket = granularity.bucketStart(for: time)
-                var existing = buckets[bucket, default: (tokens: 0, cost: 0.0)]
-                existing.tokens += slice.totalTokens
-                existing.cost += slice.estimatedCost
-                buckets[bucket] = existing
-            }
-        }
-
-        let sorted = buckets.sorted { $0.key < $1.key }
-        guard !sorted.isEmpty else { return [] }
-
-        var result: [TrendDataPoint] = [TrendDataPoint(time: sorted.first!.key, tokens: 0, cost: 0)]
-        var cumTokens = 0
-        var cumCost = 0.0
-        for (i, (time, val)) in sorted.enumerated() {
-            cumTokens += val.tokens
-            cumCost += val.cost
-            let bucketEnd = cal.date(byAdding: granularity.calendarComponent, value: granularity.stepValue, to: time)!
-            let dataTime = (i == sorted.count - 1) ? min(bucketEnd, Date()) : bucketEnd
-            result.append(TrendDataPoint(time: dataTime, tokens: cumTokens, cost: cumCost))
-        }
-        return result
     }
 
     /// Aggregates model breakdown for a specific set of sessions.
@@ -1305,82 +842,17 @@ final class SessionDataStore: ObservableObject {
         // touches `ModelPricing.estimateCost` which is fine off-main.
         let snapshot: [SessionStats] = sessions.compactMap { parsedStats[$0.id] }
         return await Task.detached {
-            Self.computeProjectModelBreakdown(stats: snapshot)
+            SessionTrendAggregator.projectModelBreakdown(stats: snapshot)
         }.value
     }
 
-    private nonisolated static func computeProjectModelBreakdown(stats: [SessionStats]) -> [ModelUsage] {
-        var combined: [String: ModelUsage] = [:]
-        for st in stats {
-            for (model, mts) in st.modelBreakdown {
-                var usage = combined[model] ?? ModelUsage(model: model)
-                usage.inputTokens += mts.inputTokens
-                usage.outputTokens += mts.outputTokens
-                usage.cacheCreation5mTokens += mts.cacheCreation5mTokens
-                usage.cacheCreation1hTokens += mts.cacheCreation1hTokens
-                usage.cacheCreationTotalTokens += mts.cacheCreationTotalTokens
-                usage.cacheReadTokens += mts.cacheReadTokens
-                usage.cost += ModelPricing.estimateCost(
-                    model: model,
-                    inputTokens: mts.inputTokens,
-                    outputTokens: mts.outputTokens,
-                    cacheCreation5mTokens: mts.cacheCreation5mTokens,
-                    cacheCreation1hTokens: mts.cacheCreation1hTokens,
-                    cacheCreationTotalTokens: mts.cacheCreationTotalTokens,
-                    cacheReadTokens: mts.cacheReadTokens
-                )
-                usage.messageCount += mts.messageCount
-                usage.sessionCount += 1
-                combined[model] = usage
-            }
-        }
-        return combined.values.sorted { $0.cost > $1.cost }
-    }
-
     func windowModelBreakdown(from start: Date, to end: Date, modelFilter: ((String) -> Bool)? = nil) -> [ModelUsage] {
-        guard start < end else { return [] }
-
-        var combined: [String: ModelUsage] = [:]
-        var modelSessionIds: [String: Set<String>] = [:]
-
-        for (sessionId, stats) in parsedStats {
-            for (sliceTime, slice) in stats.fiveMinSlices {
-                // Exclusive start: data at exact boundary belongs to previous period
-                guard sliceTime > start, sliceTime < end else { continue }
-
-                for (model, modelStats) in slice.modelBreakdown {
-                    if let filter = modelFilter, !filter(model) { continue }
-                    var existing = combined[model] ?? ModelUsage(model: model)
-                    existing.inputTokens += modelStats.inputTokens
-                    existing.outputTokens += modelStats.outputTokens
-                    existing.cacheCreation5mTokens += modelStats.cacheCreation5mTokens
-                    existing.cacheCreation1hTokens += modelStats.cacheCreation1hTokens
-                    existing.cacheCreationTotalTokens += modelStats.cacheCreationTotalTokens
-                    existing.cacheReadTokens += modelStats.cacheReadTokens
-                    existing.cost += ModelPricing.estimateCost(
-                        model: model,
-                        inputTokens: modelStats.inputTokens,
-                        outputTokens: modelStats.outputTokens,
-                        cacheCreation5mTokens: modelStats.cacheCreation5mTokens,
-                        cacheCreation1hTokens: modelStats.cacheCreation1hTokens,
-                        cacheCreationTotalTokens: modelStats.cacheCreationTotalTokens,
-                        cacheReadTokens: modelStats.cacheReadTokens
-                    )
-                    existing.messageCount += modelStats.messageCount
-                    combined[model] = existing
-                    modelSessionIds[model, default: []].insert(sessionId)
-                }
-            }
-        }
-
-        for (model, ids) in modelSessionIds {
-            if var usage = combined[model] {
-                usage.sessionCount = ids.count
-                combined[model] = usage
-            }
-        }
-
-        return combined.values.sorted { $0.totalTokens > $1.totalTokens }
+        SessionTrendAggregator.windowModelBreakdown(
+            parsedStats: parsedStats,
+            from: start,
+            to: end,
+            modelFilter: modelFilter
+        )
     }
 
     var globalModelBreakdown: [ModelUsage] {
@@ -1494,23 +966,4 @@ final class SessionDataStore: ObservableObject {
         }
         return combined.values.sorted { $0.cost > $1.cost }
     }
-}
-
-// MARK: - All-Time helper types
-
-struct TopProject: Identifiable, Hashable {
-    let path: String
-    let displayName: String
-    let cost: Double
-    let tokens: Int
-    let sessionCount: Int
-    let messageCount: Int
-
-    var id: String { path }
-}
-
-struct DailyHeatmapBucket: Hashable {
-    let date: Date
-    var cost: Double
-    var tokens: Int
 }

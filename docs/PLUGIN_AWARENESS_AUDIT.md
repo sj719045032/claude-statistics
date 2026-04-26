@@ -1,0 +1,319 @@
+# Plugin Awareness Audit — 插件化感知缺口专项整理
+
+> 审计基线：`main @ f23dcaa`（2026-04-26）。文中行号基于审计当时的代码。
+>
+> 目标：把项目里**绕开 `PluginRegistry`、用枚举/字面量数组写死**的位置一次性枚举出来，划分类别和优先级，作为后续插件化改造的工作清单。
+
+---
+
+## 1. 背景
+
+项目目前并存两套体系：
+
+- **遗留枚举/字面量**：`ProviderKind { .claude, .codex, .gemini }`、`TerminalRegistry.appCapabilities = [Ghostty…Editor]`、`ShareRoleID.allCases` 等，定义在 host 内部。
+- **插件路径**：`Plugins/Sources/ClaudeStatisticsKit/` 下定义了 `ProviderPlugin`、`TerminalPlugin`、`ShareRolePlugin`、`ShareCardThemePlugin`、`HookInstalling`、`HookProvider`、`ModelPricingRates`、`PluginRegistry` 等协议；`BuiltinProviderPlugins` / `BuiltinTerminalPlugins` 把内置实现包装成插件 dogfood，加载到 `PluginRegistry`。
+
+问题在于**消费侧**：很多 UI、启动逻辑、路由分支仍按枚举硬编码。即使 `PluginRegistry` 里有第 4 个 ProviderPlugin / 第 9 个 TerminalPlugin，host 也看不到。
+
+`PluginRegistry` 已经有 `providers / terminals / shareRoles / shareThemes` 四个桶，并按 `manifest.kind` 入桶（参见 `Plugins/Sources/ClaudeStatisticsKit/PluginRegistry.swift:46-99`）。所有"协议存在但未消费"的项，意味着 SDK 一侧已就绪，欠的是 host 一侧的查询。
+
+---
+
+## 2. 类别约定
+
+| 标签 | 含义 | 影响 |
+|---|---|---|
+| **CRITICAL** | UI/功能可见地被限制在内置数量内 | 改完即可让新插件出现在用户面前 |
+| **SCHEMA** | `@AppStorage` key、UserDefaults key 锚定在枚举 case | 阻塞纯字符串 plugin id，必须改 schema |
+| **ROUTING** | `switch <enum>` 无 default，或基于 enum case 的特判 | 新 case 编译报错或语义错误 |
+| **STARTUP** | 应用启动/初始化阶段迭代固定数组 | 插件不参与启动注册 |
+| **COSMETIC** | asset 名、字符串 hardcode | 视觉/文案，影响轻 |
+| **PROTOCOL-EXISTS-NOT-WIRED** | SDK 协议已定义、host 未消费 | 改造门槛低（接线即可） |
+
+---
+
+## 3. 维度 A — Provider 插件感知缺口
+
+> 内置 Provider 都已经包装为 ProviderPlugin（`BuiltinProviderPlugins.swift`），`ProviderRegistry.provider(for:)` 也优先查 `dynamicProviders`。但**`supportedProviders` 仍是 `[.claude, .codex, .gemini]` 字面量，`ProviderKind` 枚举本身是个根瓶颈**——所有迭代/UI/schema/routing 最终都收口到这三个 case。
+
+### 3.1 CRITICAL — UI/功能可见地写死三个
+
+| file:line | 描述 |
+|---|---|
+| `ClaudeStatistics/Views/SettingsView.swift:22-24` | 三个 `@AppStorage(MenuBarPreferences.key(for: .claude/.codex/.gemini))` 写死 binding |
+| `ClaudeStatistics/Views/SettingsView.swift:577-583` | 菜单栏 Toggle 块 `providerToggleLabel("Claude"/"Codex"/"Gemini", asset: …)` 三行字面量 |
+| ~~`ClaudeStatistics/Views/SettingsView.swift:979`~~ | ~~Developer Settings → Rebuild Index~~ — **非缺陷**：rebuild 操作的是 host 内部 SessionStore index，第三方 ProviderPlugin 的 session 数据流暂未接入 SessionStore，列出 `supportedProviders` 是语义正确。等 P1/P2 把 plugin session 接入数据流后再视情况调整。 |
+| `ClaudeStatistics/Models/ProviderKind.swift:101` | `visibleKinds()` 过滤 `ProviderKind.allCases`；UI 显示/隐藏受 enum 限制 |
+| `ClaudeStatistics/Providers/BuiltinProviderPlugins.swift:29/45/61` | 三个 dogfood `makeProvider()` 直接返回 `*Provider.shared` 单例 |
+
+### 3.2 SCHEMA — UserDefaults / @AppStorage key 锚定在枚举
+
+| file:line | 描述 |
+|---|---|
+| `ClaudeStatistics/Models/ProviderKind.swift:27-` | `MenuBarPreferences.key(for:)`、`NotchPreferences` 多个 helper 全部以 `ProviderKind` 为入参 |
+| `ClaudeStatistics/Models/ProviderKind.swift:86-89` | `MenuBarPreferences.register()` 循环 `ProviderKind.allCases` 写默认值 |
+| `ClaudeStatistics/NotchNotifications/Core/NotchPreferences.swift:12-14` | `claudeKey/codexKey/geminiKey` 三个静态 alias |
+| `ClaudeStatistics/NotchNotifications/Core/NotchPreferences.swift:53` | `anyProviderEnabled` 走 `ProviderKind.allCases.contains(where:)` |
+| `ClaudeStatistics/NotchNotifications/Core/NotchPreferences.swift:77-81` | 旧版 key 迁移循环仅遍历 enum |
+| `ClaudeStatistics/App/StatusBarController.swift:241-243` | 状态栏菜单可见性绑定再次复用三个 enum-keyed @AppStorage |
+| `ClaudeStatistics/NotchNotifications/Hooks/CodexHookInstaller.swift:5` | `providerId: String = ProviderKind.codex.rawValue` 用 enum 锚字符串 |
+
+### 3.3 ROUTING — 无 default 的 switch / case-级别特判
+
+| file:line | 描述 |
+|---|---|
+| `ClaudeStatistics/Models/ProviderKind.swift:18-22` | `descriptor` 三 case switch，无 default |
+| `ClaudeStatistics/Models/ProviderKind.swift:50-62` | `canonicalToolName(_:)` 走 switch 而不是 `descriptor.resolveToolAlias` |
+| `ClaudeStatistics/Providers/ProviderRegistry.swift:57-68` | `provider(for:)` 走 dynamic 优先 + 三 case fallback；新 enum case 必须改 switch |
+| `ClaudeStatistics/App/AccountManagers.swift:17-25` | `switch kind` 三 case 无 default，新 case 编译错 |
+| `ClaudeStatistics/App/ProviderContextRegistry.swift:103` | `guard kind == .codex else` 仅 Codex 走特殊 runtime bridge |
+| `ClaudeStatistics/HookCLI/HookCLI.swift:57-64` | CLI hook dispatcher `switch provider` 三 case |
+| `ClaudeStatistics/Utilities/DisplayTextClassifier.swift:11-16` | display mode 工厂 switch 三 case |
+| `ClaudeStatistics/Utilities/DisplayTextClassifier.swift:47-52` | mode 进一步细分时再次分组 switch |
+| `ClaudeStatistics/NotchNotifications/Core/ToolActivityFormatter.swift:234-239` | `switch provider { case .claude / case .codex, .gemini }` |
+| `ClaudeStatistics/NotchNotifications/Core/WireEventTranslator.swift:68-72` | `switch raw { case "codex": / case "gemini": / default: .claude }` 默认回落 Claude |
+| `ClaudeStatistics/NotchNotifications/Core/ProviderSessionDisplayFormatter+Candidates.swift:15-20` | `switch displayMode` 分组 case |
+| `ClaudeStatistics/NotchNotifications/Core/RuntimeStatePersistor.swift:167` | `guard provider == .claude else { return sessionId }` Claude-only 规范化 |
+| `ClaudeStatistics/NotchNotifications/Core/ActiveSessionsTracker.swift:414` | Codex-only `taskDone` 进程退出宽限期 |
+| `ClaudeStatistics/NotchNotifications/Core/ActiveSessionsTracker.swift:558` | Codex-only liveness 检查 |
+| `ClaudeStatistics/NotchNotifications/Core/ActiveSessionsTracker.swift:764` | `ProviderKind(rawValue:) ?? .claude` 兜底回 Claude |
+| `ClaudeStatistics/NotchNotifications/Core/ActiveSessionsTracker.swift:769` | Claude-only session id 规范化 |
+| `ClaudeStatistics/NotchNotifications/Hooks/CodexHookInstaller.swift:313` | `ProviderKind(rawValue:) ?? .claude` 安装器 id 兜底 |
+
+### 3.4 STARTUP — 启动期循环固定数组
+
+| file:line | 描述 |
+|---|---|
+| `ClaudeStatistics/App/ClaudeStatisticsApp.swift:15` | 状态行安装器刷新 `for kind in ProviderRegistry.supportedProviders` |
+| `ClaudeStatistics/App/ClaudeStatisticsApp.swift:195` | bootstrap 启动 `startupKinds = supportedProviders.filter` |
+| `ClaudeStatistics/App/ClaudeStatisticsApp.swift:608-612` | `applyNotchProviderPreferences` 两次过滤 `supportedProviders` |
+| `ClaudeStatistics/Models/Session.swift:38-40` | 内置 model pricing 表 `supportedProviders.reduce` |
+| `ClaudeStatistics/NotchNotifications/Hooks/CodexHookInstaller.swift:299-301` | `ProviderKind.allCases.compactMap` 收集 hook 安装器 |
+| `ClaudeStatistics/Models/ProviderKind.swift:72` | 工具名规范化 `ProviderKind.allCases.map(\.descriptor)` |
+
+### 3.5 COSMETIC — 装饰名硬编码
+
+| file:line | 描述 |
+|---|---|
+| `ClaudeStatistics/Providers/ProviderDescriptor+Builtins.swift:16/27/38` | 三个 `iconAssetName: "ClaudeProviderIcon"` 等字面量 |
+
+### 3.6 维度 A 小计
+
+CRITICAL 4（含 1 项已纠正为非缺陷）/ SCHEMA 7 / ROUTING 16 / STARTUP 6 / COSMETIC 3 — **合计 36 处**
+
+---
+
+## 4. 维度 B — Terminal 插件感知缺口
+
+> 内置 Terminal 也已经做了 `BuiltinTerminalPlugins`，但 host 仍把 `appCapabilities` 当唯一真相。`dynamicBundles`（chat-app plugin 注入的别名）只服务于 hook 反向解析（`terminal_name → bundleId`），**不进入 launchOptions / readinessOptions / setupProviders / launchingProviders**。
+
+### 4.1 CRITICAL — 8 个 builtin 之外的 TerminalPlugin 完全看不到
+
+| file:line | 描述 |
+|---|---|
+| `ClaudeStatistics/Terminal/TerminalRegistry.swift:5-14` | `appCapabilities` 字面量 8 个 capability，整个 Registry 派生于此 |
+| `ClaudeStatistics/Terminal/TerminalRegistry.swift:38-46` | `externalCapabilities` 字面量含 Hyper 一项 |
+| `ClaudeStatistics/Terminal/TerminalRegistry.swift:52-62` | `launchOptions` 仅来自 `appCapabilities` |
+| `ClaudeStatistics/Terminal/TerminalRegistry.swift:64-80` | `readinessOptions` 仅来自 `appCapabilities`（Default Terminal Picker 数据源） |
+| `ClaudeStatistics/Terminal/TerminalRegistry.swift:82-84` | `setupProviders` 同上 |
+| `ClaudeStatistics/Terminal/TerminalRegistry.swift:86-88` | `launchingProviders` 同上 |
+| `ClaudeStatistics/Views/SettingsView.swift:611` | Default Terminal Picker `ForEach(TerminalRegistry.readinessOptions)` |
+
+### 4.2 ROUTING — bundleId 字面量分支 / 无 default
+
+| file:line | 描述 |
+|---|---|
+| `ClaudeStatistics/TerminalFocus/TerminalFocusCoordinator.swift:501-506` | `switch bundleId` 显式 3 终端字面量 case |
+| `ClaudeStatistics/TerminalFocus/AppleScriptFocuser.swift:20-160` | `switch bundleId` 三 case + 内嵌 AppleScript 模板，插件无法扩展 |
+| `ClaudeStatistics/TerminalFocus/TerminalFocusRouteHandler.swift:16-21` | 5 个 focus route handler 字面量注册（AppleScript / kitty CLI / wezterm CLI / Accessibility / Activate） |
+| `ClaudeStatistics/NotchNotifications/Core/TerminalIdentityResolver.swift:20` | `private static let ghosttyBundleID = "com.mitchellh.ghostty"` 用作碰撞检测特判 |
+| `ClaudeStatistics/HookCLI/HookCLI.swift:393-402` | 环境变量解析硬编码 4 个终端名（`kitty/wezterm/iTerm2`） |
+| `ClaudeStatistics/HookCLI/HookCLI.swift:450-506` | terminal 自检 `normalized.contains` 字面量比对 builtin 名 |
+
+### 4.3 各 Capability 内部的 bundleId 写死
+
+> 这一组属于 builtin capability **自身**写死它代表的应用——本身没问题（一个 Capability 类对应一个产品就该这样）；但只要 host 还在用 `appCapabilities` 当唯一来源，TerminalPlugin 就走不进来。列出仅作为参考：
+
+`Capabilities/{Ghostty,WezTerm,ITerm,AppleTerminal,Warp,Kitty,Alacritty,Editor}TerminalCapability.swift` 各自硬编码 bundleId / option id / 检测路径。Hyper 通过 `ExternalTerminalCapability` 实例描述。
+
+### 4.4 COSMETIC
+
+| file:line | 描述 |
+|---|---|
+| `ClaudeStatistics/Terminal/TerminalPreferences.swift:50-57` | `ghosttyOptionID / iTermOptionID …` 8 个字符串常量 |
+
+### 4.5 维度 B 小计
+
+CRITICAL 7 / ROUTING 6 / COSMETIC 1 — **合计 14 处（不含 Capability 文件内自身 bundleId）**
+
+---
+
+## 5. 维度 C — 其他 PluginKind 缺口（ShareRole / ShareCardTheme / Pricing / Hook / StatusLine / TranscriptParser）
+
+> SDK 一侧已经把这几条协议都备齐了，但 host 完全没接。`PluginRegistry.shareRoles / shareThemes` 已有桶但**从未被任何 view / engine 查询**；`HookProvider`、`ModelPricingRates` 也是 SDK side ready / host side empty。
+
+### 5.1 PROTOCOL-EXISTS-NOT-WIRED — SDK 已就绪、host 未消费
+
+| 协议 | 定义位置 | host 消费现状 |
+|---|---|---|
+| `ShareRolePlugin` | `Plugins/Sources/ClaudeStatisticsKit/ShareRolePlugin.swift` | `PluginRegistry.shareRoles` 桶有写无读；`ShareRoleEngine` 仍枚举 `ShareRoleID.allCases` |
+| `ShareCardThemePlugin` | `Plugins/Sources/ClaudeStatisticsKit/ShareCardThemePlugin.swift` | `PluginRegistry.shareThemes` 桶有写无读；分享卡主题仍由 `ShareRoleID → visualTheme` 单 switch 给出 |
+| `HookInstalling` | `Plugins/Sources/ClaudeStatisticsKit/HookInstalling.swift` | host 没有"通用 hook installer 列表"概念，`PluginRegistry` 也没建桶 |
+| `HookProvider` | `Plugins/Sources/ClaudeStatisticsKit/HookProvider.swift` | `statusLineInstaller` 之类 accessor 设计好但 host 未遍历 provider 收集 |
+| `ModelPricingRates` | `Plugins/Sources/ClaudeStatisticsKit/ModelPricingRates.swift` | `Session.swift:38-40` 仍走 `supportedProviders.reduce` 拼接 builtin pricing；plugin 提供的 pricing 无法注入 |
+
+### 5.2 HARDCODED-LIST — Share 体系完全枚举驱动
+
+| file:line | 描述 |
+|---|---|
+| `ClaudeStatistics/Models/ShareRole.swift:3` | `ShareRoleID` enum 写死 9 个角色 |
+| `ClaudeStatistics/Models/ShareRole.swift:24-45` | 每个 `ShareRoleID` → `ShareVisualTheme` 巨型 switch |
+| `ClaudeStatistics/Models/ShareRole.swift:48-120` | `ShareBadgeID` enum 写死 11 个徽章 |
+| `ClaudeStatistics/Services/ShareRoleEngine.swift:37-46` | `rankedRoles()` 数组字面量列举所有角色 |
+| `ClaudeStatistics/Services/ShareRoleEngine.swift:61-70` | `rankedAllTimeRoles()` 同上结构 |
+| `ClaudeStatistics/Services/ShareRoleEngine.swift:697` | `selectBadges()` 走 `ShareBadgeID.allCases`，每个徽章评分逻辑硬编码 |
+| `ClaudeStatistics/Views/SharePreviewView.swift:283` | 主题预览迭代 `ShareRoleID.allCases` |
+
+### 5.3 HARDCODED-LIST — Pricing / Hook / StatusLine / TranscriptParser 三套一份
+
+| file | 描述 |
+|---|---|
+| `ClaudeStatistics/Providers/Claude/StatusLineInstaller.swift` 等 3 份 | 三个 provider 各自一份 StatusLineInstaller 单例，没经过协议工厂 |
+| `ClaudeStatistics/NotchNotifications/Hooks/{Claude,Codex,Gemini}HookInstaller.swift` | 三份 hook installer，`providerId` 字面量为 `ProviderKind.<x>.rawValue` |
+| `ClaudeStatistics/Providers/<X>/<X>PricingCatalog.swift`（Claude/Codex/Gemini 各一份） | 内置模型 pricing 表 |
+| `ClaudeStatistics/Providers/<X>/<X>TranscriptParser.swift` 三份 | 三份 transcript 解析器单例 |
+| `ClaudeStatistics/Providers/<X>/<X>ToolNames.swift` 三份 | 三份 tool 名别名表 |
+
+> 备注：tool 名别名其实**已经接入** plugin path（`ProviderDescriptor.resolveToolAlias`、`CanonicalToolName.resolve(_:descriptors:)` 在 Plugins SDK 里），仅 host 端 `ProviderKind.canonicalToolName` 仍保留 switch 同名 wrapper（COSMETIC）。
+
+### 5.4 维度 C 小计
+
+PROTOCOL-EXISTS-NOT-WIRED 5 / HARDCODED-LIST 多处，集中在 Share + 三套 PricingCatalog/HookInstaller/StatusLineInstaller/TranscriptParser
+
+---
+
+## 6. 优先级建议
+
+### P0 — 解锁 UI 自适应（低风险、高用户感知度）
+
+| 工作项 | 影响范围 | 状态 |
+|---|---|---|
+| `SettingsView` 菜单栏 display 改成 `ForEach(allKnownDescriptors)` | 维度 A 3.1 第 1-2 行 | ✅ 已完成 |
+| `StatusBarController.MenuBarUsageStrip` 改成动态列表（descriptor 驱动） | 维度 A 3.1 衍生 | ✅ 已完成 |
+| `MenuBarPreferences.key(for:)` 加 `forDescriptorID: String` 重载，schema 不变 | 维度 A 3.2 第 1 行 | ✅ 已完成 |
+| `PluginManifest.iconAsset` 字段在 SDK 已有，三个 builtin dogfood manifest 补值 | 维度 A 3.5 | ✅ 已完成 |
+| `ProviderRegistry.allKnownDescriptors(plugins:)` 收集器（builtin + plugin 去重） | 新增公共能力 | ✅ 已完成 |
+| `SettingsView` Default Terminal 改成读 `pluginRegistry`（区分 launchable / 非 launchable） | 维度 B 4.1 第 7 行 | 🚧 单独会话进行中 |
+| Developer Settings Rebuild Index | 维度 A 3.1 第 3 行 | ⛔ **取消**：是 host 内部索引重建，列出 builtin 是语义正确 |
+
+P0 主要项已完成。第三方 ProviderPlugin 装上 `.csplugin` 后，Settings 菜单栏 display 会自动多出对应 toggle，偏好读写走 `descriptor.id`，schema 完全兼容老用户。
+
+剩余 P0 缺口是状态栏 strip cell 渲染——目前仍仅显示 builtin 三家（plugin descriptor 的 id 不映射到 `ProviderKind`，被 `ProviderKind(rawValue:)` 优雅过滤）。等 P1 把 `appState.usageViewModel(for:)` 字符串化后这一项自然解锁。
+
+### P1 — 路由层去枚举依赖（中风险，touch 面广）
+
+| 工作项 | 影响范围 |
+|---|---|
+| 把 `switch provider` 全部迁到 `descriptor.<capability>` 接口（descriptor protocol 已经存在） | 维度 A 3.3 |
+| `RuntimeStatePersistor` / `ActiveSessionsTracker` 内部的 Claude/Codex 特判改成 descriptor 上的 hook | 维度 A 3.3 后段 |
+| `TerminalFocusCoordinator` / `AppleScriptFocuser` / `TerminalFocusRouteHandler` 改成 `TerminalCapability & TerminalFocusStrategy` 接口聚合，`switch bundleId` 退场 | 维度 B 4.2 |
+| `HookCLI` 的 builtin terminal name 检测下沉到 capability/plugin | 维度 B 4.2 后两行 |
+| `WireEventTranslator` 把 `default → .claude` 兜底改成 plugin 注册的 raw value 表 | 维度 A 3.3 |
+
+### P2 — 拓宽到第三类 PluginKind（设计 + 落地）
+
+| 工作项 |
+|---|
+| `ShareRoleEngine` 改造：从 `ShareRoleID` 枚举驱动改成 `pluginRegistry.shareRoles` 收集 + 评分协议化（`ShareRolePlugin` 暴露 `score(stats:)`） |
+| `ShareCardThemePlugin` 接入 `SharePreviewView` / `ShareCardView` 的主题选择 |
+| `HookProvider.statusLineInstaller` host 端遍历 `pluginRegistry.providers.values` 收集，替代三份 `*StatusLineInstaller` 写死调用 |
+| `ModelPricingRates` 接入 `Session.builtinModels` 的拼装；`*PricingCatalog` 三份 enum 改成 `BundledSessionProvider.modelPricing` 协议返回 |
+| `TranscriptParser` 三份单例改成 `descriptor.makeParser()` 工厂 |
+
+### P3 — Cosmetic / Schema 收尾
+
+| 工作项 |
+|---|
+| 三个 `iconAssetName` 字面量改成 manifest 字段 |
+| `TerminalPreferences.<x>OptionID` 8 个常量改成 capability 提供 |
+| 老 UserDefaults key 兼容迁移（旧版本用户的 `notch.enabled.<provider>` 等需保留读路径） |
+
+---
+
+## 7. 决策点（需要在动手前定）
+
+1. **`ProviderKind` enum 退场策略**：彻底删 enum 代价大（routing 层全是 switch），但保留 enum 又必然限制扩展。可行折衷：
+   - 短期：保留 enum 作为 builtin id 的强类型 alias，新增 `ProviderID = String`，新 plugin 走字符串路径，`ProviderKind` 提供 `var id: ProviderID` 桥接。
+   - 长期：所有 routing 切到 `ProviderID`，enum 降级为 builtin namespace。
+
+2. **TerminalPlugin 是否区分 launchable / 非 launchable**：chat-app plugin（Claude.app / Codex.app）不能 launch 新 session，不应进 Default Terminal Picker；但传统终端插件（如未来的 Tabby）应当能进。建议给 `TerminalPlugin` 加 `var isLaunchable: Bool { get }` 默认 `false`，capability 实现时返回 `true`。
+
+3. **Schema 兼容**：`@AppStorage` key 改字符串后，旧用户的 `notch.enabled.claude` 等仍要识别。需要一次性的迁移逻辑（已有先例：`NotchPreferences:77-81`）。
+
+---
+
+## 附录 — 总计
+
+| 维度 | 类别 | 数量 |
+|---|---|---|
+| A. Provider | CRITICAL / SCHEMA / ROUTING / STARTUP / COSMETIC | 5 / 7 / 16 / 6 / 3 |
+| B. Terminal | CRITICAL / ROUTING / COSMETIC | 7 / 6 / 1 |
+| C. 其他 PluginKind | PROTOCOL-NOT-WIRED + HARDCODED-LIST | 5 + ~20 |
+
+**全项目 ≈ 75-80 处硬编码点需要改造**，按上述 P0→P3 推进可以在不破坏现有用户体验的前提下逐步迁移。
+
+---
+
+## 8. 进度日志
+
+### 2026-04-26 (P0 切片：菜单栏 display 端到端插件化)
+
+**已完成**（用户感知：第三方 ProviderPlugin 装上 `.csplugin` 后，Settings → Menu bar display 自动多出 Toggle，schema 完全兼容老用户）：
+
+- ✅ 新增 `ProviderRegistry.allKnownDescriptors(plugins:)`（`ClaudeStatistics/Providers/ProviderRegistry.swift`）—— 收集 builtin descriptor + PluginRegistry 中第三方 ProviderPlugin descriptor，去重，builtin 在前。
+- ✅ `MenuBarPreferences` 加 `key/isVisible/setVisible(forDescriptorID:)` 字符串重载 + `registerDefault(forDescriptorID:)`（`ClaudeStatistics/Models/ProviderKind.swift`）。Schema 不变（`menuBar.visible.<descriptor.id>`，与老 key 完全一致）。
+- ✅ `SettingsView` 菜单栏 display section（`ClaudeStatistics/Views/SettingsView.swift`）：删 3 个 `@AppStorage`，改 `ForEach(menuBarDescriptors)`；`providerToggleLabel` 重写为接 `ProviderDescriptor`；`menuBarDisplaySummary` 动态化；用 `@State menuBarRevision` + 动态 binding 触发重渲染。
+- ✅ `StatusBarController.MenuBarUsageStrip`（`ClaudeStatistics/App/StatusBarController.swift`）：删 3 个 `@AppStorage` 和 3 行 if-append，改读 `allKnownDescriptors`；`ProviderKind(rawValue:)` 优雅降级（plugin descriptor 暂不在 strip 显示 cell，等 P1 数据流改造后自然解锁）。
+- ✅ 三个 builtin dogfood manifest 补 `iconAsset` + `category`（`ClaudeStatistics/Providers/BuiltinProviderPlugins.swift`）。`PluginManifest.iconAsset` SDK 端已经存在，仅是 builtin 没填。
+- ✅ Rebuild Index 从 §3.1 CRITICAL 降级为"非缺陷"——它操作的是 host 内部 SessionStore index，第三方 plugin session 数据流暂未接入 SessionStore，列出 `supportedProviders` 是语义正确。等 P1/P2 接入数据流后再视情况调整。
+
+**事实修正**：
+
+- `PluginManifest.iconAsset: String?` 字段早已在 SDK（`Plugins/Sources/ClaudeStatisticsKit/PluginManifest.swift:97`），原计划"为 manifest 增加 icon 字段"实际只剩"给 builtin manifest 填值"。
+- `PluginCatalogCategory.vendor` 是 marketplace Discover 面板用的字符串常量，builtin manifest 以前没填，本轮顺手补齐。
+- `ProviderRegistry.provider(for:)` 已经先查 dynamicProviders，新 plugin 可以"替换"builtin 实例；不是"无 fallback"——文档已纠正描述。
+
+**剩余 P0 缺口**（不阻塞，挪到 P1 一起做）：
+
+- 状态栏 strip cell 渲染——`appState.usageViewModel(for: ProviderKind)` 仍按 enum 派发，第三方 plugin descriptor 无对应 ProviderKind case，cell 被过滤掉。需要把这条数据流字符串化（接受 descriptor.id）。
+
+### 明天起点：P1 第一刀
+
+**目标**：把 host 里几处 provider-specific behavior 特判（绕开 ProviderKind enum 比较）capability 化到 `ProviderDescriptor`。这些是真正的"行为差异"，不是 routing 派发，做成 capability flag 后插件可选启用。
+
+**候选切片（已勘察）**：
+
+| 行为 | 现状 | 建议接口 |
+|---|---|---|
+| Claude session ID 规范化（剥 `prefix::rawID` 复合 ID）| `RuntimeStatePersistor.swift:166-177` + `ActiveSessionsTracker.swift:763-779` 各有一份 `canonicalSessionID(provider:sessionId:)` Claude-only 实现 | `ProviderDescriptor.canonicalizeSessionID: ((String) -> String)?`，nil 表示 raw 即 canonical |
+| Codex TUI 进程退出宽限期 | `ActiveSessionsTracker.swift:414` Codex-only `taskDone` 后 schedulePostStopExitCheck | `ProviderDescriptor.postStopExitGrace: TimeInterval?` |
+| Codex liveness 检查在宽限期内的二次确认 | `ActiveSessionsTracker.swift:558` `runtime.provider == .codex` | 同上字段配套 |
+| Claude session 数据回查 fallback | `ActiveSessionsTracker.swift:764` `ProviderKind(rawValue:) ?? .claude` | 维度 A 3.3 末尾，需要 string-based id 流上线后整改 |
+
+**实施顺序建议**：
+
+1. 先做 sessionID 规范化（最 self-contained，两处实现完全相同，合并到 descriptor 一处）。
+2. 再做 Codex 进程退出宽限期（一对相关字段）。
+3. 文档同步把 §3.3 ROUTING 对应行划掉。
+
+**未碰过的 P1 项**（都还在 §3.3 表里）：
+
+- `AccountManagers.swift:17-25` switch — 候选 capability：`descriptor.makeAccountManager()`
+- `ProviderContextRegistry.swift:103` `guard kind == .codex else` — Codex-specific runtime bridge
+- `HookCLI.swift:57-64` 三 case switch
+- `DisplayTextClassifier` / `ToolActivityFormatter` / `ProviderSessionDisplayFormatter` 内部分组 switch
+- `WireEventTranslator.swift:67-73` `default → .claude` 兜底（短期评估为低收益，暂缓）
+
+---
+
+*文档维护：每完成一项 P0/P1/P2 在表内标记 ~~delete~~ 或加链接到对应 PR；有新发现的硬编码点可直接追加到对应维度的小表。每次会话末尾在"进度日志"加一条以日期为标题的小节。*

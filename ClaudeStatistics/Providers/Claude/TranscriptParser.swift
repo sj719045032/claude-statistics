@@ -848,13 +848,10 @@ final class TranscriptParser {
     }
 
     private static func cleanSearchText(_ text: String) -> String? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count > 2 else { return nil }
-        if isInternalUserMessage(trimmed) { return nil }
-        if trimmed.hasPrefix("[Image: source:") && trimmed.hasSuffix("]") { return nil }
-
-        let stripped = SearchUtils.stripMarkdown(trimmed)
-        return stripped.count > 2 ? stripped : nil
+        TranscriptParserCommons.searchTextClean(text) { trimmed in
+            isInternalUserMessage(trimmed)
+                || (trimmed.hasPrefix("[Image: source:") && trimmed.hasSuffix("]"))
+        }
     }
 
     private static func searchText(forToolUse tool: TranscriptContent.ToolUseContent) -> String? {

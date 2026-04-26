@@ -238,15 +238,18 @@ final class StatusBarController: NSObject, ObservableObject {
 /// without manual wiring.
 struct MenuBarUsageStrip: View {
     @ObservedObject var appState: AppState
-    @AppStorage(MenuBarPreferences.key(for: .claude)) private var claudeVisible = true
-    @AppStorage(MenuBarPreferences.key(for: .codex)) private var codexVisible = true
-    @AppStorage(MenuBarPreferences.key(for: .gemini)) private var geminiVisible = true
     var onSizeChange: (CGSize) -> Void = { _ in }
 
     /// Shared rotation counter — lives on the strip (not inside each cell)
     /// so every cell advances to the next segment at exactly the same
     /// moment. One timer, one tick, no drift between cells.
     @State private var tick: Int = 0
+    /// Bumped on `UserDefaults.didChangeNotification` so SwiftUI
+    /// re-evaluates `visibleKinds` whenever the user flips a Settings
+    /// toggle. Replaces the three hardcoded `@AppStorage` bindings; the
+    /// list itself comes from `ProviderRegistry.allKnownDescriptors`,
+    /// which already merges builtins with plugin contributions.
+    @State private var preferenceRevision: Int = 0
     private static let rotationInterval: TimeInterval = 3
 
     var body: some View {
@@ -267,14 +270,26 @@ struct MenuBarUsageStrip: View {
         .onReceive(Timer.publish(every: Self.rotationInterval, on: .main, in: .common).autoconnect()) { _ in
             tick &+= 1
         }
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
+            preferenceRevision &+= 1
+        }
     }
 
+    /// Resolve every descriptor whose toggle is currently on, then map
+    /// it back to a `ProviderKind` for cell rendering. Plugin-contributed
+    /// descriptors whose id doesn't match a builtin enum case are
+    /// silently skipped — the strip only displays providers the host
+    /// can wire to a `UsageViewModel`. (Plugin usage data flow lands in
+    /// the P1 routing pass; this strip will pick them up automatically
+    /// once `appState.usageViewModel(for descriptorID:)` exists.)
     private var visibleKinds: [ProviderKind] {
-        var kinds: [ProviderKind] = []
-        if claudeVisible { kinds.append(.claude) }
-        if codexVisible { kinds.append(.codex) }
-        if geminiVisible { kinds.append(.gemini) }
-        return kinds
+        let _ = preferenceRevision
+        return ProviderRegistry
+            .allKnownDescriptors(plugins: appState.pluginRegistry)
+            .compactMap { descriptor in
+                guard MenuBarPreferences.isVisible(descriptorID: descriptor.id) else { return nil }
+                return ProviderKind(rawValue: descriptor.id)
+            }
     }
 }
 

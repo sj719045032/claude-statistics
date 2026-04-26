@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import ClaudeStatisticsKit
 
 enum SearchUtils {
 
@@ -184,16 +185,6 @@ enum SearchUtils {
     /// Strip markdown syntax for search matching.
     /// Removes code fences, links, bold/italic, inline code, headings.
     static func stripMarkdown(_ text: String) -> String {
-        var s = text
-        s = s.replacingOccurrences(of: "```\\w*\\n?", with: " ", options: .regularExpression)
-        s = s.replacingOccurrences(of: "\\[([^\\]]+)\\]\\([^\\)]+\\)", with: "$1", options: .regularExpression)
-        s = s.replacingOccurrences(of: "!\\[([^\\]]*)\\]\\([^\\)]+\\)", with: "$1", options: .regularExpression)
-        s = s.replacingOccurrences(of: "\\*{1,2}([^*]+)\\*{1,2}", with: "$1", options: .regularExpression)
-        s = s.replacingOccurrences(of: "`([^`]+)`", with: "$1", options: .regularExpression)
-        s = s.replacingOccurrences(of: "(?m)^#{1,6}\\s*", with: "", options: .regularExpression)
-        s = s.replacingOccurrences(of: "_{1,2}([^_]+)_{1,2}", with: "$1", options: .regularExpression)
-        s = s.replacingOccurrences(of: "(?m)^>\\s*", with: "", options: .regularExpression)
-        s = s.replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
-        return s
+        TranscriptParserCommons.stripMarkdown(text)
     }
 }

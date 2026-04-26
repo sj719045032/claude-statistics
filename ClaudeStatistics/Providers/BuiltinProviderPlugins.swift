@@ -23,7 +23,9 @@ final class ClaudePluginDogfood: NSObject, ProviderPlugin {
         version: SemVer(major: 1, minor: 0, patch: 0),
         minHostAPIVersion: SDKInfo.apiVersion,
         permissions: [.filesystemHome, .network, .keychain],
-        principalClass: "ClaudePluginDogfood"
+        principalClass: "ClaudePluginDogfood",
+        iconAsset: "ClaudeProviderIcon",
+        category: PluginCatalogCategory.vendor
     )
     var descriptor: ProviderDescriptor { .claude }
     func makeProvider() -> (any BundledSessionProvider)? { ClaudeProvider.shared }
@@ -39,7 +41,9 @@ final class CodexPluginDogfood: NSObject, ProviderPlugin {
         version: SemVer(major: 1, minor: 0, patch: 0),
         minHostAPIVersion: SDKInfo.apiVersion,
         permissions: [.filesystemHome, .network],
-        principalClass: "CodexPluginDogfood"
+        principalClass: "CodexPluginDogfood",
+        iconAsset: "CodexProviderIcon",
+        category: PluginCatalogCategory.vendor
     )
     var descriptor: ProviderDescriptor { .codex }
     func makeProvider() -> (any BundledSessionProvider)? { CodexProvider.shared }
@@ -55,7 +59,9 @@ final class GeminiPluginDogfood: NSObject, ProviderPlugin {
         version: SemVer(major: 1, minor: 0, patch: 0),
         minHostAPIVersion: SDKInfo.apiVersion,
         permissions: [.filesystemHome, .network],
-        principalClass: "GeminiPluginDogfood"
+        principalClass: "GeminiPluginDogfood",
+        iconAsset: "GeminiProviderIcon",
+        category: PluginCatalogCategory.vendor
     )
     var descriptor: ProviderDescriptor { .gemini }
     func makeProvider() -> (any BundledSessionProvider)? { GeminiProvider.shared }
