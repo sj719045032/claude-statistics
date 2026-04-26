@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 import SwiftUI
 
 private final class UsageCacheWatcher {

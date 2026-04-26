@@ -164,6 +164,7 @@
 		AFE5B13BCD7D98DD27DF6EA0 /* GeminiProviderAccountCardAccessory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BD468B7884551FA250E5E0C /* GeminiProviderAccountCardAccessory.swift */; };
 		B04844AD3BA910295978D241 /* StatusBarPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5486873DBEC29739725E366 /* StatusBarPanel.swift */; };
 		B0B1B4026A01E4A28C24922D /* KittyFocusSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E337F442CEE88957F93C95B2 /* KittyFocusSetup.swift */; };
+		B254C34493D9423B2010A88F /* ProviderUsagePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BCFE5BD947C85335BFC3783 /* ProviderUsagePresentation.swift */; };
 		B308C8501282F4C35D073282 /* GeminiHookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 623F6F9C65341AB301CF1B20 /* GeminiHookInstaller.swift */; };
 		B35C61F703B5F19516D17FF9 /* PluginRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 880DBC8623214822DA25BA07 /* PluginRegistry.swift */; };
 		B452E47CCD714F45226D388B /* ClaudeStatisticsKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; };
@@ -347,6 +348,7 @@
 		370D33AC086199C95EC1E2CD /* UsageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageData.swift; sourceTree = "<group>"; };
 		387E20F7F962C004AD38B92C /* KittyFocuser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KittyFocuser.swift; sourceTree = "<group>"; };
 		398009672C963C1E8B72A03E /* GeminiPricingFetchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiPricingFetchService.swift; sourceTree = "<group>"; };
+		3BCFE5BD947C85335BFC3783 /* ProviderUsagePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderUsagePresentation.swift; sourceTree = "<group>"; };
 		3D5BA98DFF322E54A1E5B1F2 /* SessionDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDataStore.swift; sourceTree = "<group>"; };
 		3DC9BD5962BFEFCCDDF29DF3 /* NotchShape.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchShape.swift; sourceTree = "<group>"; };
 		3E2B51B9EC984248C05583D1 /* ClaudeOAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeOAuthClient.swift; sourceTree = "<group>"; };
@@ -676,6 +678,7 @@
 				2847A8C8A8678F33407AA32F /* ProviderCapabilities.swift */,
 				D7A55E899B9748E80EF1CA53 /* ProviderDescriptor.swift */,
 				62572A1901D430E3E24CB02D /* ProviderPlugin.swift */,
+				3BCFE5BD947C85335BFC3783 /* ProviderUsagePresentation.swift */,
 				A9F4A8499C7CCC383E405EB7 /* SearchIndexMessage.swift */,
 				DBBEE45A24DCB72DA07ECD79 /* SemVer.swift */,
 				D758CE8D0B6780C973E35221 /* SessionQuickStats.swift */,
@@ -1351,6 +1354,7 @@
 				E323E4002724430EC2954218 /* ProviderCapabilities.swift in Sources */,
 				81C19CCA48AB5D51EFE62459 /* ProviderDescriptor.swift in Sources */,
 				205CC763247D474FFE1ED691 /* ProviderPlugin.swift in Sources */,
+				B254C34493D9423B2010A88F /* ProviderUsagePresentation.swift in Sources */,
 				FE1A98E363F439309F7B1F6E /* SearchIndexMessage.swift in Sources */,
 				1FFDAA9375AEB76CB9862CF3 /* SemVer.swift in Sources */,
 				EC812B09D005001919618FB5 /* SessionQuickStats.swift in Sources */,
