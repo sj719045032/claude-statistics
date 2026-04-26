@@ -1,19 +1,11 @@
 import Foundation
 import ClaudeStatisticsKit
 
-protocol SessionWatcher: AnyObject {
-    func start()
-    func stop()
-}
-
-// ProviderUsageDisplayMode, ProviderUsageWindowPresentation,
-// ProviderUsageTrendPresentation, ProviderUsagePresentation, and the
-// MenuBarStrip helpers all live in ClaudeStatisticsKit.
-
-struct ProviderUsageSnapshot {
-    let data: UsageData
-    let fetchedAt: Date
-}
+// SessionWatcher, ProviderUsageSnapshot, ProviderUsageDisplayMode,
+// ProviderUsageWindowPresentation, ProviderUsageTrendPresentation,
+// ProviderUsagePresentation, MenuBarStrip helpers, StatusLineLegend,
+// and the descriptor / capability types all live in
+// ClaudeStatisticsKit.
 
 protocol ProviderUsageSource {
     var dashboardURL: URL? { get }

@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 import CoreServices
 
 final class FSEventsWatcher {
