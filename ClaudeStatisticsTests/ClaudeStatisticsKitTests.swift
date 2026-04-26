@@ -376,6 +376,194 @@ final class PluginCatalogTests: XCTestCase {
     }
 }
 
+/// `PluginInstaller.stageBundle` is the half of the pipeline that
+/// can fail without touching `PluginRegistry` — these tests pin
+/// down its decisions (download / hash / unzip / manifest match)
+/// using real on-disk fake bundles + a stubbed DataLoader.
+final class PluginInstallerStageTests: XCTestCase {
+    private var sandbox: URL!
+
+    override func setUpWithError() throws {
+        sandbox = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("PluginInstallerTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: sandbox, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: sandbox)
+    }
+
+    /// Build a minimal `<id>.csplugin` directory with a Contents/
+    /// Info.plist carrying a CSPluginManifest dict the SDK can
+    /// decode, then zip it. Returns (zipData, sha256, manifest).
+    private func buildFakeCsplugin(
+        id: String = "com.example.foo",
+        bundleName: String = "Foo.csplugin",
+        version: SemVer = SemVer(major: 1, minor: 0, patch: 0),
+        minHostAPIVersion: SemVer = SemVer(major: 0, minor: 1, patch: 0)
+    ) throws -> (zipData: Data, sha256: String, manifest: PluginManifest) {
+        let manifest = PluginManifest(
+            id: id,
+            kind: .terminal,
+            displayName: "Foo",
+            version: version,
+            minHostAPIVersion: minHostAPIVersion,
+            principalClass: "FooPlugin",
+            category: "utility"
+        )
+        let manifestDict = try manifest.encodedAsPlistDictionary()
+        let infoDict: [String: Any] = [
+            "CFBundleIdentifier": id,
+            "CFBundleName": bundleName,
+            "CFBundleExecutable": "Foo",
+            "CFBundlePackageType": "BNDL",
+            "NSPrincipalClass": "FooPlugin",
+            PluginManifest.infoDictionaryKey: manifestDict
+        ]
+
+        let bundleDir = sandbox.appendingPathComponent(bundleName, isDirectory: true)
+        let contentsDir = bundleDir.appendingPathComponent("Contents", isDirectory: true)
+        try FileManager.default.createDirectory(at: contentsDir, withIntermediateDirectories: true)
+        let plistData = try PropertyListSerialization.data(
+            fromPropertyList: infoDict, format: .xml, options: 0
+        )
+        try plistData.write(to: contentsDir.appendingPathComponent("Info.plist"))
+
+        let zipURL = sandbox.appendingPathComponent("\(bundleName).zip")
+        let zip = Process()
+        zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        zip.arguments = ["-rq", zipURL.path, bundleName]
+        zip.currentDirectoryURL = sandbox
+        try zip.run()
+        zip.waitUntilExit()
+        XCTAssertEqual(zip.terminationStatus, 0)
+
+        let zipData = try Data(contentsOf: zipURL)
+        let hash = PluginInstaller.sha256(of: zipData)
+        // Clean up so the unzip step inside stageBundle works in a
+        // fresh staging dir (otherwise the sandbox already contains
+        // a same-named bundle).
+        try FileManager.default.removeItem(at: bundleDir)
+        try FileManager.default.removeItem(at: zipURL)
+        return (zipData, hash, manifest)
+    }
+
+    private func makeEntry(
+        id: String,
+        sha256: String,
+        downloadURL: URL = URL(string: "https://example.com/foo.csplugin.zip")!,
+        version: SemVer = SemVer(major: 1, minor: 0, patch: 0),
+        minHostAPIVersion: SemVer = SemVer(major: 0, minor: 1, patch: 0)
+    ) -> PluginCatalogEntry {
+        PluginCatalogEntry(
+            id: id,
+            name: "Foo",
+            description: "x",
+            author: "y",
+            homepage: nil,
+            category: "utility",
+            version: version,
+            minHostAPIVersion: minHostAPIVersion,
+            downloadURL: downloadURL,
+            sha256: sha256,
+            iconURL: nil,
+            permissions: []
+        )
+    }
+
+    func testStageBundleSucceedsForValidPayload() async throws {
+        let (zipData, hash, manifest) = try buildFakeCsplugin()
+        let entry = makeEntry(id: manifest.id, sha256: hash)
+        let staged = try await PluginInstaller.stageBundle(
+            entry: entry,
+            loader: { _ in zipData }
+        )
+        XCTAssertEqual(staged.manifest.id, manifest.id)
+        XCTAssertEqual(staged.bundleURL.lastPathComponent, "Foo.csplugin")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: staged.bundleURL.path))
+        try? FileManager.default.removeItem(at: staged.stagingRoot)
+    }
+
+    func testStageBundleRejectsHashMismatch() async throws {
+        let (zipData, _, manifest) = try buildFakeCsplugin()
+        let entry = makeEntry(id: manifest.id, sha256: "deadbeef")
+        do {
+            _ = try await PluginInstaller.stageBundle(
+                entry: entry,
+                loader: { _ in zipData }
+            )
+            XCTFail("Expected sha256Mismatch")
+        } catch let error as PluginInstaller.InstallError {
+            if case .sha256Mismatch(let expected, _) = error {
+                XCTAssertEqual(expected, "deadbeef")
+            } else {
+                XCTFail("Wrong error: \(error)")
+            }
+        }
+    }
+
+    func testStageBundleRejectsManifestIDMismatch() async throws {
+        let (zipData, hash, _) = try buildFakeCsplugin(id: "com.example.foo")
+        // Catalog lies about which plugin lives at this URL.
+        let entry = makeEntry(id: "com.example.malicious", sha256: hash)
+        do {
+            _ = try await PluginInstaller.stageBundle(
+                entry: entry,
+                loader: { _ in zipData }
+            )
+            XCTFail("Expected manifestIDMismatch")
+        } catch let error as PluginInstaller.InstallError {
+            if case .manifestIDMismatch(let expected, let actual) = error {
+                XCTAssertEqual(expected, "com.example.malicious")
+                XCTAssertEqual(actual, "com.example.foo")
+            } else {
+                XCTFail("Wrong error: \(error)")
+            }
+        }
+    }
+
+    func testStageBundleRejectsIncompatibleAPIVersion() async throws {
+        // Plugin requires SDK 99.x; host is 0.1.x.
+        let future = SemVer(major: 99, minor: 0, patch: 0)
+        let (zipData, hash, _) = try buildFakeCsplugin(minHostAPIVersion: future)
+        let entry = makeEntry(
+            id: "com.example.foo",
+            sha256: hash,
+            minHostAPIVersion: future
+        )
+        do {
+            _ = try await PluginInstaller.stageBundle(
+                entry: entry,
+                loader: { _ in zipData }
+            )
+            XCTFail("Expected incompatibleAPIVersion")
+        } catch let error as PluginInstaller.InstallError {
+            if case .incompatibleAPIVersion = error {
+                // expected
+            } else {
+                XCTFail("Wrong error: \(error)")
+            }
+        }
+    }
+
+    func testStageBundlePropagatesDownloadError() async throws {
+        let entry = makeEntry(id: "x", sha256: "y")
+        do {
+            _ = try await PluginInstaller.stageBundle(
+                entry: entry,
+                loader: { _ in throw URLError(.notConnectedToInternet) }
+            )
+            XCTFail("Expected downloadFailed")
+        } catch let error as PluginInstaller.InstallError {
+            if case .downloadFailed = error {
+                // expected
+            } else {
+                XCTFail("Wrong error: \(error)")
+            }
+        }
+    }
+}
+
 @MainActor
 final class PluginRegistryTests: XCTestCase {
     private final class FakeProviderPlugin: NSObject, Plugin {
