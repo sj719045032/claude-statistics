@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 /// Public OAuth "installed application" credentials baked into
 /// `google-gemini/gemini-cli` (packages/core/src/code_assist/oauth2.ts).

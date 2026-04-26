@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 @MainActor
 final class ProfileViewModel: ObservableObject {

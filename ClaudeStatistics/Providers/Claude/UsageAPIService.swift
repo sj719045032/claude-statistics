@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 final class UsageAPIService: ProviderUsageSource {
     static let shared = UsageAPIService()
