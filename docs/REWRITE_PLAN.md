@@ -1291,6 +1291,10 @@ graph LR
 - ✅ `ProviderPlugin` 加 `makeProvider() -> (any BundledSessionProvider)?` 工厂，默认 nil
 - ✅ 3 个 dogfood wrapper override 返回 `ClaudeProvider.shared` / `CodexProvider.shared` / `GeminiProvider.shared`，第三方 provider plugin 可端到端实现完整 SessionProvider
 
+**阶段 3++ Terminal plugin 与 route registry 解耦**
+- ✅ 5 个 `TerminalFocusRouteHandler` 实现（AppleScript / CLI / Accessibility / Activate）改 internal 可见
+- ✅ 8 个 builtin terminal plugin wrapper 的 `makeFocusStrategy()` 直接 instantiate 对应 strategy（不再经 `TerminalFocusRouteRegistry.handler(for: capability.route)` 反查）— 第三方 plugin 不再依赖 host 的 route registry，可独立持有 strategy 实例
+
 #### v4.0-alpha 视角下已完成
 
 **SDK 接口面已全部就位**（48 文件 / 2882 行）：第三方 plugin 可在 SDK 接口面上端到端编写完整 provider plugin（descriptor + 5 窄协议 + 所有数据模型），并可声明完整的 terminal readiness/setup 行为。

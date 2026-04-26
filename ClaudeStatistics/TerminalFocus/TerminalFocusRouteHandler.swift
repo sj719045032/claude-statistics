@@ -30,7 +30,7 @@ enum TerminalFocusRouteRegistry {
     }
 }
 
-private struct AppleScriptTerminalFocusRouteHandler: TerminalFocusRouteHandler {
+struct AppleScriptTerminalFocusRouteHandler: TerminalFocusRouteHandler {
     let route: TerminalFocusRoute = .appleScript
 
     func capability(for target: TerminalFocusTarget) -> TerminalFocusCapability {
@@ -67,7 +67,7 @@ private struct AppleScriptTerminalFocusRouteHandler: TerminalFocusRouteHandler {
     }
 }
 
-private struct CLITerminalFocusRouteHandler: TerminalFocusRouteHandler {
+struct CLITerminalFocusRouteHandler: TerminalFocusRouteHandler {
     let kind: TerminalCLIKind
 
     var route: TerminalFocusRoute {
@@ -113,7 +113,7 @@ private func defaultCapability(for target: TerminalFocusTarget) -> TerminalFocus
     return hasLocator ? .ready : .appOnly
 }
 
-private struct AccessibilityTerminalFocusRouteHandler: TerminalFocusRouteHandler {
+struct AccessibilityTerminalFocusRouteHandler: TerminalFocusRouteHandler {
     let route: TerminalFocusRoute = .accessibility
 
     func capability(for target: TerminalFocusTarget) -> TerminalFocusCapability {
@@ -140,7 +140,7 @@ private struct AccessibilityTerminalFocusRouteHandler: TerminalFocusRouteHandler
     }
 }
 
-private struct ActivateTerminalFocusRouteHandler: TerminalFocusRouteHandler {
+struct ActivateTerminalFocusRouteHandler: TerminalFocusRouteHandler {
     let route: TerminalFocusRoute = .activate
 
     func capability(for target: TerminalFocusTarget) -> TerminalFocusCapability {

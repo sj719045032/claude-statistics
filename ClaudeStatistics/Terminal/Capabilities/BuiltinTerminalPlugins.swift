@@ -26,7 +26,7 @@ final class ITermPlugin: TerminalPlugin {
     var descriptor: TerminalDescriptor { capability.descriptor }
     func detectInstalled() -> Bool { capability.isInstalled }
     func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
-        TerminalFocusRouteRegistry.handler(for: capability.route)
+        AppleScriptTerminalFocusRouteHandler()
     }
     func makeLauncher() -> (any TerminalLauncher)? {
         capability as? any TerminalLauncher
@@ -54,7 +54,7 @@ final class AppleTerminalPlugin: TerminalPlugin {
     var descriptor: TerminalDescriptor { capability.descriptor }
     func detectInstalled() -> Bool { capability.isInstalled }
     func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
-        TerminalFocusRouteRegistry.handler(for: capability.route)
+        AppleScriptTerminalFocusRouteHandler()
     }
     func makeLauncher() -> (any TerminalLauncher)? {
         capability as? any TerminalLauncher
@@ -82,7 +82,7 @@ final class GhosttyPlugin: TerminalPlugin {
     var descriptor: TerminalDescriptor { capability.descriptor }
     func detectInstalled() -> Bool { capability.isInstalled }
     func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
-        TerminalFocusRouteRegistry.handler(for: capability.route)
+        AppleScriptTerminalFocusRouteHandler()
     }
     func makeLauncher() -> (any TerminalLauncher)? {
         capability as? any TerminalLauncher
@@ -110,7 +110,7 @@ final class KittyPlugin: TerminalPlugin {
     var descriptor: TerminalDescriptor { capability.descriptor }
     func detectInstalled() -> Bool { capability.isInstalled }
     func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
-        TerminalFocusRouteRegistry.handler(for: capability.route)
+        CLITerminalFocusRouteHandler(kind: .kitty)
     }
     func makeLauncher() -> (any TerminalLauncher)? {
         capability as? any TerminalLauncher
@@ -138,7 +138,7 @@ final class WezTermPlugin: TerminalPlugin {
     var descriptor: TerminalDescriptor { capability.descriptor }
     func detectInstalled() -> Bool { capability.isInstalled }
     func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
-        TerminalFocusRouteRegistry.handler(for: capability.route)
+        CLITerminalFocusRouteHandler(kind: .wezterm)
     }
     func makeLauncher() -> (any TerminalLauncher)? {
         capability as? any TerminalLauncher
@@ -166,7 +166,7 @@ final class WarpPlugin: TerminalPlugin {
     var descriptor: TerminalDescriptor { capability.descriptor }
     func detectInstalled() -> Bool { capability.isInstalled }
     func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
-        TerminalFocusRouteRegistry.handler(for: capability.route)
+        AccessibilityTerminalFocusRouteHandler()
     }
     func makeLauncher() -> (any TerminalLauncher)? {
         capability as? any TerminalLauncher
@@ -194,7 +194,7 @@ final class EditorPlugin: TerminalPlugin {
     var descriptor: TerminalDescriptor { capability.descriptor }
     func detectInstalled() -> Bool { capability.isInstalled }
     func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
-        TerminalFocusRouteRegistry.handler(for: capability.route)
+        ActivateTerminalFocusRouteHandler()
     }
     func makeLauncher() -> (any TerminalLauncher)? {
         capability as? any TerminalLauncher
