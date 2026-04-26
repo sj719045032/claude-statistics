@@ -518,7 +518,6 @@
 "notch.status.taskDone" = "Task done";
 "notch.status.idle" = "Idle";
 "notch.status.lastActivityAgo" = "Last activity %@ ago";
-"notch.detailed.recentCompleted" = "Recent";
 "notch.detailed.finishedAgo" = "%@ ago";
 "notch.triptych.noPromptYet" = "No prompt yet";
 "notch.triptych.waitingForInput" = "Waiting for input";

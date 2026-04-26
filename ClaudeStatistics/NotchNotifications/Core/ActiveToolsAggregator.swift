@@ -1,32 +1,15 @@
 import Foundation
 
-/// Builds the "Reading 3 files · Searching 2 patterns · Running 1 command"
-/// aggregate string for the notch MIDDLE row, given the in-flight tool set
-/// plus the afterglow window of just-finished entries. Pure transformation —
-/// no `ActiveSession` dependency, only the tool entry types — so it can be
-/// unit-tested directly.
+/// Builds the "Reading 7 files · Searching 2 patterns · Running 1 command"
+/// aggregate string for the notch MIDDLE row from the runtime's turn-cumulative
+/// bucket counts (one bump per PreToolUse, reset on the next UserPromptSubmit /
+/// Stop / SessionEnd). Pure transformation — no `ActiveSession` dependency —
+/// so it can be unit-tested directly.
 enum ActiveToolsAggregator {
-    /// Returns the joined phrase, or `nil` when nothing has been happening
-    /// inside the recent window.
-    static func aggregateText(
-        active: [String: ActiveToolEntry],
-        recent: [CompletedToolEntry]
-    ) -> String? {
-        let cutoff = Date().addingTimeInterval(-ActiveSession.recentToolsWindow)
-        let freshRecent = recent.filter { $0.completedAt >= cutoff }
-
-        var buckets: [String: Int] = [:]
-        for entry in active.values {
-            let bucket = bucketKey(toolName: entry.toolName, detail: entry.detail)
-            buckets[bucket, default: 0] += 1
-        }
-        for entry in freshRecent {
-            let bucket = bucketKey(toolName: entry.toolName, detail: entry.detail)
-            buckets[bucket, default: 0] += 1
-        }
-
-        let totalCalls = buckets.values.reduce(0, +)
-        guard totalCalls > 0 else { return nil }
+    /// Returns the joined phrase, or `nil` when no tool ran in the current turn.
+    static func aggregateText(turnCounts: [String: Int]) -> String? {
+        let buckets = turnCounts.filter { $0.value > 0 }
+        guard !buckets.isEmpty else { return nil }
 
         let phrases = buckets
             .sorted { lhs, rhs in

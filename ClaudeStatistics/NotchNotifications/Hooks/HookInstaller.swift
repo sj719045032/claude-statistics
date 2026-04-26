@@ -131,10 +131,15 @@ enum HookInstallerUtils {
             APP_PATH=$(/usr/bin/mdfind "kMDItemCFBundleIdentifier == '$BUNDLE_ID'" 2>/dev/null | head -n 1)
         fi
 
-        if [ -n "$APP_PATH" ] && [ -d "$APP_PATH" ]; then
+        if [ -n "$APP_PATH" ] && [ -x "$APP_PATH/Contents/MacOS/$EXEC_NAME" ]; then
             exec "$APP_PATH/Contents/MacOS/$EXEC_NAME" "$@"
-        else
+        elif [ -x "$FALLBACK" ]; then
             exec "$FALLBACK" "$@"
+        else
+            # No app binary available (uninstalled / DerivedData wiped / .app
+            # moved). Exit silently so the host CLI does not surface a hook
+            # error every turn — the hook is purely best-effort telemetry.
+            exit 0
         fi
         """
     }

@@ -531,7 +531,6 @@
 "notch.status.taskDone" = "任务完成";
 "notch.status.idle" = "空闲";
 "notch.status.lastActivityAgo" = "最后活动：%@ 前";
-"notch.detailed.recentCompleted" = "最近完成";
 "notch.detailed.finishedAgo" = "%@ 前";
 "notch.triptych.noPromptYet" = "暂无输入";
 "notch.triptych.waitingForInput" = "等待输入";

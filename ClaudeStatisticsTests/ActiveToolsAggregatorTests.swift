@@ -3,21 +3,6 @@ import XCTest
 @testable import Claude_Statistics
 
 final class ActiveToolsAggregatorTests: XCTestCase {
-    private let now = Date()
-
-    private func active(_ name: String, detail: String? = nil) -> ActiveToolEntry {
-        ActiveToolEntry(toolName: name, detail: detail, startedAt: now)
-    }
-
-    private func recent(_ name: String, detail: String? = nil, ageSeconds: TimeInterval = 1) -> CompletedToolEntry {
-        CompletedToolEntry(
-            toolName: name,
-            detail: detail,
-            startedAt: now.addingTimeInterval(-ageSeconds - 1),
-            completedAt: now.addingTimeInterval(-ageSeconds),
-            failed: false
-        )
-    }
 
     // MARK: - bucketKey
 
@@ -171,57 +156,31 @@ final class ActiveToolsAggregatorTests: XCTestCase {
     // MARK: - aggregateText
 
     func test_aggregateText_emptyReturnsNil() {
-        XCTAssertNil(ActiveToolsAggregator.aggregateText(active: [:], recent: []))
+        XCTAssertNil(ActiveToolsAggregator.aggregateText(turnCounts: [:]))
     }
 
-    func test_aggregateText_singleActiveTool() {
-        let result = ActiveToolsAggregator.aggregateText(
-            active: ["k1": active("Read")],
-            recent: []
-        )
+    func test_aggregateText_zeroOnlyReturnsNil() {
+        XCTAssertNil(ActiveToolsAggregator.aggregateText(turnCounts: ["read": 0]))
+    }
+
+    func test_aggregateText_singleBucket() {
+        let result = ActiveToolsAggregator.aggregateText(turnCounts: ["read": 1])
         XCTAssertNotNil(result)
         XCTAssertTrue(result!.contains("1"))
-    }
-
-    func test_aggregateText_multipleActiveSameToolBucketsTogether() {
-        let result = ActiveToolsAggregator.aggregateText(
-            active: [
-                "k1": active("Read"),
-                "k2": active("Read"),
-                "k3": active("Read")
-            ],
-            recent: []
-        )
-        XCTAssertNotNil(result)
-        XCTAssertTrue(result!.contains("3"), "expected count 3 in '\(result!)'")
         XCTAssertFalse(result!.contains("·"), "single bucket should not have the · separator")
     }
 
-    func test_aggregateText_distinctToolsJoinedWithBullet() {
-        let result = ActiveToolsAggregator.aggregateText(
-            active: [
-                "k1": active("Read"),
-                "k2": active("Grep")
-            ],
-            recent: []
-        )
+    func test_aggregateText_multipleBucketsJoinedWithBullet() {
+        let result = ActiveToolsAggregator.aggregateText(turnCounts: ["read": 1, "grep": 1])
         XCTAssertNotNil(result)
         XCTAssertTrue(result!.contains(" · "), "expected · separator in '\(result!)'")
     }
 
     func test_aggregateText_sortedByCountDescending() {
-        let result = ActiveToolsAggregator.aggregateText(
-            active: [
-                "a": active("Read"),
-                "b": active("Read"),
-                "c": active("Read"),
-                "d": active("Grep")
-            ],
-            recent: []
-        )
+        let result = ActiveToolsAggregator.aggregateText(turnCounts: ["read": 7, "grep": 2])
         XCTAssertNotNil(result)
-        let readingPhrase = ActiveToolsAggregator.phraseForBucket(tool: "read", count: 3)
-        let grepPhrase = ActiveToolsAggregator.phraseForBucket(tool: "grep", count: 1)
+        let readingPhrase = ActiveToolsAggregator.phraseForBucket(tool: "read", count: 7)
+        let grepPhrase = ActiveToolsAggregator.phraseForBucket(tool: "grep", count: 2)
         let readingIndex = result!.range(of: readingPhrase)?.lowerBound
         let grepIndex = result!.range(of: grepPhrase)?.lowerBound
         XCTAssertNotNil(readingIndex)
@@ -230,13 +189,7 @@ final class ActiveToolsAggregatorTests: XCTestCase {
     }
 
     func test_aggregateText_tieBreakerByKeyAscending() {
-        let result = ActiveToolsAggregator.aggregateText(
-            active: [
-                "a": active("Read"),
-                "b": active("Grep")
-            ],
-            recent: []
-        )
+        let result = ActiveToolsAggregator.aggregateText(turnCounts: ["read": 1, "grep": 1])
         XCTAssertNotNil(result)
         let grepPhrase = ActiveToolsAggregator.phraseForBucket(tool: "grep", count: 1)
         let readPhrase = ActiveToolsAggregator.phraseForBucket(tool: "read", count: 1)
@@ -245,45 +198,12 @@ final class ActiveToolsAggregatorTests: XCTestCase {
         XCTAssertLessThan(grepIndex!, readIndex!, "alphabetical key 'grep' < 'read' breaks ties")
     }
 
-    func test_aggregateText_freshRecentMergesIntoActiveBucket() {
-        let result = ActiveToolsAggregator.aggregateText(
-            active: ["k1": active("Read")],
-            recent: [recent("Read", ageSeconds: 1)]
-        )
+    func test_aggregateText_zeroBucketsAreFilteredOut() {
+        // Defensive: if a bucket somehow lands at 0 alongside others, drop it
+        // rather than rendering "Reading 0 files".
+        let result = ActiveToolsAggregator.aggregateText(turnCounts: ["read": 3, "grep": 0])
         XCTAssertNotNil(result)
-        XCTAssertTrue(result!.contains("2"), "active+recent should sum to 2 in '\(result!)'")
-    }
-
-    func test_aggregateText_oldRecentDropped() {
-        let cutoff = ActiveSession.recentToolsWindow + 5
-        let result = ActiveToolsAggregator.aggregateText(
-            active: [:],
-            recent: [recent("Read", ageSeconds: cutoff)]
-        )
-        XCTAssertNil(result, "recent older than recentToolsWindow should be filtered out")
-    }
-
-    func test_aggregateText_recentWindowBoundaryIncluded() {
-        // Just inside the window — should still count.
-        let inside = ActiveSession.recentToolsWindow - 1
-        let result = ActiveToolsAggregator.aggregateText(
-            active: [:],
-            recent: [recent("Read", ageSeconds: inside)]
-        )
-        XCTAssertNotNil(result)
-    }
-
-    func test_aggregateText_bashRoutingAppliesInAggregation() {
-        let result = ActiveToolsAggregator.aggregateText(
-            active: [
-                "k1": active("Bash", detail: "Searching for x"),
-                "k2": active("Grep")
-            ],
-            recent: []
-        )
-        XCTAssertNotNil(result)
-        // Both should land in the grep bucket → count 2, no · separator.
-        XCTAssertTrue(result!.contains("2"), "bash+grep should fold into one bucket: '\(result!)'")
-        XCTAssertFalse(result!.contains(" · "))
+        XCTAssertFalse(result!.contains(" · "), "zero bucket should not show: '\(result!)'")
+        XCTAssertTrue(result!.contains("3"))
     }
 }

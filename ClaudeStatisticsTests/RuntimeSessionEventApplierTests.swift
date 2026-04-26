@@ -29,8 +29,7 @@ final class RuntimeSessionEventApplierTests: XCTestCase {
             "status": "idle",
             "backgroundShellCount": 0,
             "activeSubagentCount": 0,
-            "activeTools": [String: Any](),
-            "recentlyCompletedTools": [Any]()
+            "activeTools": [String: Any]()
         ]
         if let latestProgressNote { json["latestProgressNote"] = latestProgressNote }
         if let latestProgressNoteAt { json["latestProgressNoteAt"] = latestProgressNoteAt.timeIntervalSinceReferenceDate }
@@ -130,31 +129,123 @@ final class RuntimeSessionEventApplierTests: XCTestCase {
         XCTAssertEqual(runtime.backgroundShellCount, 0, "foreground bash leaves the counter alone")
     }
 
-    // MARK: - apply: PostToolUse
-
-    func test_apply_postToolUse_movesActiveEntryToRecentlyCompleted() {
+    func test_apply_preToolUse_bumpsTurnToolBucketCounts() {
         var runtime = makeRuntime()
-        let pre = makeEvent(
+        for i in 0..<7 {
+            RuntimeSessionEventApplier.apply(event: makeEvent(
+                rawEventName: "PreToolUse",
+                toolName: "Read",
+                toolInput: [:],
+                toolUseId: "r\(i)"
+            ), to: &runtime)
+        }
+
+        XCTAssertEqual(
+            runtime.turnToolBucketCounts?["read"],
+            7,
+            "every PreToolUse should bump the turn-cumulative bucket"
+        )
+    }
+
+    func test_apply_preToolUse_turnCountsRoutesBashByDetailLikeAggregator() {
+        var runtime = makeRuntime()
+        RuntimeSessionEventApplier.apply(event: makeEvent(
+            rawEventName: "PreToolUse",
+            toolName: "Grep",
+            toolInput: ["pattern": .string("foo")],
+            toolUseId: "g1"
+        ), to: &runtime)
+
+        XCTAssertEqual(runtime.turnToolBucketCounts?["grep"], 1, "Grep lands in the grep bucket")
+    }
+
+    func test_apply_preToolUse_accumulatesWithinBatch() {
+        // Within a batch (multiple PreToolUse before any PostToolUse drains
+        // activeTools to empty), counts accumulate.
+        var runtime = makeRuntime()
+        RuntimeSessionEventApplier.apply(event: makeEvent(
             rawEventName: "PreToolUse",
             toolName: "Read",
             toolInput: [:],
-            toolUseId: "t1",
-            receivedAt: Date(timeIntervalSince1970: 1_700_000_500)
-        )
-        RuntimeSessionEventApplier.apply(event: pre, to: &runtime)
-
-        let post = makeEvent(
+            toolUseId: "r1"
+        ), to: &runtime)
+        RuntimeSessionEventApplier.apply(event: makeEvent(
+            rawEventName: "PreToolUse",
+            toolName: "Read",
+            toolInput: [:],
+            toolUseId: "r2"
+        ), to: &runtime)
+        RuntimeSessionEventApplier.apply(event: makeEvent(
             rawEventName: "PostToolUse",
             toolName: "Read",
             toolInput: [:],
-            toolUseId: "t1",
-            receivedAt: Date(timeIntervalSince1970: 1_700_000_510)
+            toolUseId: "r1"
+        ), to: &runtime)
+        // r2 still active, so r3 is part of the same batch.
+        RuntimeSessionEventApplier.apply(event: makeEvent(
+            rawEventName: "PreToolUse",
+            toolName: "Read",
+            toolInput: [:],
+            toolUseId: "r3"
+        ), to: &runtime)
+
+        XCTAssertEqual(
+            runtime.turnToolBucketCounts?["read"],
+            3,
+            "all three PreToolUse fired within one batch should add up"
         )
-        RuntimeSessionEventApplier.apply(event: post, to: &runtime)
+    }
+
+    func test_apply_preToolUse_resetsTurnCountsAtBatchStart() {
+        // Batch boundary: activeTools empties out, then the next PreToolUse
+        // arrives. That marks a new batch — counts should reset, matching
+        // Claude Code CLI's per-batch "reading N files" display.
+        var runtime = makeRuntime()
+        RuntimeSessionEventApplier.apply(event: makeEvent(
+            rawEventName: "PreToolUse",
+            toolName: "Read",
+            toolInput: [:],
+            toolUseId: "r1"
+        ), to: &runtime)
+        RuntimeSessionEventApplier.apply(event: makeEvent(
+            rawEventName: "PostToolUse",
+            toolName: "Read",
+            toolInput: [:],
+            toolUseId: "r1"
+        ), to: &runtime)
+        // activeTools is now empty — batch ended. Next PreToolUse starts fresh.
+        XCTAssertTrue(runtime.activeTools.isEmpty)
+
+        RuntimeSessionEventApplier.apply(event: makeEvent(
+            rawEventName: "PreToolUse",
+            toolName: "Edit",
+            toolInput: [:],
+            toolUseId: "e1"
+        ), to: &runtime)
+
+        XCTAssertEqual(runtime.turnToolBucketCounts?["read"], nil, "previous batch's Read count must be cleared")
+        XCTAssertEqual(runtime.turnToolBucketCounts?["edit"], 1, "new batch starts at 1")
+    }
+
+    // MARK: - apply: PostToolUse
+
+    func test_apply_postToolUse_removesActiveEntry() {
+        var runtime = makeRuntime()
+        RuntimeSessionEventApplier.apply(event: makeEvent(
+            rawEventName: "PreToolUse",
+            toolName: "Read",
+            toolInput: [:],
+            toolUseId: "t1"
+        ), to: &runtime)
+
+        RuntimeSessionEventApplier.apply(event: makeEvent(
+            rawEventName: "PostToolUse",
+            toolName: "Read",
+            toolInput: [:],
+            toolUseId: "t1"
+        ), to: &runtime)
 
         XCTAssertNil(runtime.activeTools["t1"], "activeTools entry is removed on PostToolUse")
-        XCTAssertEqual(runtime.recentlyCompletedTools.first?.toolName, "Read", "completed entry is at the front of the recent buffer")
-        XCTAssertEqual(runtime.recentlyCompletedTools.first?.failed, false)
     }
 
     func test_apply_postToolUse_clearsCurrentToolWhenIdMatches() {
@@ -179,55 +270,30 @@ final class RuntimeSessionEventApplierTests: XCTestCase {
         XCTAssertNil(runtime.currentToolUseId)
     }
 
-    func test_apply_postToolUseFailure_marksRecentEntryFailed() {
+    func test_apply_postToolUse_doesNotItselfResetTurnCounts() {
+        // PostToolUse must NOT touch turnToolBucketCounts directly — the
+        // batch-end reset is lazy, deferred to the *next* PreToolUse so
+        // MIDDLE keeps showing the just-finished batch's tally until a new
+        // batch arrives. This means the row reads "Read 1 file" right after
+        // the Read completes, instead of clearing immediately.
         var runtime = makeRuntime()
         RuntimeSessionEventApplier.apply(event: makeEvent(
             rawEventName: "PreToolUse",
-            toolName: "Bash",
+            toolName: "Read",
             toolInput: [:],
             toolUseId: "t1"
         ), to: &runtime)
+
+        XCTAssertEqual(runtime.turnToolBucketCounts?["read"], 1)
 
         RuntimeSessionEventApplier.apply(event: makeEvent(
-            rawEventName: "PostToolUseFailure",
-            toolName: "Bash",
+            rawEventName: "PostToolUse",
+            toolName: "Read",
             toolInput: [:],
             toolUseId: "t1"
         ), to: &runtime)
 
-        XCTAssertEqual(runtime.recentlyCompletedTools.first?.failed, true, "failure events flag the completed entry")
-    }
-
-    func test_apply_postToolUse_recentlyCompletedToolsCappedAtMax() {
-        var runtime = makeRuntime()
-
-        // Run six PreToolUse + PostToolUse pairs — buffer should keep 5.
-        for i in 0..<6 {
-            let id = "t\(i)"
-            let pre = makeEvent(
-                rawEventName: "PreToolUse",
-                toolName: "Read",
-                toolInput: [:],
-                toolUseId: id,
-                receivedAt: Date(timeIntervalSince1970: 1_700_000_000 + Double(i * 2))
-            )
-            RuntimeSessionEventApplier.apply(event: pre, to: &runtime)
-
-            let post = makeEvent(
-                rawEventName: "PostToolUse",
-                toolName: "Read",
-                toolInput: [:],
-                toolUseId: id,
-                receivedAt: Date(timeIntervalSince1970: 1_700_000_001 + Double(i * 2))
-            )
-            RuntimeSessionEventApplier.apply(event: post, to: &runtime)
-        }
-
-        XCTAssertEqual(
-            runtime.recentlyCompletedTools.count,
-            ActiveSession.recentToolsMaxCount,
-            "recentlyCompletedTools is capped at recentToolsMaxCount (5)"
-        )
+        XCTAssertEqual(runtime.turnToolBucketCounts?["read"], 1, "PostToolUse must not itself reset")
     }
 
     // MARK: - apply: PermissionRequest
@@ -307,7 +373,7 @@ final class RuntimeSessionEventApplierTests: XCTestCase {
         XCTAssertNil(runtime.currentToolName, "UserPromptSubmit clears currentToolName")
         XCTAssertNil(runtime.approvalToolName, "UserPromptSubmit clears approvalToolName")
         XCTAssertTrue(runtime.activeTools.isEmpty, "UserPromptSubmit empties activeTools")
-        XCTAssertTrue(runtime.recentlyCompletedTools.isEmpty, "UserPromptSubmit empties recentlyCompletedTools")
+        XCTAssertNil(runtime.turnToolBucketCounts, "UserPromptSubmit clears turnToolBucketCounts")
     }
 
     func test_apply_stop_clearsTurnStateButKeepsBackgroundShellCount() {
@@ -328,11 +394,13 @@ final class RuntimeSessionEventApplierTests: XCTestCase {
 
         XCTAssertEqual(runtime.backgroundShellCount, 1)
         XCTAssertFalse(runtime.activeTools.isEmpty)
+        XCTAssertFalse(runtime.turnToolBucketCounts?.isEmpty ?? true)
 
         RuntimeSessionEventApplier.apply(event: makeEvent(rawEventName: "Stop"), to: &runtime)
 
         XCTAssertNil(runtime.currentToolName, "Stop clears currentToolName")
         XCTAssertTrue(runtime.activeTools.isEmpty, "Stop empties activeTools")
+        XCTAssertNil(runtime.turnToolBucketCounts, "Stop clears turnToolBucketCounts")
         XCTAssertEqual(runtime.backgroundShellCount, 1, "Stop preserves backgroundShellCount — bg shells outlive the turn")
     }
 
@@ -354,7 +422,7 @@ final class RuntimeSessionEventApplierTests: XCTestCase {
         XCTAssertEqual(runtime.backgroundShellCount, 0, "SessionEnd resets backgroundShellCount")
         XCTAssertEqual(runtime.activeSubagentCount, 0, "SessionEnd resets activeSubagentCount")
         XCTAssertTrue(runtime.activeTools.isEmpty)
-        XCTAssertTrue(runtime.recentlyCompletedTools.isEmpty)
+        XCTAssertNil(runtime.turnToolBucketCounts, "SessionEnd clears turnToolBucketCounts")
     }
 
     // MARK: - signals

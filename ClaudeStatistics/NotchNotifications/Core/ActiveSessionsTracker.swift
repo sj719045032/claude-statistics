@@ -40,12 +40,6 @@ final class ActiveSessionsTracker: ObservableObject {
 
     private var timer: Timer?
     private var livenessTask: Task<Void, Never>?
-    /// One-shot scheduler for the next afterglow-entry expiry. Only armed
-    /// when some runtime still has `recentlyCompletedTools` entries, and only
-    /// scheduled for the exact moment the earliest one lapses — not a
-    /// periodic tick. Rearmed by `refresh()` after every state change that
-    /// could mutate the expiry landscape.
-    private var pendingAfterglowPrune: DispatchWorkItem?
     private var runtimeByKey: [String: RuntimeSession] = [:]
     private let persistor = RuntimeStatePersistor()
     // Sessions evicted by same-tab displacement stay hidden for one activeWindow
@@ -74,8 +68,6 @@ final class ActiveSessionsTracker: ObservableObject {
     func stop() {
         timer?.invalidate()
         timer = nil
-        pendingAfterglowPrune?.cancel()
-        pendingAfterglowPrune = nil
         livenessTask?.cancel()
         livenessTask = nil
         flushPersistRuntime()
@@ -102,72 +94,29 @@ final class ActiveSessionsTracker: ObservableObject {
                 .mapValues { TerminalIdentityResolver.sanitized($0) }
         )
 
-        guard filtered.count != runtimeByKey.count || Set(filtered.keys) != Set(runtimeByKey.keys) else {
-            return
+        let dropChanged = filtered.count != runtimeByKey.count || Set(filtered.keys) != Set(runtimeByKey.keys)
+        runtimeByKey = filtered
+
+        // Sweep zombie activeTools entries — Claude Code exiting via a closed
+        // tab / Ctrl+C / crash skips SessionEnd, leaving the detailed row
+        // ticking "4m49s, 5m12s, …" on a tool whose PostToolUse will never
+        // arrive. Drop entries older than the stale window so the row is
+        // truthful instead of misleading.
+        let staleCutoff = now.addingTimeInterval(-ActiveSession.staleActiveToolWindow)
+        var toolSweepChanged = false
+        for (key, runtime) in runtimeByKey {
+            guard !runtime.activeTools.isEmpty else { continue }
+            let pruned = runtime.activeTools.filter { $0.value.startedAt >= staleCutoff }
+            guard pruned.count != runtime.activeTools.count else { continue }
+            var updated = runtime
+            updated.activeTools = pruned
+            runtimeByKey[key] = updated
+            toolSweepChanged = true
         }
 
-        runtimeByKey = filtered
+        guard dropChanged || toolSweepChanged else { return }
         persistRuntime()
         refresh()
-    }
-
-    /// Drop `recentlyCompletedTools` entries whose afterglow window has
-    /// elapsed. Returns true iff any runtime was mutated so callers can
-    /// decide whether to republish via `refresh()`.
-    @discardableResult
-    private func performAfterglowPrune() -> Bool {
-        let cutoff = Date().addingTimeInterval(-ActiveSession.recentToolsWindow)
-        var mutated = false
-        for (key, runtime) in runtimeByKey {
-            guard !runtime.recentlyCompletedTools.isEmpty else { continue }
-            let pruned = runtime.recentlyCompletedTools.filter { $0.completedAt >= cutoff }
-            guard pruned.count != runtime.recentlyCompletedTools.count else { continue }
-            var updated = runtime
-            updated.recentlyCompletedTools = pruned
-            runtimeByKey[key] = updated
-            mutated = true
-        }
-        return mutated
-    }
-
-    /// Arm a single-shot timer for the exact moment the earliest remaining
-    /// afterglow entry expires. Rearmed at the tail of every `refresh()`
-    /// call, so there's never more than one pending work item and no
-    /// background ticks fire when the afterglow set is empty. When the work
-    /// fires it prunes expired entries and calls `refresh()` (which in turn
-    /// reschedules for the next expiry). If the prune found nothing to do —
-    /// possible when entries were added past the originally-scheduled
-    /// deadline — we just rearm for the real next expiry.
-    private func rescheduleNextAfterglowPrune() {
-        pendingAfterglowPrune?.cancel()
-        pendingAfterglowPrune = nil
-
-        guard let earliestCompletedAt = runtimeByKey.values
-            .flatMap({ $0.recentlyCompletedTools })
-            .map({ $0.completedAt })
-            .min() else { return }
-
-        // Sub-millisecond slop so the prune happens just *after* the cutoff
-        // boundary, not exactly on it — a DispatchQueue asyncAfter with a
-        // zero-delta edge case can fire before filter() would drop the entry
-        // on the next `Date()` sample, producing a no-op tick.
-        let fireAt = earliestCompletedAt
-            .addingTimeInterval(ActiveSession.recentToolsWindow + 0.05)
-        let delay = max(0, fireAt.timeIntervalSinceNow)
-
-        let work = DispatchWorkItem { [weak self] in
-            Task { @MainActor in
-                guard let self else { return }
-                self.pendingAfterglowPrune = nil
-                if self.performAfterglowPrune() {
-                    self.refresh()   // republishes + recurses into reschedule
-                } else {
-                    self.rescheduleNextAfterglowPrune()
-                }
-            }
-        }
-        pendingAfterglowPrune = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     /// Remove every runtime entry for the given provider. Called when the user
@@ -539,7 +488,6 @@ final class ActiveSessionsTracker: ObservableObject {
             }
         totalCount = fresh.count
         sessions = Array(fresh.prefix(maxItems))
-        rescheduleNextAfterglowPrune()
     }
 
     private func shouldKeep(runtime: RuntimeSession, cutoff: Date, now: Date) -> Bool {

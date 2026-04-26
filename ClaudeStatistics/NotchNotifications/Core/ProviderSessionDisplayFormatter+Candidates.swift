@@ -46,16 +46,14 @@ extension ProviderSessionDisplayFormatter {
         (preferredCurrentOperationText, session.currentOperation?.symbol ?? defaultOperationSymbol)
     }
 
-    /// "Reading 3 files · Searching 2 patterns · Running 1 command" style
-    /// aggregate computed from the in-flight tool set plus the afterglow
-    /// window of just-finished entries. Fires at any count >= 1 so MIDDLE
-    /// reads as a consistent summary whenever anything has been happening,
-    /// and the detailed-mode tool list below (when present) owns the
-    /// per-target specifics.
+    /// "Reading 7 files · Searching 2 patterns · Running 1 command" style
+    /// turn-cumulative aggregate. MIDDLE stays populated for the whole turn
+    /// so the row reads like Claude Code's own CLI summary; the detailed-mode
+    /// tool list below (when present) owns the per-target specifics for tools
+    /// still in flight.
     var activeToolsSummaryCandidate: (text: String?, symbol: String) {
         let text = ActiveToolsAggregator.aggregateText(
-            active: session.activeTools,
-            recent: session.recentlyCompletedTools
+            turnCounts: session.turnToolBucketCounts ?? [:]
         )
         let symbol = session.activeSubagentCount > 0 ? "wand.and.stars" : "wrench.and.screwdriver"
         return (text, symbol)

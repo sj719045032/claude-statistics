@@ -66,10 +66,10 @@ struct ActiveToolEntry: Codable, Equatable {
     let startedAt: Date
 }
 
-/// Afterglow entry: a tool that just finished. Kept in `recentlyCompletedTools`
-/// for a short window so sub-second tools (Read/Grep) don't merely flash past
-/// in the detailed row — the user sees "✓ Read foo.swift 3s ago" instead of a
-/// blank gap between PreToolUse and PostToolUse.
+/// Afterglow entry: a tool that just finished. Kept in
+/// `recentlyCompletedTools` so sub-second tools don't merely flash past in the
+/// detailed row — the user sees "✓ Read foo.swift 3s ago" for a short window
+/// after PostToolUse instead of a blank gap.
 struct CompletedToolEntry: Codable, Equatable {
     let toolName: String
     let detail: String?
@@ -143,17 +143,39 @@ struct ActiveSession: Identifiable, Equatable {
     /// PostToolUse/PostToolUseFailure for the matching toolUseId, and fully
     /// reset on Stop/StopFailure/SessionEnd.
     var activeTools: [String: ActiveToolEntry] = [:]
-    /// Newest-first capped buffer of tools that just left `activeTools`. UI
-    /// shows them in a dimmer style with "Ns ago" to keep sub-second tools
-    /// visible instead of merely flashing past.
-    var recentlyCompletedTools: [CompletedToolEntry] = []
+    /// Cumulative bucket counts for the current *batch* of tool calls (one
+    /// "thinking → fire N parallel tools → all complete" cycle). Reset when a
+    /// PreToolUse arrives with empty `activeTools` (= new batch starts), and
+    /// also on UserPromptSubmit / Stop / StopFailure / SessionEnd. Reading
+    /// "reading 7 files · searching 2 patterns" matches what Claude Code's
+    /// CLI shows for the in-flight batch — not the entire turn, which would
+    /// inflate to 30+ when Claude makes several batches between prompts.
+    /// Optional so old persisted state without the field decodes cleanly.
+    var turnToolBucketCounts: [String: Int]? = nil
+    /// Wall-clock of the last bump to `turnToolBucketCounts`. Lets the UI
+    /// expire the post-batch afterglow ("Editing 1 files" lingering after the
+    /// only Edit completed) so the row doesn't show stale tallies forever
+    /// while Claude thinks before the next batch.
+    var turnToolBucketCountsAt: Date? = nil
+    /// Window during which a finished batch's count aggregate stays visible
+    /// in MIDDLE before being treated as stale. Long enough to bridge the
+    /// thinking gap to the next batch without flicker; short enough that a
+    /// session left mid-conversation doesn't keep displaying a minutes-old
+    /// "Editing 1 files".
+    static let turnToolBucketAfterglow: TimeInterval = 10
+    /// Newest-first capped buffer of tools that just left `activeTools`. The
+    /// detailed mode renders these as "✓ Read foo.swift 3s ago" so sub-second
+    /// tools stay visible for a short window instead of flickering past.
+    /// Optional so old persisted state without the field decodes cleanly.
+    var recentlyCompletedTools: [CompletedToolEntry]? = nil
     static let recentToolsMaxCount = 5
-    // 10s chosen so the MIDDLE aggregate ("Reading 2 files · Running 1
-    // command") stays populated across the usual between-tool gap when
-    // Claude is generating reasoning text between tool calls. Shorter and
-    // the row flickers to "Thinking…" briefly; much longer and the "finished
-    // Xs ago" trailing in the detailed section starts to feel stale.
     static let recentToolsWindow: TimeInterval = 10
+    /// An active tool entry whose PreToolUse fired more than this long ago
+    /// without a matching PostToolUse is treated as stale. Covers the case
+    /// where Claude Code exits (closed tab, crash, Ctrl+C) without firing
+    /// SessionEnd / Stop — without sweeping, the detailed row keeps ticking
+    /// "4m49s, 5m12s, 5m43s…" on a tool that finished or was orphaned.
+    static let staleActiveToolWindow: TimeInterval = 300
 
     var relativeActivityDescription: String {
         let elapsed = Int(Date().timeIntervalSince(lastActivityAt))

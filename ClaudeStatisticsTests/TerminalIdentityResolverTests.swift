@@ -32,8 +32,7 @@ final class TerminalIdentityResolverTests: XCTestCase {
             "status": "idle",
             "backgroundShellCount": 0,
             "activeSubagentCount": 0,
-            "activeTools": [String: Any](),
-            "recentlyCompletedTools": [Any]()
+            "activeTools": [String: Any]()
         ]
         if let latestPreview { json["latestPreview"] = latestPreview }
         if let tty { json["tty"] = tty }

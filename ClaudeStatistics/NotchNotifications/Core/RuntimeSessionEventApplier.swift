@@ -46,16 +46,34 @@ enum RuntimeSessionEventApplier {
 
         case "PreToolUse":
             clearApprovalIfFinished(runtime: &runtime, event: event)
+            // Batch boundary: empty activeTools at the moment a PreToolUse
+            // arrives means the previous batch already finished (every prior
+            // PreToolUse has been matched by a PostToolUse). Reset turn
+            // counts so MIDDLE reads the *current batch* — matching what
+            // Claude Code CLI shows ("reading 7 files" of the in-flight batch,
+            // not "reading 49 files" cumulative for the whole turn).
+            if runtime.activeTools.isEmpty {
+                runtime.turnToolBucketCounts = nil
+                runtime.turnToolBucketCountsAt = nil
+            }
             runtime.currentToolName = event.toolName
-            runtime.currentToolDetail = operationSummary(for: event)
+            let detail = operationSummary(for: event)
+            runtime.currentToolDetail = detail
             runtime.currentToolStartedAt = event.receivedAt
             runtime.currentToolUseId = event.toolUseId
             if let id = event.toolUseId?.nilIfEmpty, let toolName = event.toolName?.nilIfEmpty {
                 runtime.activeTools[id] = ActiveToolEntry(
                     toolName: toolName,
-                    detail: operationSummary(for: event),
+                    detail: detail,
                     startedAt: event.receivedAt
                 )
+            }
+            if let toolName = event.toolName?.nilIfEmpty {
+                let bucket = ActiveToolsAggregator.bucketKey(toolName: toolName, detail: detail)
+                var counts = runtime.turnToolBucketCounts ?? [:]
+                counts[bucket, default: 0] += 1
+                runtime.turnToolBucketCounts = counts
+                runtime.turnToolBucketCountsAt = event.receivedAt
             }
             // Backgrounded bash is fire-and-forget on Claude Code's side.
             if event.toolName?.lowercased() == "bash", isBackgroundBash(input: event.toolInput) {
@@ -73,19 +91,22 @@ enum RuntimeSessionEventApplier {
                         completedAt: event.receivedAt,
                         failed: event.rawEventName == "PostToolUseFailure"
                     )
-                    runtime.recentlyCompletedTools.insert(entry, at: 0)
-                    if runtime.recentlyCompletedTools.count > ActiveSession.recentToolsMaxCount {
-                        runtime.recentlyCompletedTools = Array(
-                            runtime.recentlyCompletedTools.prefix(ActiveSession.recentToolsMaxCount)
-                        )
+                    var recent = runtime.recentlyCompletedTools ?? []
+                    recent.insert(entry, at: 0)
+                    if recent.count > ActiveSession.recentToolsMaxCount {
+                        recent = Array(recent.prefix(ActiveSession.recentToolsMaxCount))
                     }
+                    runtime.recentlyCompletedTools = recent
                 }
+            }
+            // Stamp so the post-batch afterglow countdown starts at the
+            // moment of the last tool activity, not at the first PreToolUse.
+            if runtime.turnToolBucketCounts != nil {
+                runtime.turnToolBucketCountsAt = event.receivedAt
             }
             // activeTools is the source of truth for "what's running". Once the
             // finished tool is gone from it, currentTool* and currentOperation
-            // must not keep pointing at that tool — otherwise the MIDDLE row
-            // lingers on a completed tool while the detailed section shows it
-            // in "recent", and the row appears twice. Clear on toolUseId match
+            // must not keep pointing at that tool. Clear on toolUseId match
             // OR when activeTools no longer holds any entry for that tool name
             // (the latter covers events with dropped/missing toolUseId).
             let eventToolUseId = event.toolUseId?.nilIfEmpty
@@ -141,7 +162,7 @@ enum RuntimeSessionEventApplier {
         case "UserPromptSubmit":
             // New user turn — everything tied to the previous exchange is now
             // past-turn and must not bleed into the triptych's MIDDLE/BOTTOM.
-            // Approval, current tool, activeTools, recent trail, operation —
+            // Approval, current tool, activeTools, turn counts, operation —
             // all reset. The BOTTOM row already filters commentary by
             // `latestProgressNoteAt >= latestPromptAt`, so we don't need to
             // clear `latestProgressNote` itself (timestamp-based filtering
@@ -157,7 +178,9 @@ enum RuntimeSessionEventApplier {
             runtime.currentToolUseId = nil
             runtime.currentOperation = nil
             runtime.activeTools.removeAll()
-            runtime.recentlyCompletedTools.removeAll()
+            runtime.recentlyCompletedTools = nil
+            runtime.turnToolBucketCounts = nil
+            runtime.turnToolBucketCountsAt = nil
 
         case "Stop":
             // Turn ended — Claude can't be running a tool anymore.
@@ -171,7 +194,8 @@ enum RuntimeSessionEventApplier {
             runtime.approvalToolUseId = nil
             runtime.currentOperation = nil
             runtime.activeTools.removeAll()
-            runtime.recentlyCompletedTools.removeAll()
+            runtime.turnToolBucketCounts = nil
+            runtime.turnToolBucketCountsAt = nil
 
         case "StopFailure":
             runtime.currentToolName = nil
@@ -183,7 +207,8 @@ enum RuntimeSessionEventApplier {
             runtime.approvalStartedAt = nil
             runtime.approvalToolUseId = nil
             runtime.activeTools.removeAll()
-            runtime.recentlyCompletedTools.removeAll()
+            runtime.turnToolBucketCounts = nil
+            runtime.turnToolBucketCountsAt = nil
 
         case "SessionEnd":
             runtime.currentToolName = nil
@@ -198,7 +223,9 @@ enum RuntimeSessionEventApplier {
             runtime.backgroundShellCount = 0
             runtime.activeSubagentCount = 0
             runtime.activeTools.removeAll()
-            runtime.recentlyCompletedTools.removeAll()
+            runtime.recentlyCompletedTools = nil
+            runtime.turnToolBucketCounts = nil
+            runtime.turnToolBucketCountsAt = nil
 
         default:
             break

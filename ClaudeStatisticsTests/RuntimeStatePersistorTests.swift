@@ -52,8 +52,7 @@ final class RuntimeStatePersistorTests: XCTestCase {
             "status": "idle",
             "backgroundShellCount": 0,
             "activeSubagentCount": 0,
-            "activeTools": [String: Any](),
-            "recentlyCompletedTools": [Any]()
+            "activeTools": [String: Any]()
         ]
         if let projectPath { json["projectPath"] = projectPath }
         if let pid { json["pid"] = Int(pid) }

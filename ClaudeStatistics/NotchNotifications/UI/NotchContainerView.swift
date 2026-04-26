@@ -26,10 +26,12 @@ enum IdlePeekLayout {
     ) -> CGFloat {
         guard detailedMode else { return baseHeight }
         // Matches `activeToolsToShowInDetail`: all in-flight tools render in
-        // the detail section now that MIDDLE is a count-only aggregate.
+        // the detail section now that MIDDLE is a count-only aggregate. Also
+        // counts fresh recently-completed entries (afterglow window) so
+        // sub-second tools have a stable row instead of flashing past.
         let active = session.activeTools.count
         let cutoff = Date().addingTimeInterval(-ActiveSession.recentToolsWindow)
-        let recent = session.recentlyCompletedTools
+        let recent = (session.recentlyCompletedTools ?? [])
             .filter { $0.completedAt >= cutoff }
             .count
         let total = active + recent
@@ -1904,17 +1906,17 @@ private struct ActiveSessionRow: View {
         session.triptychContent
     }
 
-    private var freshRecentlyCompleted: [CompletedToolEntry] {
-        let cutoff = Date().addingTimeInterval(-ActiveSession.recentToolsWindow)
-        return session.recentlyCompletedTools.filter { $0.completedAt >= cutoff }
-    }
-
     /// Active tools to render in the detail section. Always surface every
     /// in-flight tool — MIDDLE in detailed mode is a CLI-style count
     /// aggregate ("Reading 1 file"), so the specific target belongs here
     /// and there's no duplication to guard against.
     private var activeToolsToShowInDetail: [(id: String, entry: ActiveToolEntry)] {
         sortedActiveTools
+    }
+
+    private var freshRecentlyCompleted: [CompletedToolEntry] {
+        let cutoff = Date().addingTimeInterval(-ActiveSession.recentToolsWindow)
+        return (session.recentlyCompletedTools ?? []).filter { $0.completedAt >= cutoff }
     }
 
     private var hasDetailedSectionContent: Bool {
@@ -1982,9 +1984,15 @@ private struct ActiveSessionRow: View {
                         // `KillShell`/`SessionEnd` reset it, but that's not a reliable
                         // liveness signal — better to hide it than mislead.
                         Spacer(minLength: 4)
-                        Text(session.relativeActivityDescription)
-                            .font(.system(size: 10, weight: .regular, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.48))
+                        // Tick once a second so "32s ago" → "33s ago" updates
+                        // while the panel is open. Without TimelineView the
+                        // Text is captured once and stays frozen until the
+                        // session itself republishes.
+                        TimelineView(.periodic(from: .now, by: 1)) { _ in
+                            Text(session.relativeActivityDescription)
+                                .font(.system(size: 10, weight: .regular, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.48))
+                        }
                         Image(systemName: session.hasFocusHint ? "arrow.up.forward.square" : "questionmark.square")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.white.opacity(session.hasFocusHint ? 0.72 : 0.32))

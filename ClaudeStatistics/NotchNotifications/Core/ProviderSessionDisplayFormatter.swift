@@ -122,17 +122,13 @@ struct ProviderSessionDisplayFormatter {
         if let started = session.currentToolStartedAt ?? session.currentOperation?.startedAt {
             return started
         }
-        // MIDDLE also represents just-finished afterglow entries ("Read 1 file"
-        // right after the Read completed), so their completion time seeds the
-        // timestamp comparison used by `isChronologicallyReversed`. Without
-        // this, the triptych would silently skip reversal whenever Claude is
-        // between tool calls.
-        let cutoff = Date().addingTimeInterval(-ActiveSession.recentToolsWindow)
-        if let latestRecent = session.recentlyCompletedTools
-            .filter({ $0.completedAt >= cutoff })
-            .map(\.completedAt)
-            .max() {
-            return latestRecent
+        // Batch just finished but the turn-cumulative aggregate ("Editing 1
+        // files") is still surfacing in MIDDLE. activeTools is empty, so
+        // `lastActivityAt` is the closest stand-in for "when the latest tool
+        // finished" — without this stamp the triptych's chronological-order
+        // logic flips and BOTTOM/MIDDLE swap visually.
+        if (session.turnToolBucketCounts?.values.contains { $0 > 0 }) == true {
+            return session.lastActivityAt
         }
         // `currentActivity` may still hold a tool-derived activity string
         // (provider hooks that set it directly rather than via PreToolUse

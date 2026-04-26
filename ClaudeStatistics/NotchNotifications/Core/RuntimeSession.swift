@@ -43,7 +43,9 @@ struct RuntimeSession: Codable, Equatable {
     var backgroundShellCount: Int = 0
     var activeSubagentCount: Int = 0
     var activeTools: [String: ActiveToolEntry] = [:]
-    var recentlyCompletedTools: [CompletedToolEntry] = []
+    var recentlyCompletedTools: [CompletedToolEntry]? = nil
+    var turnToolBucketCounts: [String: Int]? = nil
+    var turnToolBucketCountsAt: Date? = nil
 
     var activeSession: ActiveSession {
         ActiveSession(
@@ -84,6 +86,8 @@ struct RuntimeSession: Codable, Equatable {
             backgroundShellCount: backgroundShellCount,
             activeSubagentCount: activeSubagentCount,
             activeTools: activeTools,
+            turnToolBucketCounts: turnToolBucketCounts,
+            turnToolBucketCountsAt: turnToolBucketCountsAt,
             recentlyCompletedTools: recentlyCompletedTools
         )
     }

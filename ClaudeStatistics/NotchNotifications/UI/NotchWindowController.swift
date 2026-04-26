@@ -380,11 +380,6 @@ private final class NotchKeyboardInterceptor {
     private var runLoopSource: CFRunLoopSource?
     private var enabled = false
     private var warnedTapCreationFailure = false
-    // Only surface the system accessibility prompt once per launch. If the
-    // user declines, respect that decision silently — the Settings screen
-    // explains how to re-grant via System Settings whenever they're ready.
-    private var didRequestAccessibility = false
-
     /// True once a CGEventTap was successfully created — the caller can rely
     /// on global interception and avoid making the panel key (which would
     /// steal focus from the user's terminal / editor).
@@ -445,16 +440,12 @@ private final class NotchKeyboardInterceptor {
                 DiagnosticLogger.shared.warning("Notch keyboard interceptor failed to create event tap; falling back to local key monitor")
                 warnedTapCreationFailure = true
             }
-            // Surface the system "grant access" prompt exactly once per
-            // launch. If the user declines, we stop pestering them — the
-            // Settings pane carries a "Open Accessibility settings" button
-            // for when they decide to turn it on later.
-            if !didRequestAccessibility {
-                didRequestAccessibility = true
-                let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-                let options = [key: true] as CFDictionary
-                _ = AXIsProcessTrustedWithOptions(options)
-            }
+            // Don't prompt here — `ClaudeStatisticsApp.registerForAccessibilityVisibility`
+            // already drove the system dialog at launch. Re-prompting from the
+            // tap-failure path would surface a second dialog every cold start
+            // until the user grants access. The local-monitor fallback keeps
+            // the notch usable in the meantime; the Settings pane has a
+            // "Open Accessibility settings" button for the manual grant flow.
             return
         }
 

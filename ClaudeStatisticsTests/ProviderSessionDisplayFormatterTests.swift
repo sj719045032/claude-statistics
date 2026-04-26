@@ -20,7 +20,7 @@ final class ProviderSessionDisplayFormatterTests: XCTestCase {
         currentToolDetail: String? = nil,
         currentToolStartedAt: Date? = nil,
         activeTools: [String: ActiveToolEntry] = [:],
-        recentlyCompletedTools: [CompletedToolEntry] = [],
+        turnToolBucketCounts: [String: Int]? = nil,
         activeSubagentCount: Int = 0,
         approvalToolName: String? = nil,
         approvalToolDetail: String? = nil,
@@ -69,7 +69,7 @@ final class ProviderSessionDisplayFormatterTests: XCTestCase {
             backgroundShellCount: 0,
             activeSubagentCount: activeSubagentCount,
             activeTools: activeTools,
-            recentlyCompletedTools: recentlyCompletedTools
+            turnToolBucketCounts: turnToolBucketCounts
         )
     }
 
@@ -166,7 +166,8 @@ final class ProviderSessionDisplayFormatterTests: XCTestCase {
                 "k1": ActiveToolEntry(toolName: "Read", detail: nil, startedAt: now),
                 "k2": ActiveToolEntry(toolName: "Read", detail: nil, startedAt: now),
                 "k3": ActiveToolEntry(toolName: "Grep", detail: nil, startedAt: now)
-            ]
+            ],
+            turnToolBucketCounts: ["read": 2, "grep": 1]
         )
         let content = format(session)
         XCTAssertTrue(content.actionText.contains(" · "), "aggregate should join with · separator")
@@ -255,6 +256,21 @@ final class ProviderSessionDisplayFormatterTests: XCTestCase {
 
     // MARK: - resolveActionLine — actionTimestamp
 
+    func test_actionTimestamp_fallsBackToLastActivityWhenBatchJustFinished() {
+        // Batch finished (activeTools empty, no currentTool*) but the turn
+        // aggregate "Editing 1 files" is still surfacing. actionTimestamp
+        // must report a real Date so the triptych can chronologically order
+        // MIDDLE vs BOTTOM — otherwise the rows visually swap.
+        let last = now.addingTimeInterval(-3)
+        let session = makeSession(
+            activeTools: [:],
+            turnToolBucketCounts: ["edit": 1],
+            lastActivityAt: last
+        )
+        let content = format(session)
+        XCTAssertEqual(content.actionTimestamp, last, "lastActivityAt is the post-batch fallback stamp")
+    }
+
     func test_actionTimestamp_usesLatestActiveToolStart() {
         let early = now.addingTimeInterval(-30)
         let late = now.addingTimeInterval(-1)
@@ -263,10 +279,11 @@ final class ProviderSessionDisplayFormatterTests: XCTestCase {
                 "k1": ActiveToolEntry(toolName: "Task", detail: nil, startedAt: early),
                 "k2": ActiveToolEntry(toolName: "Read", detail: nil, startedAt: late),
                 "k3": ActiveToolEntry(toolName: "Read", detail: nil, startedAt: early)
-            ]
+            ],
+            turnToolBucketCounts: ["task": 1, "read": 2]
         )
-        // Need 2+ tools so activeToolsSummaryCandidate fires and timestamp is
-        // evaluated.
+        // turnToolBucketCounts makes activeToolsSummaryCandidate fire so
+        // actionTimestamp is evaluated against active tool start times.
         let content = format(session)
         XCTAssertEqual(content.actionTimestamp, late, "uses .max of active tool start times")
     }
@@ -283,42 +300,6 @@ final class ProviderSessionDisplayFormatterTests: XCTestCase {
         )
         let content = format(session)
         XCTAssertEqual(content.actionTimestamp, started)
-    }
-
-    func test_actionTimestamp_fallsBackToRecentlyCompletedWithinWindow() {
-        let completed = now.addingTimeInterval(-2)
-        let session = makeSession(
-            currentToolName: "Read",
-            currentToolDetail: "Reading bar.swift",
-            recentlyCompletedTools: [
-                CompletedToolEntry(
-                    toolName: "Read",
-                    detail: nil,
-                    startedAt: now.addingTimeInterval(-3),
-                    completedAt: completed,
-                    failed: false
-                )
-            ]
-        )
-        let content = format(session)
-        XCTAssertEqual(content.actionTimestamp, completed)
-    }
-
-    func test_actionTimestamp_oldRecentlyCompletedIgnored() {
-        let session = makeSession(
-            recentlyCompletedTools: [
-                CompletedToolEntry(
-                    toolName: "Read",
-                    detail: nil,
-                    startedAt: now.addingTimeInterval(-3600),
-                    completedAt: now.addingTimeInterval(-3600),
-                    failed: false
-                )
-            ]
-        )
-        let content = format(session)
-        // .running fallback path → timestamp nil
-        XCTAssertNil(content.actionTimestamp)
     }
 
     // MARK: - resolveCommentaryLine
