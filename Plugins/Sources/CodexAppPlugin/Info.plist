@@ -23,7 +23,7 @@
 		<key>displayName</key>
 		<string>Codex</string>
 		<key>id</key>
-		<string>com.openai.codex</string>
+		<string>com.openai.codex.app</string>
 		<key>kind</key>
 		<string>terminal</string>
 		<key>minHostAPIVersion</key>

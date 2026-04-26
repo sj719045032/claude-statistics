@@ -47,6 +47,16 @@ public struct TerminalDescriptor: Sendable {
     /// Lower values are preferred by Auto launch mode. `nil` means the
     /// capability is never selected automatically.
     public let autoLaunchPriority: Int?
+    /// Provider this terminal exclusively serves. `nil` for general
+    /// emulators (iTerm / Alacritty / VSCode / …) that work across
+    /// every provider. Non-nil for chat-app GUIs whose deep links
+    /// only resolve a single provider's sessions — `ClaudeAppPlugin`
+    /// is bound to `"claude"` because `claude://chat/<uuid>` only
+    /// makes sense for Claude transcripts; `CodexAppPlugin` is
+    /// bound to `"codex"`. The host's terminal picker hides
+    /// non-matching plugins when the user is on a different
+    /// provider so the list stays relevant.
+    public let boundProviderID: String?
 
     public init(
         id: String,
@@ -56,7 +66,8 @@ public struct TerminalDescriptor: Sendable {
         terminalNameAliases: Set<String>,
         processNameHints: Set<String>,
         focusPrecision: TerminalTabFocusPrecision,
-        autoLaunchPriority: Int?
+        autoLaunchPriority: Int?,
+        boundProviderID: String? = nil
     ) {
         self.id = id
         self.displayName = displayName
@@ -66,5 +77,6 @@ public struct TerminalDescriptor: Sendable {
         self.processNameHints = processNameHints
         self.focusPrecision = focusPrecision
         self.autoLaunchPriority = autoLaunchPriority
+        self.boundProviderID = boundProviderID
     }
 }

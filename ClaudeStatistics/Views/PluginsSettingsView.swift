@@ -21,6 +21,11 @@ struct PluginsSettingsView: View {
     @State private var pendingDisable: Row?
     @State private var pendingUninstall: Row?
     @State private var uninstallError: String?
+    @State private var enableError: String?
+    /// Plugin ids the user clicked Enable on, but whose source
+    /// (`.host`) requires a restart before the live instance comes
+    /// back. Drives the "Restart required" badge on disabled rows.
+    @State private var pendingRestartIds: Set<String> = []
     /// Bumps to force the row list to re-read from PluginRegistry
     /// after a Disable mutates it. The registry exposes a snapshot
     /// dictionary, not a published value, so SwiftUI doesn't know to
@@ -40,6 +45,13 @@ struct PluginsSettingsView: View {
         return pluginRegistry.loadedManifests()
             .sorted { $0.id < $1.id }
             .map { Row(manifest: $0, source: pluginRegistry.source(for: $0.id)) }
+    }
+
+    private var disabledRows: [Row] {
+        _ = refreshTick
+        return pluginRegistry.disabledRecords()
+            .sorted { $0.manifest.id < $1.manifest.id }
+            .map { Row(manifest: $0.manifest, source: $0.source) }
     }
 
     private func sourceLabel(_ source: PluginSource?) -> String {
@@ -118,8 +130,8 @@ struct PluginsSettingsView: View {
         ) { row in
             Button("settings.cancel", role: .cancel) { pendingDisable = nil }
             Button("settings.plugins.disable.confirmButton", role: .destructive) {
-                if let url = row.source?.bundleURL {
-                    PluginTrustGate.disable(manifest: row.manifest, bundleURL: url)
+                if let source = row.source {
+                    PluginTrustGate.disable(manifest: row.manifest, source: source)
                     refreshTick &+= 1
                 }
                 pendingDisable = nil
@@ -129,6 +141,17 @@ struct PluginsSettingsView: View {
                 format: NSLocalizedString("settings.plugins.disable.confirmMessage", comment: ""),
                 row.manifest.displayName
             ))
+        }
+        .alert(
+            "settings.plugins.enable.errorTitle",
+            isPresented: Binding(
+                get: { enableError != nil },
+                set: { if !$0 { enableError = nil } }
+            )
+        ) {
+            Button("settings.cancel", role: .cancel) { enableError = nil }
+        } message: {
+            Text(enableError ?? "")
         }
         .alert(
             "settings.plugins.uninstall.confirmTitle",
@@ -183,11 +206,24 @@ struct PluginsSettingsView: View {
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(rows) { row in
-                            pluginRow(row.manifest, source: row.source)
+                            pluginRow(row.manifest, source: row.source, isDisabled: false)
                         }
                     }
                 } header: {
                     Text(String(format: NSLocalizedString("settings.plugins.loaded.count", comment: ""), rows.count))
+                }
+
+                if !disabledRows.isEmpty {
+                    Section {
+                        ForEach(disabledRows) { row in
+                            pluginRow(row.manifest, source: row.source, isDisabled: true)
+                        }
+                    } header: {
+                        Text(String(
+                            format: NSLocalizedString("settings.plugins.disabled.count", comment: ""),
+                            disabledRows.count
+                        ))
+                    }
                 }
 
                 Section("settings.plugins.trust") {
@@ -213,8 +249,13 @@ struct PluginsSettingsView: View {
     }
 
     @ViewBuilder
-    private func pluginRow(_ manifest: PluginManifest, source: PluginSource?) -> some View {
+    private func pluginRow(
+        _ manifest: PluginManifest,
+        source: PluginSource?,
+        isDisabled: Bool
+    ) -> some View {
         let row = Row(manifest: manifest, source: source)
+        let needsRestart = pendingRestartIds.contains(manifest.id)
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Image(systemName: kindGlyph(manifest.kind))
@@ -222,6 +263,7 @@ struct PluginsSettingsView: View {
                     .foregroundStyle(.secondary)
                 Text(manifest.displayName)
                     .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(isDisabled ? .secondary : .primary)
                 Text(sourceLabel(source))
                     .font(.system(size: 9, weight: .medium))
                     .padding(.horizontal, 5)
@@ -229,21 +271,47 @@ struct PluginsSettingsView: View {
                     .background(sourceTint(source).opacity(0.15))
                     .foregroundStyle(sourceTint(source))
                     .clipShape(Capsule())
+                if needsRestart {
+                    Text("settings.plugins.enable.restartRequired")
+                        .font(.system(size: 9, weight: .medium))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Color.orange.opacity(0.15))
+                        .foregroundStyle(.orange)
+                        .clipShape(Capsule())
+                }
                 Spacer()
-                if isDisableable(source) {
+                if isDisabled {
+                    Button(action: { handleEnable(row) }) {
+                        Text("settings.plugins.enable")
+                            .font(.system(size: 10))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+                    .tint(.green)
+                    .disabled(needsRestart)
+                } else {
+                    let canDisable = canDisable(row)
                     Button(action: { pendingDisable = row }) {
                         Text("settings.plugins.disable")
                             .font(.system(size: 10))
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.mini)
-                    Button(action: { pendingUninstall = row }) {
-                        Text("settings.plugins.uninstall")
-                            .font(.system(size: 10))
+                    .disabled(!canDisable)
+                    .help(canDisable ? "" : NSLocalizedString(
+                        "settings.plugins.disable.lastProviderHint",
+                        comment: ""
+                    ))
+                    if isUninstallable(source) {
+                        Button(action: { pendingUninstall = row }) {
+                            Text("settings.plugins.uninstall")
+                                .font(.system(size: 10))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                        .tint(.red)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
-                    .tint(.red)
                 }
                 Text("v\(manifest.version)")
                     .font(.system(size: 10, design: .monospaced))
@@ -272,16 +340,48 @@ struct PluginsSettingsView: View {
             }
         }
         .padding(.vertical, 2)
+        .opacity(isDisabled ? 0.65 : 1)
     }
 
-    private func isDisableable(_ source: PluginSource?) -> Bool {
-        // Only user-installed plugins. Host-resident classes can't be
-        // dropped (they'd come back next launch), and bundled samples
-        // ship with the .app — disabling them per-session is too
-        // surprising; users delete the .app to remove a bundled
-        // plugin.
+    /// Uninstall stays gated to `.user` — we can't delete files we
+    /// don't own (host has no file, bundled lives inside the .app).
+    /// Disable, on the other hand, is universal: every source goes
+    /// through `DisabledPluginsStore`.
+    private func isUninstallable(_ source: PluginSource?) -> Bool {
         if case .user = source { return true }
         return false
+    }
+
+    /// Refuse to disable the last remaining provider plugin —
+    /// otherwise the status bar entry vanishes and the user can't
+    /// re-open Settings to flip one back on. Mirrors the same guard
+    /// in `PluginTrustGate.disable` so UI and runtime agree.
+    private func canDisable(_ row: Row) -> Bool {
+        guard row.manifest.kind == .provider || row.manifest.kind == .both else {
+            return true
+        }
+        let activeProviderCount = pluginRegistry.providers.values
+            .compactMap { $0 as? any ProviderPlugin }
+            .count
+        return activeProviderCount > 1
+    }
+
+    private func handleEnable(_ row: Row) {
+        guard let source = row.source else { return }
+        let outcome = PluginTrustGate.enable(manifest: row.manifest, source: source)
+        switch outcome {
+        case .hotLoaded:
+            pendingRestartIds.remove(row.manifest.id)
+        case .restartRequired:
+            pendingRestartIds.insert(row.manifest.id)
+        case .hotLoadFailed(let reason):
+            pendingRestartIds.insert(row.manifest.id)
+            enableError = String(format: NSLocalizedString(
+                "settings.plugins.enable.hotLoadFailed",
+                comment: ""
+            ), row.manifest.displayName, String(describing: reason))
+        }
+        refreshTick &+= 1
     }
 
     private func kindGlyph(_ kind: PluginKind) -> String {

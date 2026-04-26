@@ -11,8 +11,13 @@ private enum DefaultSettings {
 }
 
 private enum StatusLineSync {
-    static func refreshManagedIntegrations() {
-        for kind in ProviderRegistry.supportedProviders {
+    /// Refreshes already-installed status-line integrations on
+    /// startup. `plugins` filter so disabled provider plugins don't
+    /// re-install their status lines on every launch — kill-switching
+    /// gemini means its status-line install is also frozen.
+    @MainActor
+    static func refreshManagedIntegrations(plugins: PluginRegistry) {
+        for kind in ProviderRegistry.availableProviders(plugins: plugins) {
             let provider = ProviderRegistry.provider(for: kind)
             guard let installer = provider.statusLineInstaller, installer.isInstalled else { continue }
             try? installer.install()
@@ -26,6 +31,13 @@ final class AppState: ObservableObject {
     @Published private(set) var store: SessionDataStore
     @Published private(set) var sessionViewModel: SessionViewModel
     @Published private(set) var isPopoverVisible = false
+    /// Snapshot of every provider kind that's both installed on disk
+    /// and still represented by a registered `ProviderPlugin` in the
+    /// live `pluginRegistry`. Disabling Gemini drops `.gemini` from
+    /// here, which is what the menu-bar switcher and the developer
+    /// rebuild list bind to so disabled providers vanish from the UI
+    /// without restart.
+    @Published private(set) var availableProviderKinds: [ProviderKind] = []
     let profileViewModel = ProfileViewModel()
     let updaterService = UpdaterService()
     let notchCenter = NotchNotificationCenter()
@@ -42,22 +54,41 @@ final class AppState: ObservableObject {
     /// plugins (3 Provider + 8 Terminal) register here as an end-to-end
     /// smoke test of the registration path; share-card role/theme
     /// plugins land in stage 4.
+    /// Per-manifest-id factories for host (compiled-in) plugins. The
+    /// init closure builds and registers fresh instances; the
+    /// re-enable path in `PluginTrustGate.enable(...)` calls the
+    /// matching factory so a previously-disabled host plugin comes
+    /// back live without restart.
+    static let hostPluginFactories: [String: () -> any Plugin] = [
+        ClaudePluginDogfood.manifest.id:    { ClaudePluginDogfood() },
+        CodexPluginDogfood.manifest.id:     { CodexPluginDogfood() },
+        GeminiPluginDogfood.manifest.id:    { GeminiPluginDogfood() },
+        AlacrittyPlugin.manifest.id:        { AlacrittyPlugin() },
+        ITermPlugin.manifest.id:            { ITermPlugin() },
+        AppleTerminalPlugin.manifest.id:    { AppleTerminalPlugin() },
+        GhosttyPlugin.manifest.id:          { GhosttyPlugin() },
+        KittyPlugin.manifest.id:            { KittyPlugin() },
+        WezTermPlugin.manifest.id:          { WezTermPlugin() },
+        WarpPlugin.manifest.id:             { WarpPlugin() }
+    ]
+
     let pluginRegistry: PluginRegistry = {
         let registry = PluginRegistry()
-        let plugins: [any Plugin] = [
-            ClaudePluginDogfood(),
-            CodexPluginDogfood(),
-            GeminiPluginDogfood(),
-            AlacrittyPlugin(),
-            ITermPlugin(),
-            AppleTerminalPlugin(),
-            GhosttyPlugin(),
-            KittyPlugin(),
-            WezTermPlugin(),
-            WarpPlugin(),
-            EditorPlugin()
-        ]
+        let plugins: [any Plugin] = AppState.hostPluginFactories
+            .sorted { $0.key < $1.key }
+            .map { $0.value() }
         for plugin in plugins {
+            let manifest = type(of: plugin).manifest
+            // Honour the kill-switch for host plugins too: a
+            // user-disabled id is parked under `registry.disabled`
+            // so the Settings panel can show an Enable row, but the
+            // live instance is never inserted into the lookup
+            // buckets. Re-enabling a host plugin requires a restart
+            // because the host owns this instantiation list.
+            if PluginTrustGate.isDisabled(manifest.id) {
+                registry.recordDisabled(manifest: manifest, source: .host)
+                continue
+            }
             do {
                 try registry.register(plugin)
             } catch {
@@ -73,11 +104,14 @@ final class AppState: ObservableObject {
         // are gated by `PluginTrustGate`: previously-allowed plugins
         // load, previously-denied plugins are skipped, and unknown
         // plugins are queued for the post-launch NSAlert prompt.
+        // Both paths consult the disabled-set so a kill-switched
+        // plugin never reaches the trust prompt regardless of source.
         if let pluginsDir = Bundle.main.builtInPlugInsURL {
             let report = PluginLoader.loadAll(
                 from: pluginsDir,
                 into: registry,
                 trustEvaluator: { _, _ in true },
+                disabledChecker: PluginTrustGate.isDisabled,
                 sourceKind: .bundled
             )
             DiagnosticLogger.shared.info(
@@ -93,11 +127,35 @@ final class AppState: ObservableObject {
             from: PluginLoader.defaultDirectory,
             into: registry,
             trustEvaluator: PluginTrustGate.evaluate,
+            disabledChecker: PluginTrustGate.isDisabled,
             sourceKind: .user
         )
         DiagnosticLogger.shared.info(
             "PluginLoader (user): loaded=\(userReport.loaded.count) skipped=\(userReport.skipped.count) pending=\(PluginTrustGate.snapshotPending().count)"
         )
+        // Emergency fallback: if every provider plugin is disabled
+        // (or none ever loaded), force-restore Claude so the status
+        // bar entry stays reachable. Without this, a user who has
+        // killed all three builtins has no surface to flip one back
+        // on — the popover, settings, even the menu-bar icon all
+        // disappear once `availableProviderKinds` goes empty.
+        let activeProviders = registry.providers.values.compactMap { $0 as? any ProviderPlugin }
+        if activeProviders.isEmpty {
+            let claudeId = ClaudePluginDogfood.manifest.id
+            PluginTrustGate.disabledStore.setDisabled(false, for: claudeId)
+            do {
+                let claudePlugin = ClaudePluginDogfood()
+                try registry.register(claudePlugin, source: .host)
+                registry.removeDisabledRecord(id: claudeId)
+                DiagnosticLogger.shared.warning(
+                    "All providers were disabled — restored Claude as fallback so the menu bar entry stays reachable"
+                )
+            } catch {
+                DiagnosticLogger.shared.warning(
+                    "Failed to restore fallback Claude provider: \(error)"
+                )
+            }
+        }
         AppState.refreshDynamicTerminalRegistries(from: registry)
         DiagnosticLogger.shared.info(
             "PluginRegistry dogfood: providers=\(registry.providers.count) terminals=\(registry.terminals.count)"
@@ -118,20 +176,61 @@ final class AppState: ObservableObject {
     /// Idempotent — `TerminalRegistry`'s dynamic stores accumulate, so
     /// the hot-load path can call this again after registering a new
     /// plugin without dropping anything that was already known.
+    ///
+    /// Also pushes the set of disabled terminal `optionID`s so the
+    /// picker, readiness, and auto-launch surfaces drop them. Builtin
+    /// terminal plugin manifest ids equal their primary bundle id, so
+    /// we resolve `manifest.id` → `TerminalCapability` via
+    /// `capability(forBundleId:)` to recover the option id.
     static func refreshDynamicTerminalRegistries(from registry: PluginRegistry) {
         var pluginBundleIds: Set<String> = []
         var pluginNameAliases: [String: String] = [:]
-        for plugin in registry.terminals.values {
+        // Also build the set of plugin-backed capabilities for the
+        // picker / readiness / launch surfaces. Each entry is an
+        // adapter wrapping the live `TerminalPlugin` so editor
+        // `.csplugin` bundles (VSCode / Cursor / Windsurf / Zed /
+        // Trae) and chat-app plugins appear alongside the hardcoded
+        // builtins in `Settings → Default Terminal`.
+        var pluginCapabilities: [any TerminalCapability] = []
+        for (manifestId, plugin) in registry.terminals {
             guard let terminal = plugin as? any TerminalPlugin else { continue }
             let descriptor = terminal.descriptor
-            guard let primaryBundleId = descriptor.bundleIdentifiers.sorted().first else { continue }
-            pluginBundleIds.formUnion(descriptor.bundleIdentifiers)
-            for alias in descriptor.terminalNameAliases {
-                pluginNameAliases[alias] = primaryBundleId
+            if let primaryBundleId = descriptor.bundleIdentifiers.sorted().first {
+                pluginBundleIds.formUnion(descriptor.bundleIdentifiers)
+                for alias in descriptor.terminalNameAliases {
+                    pluginNameAliases[alias] = primaryBundleId
+                }
             }
+            pluginCapabilities.append(
+                PluginBackedTerminalCapability(plugin: terminal, manifestId: manifestId)
+            )
         }
         TerminalRegistry.registerDynamicBundleIdentifiers(pluginBundleIds)
         TerminalRegistry.registerDynamicTerminalNames(pluginNameAliases)
+        TerminalRegistry.setPluginCapabilities(pluginCapabilities)
+
+        // Compute the disabled option id set from disabled records.
+        // Each disabled terminal manifest may correspond to either a
+        // builtin host capability (manifest.id == primary bundle id
+        // → resolve via TerminalRegistry.capability(forBundleId:))
+        // OR a plugin-only capability that was hot-removed (already
+        // out of pluginCapabilities, so we just record manifest.id
+        // directly so any leftover preference referencing it is
+        // treated as disabled too).
+        var disabledOptionIDs: Set<String> = []
+        for record in registry.disabledRecords() {
+            guard record.manifest.kind == .terminal || record.manifest.kind == .both else { continue }
+            if let cap = TerminalRegistry.capability(forBundleId: record.manifest.id),
+               let optionID = cap.optionID {
+                disabledOptionIDs.insert(optionID)
+            } else {
+                // Plugin-only terminal: optionID equals descriptor.id
+                // which equals manifest.id (PluginBackedTerminalCapability
+                // uses descriptor.id verbatim).
+                disabledOptionIDs.insert(record.manifest.id)
+            }
+        }
+        TerminalRegistry.setDisabledOptionIDs(disabledOptionIDs)
     }
 
     /// Caches every `ProviderPlugin.makeProvider()` result into
@@ -141,15 +240,48 @@ final class AppState: ObservableObject {
     /// this is behaviour-preserving today; once bundle loading lands in
     /// M2, a third-party plugin can override a builtin by registering
     /// with the same provider id.
+    ///
+    /// Clears the dynamic store first so a disabled plugin really
+    /// disappears — without the clear, `provider(for: .gemini)` would
+    /// keep returning the cached `GeminiProvider.shared` pointer even
+    /// after `gemini` is gone from `pluginRegistry.providers`.
+    ///
+    /// Also registers UserDefaults defaults (menu-bar visibility) for
+    /// each live `ProviderPlugin`'s descriptor id so a fresh install
+    /// shows plugin providers in the strip without requiring the user
+    /// to flip a switch. Idempotent — `registerDefault(forDescriptorID:)`
+    /// is a no-op when the key has already been set.
     private func wirePluginProviderInstances() {
+        ProviderRegistry.clearDynamicProviders()
         for (_, plugin) in pluginRegistry.providers {
-            guard let providerPlugin = plugin as? any ProviderPlugin,
-                  let provider = providerPlugin.makeProvider() else { continue }
-            ProviderRegistry.registerDynamicProvider(
-                provider,
-                for: providerPlugin.descriptor.id
-            )
+            guard let providerPlugin = plugin as? any ProviderPlugin else { continue }
+            let descriptorId = providerPlugin.descriptor.id
+            MenuBarPreferences.registerDefault(forDescriptorID: descriptorId)
+            if let provider = providerPlugin.makeProvider() {
+                ProviderRegistry.registerDynamicProvider(provider, for: descriptorId)
+            }
         }
+        ProviderRegistry.refreshExtraPluginPricing(plugins: pluginRegistry)
+    }
+
+    private func recomputeAvailableProviderKinds() {
+        availableProviderKinds = ProviderRegistry.availableProviders(plugins: pluginRegistry)
+    }
+
+    /// Reaction when a plugin is disabled. If the disabled plugin
+    /// happens to be the current provider, the popover keeps showing
+    /// stale data while the footer's switcher button is already gone
+    /// — promote the next available kind so the UI stays consistent.
+    /// Non-provider kinds (terminal, share-card) bail out early.
+    private func handleProviderPluginDisabled(pluginID: String) {
+        guard let record = pluginRegistry.disabled[pluginID],
+              record.manifest.kind == .provider || record.manifest.kind == .both
+        else { return }
+        let nextAvailable = ProviderRegistry.availableProviders(plugins: pluginRegistry)
+        guard !nextAvailable.contains(providerKind),
+              let fallback = nextAvailable.first
+        else { return }
+        switchProvider(to: fallback)
     }
 
     /// Wires the focus coordinator to consult `pluginRegistry` before
@@ -187,11 +319,14 @@ final class AppState: ObservableObject {
 
     init() {
         DefaultSettings.register()
-        StatusLineSync.refreshManagedIntegrations()
+        // pluginRegistry is initialised before init body runs (stored
+        // property closure), so plugin-disabled state is honoured by
+        // every downstream filter on this path.
+        StatusLineSync.refreshManagedIntegrations(plugins: pluginRegistry)
 
         let selectedKind = ProviderRegistry.selectedProviderKind()
         providerKind = selectedKind
-        let availableKinds = Set(ProviderRegistry.availableProviders())
+        let availableKinds = Set(ProviderRegistry.availableProviders(plugins: pluginRegistry))
         let startupKinds = ProviderRegistry.supportedProviders.filter { kind in
             availableKinds.contains(kind) || kind == selectedKind
         }
@@ -237,6 +372,7 @@ final class AppState: ObservableObject {
         // closures can read `pluginRegistry`.
         wirePluginProviderInstances()
         wirePluginFocusStrategyResolver()
+        recomputeAvailableProviderKinds()
 
         // Wire hot-load: when the user clicks Allow on the prompt, the
         // plugin is dlopen'd into pluginRegistry immediately, then the
@@ -244,10 +380,13 @@ final class AppState: ObservableObject {
         // plugin's bundle ids / aliases / provider instances become
         // live without a restart.
         let registry = pluginRegistry
+        ProviderRegistry.setSharedPluginRegistry(registry)
         PluginTrustGate.setPluginRegistry(registry)
+        PluginTrustGate.setHostPluginFactories(AppState.hostPluginFactories)
         PluginTrustGate.onPluginHotLoaded = { [weak self] manifest, _ in
             Self.refreshDynamicTerminalRegistries(from: registry)
             self?.wirePluginProviderInstances()
+            self?.recomputeAvailableProviderKinds()
             DiagnosticLogger.shared.info(
                 "Plugin hot-loaded: \(manifest.id) v\(manifest.version)"
             )
@@ -260,7 +399,10 @@ final class AppState: ObservableObject {
             // the registry's current contents, so the disabled
             // plugin's contributions disappear.
             Self.refreshDynamicTerminalRegistries(from: registry)
+            ProviderRegistry.unregisterDynamicProvider(id: pluginID)
             self?.wirePluginProviderInstances()
+            self?.handleProviderPluginDisabled(pluginID: pluginID)
+            self?.recomputeAvailableProviderKinds()
             DiagnosticLogger.shared.info("Plugin disabled: \(pluginID)")
         }
 
@@ -603,9 +745,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Providers declare hook/install capabilities; the app owns global runtime
     /// effects such as active cards, the socket bridge, and the island window.
     private func applyNotchProviderPreferences() {
-        Task { _ = try? await NotchHookSync.syncCurrent() }
+        let plugins = appState.pluginRegistry
+        Task { _ = try? await NotchHookSync.syncCurrent(plugins: plugins) }
 
-        let enabledProviders = Set(ProviderRegistry.supportedProviders.filter {
+        // Filter through `availableProviderKinds` so a plugin-disabled
+        // provider's notch state isn't restored or purged twice — its
+        // runtime was already torn down when the plugin was disabled.
+        let availableKinds = appState.availableProviderKinds
+        let enabledProviders = Set(availableKinds.filter {
             NotchPreferences.isEnabled($0)
         })
         let disabledProviders = ProviderRegistry.supportedProviders.filter {

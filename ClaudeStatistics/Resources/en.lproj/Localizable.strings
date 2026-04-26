@@ -253,8 +253,14 @@
 "settings.plugins.source.user" = "user";
 "settings.plugins.disable" = "Disable";
 "settings.plugins.disable.confirmTitle" = "Disable this plugin?";
-"settings.plugins.disable.confirmMessage" = "%@ will be removed from the plugin registry and recorded as denied. Subsequent launches will skip it until you reset trust.";
+"settings.plugins.disable.confirmMessage" = "%@ will be removed from the plugin registry and skipped on every future launch. You can re-enable it from this panel at any time.";
 "settings.plugins.disable.confirmButton" = "Disable";
+"settings.plugins.disable.lastProviderHint" = "At least one provider must stay enabled — disabling this would make the menu bar entry unreachable.";
+"settings.plugins.enable" = "Enable";
+"settings.plugins.enable.restartRequired" = "Restart required";
+"settings.plugins.enable.errorTitle" = "Enable failed";
+"settings.plugins.enable.hotLoadFailed" = "%@ couldn't be re-loaded without restart (%@). Quit and relaunch Claude Statistics to bring it back.";
+"settings.plugins.disabled.count" = "Disabled (%d)";
 "settings.plugins.uninstall" = "Uninstall";
 "settings.plugins.uninstall.confirmTitle" = "Uninstall this plugin?";
 "settings.plugins.uninstall.confirmMessage" = "%@ will be unloaded, the .csplugin file deleted from disk, and its trust record cleared. The plugin can be reinstalled from Discover later.";

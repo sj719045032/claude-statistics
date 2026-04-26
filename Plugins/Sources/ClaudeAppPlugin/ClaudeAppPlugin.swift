@@ -33,7 +33,8 @@ public final class ClaudeAppPlugin: NSObject, TerminalPlugin {
         terminalNameAliases: ["claude", "claude.app"],
         processNameHints: ["claude"],
         focusPrecision: .exact,
-        autoLaunchPriority: nil
+        autoLaunchPriority: nil,
+        boundProviderID: "claude"
     )
 
     public override init() { super.init() }
@@ -44,6 +45,10 @@ public final class ClaudeAppPlugin: NSObject, TerminalPlugin {
 
     public func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
         ClaudeAppFocusStrategy()
+    }
+
+    public func makeLauncher() -> (any TerminalLauncher)? {
+        ActivateAppLauncher(bundleIdentifiers: Array(descriptor.bundleIdentifiers))
     }
 }
 

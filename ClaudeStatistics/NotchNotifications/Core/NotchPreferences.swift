@@ -35,8 +35,20 @@ enum NotchPreferences {
 
     /// Reads the master switch for a provider. Default is on.
     static func isEnabled(_ kind: ProviderKind) -> Bool {
+        isEnabled(defaultsKey: kind.notchEnabledDefaultsKey)
+    }
+
+    /// Plugin-aware variant: any descriptor (builtin or
+    /// plugin-contributed) carries its own `notchEnabledDefaultsKey`,
+    /// so we read the descriptor's key directly instead of
+    /// reconstructing it from id. Used by `anyProviderEnabled` to
+    /// honour third-party `ProviderPlugin` notch toggles.
+    static func isEnabled(descriptor: ProviderDescriptor) -> Bool {
+        isEnabled(defaultsKey: descriptor.notchEnabledDefaultsKey)
+    }
+
+    private static func isEnabled(defaultsKey key: String) -> Bool {
         let d = UserDefaults.standard
-        let key = kind.notchEnabledDefaultsKey
         return d.object(forKey: key) == nil || d.bool(forKey: key)
     }
 
@@ -48,9 +60,13 @@ enum NotchPreferences {
     }
 
     /// True when at least one provider's master switch is on — drives whether
-    /// the bridge, tracker, and notch window are alive at all.
+    /// the bridge, tracker, and notch window are alive at all. Honours
+    /// plugin-contributed descriptors via the shared `PluginRegistry`.
+    @MainActor
     static var anyProviderEnabled: Bool {
-        ProviderKind.allCases.contains(where: isEnabled)
+        let plugins = ProviderRegistry.currentSharedPluginRegistry()
+        let descriptors = ProviderRegistry.allKnownDescriptors(plugins: plugins)
+        return descriptors.contains { isEnabled(descriptor: $0) }
     }
 
     static let stateChangedNotification = Notification.Name("notch.state.changed")

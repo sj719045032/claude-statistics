@@ -95,7 +95,7 @@ targets:
         CFBundlePackageType: BNDL
         NSPrincipalClass: CodexAppPlugin
         CSPluginManifest:
-          id: com.openai.codex
+          id: com.openai.codex.app
           kind: terminal
           displayName: Codex
           version: 1.0.0

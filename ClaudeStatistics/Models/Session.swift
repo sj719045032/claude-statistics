@@ -34,11 +34,24 @@ final class ModelPricing {
     private(set) var models: [String: Pricing] = [:]
     private(set) var defaultPricing = Pricing(input: 3.0, output: 15.0, cacheWrite5m: 3.75, cacheWrite1h: 6.0, cacheRead: 0.30)
 
-    private static var builtinModels: [String: Pricing] {
-        ProviderRegistry.supportedProviders.reduce(into: [:]) { merged, kind in
+    /// Aggregates pricing tables from every known provider. The
+    /// `provider(for: kind)` path already prefers the dynamic store
+    /// over the hardcoded singleton, so a `ProviderPlugin` (including
+    /// the future `.csplugin` versions of Codex / Gemini) overrides
+    /// builtin pricing the moment it registers. Plus any plugin-only
+    /// pricing surfaced through `ProviderRegistry.extraPluginPricing`
+    /// — third-party providers whose descriptor id doesn't map back
+    /// to `ProviderKind` get their pricing through that thread-safe
+    /// snapshot instead of a `@MainActor`-isolated lookup that would
+    /// trap when called from background pricing recomputation.
+    private static func builtinModels() -> [String: Pricing] {
+        var merged: [String: Pricing] = [:]
+        for kind in ProviderRegistry.supportedProviders {
             let provider = ProviderRegistry.provider(for: kind)
             merged.merge(provider.builtinPricingModels) { current, _ in current }
         }
+        merged.merge(ProviderRegistry.extraPluginPricing()) { current, _ in current }
+        return merged
     }
 
     private var configDir: String {
@@ -59,7 +72,7 @@ final class ModelPricing {
         // Try loading from config file
         if let data = fm.contents(atPath: pricingFilePath),
            let loaded = try? JSONDecoder().decode(PricingFile.self, from: data) {
-            var merged = Self.builtinModels
+            var merged = Self.builtinModels()
             merged.merge(loaded.models) { _, user in user }
             models = merged
             if let d = loaded.default_pricing { defaultPricing = d }
@@ -67,7 +80,7 @@ final class ModelPricing {
         }
 
         // Use built-in defaults and write config file for user to edit
-        models = Self.builtinModels
+        models = Self.builtinModels()
         savePricing()
     }
 

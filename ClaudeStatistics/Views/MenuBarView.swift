@@ -22,7 +22,11 @@ struct MenuBarView: View {
     }
 
     private var visibleProviders: [ProviderKind] {
-        ProviderRegistry.availableProviders()
+        // Bound to AppState's @Published list, which already filters
+        // out providers whose plugin has been disabled in
+        // `pluginRegistry`. Disabling a builtin provider plugin
+        // removes its switcher button live without restart.
+        appState.availableProviderKinds
     }
 
     var body: some View {
@@ -250,7 +254,7 @@ struct MenuBarView: View {
                 onResume: {
                     sessionViewModel.resumeSession(session)
                     if TerminalPreferences.isEditorPreferred {
-                        toastCenter.show(EditorApp.resumeCopiedToastMessage)
+                        toastCenter.show(TerminalPreferences.resumeCopiedToastMessage)
                     }
                 },
                 resumeCommand: sessionViewModel.resumeCommand(for: session),
@@ -286,7 +290,7 @@ struct MenuBarView: View {
             onResume: { session in
                 sessionViewModel.resumeSession(session)
                 if TerminalPreferences.isEditorPreferred {
-                    toastCenter.show(EditorApp.resumeCopiedToastMessage)
+                    toastCenter.show(TerminalPreferences.resumeCopiedToastMessage)
                 }
             },
             onDelete: { sessionViewModel.deleteSession($0) },

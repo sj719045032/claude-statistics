@@ -13,8 +13,12 @@ struct SettingsView: View {
     let provider: any SessionProvider
     @AppStorage(AppPreferences.autoRefreshEnabled) private var autoRefreshEnabled = true
     @AppStorage(AppPreferences.refreshInterval) private var refreshInterval = 300.0
-    @AppStorage(TerminalPreferences.preferredTerminalKey) private var preferredTerminal = TerminalPreferences.autoOptionID
-    @AppStorage(AppPreferences.preferredEditor) private var preferredEditor = "VSCode"
+    /// Bumped on terminal preference changes to invalidate the
+    /// per-provider picker binding. Each provider has its own
+    /// `preferredTerminal.<descriptorID>` UserDefaults key, so we
+    /// can't bind a static `@AppStorage` here — we'd lose the
+    /// per-provider scoping.
+    @State private var terminalPreferenceRevision: Int = 0
     @AppStorage(AppPreferences.appLanguage) private var appLanguage = "auto"
     @AppStorage(AppPreferences.fontScale) private var fontScale = 1.0
     @AppStorage(AppPreferences.customInterval) private var customInterval = false
@@ -55,7 +59,9 @@ struct SettingsView: View {
                 KeyboardShortcutsSettingsView(onBack: { showKeyboardShortcuts = false })
             } else if showTerminalFocusSettings {
                 TerminalFocusSettingsView(
-                    preferredOptionID: preferredTerminal,
+                    preferredOptionID: TerminalPreferences.preferredOptionID(
+                        forProvider: appState.providerKind.descriptor.id
+                    ),
                     onBack: { showTerminalFocusSettings = false }
                 )
             } else if showDeveloperSettings {
@@ -605,11 +611,32 @@ struct SettingsView: View {
         }
     }
 
+    /// Picker binding scoped to the *currently selected* provider so
+    /// switching from Claude → Codex doesn't drag the Claude default
+    /// terminal along — each provider's pick is stored in its own
+    /// UserDefaults key (`preferredTerminal.<descriptorID>`).
+    private var preferredTerminalBinding: Binding<String> {
+        let providerID = appState.providerKind.descriptor.id
+        return Binding(
+            get: {
+                _ = terminalPreferenceRevision
+                return TerminalPreferences.preferredOptionID(forProvider: providerID)
+            },
+            set: { newValue in
+                TerminalPreferences.setPreferredOptionID(newValue, forProvider: providerID)
+                terminalPreferenceRevision &+= 1
+                TerminalSetupCoordinator.shared.refreshBanner()
+            }
+        )
+    }
+
     @ViewBuilder
     private var terminalSection: some View {
         Section("settings.terminal") {
-            Picker(selection: $preferredTerminal) {
-                ForEach(TerminalRegistry.readinessOptions) { option in
+            Picker(selection: preferredTerminalBinding) {
+                ForEach(TerminalRegistry.readinessOptions(
+                    forProvider: appState.providerKind.descriptor.id
+                )) { option in
                     if option.id != TerminalPreferences.autoOptionID && !option.isInstalled {
                         Text("settings.notFound \(option.title)")
                             .tag(option.id)
@@ -623,9 +650,6 @@ struct SettingsView: View {
                     .labelStyle(SettingsRowLabelStyle())
             }
             .pickerStyle(.menu)
-            .onChange(of: preferredTerminal) { _, _ in
-                TerminalSetupCoordinator.shared.refreshBanner()
-            }
 
             SettingsRowButton(action: { showTerminalFocusSettings = true }) {
                 HStack {
@@ -641,26 +665,6 @@ struct SettingsView: View {
                 }
             }
 
-            if TerminalPreferences.isEditorPreferred(rawValue: preferredTerminal) {
-                Picker(selection: $preferredEditor) {
-                    ForEach(EditorApp.allCases) { app in
-                        if !app.isInstalled {
-                            Text("settings.notFound \(app.rawValue)")
-                                .tag(app.rawValue)
-                        } else {
-                            Text(app.rawValue)
-                                .tag(app.rawValue)
-                        }
-                    }
-                } label: {
-                    Label("settings.chooseEditor", systemImage: "doc.text")
-                        .labelStyle(SettingsRowLabelStyle())
-                }
-                .pickerStyle(.menu)
-                .onChange(of: preferredEditor) { _, _ in
-                    TerminalSetupCoordinator.shared.refreshBanner()
-                }
-            }
         }
     }
 
@@ -713,7 +717,18 @@ struct SettingsView: View {
     @ViewBuilder
     private func providerToggleLabel(_ descriptor: ProviderDescriptor) -> some View {
         Label {
-            Text(descriptor.displayName).font(.system(size: 12))
+            HStack(spacing: 6) {
+                Text(descriptor.displayName).font(.system(size: 12))
+                if let badge = providerSourceBadge(for: descriptor.id) {
+                    Text(badge)
+                        .font(.system(size: 9, weight: .medium))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Color.blue.opacity(0.15))
+                        .foregroundStyle(Color.blue)
+                        .clipShape(Capsule())
+                }
+            }
         } icon: {
             Image(descriptor.iconAssetName)
                 .resizable()
@@ -722,6 +737,26 @@ struct SettingsView: View {
                 .frame(width: 12, height: 12)
                 .foregroundStyle(.secondary)
                 .frame(width: 18, alignment: .leading)
+        }
+    }
+
+    /// Localized "(plugin)" / "(user plugin)" tag rendered next to a
+    /// provider name when its `PluginRegistry` source isn't `.host`.
+    /// Returns nil for compiled-in builtin providers — they don't
+    /// need an attribution badge. Once Codex / Gemini move to
+    /// `.csplugin`, this badge appears on them automatically.
+    private func providerSourceBadge(for descriptorID: String) -> String? {
+        guard let plugin = appState.pluginRegistry.providers.values.first(where: {
+            ($0 as? any ProviderPlugin)?.descriptor.id == descriptorID
+        }) else { return nil }
+        let manifestId = type(of: plugin).manifest.id
+        switch appState.pluginRegistry.source(for: manifestId) {
+        case .none, .host:
+            return nil
+        case .bundled:
+            return NSLocalizedString("settings.plugins.source.bundled", comment: "")
+        case .user:
+            return NSLocalizedString("settings.plugins.source.user", comment: "")
         }
     }
 
@@ -798,10 +833,14 @@ struct SettingsView: View {
     }
 
     private var currentTerminalReadiness: TerminalReadiness? {
-        if preferredTerminal == TerminalPreferences.autoOptionID {
-            return TerminalRegistry.preferredReadiness(preferredOptionID: preferredTerminal)
+        _ = terminalPreferenceRevision
+        let optionID = TerminalPreferences.preferredOptionID(
+            forProvider: appState.providerKind.descriptor.id
+        )
+        if optionID == TerminalPreferences.autoOptionID {
+            return TerminalRegistry.preferredReadiness(preferredOptionID: optionID)
         }
-        return TerminalRegistry.readiness(forOptionID: preferredTerminal)
+        return TerminalRegistry.readiness(forOptionID: optionID)
     }
 
 }
@@ -1004,7 +1043,7 @@ private struct DeveloperSettingsView: View {
                 }
 
                 Section("settings.developer.rebuildIndexes") {
-                    ForEach(ProviderRegistry.supportedProviders, id: \.self) { kind in
+                    ForEach(appState.availableProviderKinds, id: \.self) { kind in
                         SettingsRowButton(action: { pendingRebuildProvider = kind }) {
                             HStack(spacing: 8) {
                                 SettingsRowIcon(name: "arrow.triangle.2.circlepath")

@@ -81,6 +81,31 @@ public struct ActivateAppFocusStrategy: TerminalFocusStrategy {
 /// extracted so per-vendor plugins (VSCode / Cursor / Windsurf /
 /// Trae / Zed) can re-use it without duplicating ten lines five
 /// times.
+/// Drop-in `TerminalLauncher` for chat-app GUIs (Codex.app /
+/// Claude.app) that have no "open at path" surface and no embedded
+/// shell to receive commands. Just brings the app forward — the
+/// host's clipboard-copy toast (when the app's category is `.editor`
+/// would handle the message; chat apps run their own session UI so
+/// the resume command itself isn't useful).
+public struct ActivateAppLauncher: TerminalLauncher {
+    public let bundleIdentifiers: [String]
+
+    public init(bundleIdentifiers: [String]) {
+        self.bundleIdentifiers = bundleIdentifiers
+    }
+
+    public func launch(_ request: TerminalLaunchRequest) {
+        guard let appURL = bundleIdentifiers
+            .lazy
+            .compactMap({ NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) })
+            .first
+        else { return }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: appURL, configuration: configuration)
+    }
+}
+
 public struct OpenInEditorLauncher: TerminalLauncher {
     public let bundleIdentifiers: [String]
 

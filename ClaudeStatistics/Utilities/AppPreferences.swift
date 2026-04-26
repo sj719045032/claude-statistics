@@ -45,11 +45,6 @@ enum AppPreferences {
     /// Verbose diagnostic logging toggle.
     static let verboseLogging = "diagnostic.verbose.enabled"
 
-    // MARK: Editor
-
-    /// External editor app preference (rawValue of `EditorApp`).
-    static let preferredEditor = "preferredEditor"
-
     // MARK: Provider usage backoff
 
     /// Claude usage API retry-after deadline (Date).

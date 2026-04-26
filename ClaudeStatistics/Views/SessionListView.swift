@@ -35,7 +35,7 @@ struct SessionListView: View {
                     onResume: { session in
                         viewModel.resumeSession(session)
                         if TerminalPreferences.isEditorPreferred {
-                            toastCenter.show(EditorApp.resumeCopiedToastMessage)
+                            toastCenter.show(TerminalPreferences.resumeCopiedToastMessage)
                         }
                     },
                     onDelete: { viewModel.deleteSession($0) },
@@ -182,7 +182,7 @@ struct SessionListView: View {
                                 onResume: {
                                     viewModel.resumeSession(session)
                                     if TerminalPreferences.isEditorPreferred {
-                                        toastCenter.show(EditorApp.resumeCopiedToastMessage)
+                                        toastCenter.show(TerminalPreferences.resumeCopiedToastMessage)
                                     }
                                 },
                                 onViewTranscript: { viewModel.openTranscript(for: session) }
@@ -246,7 +246,7 @@ struct SessionListView: View {
                                     onResume: {
                                         viewModel.resumeSession(session)
                                         if TerminalPreferences.isEditorPreferred {
-                                            toastCenter.show(EditorApp.resumeCopiedToastMessage)
+                                            toastCenter.show(TerminalPreferences.resumeCopiedToastMessage)
                                         }
                                     },
                                     onDelete: { skipConfirm in

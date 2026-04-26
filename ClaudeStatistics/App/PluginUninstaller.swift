@@ -48,12 +48,12 @@ enum PluginUninstaller {
             throw UninstallError.sourceNotUserInstalled
         }
 
-        // 2. Disable: persist .denied, drop from registry, fire
-        //    onPluginDisabled so host glue refreshes terminal
+        // 2. Disable: drop from registry, set the kill-switch flag,
+        //    fire onPluginDisabled so host glue refreshes terminal
         //    aliases / provider lookup. PluginTrustGate has the
         //    canonical implementation we already exercise from the
         //    Settings → Disable button.
-        PluginTrustGate.disable(manifest: manifest, bundleURL: bundleURL)
+        PluginTrustGate.disable(manifest: manifest, source: source)
 
         // 3. Delete the bundle.
         do {
@@ -62,14 +62,17 @@ enum PluginUninstaller {
             throw UninstallError.fileRemovalFailed(String(describing: error))
         }
 
-        // 4. Remove the trust record so a reinstall isn't blocked
-        //    by the .denied flag we just wrote in step 2. (Same
-        //    plugin, fresh path — but path-equality isn't guaranteed
-        //    after delete-and-recreate.) Keying off both manifest.id
-        //    and Info.plist hash means even a re-prompt would only
-        //    match the old record, but cleaning up here makes the
-        //    intent explicit.
+        // 4. Clean up state so a reinstall starts fresh:
+        //    - Remove the trust entry so the next install isn't
+        //      shadowed by a stale prior decision (we never write
+        //      `.denied` here anymore, but legacy installs might).
+        //    - Clear the kill-switch flag so the reinstalled plugin
+        //      isn't immediately filtered out by the disabled set.
+        //    - Drop the parked "disabled" snapshot from the registry
+        //      so the Settings panel doesn't keep ghosting the row.
         resolvedTrustStore.removeEntry(for: manifest, bundleURL: bundleURL)
+        PluginTrustGate.disabledStore.setDisabled(false, for: manifest.id)
+        registry.removeDisabledRecord(id: manifest.id)
 
         return bundleURL
     }

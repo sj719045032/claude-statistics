@@ -52,6 +52,7 @@ public enum PluginLoader {
         case manifestMissing
         case incompatibleAPIVersion(required: SemVer, host: SemVer)
         case trustDenied
+        case disabled
         case bundleLoadFailed
         case principalClassMissing(name: String)
         case principalClassWrongType(name: String)
@@ -64,6 +65,16 @@ public enum PluginLoader {
     /// mechanism, the policy lives in the host.
     public typealias TrustEvaluator =
         @MainActor (_ manifest: PluginManifest, _ bundleURL: URL) -> Bool
+
+    /// Disabled-flag callback. Returns `true` if the user has
+    /// explicitly disabled this plugin id. When true, the loader
+    /// stops at the manifest stage (no `dlopen`), records the
+    /// manifest as disabled in the registry so the Settings panel
+    /// can still display a row, and returns `.failure(.disabled)`.
+    /// Default `{ _ in false }` keeps callers that don't care
+    /// (tests, hot-load) on the legacy path.
+    public typealias DisabledChecker =
+        @MainActor (_ pluginId: String) -> Bool
 
     /// `sourceKind` controls how the registry tags each loaded plugin:
     /// pass `.bundled` when scanning `Contents/PlugIns/` and `.user`
@@ -78,6 +89,7 @@ public enum PluginLoader {
         from directory: URL,
         into registry: PluginRegistry,
         trustEvaluator: TrustEvaluator = { _, _ in true },
+        disabledChecker: DisabledChecker = { _ in false },
         sourceKind: SourceKind = .user
     ) -> Report {
         var loaded: [PluginManifest] = []
@@ -93,7 +105,13 @@ public enum PluginLoader {
 
         for url in entries.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
             let source: PluginSource = sourceKind == .bundled ? .bundled(url: url) : .user(url: url)
-            switch loadOne(at: url, into: registry, trustEvaluator: trustEvaluator, source: source) {
+            switch loadOne(
+                at: url,
+                into: registry,
+                trustEvaluator: trustEvaluator,
+                disabledChecker: disabledChecker,
+                source: source
+            ) {
             case .success(let manifest):
                 loaded.append(manifest)
             case .failure(let reason):
@@ -128,6 +146,7 @@ public enum PluginLoader {
         at url: URL,
         into registry: PluginRegistry,
         trustEvaluator: TrustEvaluator = { _, _ in true },
+        disabledChecker: DisabledChecker = { _ in false },
         source: PluginSource? = nil
     ) -> Result<PluginManifest, SkipReason> {
         guard url.pathExtension == "csplugin" else {
@@ -142,6 +161,16 @@ public enum PluginLoader {
                 required: manifest.minHostAPIVersion,
                 host: SDKInfo.apiVersion
             ))
+        }
+        // Disabled check runs before trust: a disabled plugin
+        // shouldn't trigger a trust prompt either, and the user
+        // already saw it once when they originally enabled it.
+        if disabledChecker(manifest.id) {
+            registry.recordDisabled(
+                manifest: manifest,
+                source: source ?? .user(url: url)
+            )
+            return .failure(.disabled)
         }
         guard trustEvaluator(manifest, url) else {
             return .failure(.trustDenied)

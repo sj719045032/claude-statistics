@@ -7,43 +7,17 @@ struct TerminalPreferenceOption: Identifiable, Equatable {
     let isInstalled: Bool
 }
 
-enum EditorApp: String, CaseIterable, Identifiable {
-    case vscode = "VSCode"
-    case cursor = "Cursor"
-    case windsurf = "Windsurf"
-    case trae = "Trae"
-
-    var id: String { rawValue }
-
-    var bundleId: String {
-        switch self {
-        case .vscode:   return "com.microsoft.VSCode"
-        case .cursor:   return "com.todesktop.230313mzl4w4u92"
-        case .windsurf: return "com.exafunction.windsurf"
-        case .trae:     return "com.trae.app"
-        }
-    }
-
-    var appURL: URL? {
-        NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId)
-    }
-
-    var isInstalled: Bool { appURL != nil }
-
-    static var preferred: EditorApp {
-        let raw = UserDefaults.standard.string(forKey: AppPreferences.preferredEditor) ?? "VSCode"
-        return EditorApp(rawValue: raw) ?? .vscode
-    }
-
-    static func setPreferred(_ app: EditorApp) {
-        UserDefaults.standard.set(app.rawValue, forKey: AppPreferences.preferredEditor)
-    }
-
-    static var resumeCopiedToastMessage: String {
-        String(format: NSLocalizedString("detail.resumeCopiedHint %@", comment: ""), Self.preferred.rawValue)
-    }
-}
-
+/// Per-provider default terminal preference. The user picks a terminal
+/// for Claude separately from Codex / Gemini / any third-party plugin
+/// provider — selecting "Codex.app" while on the Codex provider keeps
+/// the Claude provider's choice intact.
+///
+/// Storage schema:
+///   - `preferredTerminal.<descriptor.id>` — per-provider entry,
+///     written every time the user picks a terminal in Settings.
+///   - `preferredTerminal` (legacy single key) — read-only fallback
+///     during the migration window so existing installs keep their
+///     choice when they first launch this build.
 enum TerminalPreferences {
     static let preferredTerminalKey = "preferredTerminal"
     static let autoOptionID = "Auto"
@@ -54,23 +28,74 @@ enum TerminalPreferences {
     static let kittyOptionID = "Kitty"
     static let wezTermOptionID = "WezTerm"
     static let alacrittyOptionID = "Alacritty"
-    static let editorOptionID = "Editor"
 
+    private static func perProviderKey(_ providerID: String) -> String {
+        "\(preferredTerminalKey).\(providerID)"
+    }
+
+    /// Default-getter routed through `ProviderRegistry.selectedProviderKind()`
+    /// so existing call sites (TerminalRegistry.launch's default arg,
+    /// the launch coordinator, etc.) automatically pick the
+    /// preference for the *currently selected* provider without
+    /// threading a kind parameter through every layer.
     static var preferredOptionID: String {
-        let raw = UserDefaults.standard.string(forKey: preferredTerminalKey) ?? autoOptionID
-        return option(for: raw)?.id ?? autoOptionID
+        let currentProviderID = ProviderRegistry.selectedProviderKind().descriptor.id
+        return preferredOptionID(forProvider: currentProviderID)
     }
 
+    static func preferredOptionID(forProvider providerID: String) -> String {
+        let d = UserDefaults.standard
+        // 1. Per-provider key takes precedence.
+        if let raw = d.string(forKey: perProviderKey(providerID)),
+           let option = option(for: raw) {
+            return option.id
+        }
+        // 2. Fall back to the legacy single key during migration.
+        //    Don't write it back per-provider here — the first
+        //    explicit pick fills the per-provider entry naturally.
+        if let raw = d.string(forKey: preferredTerminalKey),
+           let option = option(for: raw) {
+            return option.id
+        }
+        return autoOptionID
+    }
+
+    /// Default-setter routes to the currently selected provider. Used
+    /// by the picker's binding when the user hasn't explicitly
+    /// scoped the change.
     static func setPreferredOptionID(_ optionID: String) {
-        UserDefaults.standard.set(optionID, forKey: preferredTerminalKey)
+        let currentProviderID = ProviderRegistry.selectedProviderKind().descriptor.id
+        setPreferredOptionID(optionID, forProvider: currentProviderID)
     }
 
+    static func setPreferredOptionID(_ optionID: String, forProvider providerID: String) {
+        UserDefaults.standard.set(optionID, forKey: perProviderKey(providerID))
+    }
+
+    /// True when the currently-selected terminal is an editor (e.g.
+    /// VSCodePlugin / CursorPlugin / ZedPlugin). The host's "resume
+    /// session" flow copies the resume command to the clipboard
+    /// instead of executing it directly when this is true, since
+    /// editors don't have a shell prompt to receive the command.
     static var isEditorPreferred: Bool {
-        preferredOptionID == editorOptionID
+        isEditorPreferred(rawValue: preferredOptionID)
     }
 
     static func isEditorPreferred(rawValue: String) -> Bool {
-        rawValue == editorOptionID
+        TerminalRegistry.capability(forOptionID: rawValue)?.category == .editor
+    }
+
+    /// Toast text shown when a resume command is copied to the
+    /// clipboard for an editor-preferred session.
+    static var resumeCopiedToastMessage: String {
+        let editorName = TerminalRegistry
+            .capability(forOptionID: preferredOptionID)?
+            .displayName
+            ?? NSLocalizedString("settings.defaultTerminal", comment: "")
+        return String(
+            format: NSLocalizedString("detail.resumeCopiedHint %@", comment: ""),
+            editorName
+        )
     }
 
     static func option(for rawValue: String) -> TerminalPreferenceOption? {

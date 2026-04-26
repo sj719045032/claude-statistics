@@ -19,6 +19,13 @@ protocol TerminalCapability {
     /// Lower values are preferred by Auto launch mode. `nil` means the
     /// capability is never selected automatically.
     var autoLaunchPriority: Int? { get }
+    /// Provider this terminal exclusively serves. `nil` for general
+    /// emulators that work across every provider; non-nil for chat-app
+    /// hosts (Codex.app / Claude.app) whose deep-link scheme only
+    /// makes sense for one provider's transcripts. The picker hides
+    /// non-matching capabilities when the user is on a different
+    /// provider.
+    var boundProviderID: String? { get }
 }
 
 extension TerminalCapability {
@@ -26,6 +33,7 @@ extension TerminalCapability {
     // override this.
     var tabFocusPrecision: TerminalTabFocusPrecision { .appOnly }
     var autoLaunchPriority: Int? { nil }
+    var boundProviderID: String? { nil }
 }
 
 // `TerminalLauncher` lives in `ClaudeStatisticsKit`.

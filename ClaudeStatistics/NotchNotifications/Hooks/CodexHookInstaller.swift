@@ -295,18 +295,23 @@ struct CodexHookInstaller: HookInstalling {
 enum NotchHookSync {
     /// Collected from each provider's own declaration — no central list to
     /// keep in sync. A provider without a `notchHookInstaller` simply sits out.
-    static var installers: [any HookInstalling] {
-        ProviderKind.allCases.compactMap { kind in
+    /// `plugins` filters out provider plugins the user has disabled so
+    /// their hook installers don't keep mounting on every notch
+    /// reconciliation.
+    @MainActor
+    static func installers(plugins: PluginRegistry?) -> [any HookInstalling] {
+        ProviderRegistry.availableProviders(plugins: plugins).compactMap { kind in
             ProviderRegistry.provider(for: kind).notchHookInstaller
         }
     }
 
     /// Install or uninstall each provider's hooks based on its own master switch.
+    @MainActor
     @discardableResult
-    static func syncCurrent() async throws -> HookInstallResult {
+    static func syncCurrent(plugins: PluginRegistry? = nil) async throws -> HookInstallResult {
         var sawConfirmationDenied = false
 
-        for installer in installers {
+        for installer in installers(plugins: plugins) {
             // Builtin installers always have a kind that maps back to the
             // legacy enum; default to .claude for the impossible no-match
             // path so the loop stays total.

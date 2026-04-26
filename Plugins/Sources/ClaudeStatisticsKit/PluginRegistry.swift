@@ -34,6 +34,20 @@ public enum PluginSource: Sendable, Equatable {
     }
 }
 
+/// Snapshot of a plugin the host knows about but didn't register
+/// because it's currently disabled. Carries the manifest so the
+/// Settings UI can render a row even though no live `Plugin`
+/// instance exists in the registry.
+public struct DisabledRecord: Sendable {
+    public let manifest: PluginManifest
+    public let source: PluginSource
+
+    public init(manifest: PluginManifest, source: PluginSource) {
+        self.manifest = manifest
+        self.source = source
+    }
+}
+
 @MainActor
 public final class PluginRegistry {
     public init() {}
@@ -50,6 +64,13 @@ public final class PluginRegistry {
     /// information is keyed by `manifest.id` — `.both` plugins land
     /// in two buckets but share one source entry.
     public private(set) var sources: [String: PluginSource] = [:]
+
+    /// Plugins the host saw at startup but skipped because the user
+    /// disabled them. The Settings panel reads this so disabled
+    /// plugins still appear in the list (with an Enable button)
+    /// instead of vanishing. Keyed by `manifest.id` so the UI can
+    /// dedupe across sources.
+    public private(set) var disabled: [String: DisabledRecord] = [:]
 
     /// Register a freshly-instantiated plugin. The registry stores it
     /// against `manifest.id` in the bucket(s) implied by `manifest.kind`.
@@ -81,6 +102,30 @@ public final class PluginRegistry {
 
     public func source(for pluginID: String) -> PluginSource? {
         sources[pluginID]
+    }
+
+    /// Stash a manifest the host saw on disk (or in the dogfood list)
+    /// but skipped because the user has disabled the plugin. Removes
+    /// the same id from the registered buckets if it was somehow
+    /// already there, so disabled and registered states stay
+    /// mutually exclusive.
+    public func recordDisabled(manifest: PluginManifest, source: PluginSource) {
+        unregister(id: manifest.id)
+        disabled[manifest.id] = DisabledRecord(manifest: manifest, source: source)
+    }
+
+    /// Drop a previously-recorded disabled snapshot. Called when the
+    /// user clicks Enable, after the host re-registers (or restarts
+    /// to re-register) the plugin.
+    @discardableResult
+    public func removeDisabledRecord(id: String) -> Bool {
+        disabled.removeValue(forKey: id) != nil
+    }
+
+    /// Snapshot of every plugin the registry knows is disabled. Used
+    /// by the Settings panel to populate the "Disabled" section.
+    public func disabledRecords() -> [DisabledRecord] {
+        Array(disabled.values)
     }
 
     /// Remove a plugin from every bucket it occupies plus the source

@@ -266,8 +266,14 @@
 "settings.plugins.source.user" = "用户";
 "settings.plugins.disable" = "禁用";
 "settings.plugins.disable.confirmTitle" = "禁用此插件？";
-"settings.plugins.disable.confirmMessage" = "%@ 将从插件注册表移除并记录为已拒绝。直到你重置信任之前，后续启动都不会加载它。";
+"settings.plugins.disable.confirmMessage" = "%@ 将从插件注册表移除，且后续每次启动都会跳过加载。你随时可以在此面板将它重新启用。";
 "settings.plugins.disable.confirmButton" = "禁用";
+"settings.plugins.disable.lastProviderHint" = "至少需要保留一个 Provider 处于启用状态，否则菜单栏入口会消失。";
+"settings.plugins.enable" = "启用";
+"settings.plugins.enable.restartRequired" = "需要重启";
+"settings.plugins.enable.errorTitle" = "启用失败";
+"settings.plugins.enable.hotLoadFailed" = "%@ 无法在不重启的情况下重新加载（%@）。请退出并重启 Claude Statistics。";
+"settings.plugins.disabled.count" = "已禁用（%d）";
 "settings.plugins.uninstall" = "卸载";
 "settings.plugins.uninstall.confirmTitle" = "卸载此插件？";
 "settings.plugins.uninstall.confirmMessage" = "%@ 将被从注册表移除、磁盘上的 .csplugin 文件被删除、信任记录被清空。之后可以从市场重新安装。";

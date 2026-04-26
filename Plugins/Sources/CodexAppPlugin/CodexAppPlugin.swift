@@ -12,8 +12,15 @@ import Foundation
 /// the app.
 @objc(CodexAppPlugin)
 public final class CodexAppPlugin: NSObject, TerminalPlugin {
+    /// Distinct from `CodexPluginDogfood` (the provider-side adapter
+    /// at `com.openai.codex`) — this `.app` suffix marks the GUI
+    /// terminal host so PluginRegistry's id-keyed bookkeeping
+    /// (sources, disabled, source(for:)) doesn't collapse the two
+    /// instances into one entry. The `descriptor.bundleIdentifiers`
+    /// still carry the real macOS bundle id so process tree walking
+    /// and focus dispatch resolve correctly against the on-disk app.
     public static let manifest = PluginManifest(
-        id: "com.openai.codex",
+        id: "com.openai.codex.app",
         kind: .terminal,
         displayName: "Codex",
         version: SemVer(major: 1, minor: 0, patch: 0),
@@ -23,14 +30,15 @@ public final class CodexAppPlugin: NSObject, TerminalPlugin {
     )
 
     public let descriptor = TerminalDescriptor(
-        id: "com.openai.codex",
+        id: "com.openai.codex.app",
         displayName: "Codex",
         category: .terminal,
         bundleIdentifiers: ["com.openai.codex"],
         terminalNameAliases: ["codex", "codex.app"],
         processNameHints: ["codex"],
         focusPrecision: .exact,
-        autoLaunchPriority: nil
+        autoLaunchPriority: nil,
+        boundProviderID: "codex"
     )
 
     public override init() { super.init() }
@@ -41,6 +49,10 @@ public final class CodexAppPlugin: NSObject, TerminalPlugin {
 
     public func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
         CodexAppFocusStrategy()
+    }
+
+    public func makeLauncher() -> (any TerminalLauncher)? {
+        ActivateAppLauncher(bundleIdentifiers: Array(descriptor.bundleIdentifiers))
     }
 
     /// Codex.app fires a fresh `codex-cli` subprocess (with a new

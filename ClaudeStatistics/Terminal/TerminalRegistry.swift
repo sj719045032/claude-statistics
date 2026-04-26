@@ -9,8 +9,7 @@ enum TerminalRegistry {
         AppleTerminalCapability(),
         WarpTerminalCapability(),
         KittyTerminalCapability(),
-        AlacrittyTerminalCapability(),
-        EditorTerminalCapability()
+        AlacrittyTerminalCapability()
     ]
 
     /// Identifiers contributed by external `TerminalPlugin`s at runtime
@@ -45,13 +44,97 @@ enum TerminalRegistry {
         )
     ]
 
+    /// Option ids the user has disabled via the Plugins panel. The
+    /// AppState recomputes this set on every plugin disable/enable
+    /// hot-load and pushes it through `setDisabledOptionIDs`.
+    /// Picker, readiness, and launch surfaces filter against it so
+    /// disabled terminals stop appearing in the user-facing list
+    /// while metadata lookups (`capability(forBundleId:)`,
+    /// `bundleId(forTerminalName:)` used by the focus pipeline) keep
+    /// returning the capability — disabling a terminal plugin
+    /// shouldn't break parent-process focus inspection that already
+    /// has a session pointing at it.
+    private static let disabledOptionIDsStore = DisabledOptionIDStore()
+
+    /// Live snapshot of plugin-contributed terminal capabilities.
+    /// Maintained by AppState whenever PluginRegistry changes
+    /// (initial load, hot-load on enable, removal on disable). Each
+    /// entry is a `PluginBackedTerminalCapability` adapter wrapping
+    /// a `TerminalPlugin` so the host's `TerminalCapability` surfaces
+    /// (picker, readiness, launch) treat plugin terminals like
+    /// builtins.
+    private static let pluginCapabilitiesStore = PluginCapabilityStore()
+
+    static func setDisabledOptionIDs(_ ids: Set<String>) {
+        disabledOptionIDsStore.set(ids)
+    }
+
+    @MainActor
+    static func setPluginCapabilities(_ capabilities: [any TerminalCapability]) {
+        pluginCapabilitiesStore.set(capabilities)
+    }
+
+    /// All capabilities the user can pick from: hardcoded builtins +
+    /// plugin-contributed adapters, minus the kill-switched ids. Used
+    /// by every picker / readiness / launch surface.
+    ///
+    /// `forProvider`: when non-nil, hides capabilities whose
+    /// `boundProviderID` doesn't match — chat-app GUIs (Codex.app,
+    /// Claude.app) only show up under their own provider. Pass nil
+    /// from contexts without a provider in scope (auto-launch picks,
+    /// process-tree-walker bundle id mapping) so those keep seeing
+    /// every capability.
+    private static func enabledSelectableCapabilities(
+        forProvider providerID: String? = nil
+    ) -> [any TerminalCapability] {
+        let disabled = disabledOptionIDsStore.snapshot()
+        let plugins = pluginCapabilitiesStore.snapshot()
+        // Plugin-contributed capabilities take precedence over
+        // builtins with the same option id (lets a plugin override a
+        // builtin without conflict), and disabled ids drop out.
+        var seen = Set<String>()
+        var result: [any TerminalCapability] = []
+        for cap in plugins {
+            guard !isHiddenByProviderBinding(cap, forProvider: providerID) else { continue }
+            guard let optionID = cap.optionID, !disabled.contains(optionID) else { continue }
+            if seen.insert(optionID).inserted {
+                result.append(cap)
+            }
+        }
+        for cap in appCapabilities {
+            guard !isHiddenByProviderBinding(cap, forProvider: providerID) else { continue }
+            guard let optionID = cap.optionID else {
+                result.append(cap)
+                continue
+            }
+            if disabled.contains(optionID) { continue }
+            if seen.insert(optionID).inserted {
+                result.append(cap)
+            }
+        }
+        return result
+    }
+
+    private static func isHiddenByProviderBinding(
+        _ cap: any TerminalCapability,
+        forProvider providerID: String?
+    ) -> Bool {
+        guard let bound = cap.boundProviderID else { return false }
+        guard let providerID else { return false }
+        return bound != providerID
+    }
+
     static var capabilities: [any TerminalCapability] {
-        appCapabilities + externalCapabilities
+        appCapabilities + externalCapabilities + pluginCapabilitiesStore.snapshot()
     }
 
     static var launchOptions: [TerminalPreferenceOption] {
+        launchOptions(forProvider: nil)
+    }
+
+    static func launchOptions(forProvider providerID: String?) -> [TerminalPreferenceOption] {
         [TerminalPreferenceOption(id: TerminalPreferences.autoOptionID, title: TerminalPreferences.autoOptionID, isInstalled: true)]
-            + appCapabilities.compactMap { capability in
+            + enabledSelectableCapabilities(forProvider: providerID).compactMap { capability in
                 guard let optionID = capability.optionID else { return nil }
                 return TerminalPreferenceOption(
                     id: optionID,
@@ -62,12 +145,16 @@ enum TerminalRegistry {
     }
 
     static var readinessOptions: [TerminalOptionStatus] {
+        readinessOptions(forProvider: nil)
+    }
+
+    static func readinessOptions(forProvider providerID: String?) -> [TerminalOptionStatus] {
         [TerminalOptionStatus(
             id: TerminalPreferences.autoOptionID,
             title: TerminalPreferences.autoOptionID,
             isInstalled: true,
             readiness: preferredReadiness(preferredOptionID: TerminalPreferences.autoOptionID)
-        )] + appCapabilities.compactMap { capability in
+        )] + enabledSelectableCapabilities(forProvider: providerID).compactMap { capability in
             guard let optionID = capability.optionID else { return nil }
             let readiness = capability.readiness()
             return TerminalOptionStatus(
@@ -80,11 +167,11 @@ enum TerminalRegistry {
     }
 
     static var setupProviders: [any TerminalCapability & TerminalSetupProviding] {
-        appCapabilities.compactMap { $0 as? any TerminalCapability & TerminalSetupProviding }
+        enabledSelectableCapabilities().compactMap { $0 as? any TerminalCapability & TerminalSetupProviding }
     }
 
     static var launchingProviders: [any TerminalCapability & TerminalLauncher] {
-        appCapabilities.compactMap { $0 as? any TerminalCapability & TerminalLauncher }
+        enabledSelectableCapabilities().compactMap { $0 as? any TerminalCapability & TerminalLauncher }
     }
 
     static var directFocusProviders: [any TerminalCapability & TerminalDirectFocusing] {
@@ -268,6 +355,40 @@ enum TerminalRegistry {
             .sorted { $0.priority < $1.priority }
             .first?
             .capability
+    }
+}
+
+private final class DisabledOptionIDStore: @unchecked Sendable {
+    private let lock = NSLock()
+    private var ids: Set<String> = []
+
+    func set(_ newIds: Set<String>) {
+        lock.lock()
+        defer { lock.unlock() }
+        ids = newIds
+    }
+
+    func snapshot() -> Set<String> {
+        lock.lock()
+        defer { lock.unlock() }
+        return ids
+    }
+}
+
+private final class PluginCapabilityStore: @unchecked Sendable {
+    private let lock = NSLock()
+    private var capabilities: [any TerminalCapability] = []
+
+    func set(_ caps: [any TerminalCapability]) {
+        lock.lock()
+        defer { lock.unlock() }
+        capabilities = caps
+    }
+
+    func snapshot() -> [any TerminalCapability] {
+        lock.lock()
+        defer { lock.unlock() }
+        return capabilities
     }
 }
 
