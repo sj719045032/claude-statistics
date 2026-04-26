@@ -181,6 +181,7 @@
 		B872C0AE8B54239EEA84509E /* ClaudeAccountModeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD2C72B18AE30277C693576A /* ClaudeAccountModeController.swift */; };
 		B94C016E1EDF5D5940A78026 /* TrendDataPoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5CD3EF8FA91298047B26D20 /* TrendDataPoint.swift */; };
 		B98C3A36B759BBAD6E398BCA /* DaySlice+Pricing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CE65D192C24051486ABF875 /* DaySlice+Pricing.swift */; };
+		BB6858F502827249DFC7E71E /* AccountProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561139B5156918EA6069C129 /* AccountProvider.swift */; };
 		BB9902B8A5E35FB7C78F63F0 /* SharePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52FF7E2030D328036A1F8F6D /* SharePreviewView.swift */; };
 		BC186868FB56DC3ED72EC57E /* StatusLineInstalling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDE956A15BE7200F87C51D4 /* StatusLineInstalling.swift */; };
 		BC65FB4B58BE9FD0EBB88C70 /* AppleScriptFocuser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 645A6AB9436D7D2577DAE9D8 /* AppleScriptFocuser.swift */; };
@@ -383,6 +384,7 @@
 		52FF7E2030D328036A1F8F6D /* SharePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharePreviewView.swift; sourceTree = "<group>"; };
 		5306E49F4AF08425229312F0 /* UsageViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageViewModel.swift; sourceTree = "<group>"; };
 		54DA495D7C6105F8AD37FD7D /* SessionScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionScanner.swift; sourceTree = "<group>"; };
+		561139B5156918EA6069C129 /* AccountProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountProvider.swift; sourceTree = "<group>"; };
 		563272C01660D2FA4FBCBE13 /* NotificationTimerStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationTimerStoreTests.swift; sourceTree = "<group>"; };
 		563283ED216FE68D0E3B11EA /* SessionStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStats.swift; sourceTree = "<group>"; };
 		5657C95B75EDEA0DA7660426 /* InformationalEventGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InformationalEventGateTests.swift; sourceTree = "<group>"; };
@@ -693,6 +695,7 @@
 		2489CD3BC5CC01CED948DEAF /* ClaudeStatisticsKit */ = {
 			isa = PBXGroup;
 			children = (
+				561139B5156918EA6069C129 /* AccountProvider.swift */,
 				0F23EB1047050D22FF96E2B2 /* CanonicalToolName.swift */,
 				25FAD30C4ED3FB7C010C8E96 /* ClaudeStatisticsKit.swift */,
 				5751B5879E1EAFCE00A80DAC /* DaySlice.swift */,
@@ -1382,6 +1385,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BB6858F502827249DFC7E71E /* AccountProvider.swift in Sources */,
 				A2F7960601060A4F2D8BE790 /* CanonicalToolName.swift in Sources */,
 				452CF0878A952AAF60319431 /* ClaudeStatisticsKit.swift in Sources */,
 				21492C1C67351582F64D20A1 /* DaySlice.swift in Sources */,

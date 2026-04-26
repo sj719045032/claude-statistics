@@ -81,17 +81,7 @@ protocol UsageProvider: Sendable {
     func menuBarStripSegments(from usage: UsageData?) -> [MenuBarStripSegment]
 }
 
-/// Credentials + profile fetch. Currently part of the `SessionProvider`
-/// composition because every provider implements it, but defined as its
-/// own protocol so consumers that only need profile data can narrow to
-/// `any AccountProvider`.
-protocol AccountProvider: Sendable {
-    /// Whether stored credentials exist. `nil` means the check is not applicable for this provider.
-    var credentialStatus: Bool? { get }
-    /// Localization key describing where this provider's credentials are read from.
-    var credentialHintLocalizationKey: String? { get }
-    func fetchProfile() async -> UserProfile?
-}
+// AccountProvider lives in ClaudeStatisticsKit.
 
 /// Notch hook + statusline installation.
 protocol HookProvider: Sendable {
@@ -208,11 +198,7 @@ extension UsageProvider {
     }
 }
 
-extension AccountProvider {
-    var credentialStatus: Bool? { nil }
-    var credentialHintLocalizationKey: String? { nil }
-    func fetchProfile() async -> UserProfile? { nil }
-}
+// AccountProvider default impls live in ClaudeStatisticsKit.
 
 extension HookProvider {
     var statusLineInstaller: (any StatusLineInstalling)? { nil }
