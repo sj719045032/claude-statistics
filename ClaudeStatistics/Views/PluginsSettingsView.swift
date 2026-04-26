@@ -10,6 +10,12 @@ struct PluginsSettingsView: View {
     let pluginRegistry: PluginRegistry
     let onBack: () -> Void
 
+    private enum Tab: Hashable {
+        case installed
+        case discover
+    }
+
+    @State private var tab: Tab = .installed
     @State private var showResetConfirmation = false
     @State private var resetMessage: String?
     @State private var pendingDisable: Row?
@@ -73,44 +79,23 @@ struct PluginsSettingsView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
 
+            Picker("", selection: $tab) {
+                Text("settings.plugins.tab.installed").tag(Tab.installed)
+                Text("settings.plugins.tab.discover").tag(Tab.discover)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
+
             Divider()
 
-            Form {
-                Section {
-                    if rows.isEmpty {
-                        Text("settings.plugins.empty")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(rows) { row in
-                            pluginRow(row.manifest, source: row.source)
-                        }
-                    }
-                } header: {
-                    Text(String(format: NSLocalizedString("settings.plugins.loaded.count", comment: ""), rows.count))
-                }
-
-                Section("settings.plugins.trust") {
-                    Button(action: { showResetConfirmation = true }) {
-                        HStack {
-                            Label("settings.plugins.resetTrust", systemImage: "arrow.counterclockwise.circle")
-                                .labelStyle(SettingsRowLabelStyle())
-                            Spacer()
-                            Image(systemName: "exclamationmark.triangle")
-                                .font(.system(size: 10))
-                                .foregroundStyle(.orange)
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    if let resetMessage {
-                        Text(resetMessage)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    }
-                }
+            switch tab {
+            case .installed:
+                installedTab
+            case .discover:
+                PluginDiscoverView(pluginRegistry: pluginRegistry)
             }
-            .formStyle(.grouped)
         }
         .alert("settings.plugins.resetTrust.confirmTitle", isPresented: $showResetConfirmation) {
             Button("settings.cancel", role: .cancel) {}
@@ -143,6 +128,45 @@ struct PluginsSettingsView: View {
                 row.manifest.displayName
             ))
         }
+    }
+
+    @ViewBuilder
+    private var installedTab: some View {
+        Form {
+                Section {
+                    if rows.isEmpty {
+                        Text("settings.plugins.empty")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(rows) { row in
+                            pluginRow(row.manifest, source: row.source)
+                        }
+                    }
+                } header: {
+                    Text(String(format: NSLocalizedString("settings.plugins.loaded.count", comment: ""), rows.count))
+                }
+
+                Section("settings.plugins.trust") {
+                    SettingsRowButton(action: { showResetConfirmation = true }) {
+                        HStack {
+                            Label("settings.plugins.resetTrust", systemImage: "arrow.counterclockwise.circle")
+                                .labelStyle(SettingsRowLabelStyle())
+                            Spacer()
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.orange)
+                        }
+                    }
+
+                    if let resetMessage {
+                        Text(resetMessage)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .formStyle(.grouped)
     }
 
     @ViewBuilder
