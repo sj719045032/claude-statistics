@@ -247,8 +247,8 @@ struct SessionDetailView: View {
                     Divider()
 
                     let maxCount = stats.sortedToolUses.first?.count ?? 1
-                    ForEach(Array(stats.sortedToolUses.enumerated()), id: \.element.name) { index, tool in
-                        ToolBarRow(name: tool.name, count: tool.count, maxCount: maxCount, delay: Double(index) * 0.03)
+                    ForEach(stats.sortedToolUses, id: \.name) { tool in
+                        ToolBarRow(name: tool.name, count: tool.count, maxCount: maxCount)
                     }
                 }
             }
@@ -683,7 +683,6 @@ struct ToolBarRow: View {
     let name: String
     let count: Int
     let maxCount: Int
-    let delay: Double
     @State private var animatedWidth: CGFloat = 0
 
     var body: some View {
@@ -709,7 +708,7 @@ struct ToolBarRow: View {
                         .frame(width: animatedWidth)
                 }
                 .onAppear {
-                    withAnimation(.easeOut(duration: 0.5).delay(delay)) {
+                    withAnimation(.easeOut(duration: 0.5)) {
                         animatedWidth = target
                     }
                 }

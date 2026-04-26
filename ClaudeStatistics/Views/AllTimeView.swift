@@ -69,7 +69,7 @@ struct AllTimeView: View {
             }
         }
         .task(id: stat.id) {
-            trendData = store.aggregateTrendData(for: stat, periodType: .all)
+            trendData = await store.aggregateTrendData(for: stat, periodType: .all)
         }
     }
 
@@ -179,9 +179,7 @@ struct AllTimeView: View {
     }
 
     private var availableHeatmapYears: [Int] {
-        let cal = Calendar.current
-        let years = Set(store.dailyHeatmapData.keys.map { cal.component(.year, from: $0) })
-        return years.sorted(by: >)
+        store.availableHeatmapYears
     }
 
     // MARK: - Top projects (by cost)
@@ -227,8 +225,8 @@ struct AllTimeView: View {
                 Divider()
                 let sorted = stat.toolUseCounts.sorted { $0.value > $1.value }
                 let maxCount = sorted.first?.value ?? 1
-                ForEach(Array(sorted.prefix(15).enumerated()), id: \.element.key) { index, item in
-                    ToolBarRow(name: item.key, count: item.value, maxCount: maxCount, delay: Double(index) * 0.03)
+                ForEach(Array(sorted.prefix(15)), id: \.key) { item in
+                    ToolBarRow(name: item.key, count: item.value, maxCount: maxCount)
                 }
             }
         }

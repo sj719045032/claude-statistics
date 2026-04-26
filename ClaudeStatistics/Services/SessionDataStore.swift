@@ -803,7 +803,29 @@ final class SessionDataStore: ObservableObject {
 
     /// Aggregate projects by their `cwd` (or projectPath fallback) for a specific period.
     /// Aggregate projects by their `cwd` (or projectPath fallback) for a specific period.
-    func aggregatePeriodTopProjects(for period: PeriodStats, periodType: StatsPeriod) -> [TopProject] {
+    func aggregatePeriodTopProjects(for period: PeriodStats, periodType: StatsPeriod) async -> [TopProject] {
+        // Snapshot main-actor state so the heavy fold runs off the UI thread.
+        let currentSessions = sessions.isEmpty ? ProviderRegistry.provider(for: provider.kind).scanSessions() : sessions
+        let snapshot = parsedStats
+        let resetDate = weeklyResetDate
+        return await Task.detached {
+            Self.computePeriodTopProjects(
+                parsedStats: snapshot,
+                sessions: currentSessions,
+                period: period,
+                periodType: periodType,
+                weeklyResetDate: resetDate
+            )
+        }.value
+    }
+
+    private nonisolated static func computePeriodTopProjects(
+        parsedStats: [String: SessionStats],
+        sessions: [Session],
+        period: PeriodStats,
+        periodType: StatsPeriod,
+        weeklyResetDate: Date?
+    ) -> [TopProject] {
         struct Acc {
             var cost: Double = 0
             var tokens: Int = 0
@@ -811,31 +833,27 @@ final class SessionDataStore: ObservableObject {
             var messageCount: Int = 0
         }
         var acc: [String: Acc] = [:]
-        
-        // Ensure we have current sessions
-        let currentSessions = sessions.isEmpty ? ProviderRegistry.provider(for: provider.kind).scanSessions() : sessions
-        let sessionById = Dictionary(uniqueKeysWithValues: currentSessions.map { ($0.id, $0) })
-        let resetDate = weeklyResetDate
-        
+        let sessionById = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
+
         let periodStart = period.period
-        let periodEnd = periodType == .all ? Date.distantFuture : periodType.nextPeriodStart(after: periodStart, weeklyResetDate: resetDate)
+        let periodEnd = periodType == .all ? Date.distantFuture : periodType.nextPeriodStart(after: periodStart, weeklyResetDate: weeklyResetDate)
 
         for (sessionId, stats) in parsedStats {
             guard let session = sessionById[sessionId] else { continue }
             let key = session.cwd ?? session.projectPath
-            
+
             let sStart = stats.startTime ?? session.lastModified
             let sEnd = stats.endTime ?? session.lastModified
-            
+
             // Check if session interval [sStart, sEnd] overlaps with [periodStart, periodEnd)
             let overlaps = sStart < periodEnd && sEnd >= periodStart
             guard overlaps else { continue }
-            
+
             var a = acc[key, default: Acc()]
-            
+
             if stats.fiveMinSlices.isEmpty {
                 // For all-time aggregated stats (Date.distantPast), or if start periods match
-                if periodType == .all || periodType.startOfPeriod(for: sStart, weeklyResetDate: resetDate) == periodStart {
+                if periodType == .all || periodType.startOfPeriod(for: sStart, weeklyResetDate: weeklyResetDate) == periodStart {
                     a.cost += stats.estimatedCost
                     a.tokens += stats.totalTokens
                     a.messageCount += stats.messageCount
@@ -846,7 +864,7 @@ final class SessionDataStore: ObservableObject {
                 var tokensInPeriod = 0
                 var messagesInPeriod = 0
                 var hasActivityInPeriod = false
-                
+
                 for (sliceTime, slice) in stats.fiveMinSlices {
                     if sliceTime >= periodStart && sliceTime < periodEnd {
                         costInPeriod += slice.estimatedCost
@@ -855,7 +873,7 @@ final class SessionDataStore: ObservableObject {
                         hasActivityInPeriod = true
                     }
                 }
-                
+
                 if hasActivityInPeriod {
                     a.cost += costInPeriod
                     a.tokens += tokensInPeriod
@@ -897,7 +915,7 @@ final class SessionDataStore: ObservableObject {
 
     /// Trim/relabel a full path into something compact enough for a list row.
     /// Prefers the last path component (like the basename of a repo).
-    private static func displayNameForProjectPath(_ path: String) -> String {
+    nonisolated private static func displayNameForProjectPath(_ path: String) -> String {
         let expanded = (path as NSString).expandingTildeInPath
         let last = (expanded as NSString).lastPathComponent
         return last.isEmpty ? expanded : last
@@ -914,6 +932,13 @@ final class SessionDataStore: ObservableObject {
     /// walked every session's full slice map twice.
     var dailyHeatmapData: [Date: DailyHeatmapBucket] { _dailyHeatmapCache }
     @Published private var _dailyHeatmapCache: [Date: DailyHeatmapBucket] = [:]
+
+    /// Sorted-descending list of calendar years present in `dailyHeatmapData`.
+    /// Cached alongside the heatmap so AllTimeView's scope picker doesn't
+    /// re-run a `Set` build + `sort` over every dictionary key on each body
+    /// pass.
+    var availableHeatmapYears: [Int] { _availableHeatmapYearsCache }
+    @Published private var _availableHeatmapYearsCache: [Int] = []
 
     /// Recompute `_dailyHeatmapCache` and `_topProjectsCache`. Single
     /// O(sessions × slices) walk producing both — the heatmap's daily
@@ -969,6 +994,8 @@ final class SessionDataStore: ObservableObject {
         }
 
         _dailyHeatmapCache = heatmap
+        let years = Set(heatmap.keys.map { cal.component(.year, from: $0) })
+        _availableHeatmapYearsCache = years.sorted(by: >)
         _topProjectsCache = projectAcc.map { key, v in
             TopProject(
                 path: key,
@@ -1066,20 +1093,42 @@ final class SessionDataStore: ObservableObject {
     @Published private(set) var visibleModelBreakdown: [ModelUsage] = []
 
     /// Aggregate trend data for a given period from parsed session stats
-    func aggregateTrendData(for period: PeriodStats, periodType: StatsPeriod) -> [TrendDataPoint] {
+    func aggregateTrendData(for period: PeriodStats, periodType: StatsPeriod) async -> [TrendDataPoint] {
+        // Snapshot main-actor state so the heavy fold runs off the UI thread.
+        let snapshot = parsedStats
+        let snapshotSessions = sessions
+        let resetDate = weeklyResetDate
+        return await Task.detached {
+            Self.computeTrendData(
+                parsedStats: snapshot,
+                sessions: snapshotSessions,
+                period: period,
+                periodType: periodType,
+                weeklyResetDate: resetDate
+            )
+        }.value
+    }
+
+    private nonisolated static func computeTrendData(
+        parsedStats: [String: SessionStats],
+        sessions: [Session],
+        period: PeriodStats,
+        periodType: StatsPeriod,
+        weeklyResetDate: Date?
+    ) -> [TrendDataPoint] {
         let granularity = periodType.trendGranularity
         var buckets: [Date: (tokens: Int, cost: Double)] = [:]
 
         // Use fiveMinSlices for daily view or weekly with non-midnight subscription boundary
         let useFineSlices = periodType == .daily || (periodType == .weekly && weeklyResetDate != nil)
 
-        let resetDate = weeklyResetDate
+        let sessionById = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
 
         for (sessionId, stats) in parsedStats {
             let slices: [Date: DaySlice] = useFineSlices ? stats.fiveMinSlices : stats.daySlices
             if !slices.isEmpty {
                 for (sliceTime, slice) in slices {
-                    let slicePeriodStart = periodType.startOfPeriod(for: sliceTime, weeklyResetDate: resetDate)
+                    let slicePeriodStart = periodType.startOfPeriod(for: sliceTime, weeklyResetDate: weeklyResetDate)
                     guard slicePeriodStart == period.period else { continue }
 
                     let bucket = granularity.bucketStart(for: sliceTime)
@@ -1090,9 +1139,9 @@ final class SessionDataStore: ObservableObject {
                 }
             } else {
                 // Fallback for sessions without hourSlice data
-                guard let session = sessions.first(where: { $0.id == sessionId }) else { continue }
+                guard let session = sessionById[sessionId] else { continue }
                 let sessionDate = stats.startTime ?? session.lastModified
-                let sessionPeriodStart = periodType.startOfPeriod(for: sessionDate, weeklyResetDate: resetDate)
+                let sessionPeriodStart = periodType.startOfPeriod(for: sessionDate, weeklyResetDate: weeklyResetDate)
                 guard sessionPeriodStart == period.period else { continue }
 
                 let bucket = granularity.bucketStart(for: sessionDate)
@@ -1251,11 +1300,19 @@ final class SessionDataStore: ObservableObject {
     }
 
     /// Aggregates model breakdown for a specific set of sessions.
-    func aggregateProjectModelBreakdown(sessions: [Session]) -> [ModelUsage] {
+    func aggregateProjectModelBreakdown(sessions: [Session]) async -> [ModelUsage] {
+        // Snapshot on main actor — the per-model fold below is pure but
+        // touches `ModelPricing.estimateCost` which is fine off-main.
+        let snapshot: [SessionStats] = sessions.compactMap { parsedStats[$0.id] }
+        return await Task.detached {
+            Self.computeProjectModelBreakdown(stats: snapshot)
+        }.value
+    }
+
+    private nonisolated static func computeProjectModelBreakdown(stats: [SessionStats]) -> [ModelUsage] {
         var combined: [String: ModelUsage] = [:]
-        for session in sessions {
-            guard let stats = parsedStats[session.id] else { continue }
-            for (model, mts) in stats.modelBreakdown {
+        for st in stats {
+            for (model, mts) in st.modelBreakdown {
                 var usage = combined[model] ?? ModelUsage(model: model)
                 usage.inputTokens += mts.inputTokens
                 usage.outputTokens += mts.outputTokens

@@ -15,10 +15,17 @@ struct CalendarHeatmap: View {
 
     @State private var hoveredCellID: Date?
 
+    /// Pre-computed colour-bucket cutoffs. Held as `let` so the O(N log N)
+    /// sort runs once per `init` instead of on every cell render — `color(for:)`
+    /// is called per cell (≈365 / year) and previously triggered a fresh sort
+    /// over `buckets.values` each time, which dominated heatmap re-render cost.
+    private let thresholds: [Double]
+
     init(buckets: [Date: DailyHeatmapBucket], metric: Metric, scope: Scope = .last12Months) {
         self.buckets = buckets
         self.metric = metric
         self.scope = scope
+        self.thresholds = Self.computeThresholds(buckets: buckets, metric: metric)
     }
 
     enum Metric {
@@ -126,7 +133,7 @@ struct CalendarHeatmap: View {
     /// 4 thresholds cut the non-zero active range into 5 visual buckets.
     /// Uses the 85th percentile as the "high" end so a few extreme days don't
     /// crush everything else into a single pale bucket.
-    private var thresholds: [Double] {
+    private static func computeThresholds(buckets: [Date: DailyHeatmapBucket], metric: Metric) -> [Double] {
         let active = buckets.values
             .map { metric == .cost ? $0.cost : Double($0.tokens) }
             .filter { $0 > 0 }

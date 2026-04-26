@@ -1,6 +1,28 @@
 import SwiftUI
 import ClaudeStatisticsKit
 
+/// Reusable formatters for the header and chart-window labels. Kept here as
+/// `static let` so we don't allocate a fresh `DateFormatter` on every body
+/// pass — `compactUpdatedText` and `windowTimeRange` are called per render
+/// of the usage panel header and each visible chart.
+fileprivate enum UsageDateFormatters {
+    static let timeOnly: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        return f
+    }()
+    static let dateTime: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MM/dd HH:mm"
+        return f
+    }()
+    static let dateOnly: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MM/dd"
+        return f
+    }()
+}
+
 struct UsageView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var viewModel: UsageViewModel
@@ -539,14 +561,9 @@ extension UsageView {
 
     private func compactUpdatedText(_ date: Date) -> String {
         if Calendar.current.isDateInToday(date) {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "HH:mm"
-            return formatter.string(from: date)
+            return UsageDateFormatters.timeOnly.string(from: date)
         }
-
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MM/dd HH:mm"
-        return formatter.string(from: date)
+        return UsageDateFormatters.dateTime.string(from: date)
     }
 
     private func ensureValidSelectedWindow() {
@@ -582,27 +599,22 @@ extension UsageView {
     }
 
     private func windowTimeRange(_ info: WindowTrendInfo) -> some View {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "MM/dd HH:mm"
-        let startStr = formatWindowTime(info.windowStart, fmt: fmt)
-        let endStr = formatWindowTime(info.windowEnd, fmt: fmt)
+        let startStr = formatWindowTime(info.windowStart)
+        let endStr = formatWindowTime(info.windowEnd)
         return Text("\(startStr) — \(endStr)")
             .font(.caption2)
             .foregroundStyle(.tertiary)
             .frame(maxWidth: .infinity, alignment: .center)
     }
 
-    private func formatWindowTime(_ date: Date, fmt: DateFormatter) -> String {
+    private func formatWindowTime(_ date: Date) -> String {
         let cal = Calendar.current
         let comps = cal.dateComponents([.hour, .minute], from: date)
         if comps.hour == 0 && (comps.minute ?? 0) == 0 {
             let prevDay = cal.date(byAdding: .day, value: -1, to: date)!
-            fmt.dateFormat = "MM/dd"
-            let dayStr = fmt.string(from: prevDay)
-            fmt.dateFormat = "MM/dd HH:mm"
-            return dayStr + " 24:00"
+            return UsageDateFormatters.dateOnly.string(from: prevDay) + " 24:00"
         }
-        return fmt.string(from: date)
+        return UsageDateFormatters.dateTime.string(from: date)
     }
 
     func errorBanner(_ error: String) -> some View {

@@ -29,6 +29,7 @@ struct ProjectAnalyticsView: View {
     var inlineSessionDetailAdapter: InlineSessionDetailAdapter? = nil
 
     @State private var modelUsages: [ModelUsage] = []
+    @State private var toolCounts: [(name: String, count: Int)] = []
     @State private var inlineSelectedSession: Session?
 
     var body: some View {
@@ -149,13 +150,12 @@ struct ProjectAnalyticsView: View {
                                 }
                                 Divider()
                                 let maxCost = topSess.first?.stats.estimatedCost ?? 1
-                                ForEach(Array(topSess.enumerated()), id: \.element.session.id) { index, item in
+                                ForEach(topSess, id: \.session.id) { item in
                                     TopSessionRow(
                                         session: item.session,
                                         stats: item.stats,
                                         quickStats: store.quickStats[item.session.id],
                                         maxCost: max(maxCost, 0.000001),
-                                        delay: Double(index) * 0.03,
                                         onTap: inlineSessionDetailAdapter == nil ? nil : {
                                             withAnimation(Theme.springAnimation) {
                                                 inlineSelectedSession = item.session
@@ -168,25 +168,22 @@ struct ProjectAnalyticsView: View {
                     }
 
                     // 5. Tools
-                    if group.toolUseCount > 0 {
-                        let toolCounts = aggregatedToolCounts()
-                        if !toolCounts.isEmpty {
-                            SectionCard {
-                                VStack(spacing: 6) {
-                                    HStack {
-                                        Label("detail.tools", systemImage: "wrench.and.screwdriver")
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(.secondary)
-                                        Spacer()
-                                        Text("detail.calls \(group.toolUseCount)")
-                                            .font(.system(size: 11))
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                    Divider()
-                                    let maxCount = toolCounts.first?.count ?? 1
-                                    ForEach(Array(toolCounts.prefix(15).enumerated()), id: \.element.name) { index, item in
-                                        ToolBarRow(name: item.name, count: item.count, maxCount: maxCount, delay: Double(index) * 0.03)
-                                    }
+                    if !toolCounts.isEmpty {
+                        SectionCard {
+                            VStack(spacing: 6) {
+                                HStack {
+                                    Label("detail.tools", systemImage: "wrench.and.screwdriver")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text("detail.calls \(group.toolUseCount)")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.tertiary)
+                                }
+                                Divider()
+                                let maxCount = toolCounts.first?.count ?? 1
+                                ForEach(Array(toolCounts.prefix(15)), id: \.name) { item in
+                                    ToolBarRow(name: item.name, count: item.count, maxCount: maxCount)
                                 }
                             }
                         }
@@ -196,7 +193,8 @@ struct ProjectAnalyticsView: View {
             }
         }
         .task {
-            modelUsages = store.aggregateProjectModelBreakdown(sessions: group.sessions)
+            modelUsages = await store.aggregateProjectModelBreakdown(sessions: group.sessions)
+            toolCounts = aggregatedToolCounts()
         }
     }
 
@@ -232,7 +230,6 @@ private struct TopSessionRow: View {
     let stats: SessionStats
     let quickStats: SessionQuickStats?
     let maxCost: Double
-    let delay: Double
     var onTap: (() -> Void)?
 
     @State private var appeared = false
@@ -320,8 +317,8 @@ private struct TopSessionRow: View {
         .disabled(onTap == nil)
         .onHover { isHovered = $0 }
         .onAppear {
-            appeared = false
-            withAnimation(.easeOut(duration: 0.4).delay(delay)) {
+            guard !appeared else { return }
+            withAnimation(.easeOut(duration: 0.4)) {
                 appeared = true
             }
         }

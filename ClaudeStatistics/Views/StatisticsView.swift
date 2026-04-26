@@ -128,12 +128,11 @@ struct StatisticsView: View {
                 let maxCost = items.map(\.totalCost).max() ?? 1.0
 
                 HStack(alignment: .bottom, spacing: 4) {
-                    ForEach(Array(items.enumerated()), id: \.element.id) { index, stat in
+                    ForEach(items, id: \.id) { stat in
                         BarChartColumn(
                             cost: stat.totalCost,
                             maxCost: maxCost,
-                            label: stat.chartLabel,
-                            delay: Double(index) * 0.04
+                            label: stat.chartLabel
                         )
                         .frame(maxWidth: 60)
                         .contentShape(Rectangle())
@@ -247,7 +246,6 @@ struct StatisticsView: View {
 struct TopProjectRow: View {
     let project: TopProject
     let maxCost: Double
-    let delay: Double
     var onTap: (() -> Void)? = nil
 
     @State private var appeared = false
@@ -306,8 +304,8 @@ struct TopProjectRow: View {
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
         .onAppear {
-            appeared = false
-            withAnimation(.easeOut(duration: 0.4).delay(delay)) {
+            guard !appeared else { return }
+            withAnimation(.easeOut(duration: 0.4)) {
                 appeared = true
             }
         }
@@ -348,11 +346,10 @@ struct PeriodTopProjectsCard: View {
                         }
                         Divider()
                         let maxCost = top.first?.cost ?? 1
-                        ForEach(Array(top.prefix(10).enumerated()), id: \.element.id) { index, proj in
+                        ForEach(Array(top.prefix(10)), id: \.id) { proj in
                             TopProjectRow(
                                 project: proj,
                                 maxCost: max(maxCost, 0.000001),
-                                delay: Double(index) * 0.03,
                                 onTap: { onProjectTap(proj) }
                             )
                         }
@@ -393,7 +390,6 @@ private struct BarChartColumn: View {
     let cost: Double
     let maxCost: Double
     let label: String
-    let delay: Double
 
     @State private var animatedHeight: CGFloat = 0
     @State private var isHovered = false
@@ -425,11 +421,6 @@ private struct BarChartColumn: View {
             withAnimation(Theme.quickSpring) { isHovered = hovering }
         }
         .onAppear {
-            withAnimation(Theme.springAnimation.delay(delay)) {
-                animatedHeight = targetHeight
-            }
-        }
-        .onChange(of: cost) { _, _ in
             withAnimation(Theme.springAnimation) {
                 animatedHeight = targetHeight
             }
@@ -771,7 +762,7 @@ struct PeriodDetailView: View {
                         }
                     }
                     .task {
-                        trendData = store.aggregateTrendData(for: stat, periodType: periodType)
+                        trendData = await store.aggregateTrendData(for: stat, periodType: periodType)
                     }
 
                     // 3. Tokens + Models — unified breakdown
@@ -817,8 +808,8 @@ struct PeriodDetailView: View {
                                 Divider()
                                 let sorted = stat.toolUseCounts.sorted { $0.value > $1.value }
                                 let maxCount = sorted.first?.value ?? 1
-                                ForEach(Array(sorted.prefix(15).enumerated()), id: \.element.key) { index, item in
-                                    ToolBarRow(name: item.key, count: item.value, maxCount: maxCount, delay: Double(index) * 0.03)
+                                ForEach(Array(sorted.prefix(15)), id: \.key) { item in
+                                    ToolBarRow(name: item.key, count: item.value, maxCount: maxCount)
                                 }
                             }
                         }
@@ -827,8 +818,8 @@ struct PeriodDetailView: View {
                 }
                 .padding(12)
             }
-            .onAppear {
-                topProjects = store.aggregatePeriodTopProjects(for: stat, periodType: periodType)
+            .task {
+                topProjects = await store.aggregatePeriodTopProjects(for: stat, periodType: periodType)
             }
         }
     }

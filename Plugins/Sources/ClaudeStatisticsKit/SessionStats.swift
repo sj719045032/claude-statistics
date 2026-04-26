@@ -58,6 +58,10 @@ public struct SessionStats: Codable, Sendable {
     public private(set) var messageCount: Int = 0
     public private(set) var toolUseCounts: [String: Int] = [:]
     public private(set) var modelBreakdown: [String: ModelTokenStats] = [:]
+    /// Per-hour buckets, keyed by the start of each hour.
+    public private(set) var hourSlices: [Date: DaySlice] = [:]
+    /// Per-day buckets, keyed by `startOfDay` in the local timezone.
+    public private(set) var daySlices: [Date: DaySlice] = [:]
 
     /// Recompute every stored aggregate above from `fiveMinSlices`. Call
     /// this once after finishing a parse or after decoding from cache.
@@ -65,6 +69,7 @@ public struct SessionStats: Codable, Sendable {
     /// computed-property walks, but only happens once per parse instead
     /// of per-View-render.
     public mutating func precomputeAggregates() {
+        let cal = Calendar.current
         var totalInput = 0
         var totalOutput = 0
         var cache5m = 0
@@ -74,8 +79,10 @@ public struct SessionStats: Codable, Sendable {
         var messages = 0
         var tools: [String: Int] = [:]
         var models: [String: ModelTokenStats] = [:]
+        var hourBuckets: [Date: DaySlice] = [:]
+        var dayBuckets: [Date: DaySlice] = [:]
 
-        for slice in fiveMinSlices.values {
+        for (sliceStart, slice) in fiveMinSlices {
             totalInput += slice.totalInputTokens
             totalOutput += slice.totalOutputTokens
             cache5m += slice.cacheCreation5mTokens
@@ -97,6 +104,13 @@ public struct SessionStats: Codable, Sendable {
                 existing.messageCount += mts.messageCount
                 models[model] = existing
             }
+
+            let hourComps = cal.dateComponents([.year, .month, .day, .hour], from: sliceStart)
+            let hourStart = cal.date(from: hourComps) ?? sliceStart
+            hourBuckets[hourStart, default: DaySlice()].merge(slice)
+
+            let dayStart = cal.startOfDay(for: sliceStart)
+            dayBuckets[dayStart, default: DaySlice()].merge(slice)
         }
 
         self.totalInputTokens = totalInput
@@ -108,29 +122,8 @@ public struct SessionStats: Codable, Sendable {
         self.messageCount = messages
         self.toolUseCounts = tools
         self.modelBreakdown = models
-    }
-
-    /// Per-hour buckets, keyed by the start of each hour.
-    public var hourSlices: [Date: DaySlice] {
-        let cal = Calendar.current
-        var buckets: [Date: DaySlice] = [:]
-        for (sliceStart, slice) in fiveMinSlices {
-            let comps = cal.dateComponents([.year, .month, .day, .hour], from: sliceStart)
-            let hourStart = cal.date(from: comps) ?? sliceStart
-            buckets[hourStart, default: DaySlice()].merge(slice)
-        }
-        return buckets
-    }
-
-    /// Per-day buckets, keyed by `startOfDay` in the local timezone.
-    public var daySlices: [Date: DaySlice] {
-        let cal = Calendar.current
-        var buckets: [Date: DaySlice] = [:]
-        for (sliceStart, slice) in fiveMinSlices {
-            let dayStart = cal.startOfDay(for: sliceStart)
-            buckets[dayStart, default: DaySlice()].merge(slice)
-        }
-        return buckets
+        self.hourSlices = hourBuckets
+        self.daySlices = dayBuckets
     }
 
     // MARK: - Convenience computed properties
