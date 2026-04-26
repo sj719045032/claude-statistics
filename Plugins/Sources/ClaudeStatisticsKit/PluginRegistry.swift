@@ -83,6 +83,27 @@ public final class PluginRegistry {
         sources[pluginID]
     }
 
+    /// Remove a plugin from every bucket it occupies plus the source
+    /// map. Used by the Settings panel's Disable button so a user can
+    /// revoke a previously-allowed `.csplugin` without restarting the
+    /// host. macOS doesn't truly unload a Mach-O bundle once it's
+    /// dlopen'd, so the principal class stays in memory — this just
+    /// makes the registry stop handing it out, which is enough to
+    /// neutralise the plugin's contribution (focus / launch /
+    /// readiness lookups all consult the registry).
+    @discardableResult
+    public func unregister(id: String) -> Bool {
+        let inProviders = providers.removeValue(forKey: id) != nil
+        let inTerminals = terminals.removeValue(forKey: id) != nil
+        let inShareRoles = shareRoles.removeValue(forKey: id) != nil
+        let inShareThemes = shareThemes.removeValue(forKey: id) != nil
+        let removed = inProviders || inTerminals || inShareRoles || inShareThemes
+        if removed {
+            sources.removeValue(forKey: id)
+        }
+        return removed
+    }
+
     // MARK: - Typed look-ups
 
     /// Returns the registered Provider plugin for the given id, or

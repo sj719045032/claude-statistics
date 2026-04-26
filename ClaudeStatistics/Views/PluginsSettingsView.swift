@@ -12,6 +12,12 @@ struct PluginsSettingsView: View {
 
     @State private var showResetConfirmation = false
     @State private var resetMessage: String?
+    @State private var pendingDisable: Row?
+    /// Bumps to force the row list to re-read from PluginRegistry
+    /// after a Disable mutates it. The registry exposes a snapshot
+    /// dictionary, not a published value, so SwiftUI doesn't know to
+    /// re-render unless we nudge it.
+    @State private var refreshTick = 0
 
     private struct Row: Identifiable {
         let manifest: PluginManifest
@@ -20,7 +26,10 @@ struct PluginsSettingsView: View {
     }
 
     private var rows: [Row] {
-        pluginRegistry.loadedManifests()
+        // refreshTick is read here so SwiftUI reruns the body after a
+        // disable. Without it the registry mutation is invisible.
+        _ = refreshTick
+        return pluginRegistry.loadedManifests()
             .sorted { $0.id < $1.id }
             .map { Row(manifest: $0, source: pluginRegistry.source(for: $0.id)) }
     }
@@ -112,10 +121,33 @@ struct PluginsSettingsView: View {
         } message: {
             Text("settings.plugins.resetTrust.confirmMessage")
         }
+        .alert(
+            "settings.plugins.disable.confirmTitle",
+            isPresented: Binding(
+                get: { pendingDisable != nil },
+                set: { if !$0 { pendingDisable = nil } }
+            ),
+            presenting: pendingDisable
+        ) { row in
+            Button("settings.cancel", role: .cancel) { pendingDisable = nil }
+            Button("settings.plugins.disable.confirmButton", role: .destructive) {
+                if let url = row.source?.bundleURL {
+                    PluginTrustGate.disable(manifest: row.manifest, bundleURL: url)
+                    refreshTick &+= 1
+                }
+                pendingDisable = nil
+            }
+        } message: { row in
+            Text(String(
+                format: NSLocalizedString("settings.plugins.disable.confirmMessage", comment: ""),
+                row.manifest.displayName
+            ))
+        }
     }
 
     @ViewBuilder
     private func pluginRow(_ manifest: PluginManifest, source: PluginSource?) -> some View {
+        let row = Row(manifest: manifest, source: source)
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Image(systemName: kindGlyph(manifest.kind))
@@ -131,6 +163,14 @@ struct PluginsSettingsView: View {
                     .foregroundStyle(sourceTint(source))
                     .clipShape(Capsule())
                 Spacer()
+                if isDisableable(source) {
+                    Button(action: { pendingDisable = row }) {
+                        Text("settings.plugins.disable")
+                            .font(.system(size: 10))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+                }
                 Text("v\(manifest.version)")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.secondary)
@@ -158,6 +198,16 @@ struct PluginsSettingsView: View {
             }
         }
         .padding(.vertical, 2)
+    }
+
+    private func isDisableable(_ source: PluginSource?) -> Bool {
+        // Only user-installed plugins. Host-resident classes can't be
+        // dropped (they'd come back next launch), and bundled samples
+        // ship with the .app — disabling them per-session is too
+        // surprising; users delete the .app to remove a bundled
+        // plugin.
+        if case .user = source { return true }
+        return false
     }
 
     private func kindGlyph(_ kind: PluginKind) -> String {

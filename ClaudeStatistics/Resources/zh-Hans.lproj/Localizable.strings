@@ -264,6 +264,10 @@
 "settings.plugins.source.host" = "内置";
 "settings.plugins.source.bundled" = "随包";
 "settings.plugins.source.user" = "用户";
+"settings.plugins.disable" = "禁用";
+"settings.plugins.disable.confirmTitle" = "禁用此插件？";
+"settings.plugins.disable.confirmMessage" = "%@ 将从插件注册表移除并记录为已拒绝。直到你重置信任之前，后续启动都不会加载它。";
+"settings.plugins.disable.confirmButton" = "禁用";
 "settings.developer.rebuildIndexes" = "重建数据";
 "settings.developer.rebuildProviderIndex" = "重建 %@ 索引";
 "settings.developer.rebuildProviderIndexHint" = "删除该 provider 的解析缓存，并重新构建搜索索引。";

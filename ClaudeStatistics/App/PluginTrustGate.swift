@@ -27,6 +27,12 @@ enum PluginTrustGate {
     /// a restart.
     static var onPluginHotLoaded: ((PluginManifest, URL) -> Void)?
 
+    /// Fired after a plugin is removed from `pluginRegistry` via
+    /// `disable(...)`. Host re-derives dynamic registries so the
+    /// disabled plugin's bundle ids / aliases / strategies stop
+    /// resolving.
+    static var onPluginDisabled: ((String) -> Void)?
+
     static func setPluginRegistry(_ registry: PluginRegistry) {
         pluginRegistry = registry
     }
@@ -97,6 +103,21 @@ enum PluginTrustGate {
     static func _resetForTesting(trustStore: TrustStore) {
         pending = []
         self.trustStore = trustStore
+    }
+
+    /// Revoke a previously-allowed plugin: persist `.denied`,
+    /// unregister from `pluginRegistry`, and fire
+    /// `onPluginDisabled` so host glue re-derives. Returns whether
+    /// anything actually changed.
+    @discardableResult
+    static func disable(manifest: PluginManifest, bundleURL: URL) -> Bool {
+        trustStore.record(.denied, for: manifest, bundleURL: bundleURL)
+        guard let registry = pluginRegistry else { return false }
+        let removed = registry.unregister(id: manifest.id)
+        if removed {
+            onPluginDisabled?(manifest.id)
+        }
+        return removed
     }
 
     static let defaultPrompter: (PendingEntry) -> TrustStore.Decision = { entry in

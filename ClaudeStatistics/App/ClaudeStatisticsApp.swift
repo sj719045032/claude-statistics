@@ -252,6 +252,17 @@ final class AppState: ObservableObject {
                 "Plugin hot-loaded: \(manifest.id) v\(manifest.version)"
             )
         }
+        PluginTrustGate.onPluginDisabled = { [weak self] pluginID in
+            // Plugin's bundle stays in memory (macOS can't truly
+            // unload a dlopen'd bundle); we just stop resolving it
+            // from the registry. The dynamic-terminal-registry
+            // refresher rebuilds its bundle-id / alias caches from
+            // the registry's current contents, so the disabled
+            // plugin's contributions disappear.
+            Self.refreshDynamicTerminalRegistries(from: registry)
+            self?.wirePluginProviderInstances()
+            DiagnosticLogger.shared.info("Plugin disabled: \(pluginID)")
+        }
 
         // Drain the trust queue collected during plugin discovery. Run
         // off the current call stack so the menu-bar / status panel

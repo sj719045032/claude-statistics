@@ -251,6 +251,10 @@
 "settings.plugins.source.host" = "built-in";
 "settings.plugins.source.bundled" = "bundled";
 "settings.plugins.source.user" = "user";
+"settings.plugins.disable" = "Disable";
+"settings.plugins.disable.confirmTitle" = "Disable this plugin?";
+"settings.plugins.disable.confirmMessage" = "%@ will be removed from the plugin registry and recorded as denied. Subsequent launches will skip it until you reset trust.";
+"settings.plugins.disable.confirmButton" = "Disable";
 "settings.developer.rebuildIndexes" = "Rebuild Data";
 "settings.developer.rebuildProviderIndex" = "Rebuild %@ Index";
 "settings.developer.rebuildProviderIndexHint" = "Deletes cached parsed data and rebuilds the search index for this provider.";

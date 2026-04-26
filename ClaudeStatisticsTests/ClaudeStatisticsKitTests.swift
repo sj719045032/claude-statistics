@@ -220,6 +220,43 @@ final class PluginRegistryTests: XCTestCase {
         override init() { super.init() }
     }
 
+    func testUnregisterRemovesFromAllBuckets() throws {
+        let registry = PluginRegistry()
+        try registry.register(FakeBothPlugin())
+        XCTAssertNotNil(registry.providers["com.test.combo"])
+        XCTAssertNotNil(registry.terminals["com.test.combo"])
+
+        let removed = registry.unregister(id: "com.test.combo")
+        XCTAssertTrue(removed)
+        XCTAssertNil(registry.providers["com.test.combo"])
+        XCTAssertNil(registry.terminals["com.test.combo"])
+        XCTAssertNil(registry.source(for: "com.test.combo"))
+
+        // Idempotent: a second call returns false rather than throwing.
+        XCTAssertFalse(registry.unregister(id: "com.test.combo"))
+    }
+
+    func testRegisterRecordsDefaultHostSource() throws {
+        let registry = PluginRegistry()
+        try registry.register(FakeProviderPlugin())
+        if case .host = registry.source(for: "com.test.alpha") {
+            // expected
+        } else {
+            XCTFail("Default source should be .host")
+        }
+    }
+
+    func testRegisterCarriesExplicitSource() throws {
+        let registry = PluginRegistry()
+        let url = URL(fileURLWithPath: "/tmp/example.csplugin")
+        try registry.register(FakeProviderPlugin(), source: .user(url: url))
+        if case .user(let recordedURL) = registry.source(for: "com.test.alpha") {
+            XCTAssertEqual(recordedURL, url)
+        } else {
+            XCTFail("Source should round-trip the .user case")
+        }
+    }
+
     func testTypedLookupsReturnConcretePlugin() throws {
         let registry = PluginRegistry()
         try registry.register(FakeProviderPluginImpl())
