@@ -232,6 +232,7 @@
 		FBF2DAF01D66B86D4FF704B9 /* SessionDisplayDialogueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B842A348C3909C8D98C92B1 /* SessionDisplayDialogueTests.swift */; };
 		FD14DC1AD66B5C54FED7B078 /* CodexSessionScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872985FBB1CB099BD6D4B01E /* CodexSessionScanner.swift */; };
 		FDBE2C2C6B6D044072235F42 /* UsageData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 370D33AC086199C95EC1E2CD /* UsageData.swift */; };
+		FE1A98E363F439309F7B1F6E /* SearchIndexMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F4A8499C7CCC383E405EB7 /* SearchIndexMessage.swift */; };
 		FE5ADEDB9BFDB937666A3163 /* ClaudeAccountSourcePickerRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40D1CDF1FEEF8397DDFDBBDC /* ClaudeAccountSourcePickerRow.swift */; };
 		FEFC2968DA07D06063D40E24 /* ClaudeStatisticsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68083922F93D555879FAD90B /* ClaudeStatisticsApp.swift */; };
 		FF23B86D06717D1D06D1BC63 /* MarkdownView in Frameworks */ = {isa = PBXBuildFile; productRef = D9B81B6A9F5F3A3C056BB0D3 /* MarkdownView */; };
@@ -438,6 +439,7 @@
 		A776ADBF033757E89353F9E2 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		A7C96479A32A5A1C4D1A624B /* ShareRoleEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRoleEngine.swift; sourceTree = "<group>"; };
 		A872F99484F4F48F8F878E49 /* ShareRoleEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRoleEngineTests.swift; sourceTree = "<group>"; };
+		A9F4A8499C7CCC383E405EB7 /* SearchIndexMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchIndexMessage.swift; sourceTree = "<group>"; };
 		AD9EAD578F58BF668BBBFC13 /* TerminalReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalReadiness.swift; sourceTree = "<group>"; };
 		AED35908F8D6A2C41A2A6E59 /* MenuBarBanners.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarBanners.swift; sourceTree = "<group>"; };
 		AF4F05A7A269AFD18AC995DF /* BuiltinTerminalPlugins.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuiltinTerminalPlugins.swift; sourceTree = "<group>"; };
@@ -666,6 +668,7 @@
 				880DBC8623214822DA25BA07 /* PluginRegistry.swift */,
 				D7A55E899B9748E80EF1CA53 /* ProviderDescriptor.swift */,
 				62572A1901D430E3E24CB02D /* ProviderPlugin.swift */,
+				A9F4A8499C7CCC383E405EB7 /* SearchIndexMessage.swift */,
 				DBBEE45A24DCB72DA07ECD79 /* SemVer.swift */,
 				0398E20299823326D6ED583C /* ShareCardThemePlugin.swift */,
 				4CF4AF3083144F9E8BD8D7B0 /* ShareRolePlugin.swift */,
@@ -1338,6 +1341,7 @@
 				B35C61F703B5F19516D17FF9 /* PluginRegistry.swift in Sources */,
 				81C19CCA48AB5D51EFE62459 /* ProviderDescriptor.swift in Sources */,
 				205CC763247D474FFE1ED691 /* ProviderPlugin.swift in Sources */,
+				FE1A98E363F439309F7B1F6E /* SearchIndexMessage.swift in Sources */,
 				1FFDAA9375AEB76CB9862CF3 /* SemVer.swift in Sources */,
 				A830A50BBE76ECD3E3990820 /* ShareCardThemePlugin.swift in Sources */,
 				6D53771D8F61F6149FD50D46 /* ShareRolePlugin.swift in Sources */,

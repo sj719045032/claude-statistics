@@ -149,12 +149,6 @@ struct ProviderUsageSnapshot {
     let fetchedAt: Date
 }
 
-struct SearchIndexMessage {
-    let role: String
-    let content: String
-    let timestamp: Date?
-}
-
 protocol ProviderUsageSource {
     var dashboardURL: URL? { get }
     var usageCacheFilePath: String? { get }

@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 import SQLite3
 
 // MARK: - DatabaseService
