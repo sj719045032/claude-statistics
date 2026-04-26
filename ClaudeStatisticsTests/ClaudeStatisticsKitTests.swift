@@ -994,6 +994,34 @@ final class TrustStoreTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: storeURL.path))
         XCTAssertNil(store.decision(for: sampleManifest, bundleURL: bundle))
     }
+
+    func testRemoveEntryDropsOnePluginsRecordOnly() throws {
+        // Two plugins, both recorded; uninstalling one mustn't lose
+        // the other's decision.
+        let bundleA = try makeBundle(infoPlist: "<plist>a</plist>", name: "a")
+        let bundleB = try makeBundle(infoPlist: "<plist>b</plist>", name: "b")
+        let manifestB = PluginManifest(
+            id: "com.example.other",
+            kind: .terminal,
+            displayName: "Other",
+            version: SemVer(major: 1, minor: 0, patch: 0),
+            minHostAPIVersion: SemVer(major: 0, minor: 1, patch: 0),
+            principalClass: "OtherPlugin"
+        )
+        let store = TrustStore(storeURL: storeURL)
+        store.record(.allowed, for: sampleManifest, bundleURL: bundleA)
+        store.record(.allowed, for: manifestB, bundleURL: bundleB)
+
+        store.removeEntry(for: sampleManifest, bundleURL: bundleA)
+
+        XCTAssertNil(store.decision(for: sampleManifest, bundleURL: bundleA))
+        XCTAssertEqual(store.decision(for: manifestB, bundleURL: bundleB), .allowed)
+        // Persists across instances — the file was rewritten, not
+        // forgotten in memory.
+        let reopened = TrustStore(storeURL: storeURL)
+        XCTAssertNil(reopened.decision(for: sampleManifest, bundleURL: bundleA))
+        XCTAssertEqual(reopened.decision(for: manifestB, bundleURL: bundleB), .allowed)
+    }
 }
 
 /// Coverage for `PluginLoader`'s discovery + skip paths. The happy

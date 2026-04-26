@@ -19,6 +19,8 @@ struct PluginsSettingsView: View {
     @State private var showResetConfirmation = false
     @State private var resetMessage: String?
     @State private var pendingDisable: Row?
+    @State private var pendingUninstall: Row?
+    @State private var uninstallError: String?
     /// Bumps to force the row list to re-read from PluginRegistry
     /// after a Disable mutates it. The registry exposes a snapshot
     /// dictionary, not a published value, so SwiftUI doesn't know to
@@ -128,6 +130,47 @@ struct PluginsSettingsView: View {
                 row.manifest.displayName
             ))
         }
+        .alert(
+            "settings.plugins.uninstall.confirmTitle",
+            isPresented: Binding(
+                get: { pendingUninstall != nil },
+                set: { if !$0 { pendingUninstall = nil } }
+            ),
+            presenting: pendingUninstall
+        ) { row in
+            Button("settings.cancel", role: .cancel) { pendingUninstall = nil }
+            Button("settings.plugins.uninstall.confirmButton", role: .destructive) {
+                if let source = row.source {
+                    do {
+                        try PluginUninstaller.uninstall(
+                            manifest: row.manifest,
+                            source: source,
+                            registry: pluginRegistry
+                        )
+                        refreshTick &+= 1
+                    } catch {
+                        uninstallError = String(describing: error)
+                    }
+                }
+                pendingUninstall = nil
+            }
+        } message: { row in
+            Text(String(
+                format: NSLocalizedString("settings.plugins.uninstall.confirmMessage", comment: ""),
+                row.manifest.displayName
+            ))
+        }
+        .alert(
+            "settings.plugins.uninstall.errorTitle",
+            isPresented: Binding(
+                get: { uninstallError != nil },
+                set: { if !$0 { uninstallError = nil } }
+            )
+        ) {
+            Button("settings.cancel", role: .cancel) { uninstallError = nil }
+        } message: {
+            Text(uninstallError ?? "")
+        }
     }
 
     @ViewBuilder
@@ -194,6 +237,13 @@ struct PluginsSettingsView: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.mini)
+                    Button(action: { pendingUninstall = row }) {
+                        Text("settings.plugins.uninstall")
+                            .font(.system(size: 10))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+                    .tint(.red)
                 }
                 Text("v\(manifest.version)")
                     .font(.system(size: 10, design: .monospaced))

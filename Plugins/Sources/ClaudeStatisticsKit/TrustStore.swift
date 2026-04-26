@@ -77,6 +77,21 @@ public final class TrustStore: @unchecked Sendable {
         try? FileManager.default.removeItem(at: storeURL)
     }
 
+    /// Drop the persisted decision for one specific plugin. Called by
+    /// the marketplace uninstaller so a previously-`.denied` decision
+    /// doesn't haunt a reinstall — re-adding the same plugin should
+    /// behave like a brand-new install (prompt or auto-allow per
+    /// install path).
+    public func removeEntry(for manifest: PluginManifest, bundleURL: URL) {
+        let key = makeKey(manifestId: manifest.id, hash: hash(of: bundleURL))
+        lock.lock()
+        let existed = entries.removeValue(forKey: key) != nil
+        let snapshot = entries
+        lock.unlock()
+        guard existed else { return }
+        try? Self.save(snapshot, to: storeURL)
+    }
+
     // MARK: - Internals
 
     private struct Entry: Codable {

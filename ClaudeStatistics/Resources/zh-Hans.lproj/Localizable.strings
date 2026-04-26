@@ -268,6 +268,11 @@
 "settings.plugins.disable.confirmTitle" = "禁用此插件？";
 "settings.plugins.disable.confirmMessage" = "%@ 将从插件注册表移除并记录为已拒绝。直到你重置信任之前，后续启动都不会加载它。";
 "settings.plugins.disable.confirmButton" = "禁用";
+"settings.plugins.uninstall" = "卸载";
+"settings.plugins.uninstall.confirmTitle" = "卸载此插件？";
+"settings.plugins.uninstall.confirmMessage" = "%@ 将被从注册表移除、磁盘上的 .csplugin 文件被删除、信任记录被清空。之后可以从市场重新安装。";
+"settings.plugins.uninstall.confirmButton" = "卸载";
+"settings.plugins.uninstall.errorTitle" = "卸载失败";
 "settings.plugins.tab.installed" = "已安装";
 "settings.plugins.tab.discover" = "市场";
 "settings.plugins.discover.loading" = "正在获取插件目录…";

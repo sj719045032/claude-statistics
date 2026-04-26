@@ -255,6 +255,11 @@
 "settings.plugins.disable.confirmTitle" = "Disable this plugin?";
 "settings.plugins.disable.confirmMessage" = "%@ will be removed from the plugin registry and recorded as denied. Subsequent launches will skip it until you reset trust.";
 "settings.plugins.disable.confirmButton" = "Disable";
+"settings.plugins.uninstall" = "Uninstall";
+"settings.plugins.uninstall.confirmTitle" = "Uninstall this plugin?";
+"settings.plugins.uninstall.confirmMessage" = "%@ will be unloaded, the .csplugin file deleted from disk, and its trust record cleared. The plugin can be reinstalled from Discover later.";
+"settings.plugins.uninstall.confirmButton" = "Uninstall";
+"settings.plugins.uninstall.errorTitle" = "Uninstall failed";
 "settings.plugins.tab.installed" = "Installed";
 "settings.plugins.tab.discover" = "Discover";
 "settings.plugins.discover.loading" = "Fetching catalog…";
