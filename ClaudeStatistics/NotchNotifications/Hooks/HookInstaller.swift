@@ -132,15 +132,23 @@ enum HookInstallerUtils {
         fi
 
         if [ -n "$APP_PATH" ] && [ -x "$APP_PATH/Contents/MacOS/$EXEC_NAME" ]; then
-            exec "$APP_PATH/Contents/MacOS/$EXEC_NAME" "$@"
-        elif [ -x "$FALLBACK" ]; then
-            exec "$FALLBACK" "$@"
-        else
-            # No app binary available (uninstalled / DerivedData wiped / .app
-            # moved). Exit silently so the host CLI does not surface a hook
-            # error every turn — the hook is purely best-effort telemetry.
-            exit 0
+            # Guard against exec'ing into a binary whose framework dependencies
+            # were swept away mid-rebuild (xcodebuild clean removes
+            # PackageFrameworks before the new build is installed). Without this
+            # check dyld crashes the hook process with SIGABRT, producing a
+            # non-zero exit and no stderr — Claude Code then reports
+            # "Stop hook error: Failed with non-blocking status code: No stderr output".
+            if [ -d "$APP_PATH/Contents/Frameworks/ClaudeStatisticsKit.framework" ]; then
+                exec "$APP_PATH/Contents/MacOS/$EXEC_NAME" "$@"
+            fi
         fi
+        if [ -x "$FALLBACK" ]; then
+            exec "$FALLBACK" "$@"
+        fi
+        # No app binary available (uninstalled / DerivedData wiped / .app
+        # moved). Exit silently so the host CLI does not surface a hook
+        # error every turn — the hook is purely best-effort telemetry.
+        exit 0
         """
     }
 
