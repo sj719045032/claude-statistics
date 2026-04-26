@@ -1,8 +1,8 @@
 # Claude Statistics 架构与重写计划
 
 > 最后更新：2026-04-26
-> 当前版本：v3.1.0 + v4.0-alpha（SDK 协议表面已就位）+ v4.0-beta 启动（M2 .csplugin 加载机制完整能力就位，1 个 chat-app 样本运行）
-> SDK 现状：`ClaudeStatisticsKit` 51 文件 / 3300+ 行；795 测试通过
+> 当前版本：v3.1.0 + v4.0-alpha（SDK 协议表面已就位）+ v4.0-beta（M2 .csplugin 加载机制 + Marketplace 全栈就位）
+> SDK 现状：`ClaudeStatisticsKit` 54 文件 / 3700+ 行；818 测试通过
 > 目标版本：v4.0（插件化架构）
 
 本文档是项目的**单一权威架构文档**，合并了原 `ARCHITECTURE.md`（现状描述）与 `ARCHITECTURE_REVIEW.md`（优化评估），并在此基础上规划了 v4.0 的插件化重写。
@@ -1324,17 +1324,27 @@ graph LR
   - `TrustStore`（SHA-256 of Info.plist + `trust.json` 持久化）
   - `PluginTrustGate` host 端：未知 plugin 入队 → 启动后 NSAlert prompt → 用户 Allow 即时 hot-load + 触发 `onPluginHotLoaded` 让 host refresh dynamic registries / Deny 持久化拒绝
   - `disable(manifest:bundleURL:)` 撤销已加载 plugin（持久化 `.denied` + `unregister` + `onPluginDisabled`）
-- ✅ Settings → Plugins 面板：列出 manifest（id / version / kind / permissions）+ 来源 pill（built-in / bundled / user）+ 路径；user plugin 行有 Disable 按钮；底部 "Reset all plugin trust decisions" 一键重置 trust.json
-- ⏸️ entitlement `disable-library-validation` — S7 commit (`3b8f2cb`) 已加，但 working tree 中外部恢复成空 dict（debug 不需要因为 hardened runtime OFF；release notarization 时再补反向 commit）
+- ✅ Settings → Plugins 面板：列出 manifest（id / version / kind / permissions）+ 来源 pill（built-in / bundled / user）+ 路径；user plugin 行有 Disable + Uninstall 按钮；底部 "Reset all plugin trust decisions" 一键重置 trust.json
+- ✅ **Plugin Marketplace（v4.0.x，M2 之后增量；详见 `docs/PLUGIN_MARKETPLACE.md`）** — 全部 8 个 Phase 就位：
+  - Phase 0: marketplace 设计文档（402 行单一事实来源）
+  - Phase 1.1: `PluginManifest.category` 字段 + `PluginCatalogCategory` 6 大用户视角分类（vendor / terminal / chat-app / share-card / editor-integration / utility）
+  - Phase 1.2: `PluginCatalogEntry` + `PluginCatalogIndex` wire-format 类型，对应 `index.json` schema
+  - Phase 1.3: `PluginCatalog` actor — 每次 fetch + 网络失败时 fallback 到本地 cache（无 TTL，`Outcome.kind` 区分 live vs offline）
+  - Phase 1.4: `PluginInstaller` — download → SHA-256 → `/usr/bin/unzip` → manifest 校验（5 道闸）→ atomic move → `loadOne` hot-load
+  - Phase 1.5: Settings → Plugins 顶部 segmented Picker（Installed / Discover）+ `PluginDiscoverView` 按 category 分组渲染 + Install/Update/Installed/Incompatible 状态
+  - Phase 2: `PluginUninstaller` 把 disable + 删文件 + `TrustStore.removeEntry` 三件事打包 + Settings 行 Uninstall 按钮 + 卸载会清 `.denied` 残留让重装回到原状
+  - Phase 3: `marketplace-template/` 含 `README.md`（双语）+ `index.json` 含两个真实样本 + `submissions-template.md` PR 模板 + `PUBLISHING.md` plugin 作者打包指南；待主作者一次 git init+push 到 `claude-statistics-plugins` 独立仓库
+- ⏸️ entitlement `disable-library-validation` — S7 commit (`3b8f2cb`) 加进 + `92b34e3` 撤回（debug 不需要因为 hardened runtime OFF；release notarization 时再补回）
 - ✅ `ProviderRegistry.provider(for:)` switch → plugin lookup（NSLock-guarded dynamic store；switch 保留为 fallback）
 
-**结论**：v4.0-alpha + M2 主线收尾 — 第三方开发者已可基于 `ClaudeStatisticsKit` 构建完整的 `.csplugin`，主 App 端到端流程跑通：拷贝到 user 目录 → 重启弹 prompt → Allow 即时加载（无需重启）/ Deny 持久化拒绝 → Settings 看列表/路径/来源 → 一键 Disable 或 Reset trust。后续 M2 收尾仅剩 11 个 builtin plugin 的逐个抽出（按现有 chat-app 模板独立 PR）；M3 工作（仓库分离 / SDK 文档 / 签名公证）在 M2 dogfood 期后启动。
+**结论**：v4.0-alpha + M2 + Marketplace 全栈收尾 — 第三方开发者打包 `.csplugin.zip` → 提 PR 到 catalog repo → 用户在 Discover 面板 Install → 即时加载 / Update / Disable / Uninstall 全流程不依赖重启。后续仅剩 11 个 builtin plugin 的逐个抽出（按现有 chat-app 模板独立 PR）；M3 工作（catalog repo push 上线 / 仓库分离 / SDK 文档 / 签名公证）在 marketplace dogfood 期后启动。
 
 #### 当前 runtime 状态
 
-- 795 测试全部通过
+- 818 测试全部通过
 - App 启动正常（`run-debug.sh`）
 - Plugin 完整链路 end-to-end 跑通：`PluginRegistry dogfood: providers=3 terminals=10`（host 8 + 2 个 .csplugin），`PluginLoader (bundled): loaded=2 skipped=0`
+- Marketplace UI 就位（Settings → Plugins 加 segmented Picker，Discover 面板按 category 分组）；catalog 后端待 `marketplace-template/` 的内容 push 到 `github.com/sj719045032/claude-statistics-plugins`
 
 #### 第三方 plugin 已可起步的能力清单
 
