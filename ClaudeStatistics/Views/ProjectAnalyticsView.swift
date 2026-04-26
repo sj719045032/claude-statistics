@@ -1,4 +1,5 @@
 import SwiftUI
+import ClaudeStatisticsKit
 
 /// Bundle of callbacks + provider info that lets `ProjectAnalyticsView` push a
 /// `SessionDetailView` inline without depending on `SessionViewModel`. The

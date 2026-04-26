@@ -1,4 +1,5 @@
 import SwiftUI
+import ClaudeStatisticsKit
 
 struct StatisticsView: View {
     @ObservedObject var store: SessionDataStore

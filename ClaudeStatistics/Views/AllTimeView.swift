@@ -1,4 +1,5 @@
 import SwiftUI
+import ClaudeStatisticsKit
 
 /// The "All" tab of the Stats view.
 ///

@@ -1,4 +1,5 @@
 import SwiftUI
+import ClaudeStatisticsKit
 import Charts
 
 /// Cumulative dual-axis chart for subscription usage windows (5h / 7d).

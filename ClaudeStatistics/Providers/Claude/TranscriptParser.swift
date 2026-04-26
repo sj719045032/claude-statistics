@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 final class TranscriptParser {
     static let shared = TranscriptParser()

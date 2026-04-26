@@ -1,4 +1,5 @@
 import SwiftUI
+import ClaudeStatisticsKit
 
 struct UsageView: View {
     @ObservedObject var appState: AppState

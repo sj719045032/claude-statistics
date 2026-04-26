@@ -1,16 +1,29 @@
 import Foundation
 
-struct TrendDataPoint: Identifiable {
-    let id = UUID()
-    let time: Date
-    let tokens: Int       // input + output + cacheCreation + cacheRead
-    let cost: Double      // USD
+/// A single point on the trend chart shown in the session detail view
+/// and the share-card flame trace. Plugins emit these from their
+/// `parseTrendData(from:granularity:)` implementations.
+public struct TrendDataPoint: Identifiable, Sendable {
+    public let id: UUID
+    public let time: Date
+    public let tokens: Int       // input + output + cacheCreation + cacheRead
+    public let cost: Double      // USD
+
+    public init(time: Date, tokens: Int, cost: Double) {
+        self.id = UUID()
+        self.time = time
+        self.tokens = tokens
+        self.cost = cost
+    }
 }
 
-enum TrendGranularity: String, CaseIterable {
+/// Time-bucket granularity used by trend charts and provider parsers.
+/// Each plugin's transcript parser emits `TrendDataPoint`s aligned to
+/// one of these buckets via `bucketStart(for:)`.
+public enum TrendGranularity: String, CaseIterable, Sendable {
     case fiveMinute, minute, hour, day, week, month
 
-    var calendarComponent: Calendar.Component {
+    public var calendarComponent: Calendar.Component {
         switch self {
         case .fiveMinute: return .minute
         case .minute: return .minute
@@ -21,21 +34,21 @@ enum TrendGranularity: String, CaseIterable {
         }
     }
 
-    /// Step value for advancing to the next bucket
-    var stepValue: Int {
+    /// Step value for advancing to the next bucket.
+    public var stepValue: Int {
         switch self {
         case .fiveMinute: return 5
         default: return 1
         }
     }
 
-    /// Cases available for session detail granularity picker
-    static var sessionCases: [TrendGranularity] {
+    /// Cases available for the session-detail granularity picker.
+    public static var sessionCases: [TrendGranularity] {
         [.minute, .hour, .day]
     }
 
-    /// Truncate a date to the start of this granularity's bucket
-    func bucketStart(for date: Date) -> Date {
+    /// Truncate a date to the start of this granularity's bucket.
+    public func bucketStart(for date: Date) -> Date {
         let cal = Calendar.current
         switch self {
         case .fiveMinute:
@@ -59,8 +72,8 @@ enum TrendGranularity: String, CaseIterable {
         }
     }
 
-    /// X-axis date format string
-    var dateFormatString: String {
+    /// X-axis date format string.
+    public var dateFormatString: String {
         switch self {
         case .fiveMinute: return "HH:mm"
         case .minute: return "HH:mm"
@@ -71,23 +84,11 @@ enum TrendGranularity: String, CaseIterable {
         }
     }
 
-    /// Auto-select granularity based on session duration
-    static func autoSelect(for duration: TimeInterval?) -> TrendGranularity {
+    /// Auto-select granularity based on session duration.
+    public static func autoSelect(for duration: TimeInterval?) -> TrendGranularity {
         guard let duration else { return .hour }
         if duration < 3600 { return .minute }       // < 1 hour
         if duration < 86400 { return .hour }         // < 24 hours
         return .day
-    }
-}
-
-extension StatsPeriod {
-    /// The trend chart granularity for this period type
-    var trendGranularity: TrendGranularity {
-        switch self {
-        case .all:     return .day
-        case .daily:   return .hour
-        case .weekly:  return .day
-        case .monthly: return .day
-        }
     }
 }

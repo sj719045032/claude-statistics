@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 final class GeminiTranscriptParser {
     static let shared = GeminiTranscriptParser()

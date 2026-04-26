@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 protocol SessionWatcher: AnyObject {
     func start()

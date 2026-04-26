@@ -1,4 +1,5 @@
 import SwiftUI
+import ClaudeStatisticsKit
 
 // MARK: - Design Tokens
 
