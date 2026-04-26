@@ -482,6 +482,7 @@ final class ActiveSessionsTracker: ObservableObject {
         }
 
         let fresh = Array(merged.values)
+            .filter { TerminalRegistry.canFocusBackToTerminal(named: $0.terminalName) }
             .sorted {
                 if $0.hasFocusHint != $1.hasFocusHint {
                     return $0.hasFocusHint && !$1.hasFocusHint

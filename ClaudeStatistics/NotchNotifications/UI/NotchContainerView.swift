@@ -867,6 +867,7 @@ struct NotchContainerView: View {
         let terminalWindowID = session.terminalWindowID
         let terminalTabID = session.terminalTabID
         let terminalStableID = session.terminalStableID
+        let sessionId = session.sessionId
         closeIslandBeforeFocus()
         Task(priority: .userInitiated) {
             _ = await TerminalFocusCoordinator.shared.focus(
@@ -878,7 +879,8 @@ struct NotchContainerView: View {
                 terminalSocket: terminalSocket,
                 terminalWindowID: terminalWindowID,
                 terminalTabID: terminalTabID,
-                stableTerminalID: terminalStableID
+                stableTerminalID: terminalStableID,
+                sessionId: sessionId
             )
         }
     }
@@ -889,6 +891,7 @@ struct NotchContainerView: View {
             "Island focus action event key=\(event.provider.rawValue):\(event.sessionId) raw=\(event.rawEventName) pid=\(focusContext.pid.map(String.init) ?? "-") tty=\(focusContext.tty ?? "-") terminal=\(focusContext.terminalName ?? "-") tabID=\(focusContext.terminalTabID ?? "-") stableID=\(focusContext.terminalStableID ?? "-") cwd=\(focusContext.projectPath ?? "-")"
         )
         let focusKey = "\(event.provider.rawValue):\(event.sessionId)"
+        let sessionId = event.sessionId
         closeIslandBeforeFocus(eventId: event.id)
         Task(priority: .userInitiated) {
             _ = await TerminalFocusCoordinator.shared.focus(
@@ -900,7 +903,8 @@ struct NotchContainerView: View {
                 terminalSocket: focusContext.terminalSocket,
                 terminalWindowID: focusContext.terminalWindowID,
                 terminalTabID: focusContext.terminalTabID,
-                stableTerminalID: focusContext.terminalStableID
+                stableTerminalID: focusContext.terminalStableID,
+                sessionId: sessionId
             )
         }
     }

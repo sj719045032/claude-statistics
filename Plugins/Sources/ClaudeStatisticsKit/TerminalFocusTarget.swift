@@ -36,6 +36,12 @@ public struct TerminalFocusTarget: Equatable, Sendable {
     public let terminalWindowID: String?
     public let terminalTabID: String?
     public let terminalStableID: String?
+    /// Provider-side session identifier (matches `Session.id`). Carried
+    /// through so deep-link strategies (e.g. chat-app plugins that route
+    /// `claude://claude.ai/resume?session=<id>` or `codex://threads/<id>`)
+    /// can address a specific conversation rather than just activating
+    /// the app. Strategies that focus on terminal tabs ignore it.
+    public let sessionId: String?
     public let capability: TerminalFocusCapability
     public let capturedAt: Date
 
@@ -49,6 +55,7 @@ public struct TerminalFocusTarget: Equatable, Sendable {
         terminalWindowID: String?,
         terminalTabID: String?,
         terminalStableID: String?,
+        sessionId: String? = nil,
         capability: TerminalFocusCapability,
         capturedAt: Date
     ) {
@@ -61,6 +68,7 @@ public struct TerminalFocusTarget: Equatable, Sendable {
         self.terminalWindowID = terminalWindowID
         self.terminalTabID = terminalTabID
         self.terminalStableID = terminalStableID
+        self.sessionId = sessionId
         self.capability = capability
         self.capturedAt = capturedAt
     }
@@ -94,6 +102,7 @@ public struct TerminalFocusTarget: Equatable, Sendable {
             terminalWindowID: terminalWindowID,
             terminalTabID: terminalTabID,
             terminalStableID: stableTerminalID,
+            sessionId: sessionId,
             capability: capability,
             capturedAt: capturedAt
         )
@@ -112,6 +121,7 @@ public struct TerminalFocusTarget: Equatable, Sendable {
             terminalWindowID: nil,
             terminalTabID: nil,
             terminalStableID: nil,
+            sessionId: sessionId,
             capability: capability,
             capturedAt: capturedAt
         )

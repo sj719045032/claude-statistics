@@ -2,6 +2,8 @@ import SwiftUI
 import Combine
 import TelemetryDeck
 import ClaudeStatisticsKit
+import ClaudeAppPlugin
+import CodexAppPlugin
 
 private enum DefaultSettings {
     static func register() {
@@ -55,7 +57,9 @@ final class AppState: ObservableObject {
             KittyPlugin(),
             WezTermPlugin(),
             WarpPlugin(),
-            EditorPlugin()
+            EditorPlugin(),
+            ClaudeAppPlugin(),
+            CodexAppPlugin()
         ]
         for plugin in plugins {
             do {
@@ -66,6 +70,28 @@ final class AppState: ObservableObject {
                 )
             }
         }
+        // Teach `TerminalRegistry` about every terminal plugin's bundle
+        // ids and `terminalNameAliases`. Bundle ids let `ProcessTreeWalker`
+        // accept external plugins (e.g. the chat-app plugins above) as focus
+        // targets while ascending the parent process chain. Alias mappings
+        // let `bundleId(forTerminalName:)` resolve hook `terminal_name`
+        // strings (e.g. "claude", "codex") to the plugin's bundle id when
+        // no host-side `TerminalCapability` claims that name. Builtin
+        // identifiers/aliases are also covered by `appCapabilities`; the
+        // union here is harmless.
+        var pluginBundleIds: Set<String> = []
+        var pluginNameAliases: [String: String] = [:]
+        for plugin in registry.terminals.values {
+            guard let terminal = plugin as? any TerminalPlugin else { continue }
+            let descriptor = terminal.descriptor
+            guard let primaryBundleId = descriptor.bundleIdentifiers.sorted().first else { continue }
+            pluginBundleIds.formUnion(descriptor.bundleIdentifiers)
+            for alias in descriptor.terminalNameAliases {
+                pluginNameAliases[alias] = primaryBundleId
+            }
+        }
+        TerminalRegistry.registerDynamicBundleIdentifiers(pluginBundleIds)
+        TerminalRegistry.registerDynamicTerminalNames(pluginNameAliases)
         DiagnosticLogger.shared.info(
             "PluginRegistry dogfood: providers=\(registry.providers.count) terminals=\(registry.terminals.count)"
         )

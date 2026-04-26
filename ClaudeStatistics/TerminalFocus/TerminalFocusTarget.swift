@@ -26,6 +26,7 @@ extension TerminalFocusTarget {
             terminalWindowID: terminalWindowID,
             terminalTabID: terminalTabID,
             terminalStableID: terminalStableID,
+            sessionId: sessionId,
             capability: resolvedCapability,
             capturedAt: capturedAt
         )

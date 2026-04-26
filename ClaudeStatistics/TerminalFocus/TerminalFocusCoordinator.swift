@@ -44,10 +44,11 @@ actor TerminalFocusCoordinator {
         terminalSocket: String?,
         terminalWindowID: String?,
         terminalTabID: String?,
-        stableTerminalID: String?
+        stableTerminalID: String?,
+        sessionId: String? = nil
     ) {
         DiagnosticLogger.shared.info(
-            "Terminal requestFocus start key=\(cacheKey) pid=\(pid.map(String.init) ?? "-") tty=\(tty ?? "-") terminal=\(terminalName ?? "-") tabID=\(terminalTabID ?? "-") stableID=\(stableTerminalID ?? "-") cwd=\(projectPath ?? "-")"
+            "Terminal requestFocus start key=\(cacheKey) pid=\(pid.map(String.init) ?? "-") tty=\(tty ?? "-") terminal=\(terminalName ?? "-") tabID=\(terminalTabID ?? "-") stableID=\(stableTerminalID ?? "-") session=\(sessionId ?? "-") cwd=\(projectPath ?? "-")"
         )
         Task(priority: .userInitiated) {
             _ = await TerminalFocusCoordinator.shared.focus(
@@ -59,7 +60,8 @@ actor TerminalFocusCoordinator {
                 terminalSocket: terminalSocket,
                 terminalWindowID: terminalWindowID,
                 terminalTabID: terminalTabID,
-                stableTerminalID: stableTerminalID
+                stableTerminalID: stableTerminalID,
+                sessionId: sessionId
             )
         }
     }
@@ -74,10 +76,11 @@ actor TerminalFocusCoordinator {
         terminalSocket: String?,
         terminalWindowID: String?,
         terminalTabID: String?,
-        stableTerminalID: String?
+        stableTerminalID: String?,
+        sessionId: String? = nil
     ) async -> TerminalFocusCapability {
         DiagnosticLogger.shared.info(
-            "Terminal focus requested key=\(cacheKey) pid=\(pid.map(String.init) ?? "-") tty=\(tty ?? "-") terminal=\(terminalName ?? "-") socket=\(terminalSocket ?? "-") stableID=\(stableTerminalID ?? "-") cwd=\(projectPath ?? "-")"
+            "Terminal focus requested key=\(cacheKey) pid=\(pid.map(String.init) ?? "-") tty=\(tty ?? "-") terminal=\(terminalName ?? "-") socket=\(terminalSocket ?? "-") stableID=\(stableTerminalID ?? "-") session=\(sessionId ?? "-") cwd=\(projectPath ?? "-")"
         )
 
         if let immediateTarget = makeImmediateTarget(
@@ -89,7 +92,8 @@ actor TerminalFocusCoordinator {
             terminalSocket: terminalSocket,
             terminalWindowID: terminalWindowID,
             terminalTabID: terminalTabID,
-            stableTerminalID: stableTerminalID
+            stableTerminalID: stableTerminalID,
+            sessionId: sessionId
         ) {
             if let capability = await attemptDirectFocus(target: immediateTarget, cacheKey: cacheKey) {
                 return capability
@@ -105,7 +109,8 @@ actor TerminalFocusCoordinator {
             terminalSocket: terminalSocket,
             terminalWindowID: terminalWindowID,
             terminalTabID: terminalTabID,
-            stableTerminalID: stableTerminalID
+            stableTerminalID: stableTerminalID,
+            sessionId: sessionId
         )
         guard target.bundleId != nil || target.terminalPid != nil else {
             DiagnosticLogger.shared.warning("Terminal focus unresolved for \(cacheKey)")
@@ -129,7 +134,8 @@ actor TerminalFocusCoordinator {
         terminalSocket: String?,
         terminalWindowID: String?,
         terminalTabID: String?,
-        stableTerminalID: String?
+        stableTerminalID: String?,
+        sessionId: String?
     ) -> TerminalFocusTarget? {
         let cached = cachedTargets[cacheKey]
         let bundleId = TerminalRegistry.bundleId(forTerminalName: terminalName)
@@ -150,6 +156,7 @@ actor TerminalFocusCoordinator {
         let resolvedSocket = terminalSocket?.nilIfEmpty ?? cached?.terminalSocket
         let resolvedPid = pid ?? cached?.terminalPid
         let resolvedName = terminalName?.nilIfEmpty ?? cached?.terminalName
+        let resolvedSessionId = sessionId?.nilIfEmpty ?? cached?.sessionId
 
         guard bundleId != nil
                 || resolvedPid != nil
@@ -172,6 +179,7 @@ actor TerminalFocusCoordinator {
             terminalWindowID: resolvedWindowID,
             terminalTabID: resolvedTabID,
             terminalStableID: resolvedStableID,
+            sessionId: resolvedSessionId,
             capability: .unresolved,
             capturedAt: Date()
         )
@@ -258,7 +266,8 @@ actor TerminalFocusCoordinator {
         terminalSocket: String?,
         terminalWindowID: String?,
         terminalTabID: String?,
-        stableTerminalID: String?
+        stableTerminalID: String?,
+        sessionId: String?
     ) async -> TerminalFocusTarget {
         let inferredBundleId = TerminalRegistry.bundleId(forTerminalName: terminalName) ?? cachedTargets[cacheKey]?.bundleId
         let canUseCachedTerminalIdentity = focusIdentityProvider(for: inferredBundleId)?
@@ -268,6 +277,7 @@ actor TerminalFocusCoordinator {
                 requestedStableID: stableTerminalID,
                 cachedTarget: cachedTargets[cacheKey]
             ) ?? true
+        let resolvedSessionId = sessionId?.nilIfEmpty ?? cachedTargets[cacheKey]?.sessionId
 
         if let cached = cachedTargets[cacheKey],
            canUseCachedTerminalIdentity,
@@ -296,6 +306,7 @@ actor TerminalFocusCoordinator {
                     terminalWindowID: terminalWindowID,
                     terminalTabID: terminalTabID,
                     stableTerminalID: stableTerminalID,
+                    sessionId: resolvedSessionId,
                     cached: cachedTargets[cacheKey]
                 )
                 cachedTargets[cacheKey] = recoveredTarget
@@ -313,6 +324,7 @@ actor TerminalFocusCoordinator {
                     terminalWindowID: terminalWindowID?.nilIfEmpty ?? (canUseCachedTerminalIdentity ? cached.terminalWindowID : nil),
                     terminalTabID: terminalTabID?.nilIfEmpty ?? (canUseCachedTerminalIdentity ? cached.terminalTabID : nil),
                     terminalStableID: stableTerminalID?.nilIfEmpty ?? (canUseCachedTerminalIdentity ? cached.terminalStableID : nil),
+                    sessionId: resolvedSessionId ?? cached.sessionId,
                     capability: cached.capability,
                     capturedAt: Date()
                 ).withResolvedCapability()
@@ -335,6 +347,7 @@ actor TerminalFocusCoordinator {
                     terminalTabID: terminalTabID?.nilIfEmpty,
                     terminalStableID: stableTerminalID?.nilIfEmpty
                         ?? (canUseCachedTerminalIdentity ? cachedTargets[cacheKey]?.terminalStableID : nil),
+                    sessionId: resolvedSessionId,
                     capability: .unresolved,
                     capturedAt: Date()
                 ).withResolvedCapability()
@@ -351,6 +364,7 @@ actor TerminalFocusCoordinator {
                 terminalWindowID: terminalWindowID?.nilIfEmpty,
                 terminalTabID: terminalTabID?.nilIfEmpty,
                 terminalStableID: stableTerminalID?.nilIfEmpty,
+                sessionId: resolvedSessionId,
                 capability: .unresolved,
                 capturedAt: Date()
             )
@@ -369,6 +383,7 @@ actor TerminalFocusCoordinator {
             terminalWindowID: terminalWindowID,
             terminalTabID: terminalTabID,
             stableTerminalID: stableTerminalID,
+            sessionId: resolvedSessionId,
             cached: canUseCachedTerminalIdentity ? cachedTargets[cacheKey] : nil
         )
         cachedTargets[cacheKey] = target
@@ -384,6 +399,7 @@ actor TerminalFocusCoordinator {
         terminalWindowID: String?,
         terminalTabID: String?,
         stableTerminalID: String?,
+        sessionId: String?,
         cached: TerminalFocusTarget?
     ) -> TerminalFocusTarget {
         return TerminalFocusTarget(
@@ -396,6 +412,7 @@ actor TerminalFocusCoordinator {
             terminalWindowID: terminalWindowID?.nilIfEmpty ?? cached?.terminalWindowID,
             terminalTabID: terminalTabID?.nilIfEmpty ?? cached?.terminalTabID,
             terminalStableID: stableTerminalID?.nilIfEmpty ?? cached?.terminalStableID,
+            sessionId: sessionId?.nilIfEmpty ?? cached?.sessionId,
             capability: .unresolved,
             capturedAt: Date()
         ).withResolvedCapability()

@@ -13,6 +13,28 @@ enum TerminalRegistry {
         EditorTerminalCapability()
     ]
 
+    /// Identifiers contributed by external `TerminalPlugin`s at runtime
+    /// (chat-app plugins like ClaudeAppPlugin / CodexAppPlugin). These
+    /// don't ship a host-side `TerminalCapability` — they implement
+    /// focus entirely through the SDK's `TerminalFocusStrategy`. The
+    /// registry stores both their bundle ids (so `ProcessTreeWalker`
+    /// accepts them as focus targets while ascending the parent process
+    /// chain) and their `terminalNameAliases` (so a hook arriving with
+    /// `terminal_name: "claude"` resolves to `com.anthropic.claudefordesktop`
+    /// without a matching builtin capability).
+    private static let dynamicBundles = DynamicBundleStore()
+
+    static func registerDynamicBundleIdentifiers(_ ids: Set<String>) {
+        dynamicBundles.add(bundleIds: ids)
+    }
+
+    /// Register `terminalNameAliases` -> `bundleId` mappings contributed by
+    /// plugins. Aliases are normalized the same way `matchesTerminalName`
+    /// normalizes incoming hook input, so lookup is case/whitespace tolerant.
+    static func registerDynamicTerminalNames(_ mapping: [String: String]) {
+        dynamicBundles.add(nameAliases: mapping)
+    }
+
     private static let externalCapabilities: [any TerminalCapability] = [
         ExternalTerminalCapability(
             displayName: "Hyper",
@@ -150,7 +172,10 @@ enum TerminalRegistry {
     }
 
     static func bundleId(forTerminalName terminalName: String?) -> String? {
-        capabilities.first { $0.matchesTerminalName(terminalName) }?.primaryBundleIdentifier
+        if let cap = capabilities.first(where: { $0.matchesTerminalName(terminalName) }) {
+            return cap.primaryBundleIdentifier
+        }
+        return dynamicBundles.bundleId(forTerminalName: terminalName)
     }
 
     static func bundleId(forProcessName processName: String?) -> String? {
@@ -161,12 +186,26 @@ enum TerminalRegistry {
         capabilities.first { $0.ownsBundleIdentifier(bundleId) }?.route ?? .accessibility
     }
 
+    /// True if the named terminal resolves to a registered capability — i.e.
+    /// the click handler has *some* path to act on the row, even if that's
+    /// only raising the app (`.activate` route for editor hosts like VSCode).
+    /// False only for terminals whose hook `terminal_name` doesn't match any
+    /// alias and therefore have no actionable target at all. Used to filter
+    /// the notch session list so we don't list rows that go nowhere.
+    static func canFocusBackToTerminal(named terminalName: String?) -> Bool {
+        bundleId(forTerminalName: terminalName) != nil
+    }
+
     static func isTerminalProcessName(_ processName: String?) -> Bool {
         bundleId(forProcessName: processName) != nil
     }
 
     static func isTerminalLikeBundle(_ bundleId: String?) -> Bool {
-        capabilities.contains { $0.ownsBundleIdentifier(bundleId) }
+        if capabilities.contains(where: { $0.ownsBundleIdentifier(bundleId) }) {
+            return true
+        }
+        guard let bundleId else { return false }
+        return dynamicBundles.contains(bundleId)
     }
 
     static func isEditorLikeBundle(_ bundleId: String?) -> Bool {
@@ -214,5 +253,44 @@ enum TerminalRegistry {
             .sorted { $0.priority < $1.priority }
             .first?
             .capability
+    }
+}
+
+private final class DynamicBundleStore: @unchecked Sendable {
+    private let lock = NSLock()
+    private var identifiers: Set<String> = []
+    /// Normalized `terminalNameAlias` → `bundleId`. Normalization mirrors
+    /// `matchesTerminalName` (lowercased + whitespace-trimmed) so hook
+    /// `terminal_name` strings can be looked up directly.
+    private var nameToBundleId: [String: String] = [:]
+
+    func add(bundleIds newIdentifiers: Set<String>) {
+        lock.lock()
+        defer { lock.unlock() }
+        identifiers.formUnion(newIdentifiers)
+    }
+
+    func add(nameAliases mapping: [String: String]) {
+        lock.lock()
+        defer { lock.unlock() }
+        for (alias, bundleId) in mapping {
+            let normalized = alias.terminalRegistryNormalizedName
+            guard !normalized.isEmpty else { continue }
+            nameToBundleId[normalized] = bundleId
+        }
+    }
+
+    func contains(_ identifier: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return identifiers.contains(identifier)
+    }
+
+    func bundleId(forTerminalName terminalName: String?) -> String? {
+        guard let normalized = terminalName?.terminalRegistryNormalizedName,
+              !normalized.isEmpty else { return nil }
+        lock.lock()
+        defer { lock.unlock() }
+        return nameToBundleId[normalized]
     }
 }
