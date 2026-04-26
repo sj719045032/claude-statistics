@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 struct Session: Identifiable, Hashable {
     let id: String
@@ -31,21 +32,7 @@ struct Session: Identifiable, Hashable {
     }
 }
 
-struct ModelTokenStats: Codable {
-    var inputTokens: Int = 0
-    var outputTokens: Int = 0
-    var cacheCreation5mTokens: Int = 0
-    var cacheCreation1hTokens: Int = 0
-    var cacheCreationTotalTokens: Int = 0
-    var cacheReadTokens: Int = 0
-    var messageCount: Int = 0
-
-    var totalTokens: Int { inputTokens + outputTokens + cacheCreationTotalTokens + cacheReadTokens }
-
-    var estimatedCost: Double {
-        0 // computed externally with model name
-    }
-}
+// ModelTokenStats lives in ClaudeStatisticsKit.
 
 struct SessionStats: Codable {
     // MARK: - Stored: session-level metadata
