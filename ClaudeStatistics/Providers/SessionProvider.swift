@@ -37,28 +37,7 @@ struct ProviderUsageTrendPresentation: Identifiable, Hashable {
     var modelFamily: String? = nil
 }
 
-enum MenuBarStripFormat {
-    /// "Flash Lite" → "FL", "Pro" → "P", "GPT 5" → "G5".
-    /// Takes the first alphanumeric character of each space-separated
-    /// token. Uppercased so short labels read cleanly in the menu bar.
-    static func initials(of title: String) -> String {
-        let tokens = title.split { !$0.isLetter && !$0.isNumber }
-        let letters = tokens.compactMap { $0.first.map(Character.init) }
-        let joined = String(letters).uppercased()
-        return joined.isEmpty ? title : joined
-    }
-}
-
-/// One page in the rotating multi-provider menu bar strip. Split into
-/// `prefix` (window or bucket label, e.g. "5h", "FL") and `value`
-/// (e.g. "72%") so the cell can stack them across two lines. `usedPercent`
-/// is always *consumed* fraction (0–100), never "remaining", so colour
-/// thresholds behave the same across providers.
-struct MenuBarStripSegment: Equatable {
-    let prefix: String
-    let value: String
-    let usedPercent: Double
-}
+// MenuBarStripFormat and MenuBarStripSegment live in ClaudeStatisticsKit.
 
 struct ProviderUsagePresentation {
     enum PreferredWindow {
@@ -172,19 +151,7 @@ protocol ProviderPricingFetching {
     func fetchPricing() async throws -> [String: ModelPricing.Pricing]
 }
 
-struct StatusLineLegendItem: Identifiable {
-    let example: String
-    let descriptionLocalizationKey: String
-
-    var id: String { "\(example)::\(descriptionLocalizationKey)" }
-}
-
-struct StatusLineLegendSection: Identifiable {
-    let titleLocalizationKey: String
-    let items: [StatusLineLegendItem]
-
-    var id: String { titleLocalizationKey }
-}
+// StatusLineLegendItem and StatusLineLegendSection live in ClaudeStatisticsKit.
 
 /// Encapsulates statusline install/restore operations for a specific provider.
 /// Title and description localization keys are plain strings to avoid SwiftUI import.
