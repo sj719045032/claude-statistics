@@ -24,12 +24,33 @@ packages:
     from: "2.0.0"
 
 targets:
+  ClaudeStatisticsKit:
+    type: framework
+    platform: macOS
+    sources:
+      - path: Plugins/Sources/ClaudeStatisticsKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tinystone.ClaudeStatisticsKit
+        PRODUCT_NAME: ClaudeStatisticsKit
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        DEFINES_MODULE: YES
+        BUILD_LIBRARY_FOR_DISTRIBUTION: YES
+        SKIP_INSTALL: NO
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_STRICT_CONCURRENCY: minimal
+
   ClaudeStatistics:
     type: application
     platform: macOS
     sources:
       - path: ClaudeStatistics
     dependencies:
+      - target: ClaudeStatisticsKit
+        embed: true
       - package: Sparkle
       - package: MarkdownView
         product: MarkdownView
@@ -64,6 +85,7 @@ targets:
       - path: ClaudeStatisticsTests
     dependencies:
       - target: ClaudeStatistics
+      - target: ClaudeStatisticsKit
     settings:
       base:
         SWIFT_VERSION: "5.9"

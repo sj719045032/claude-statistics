@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import ClaudeStatisticsKit
 
 enum ProviderKind: String, CaseIterable, Identifiable, Codable {
     case claude
@@ -8,39 +9,34 @@ enum ProviderKind: String, CaseIterable, Identifiable, Codable {
 
     var id: String { rawValue }
 
-    var displayName: String {
+    /// The descriptor for this kind. Stage-1A introduces this as the new
+    /// single source of truth; the legacy property accessors below now
+    /// forward to it. Stage 1D migrates all `switch self` consumers to
+    /// read `descriptor.<field>` directly and the legacy accessors will
+    /// be deprecated once those migrations land.
+    var descriptor: ProviderDescriptor {
         switch self {
-        case .claude: return "Claude"
-        case .codex: return "Codex"
-        case .gemini: return "Gemini"
+        case .claude: return .claude
+        case .codex:  return .codex
+        case .gemini: return .gemini
         }
     }
+
+    var displayName: String { descriptor.displayName }
 
     /// UserDefaults key for this provider's notch master switch. Anchored on
     /// the enum's rawValue so adding a new provider needs no central table
     /// edit — each provider owns its own string.
-    var notchEnabledDefaultsKey: String { "notch.enabled.\(rawValue)" }
+    var notchEnabledDefaultsKey: String { descriptor.notchEnabledDefaultsKey }
 
     /// Asset name of the monochrome template icon used to represent this
     /// provider in the menu bar strip. Template-rendered so the icon
     /// inherits the status bar's tint across dark/light mode.
-    var statusIconAssetName: String {
-        switch self {
-        case .claude: return "ClaudeProviderIcon"
-        case .codex: return "CodexProviderIcon"
-        case .gemini: return "GeminiProviderIcon"
-        }
-    }
+    var statusIconAssetName: String { descriptor.iconAssetName }
 
     /// Brand accent color — used as a subtle tint for the provider icon
     /// when not inheriting the status bar's template color.
-    var accentColor: Color {
-        switch self {
-        case .claude: return Color(red: 0.83, green: 0.40, blue: 0.25)
-        case .codex: return Color(red: 0.10, green: 0.66, blue: 0.50)
-        case .gemini: return Color(red: 0.26, green: 0.52, blue: 0.96)
-        }
-    }
+    var accentColor: Color { descriptor.accentColor }
 }
 
 extension ProviderKind {
@@ -48,8 +44,9 @@ extension ProviderKind {
     /// `Edit` / `apply_patch` / `replace` all collapse to `"edit"`, `Read` /
     /// `read_file` collapse to `"read"`, etc. The alias tables live in each
     /// provider's own file (`ClaudeToolNames` / `CodexToolNames` /
-    /// `GeminiToolNames`) so adding a new alias for one provider doesn't
-    /// touch shared code. Unknown names pass through as lower-cased.
+    /// `GeminiToolNames`) and are exposed through `ProviderDescriptor
+    /// .resolveToolAlias` so adding a new provider does not touch this
+    /// shared code. Unknown names pass through as lower-cased.
     func canonicalToolName(_ raw: String?) -> String {
         guard let raw else { return "" }
         let normalized = raw
@@ -58,18 +55,10 @@ extension ProviderKind {
             .replacingOccurrences(of: "-", with: "_")
             .replacingOccurrences(of: " ", with: "_")
         guard !normalized.isEmpty else { return "" }
-        if let mapped = providerAlias(normalized) {
+        if let mapped = descriptor.resolveToolAlias(normalized) {
             return mapped
         }
         return normalized
-    }
-
-    private func providerAlias(_ normalized: String) -> String? {
-        switch self {
-        case .claude: return ClaudeToolNames.canonical(normalized)
-        case .codex:  return CodexToolNames.canonical(normalized)
-        case .gemini: return GeminiToolNames.canonical(normalized)
-        }
     }
 }
 
@@ -79,8 +68,8 @@ extension ProviderKind {
 /// in one place instead of duplicated across transcript parsers and formatters.
 enum CanonicalToolName {
     /// Tool-name fallback used by callers that lack a `ProviderKind` context.
-    /// Tries every provider's alias table in turn; returns the lower-cased
-    /// normalized name when no provider recognizes the alias.
+    /// Tries every registered provider's alias table in turn; returns the
+    /// lower-cased normalized name when no provider recognizes the alias.
     static func resolve(_ raw: String?) -> String {
         guard let raw else { return "" }
         let normalized = raw
@@ -90,7 +79,7 @@ enum CanonicalToolName {
             .replacingOccurrences(of: " ", with: "_")
         guard !normalized.isEmpty else { return "" }
         for kind in ProviderKind.allCases {
-            if let mapped = alias(from: kind, normalized: normalized) {
+            if let mapped = kind.descriptor.resolveToolAlias(normalized) {
                 return mapped
             }
         }
@@ -120,13 +109,6 @@ enum CanonicalToolName {
         }
     }
 
-    private static func alias(from kind: ProviderKind, normalized: String) -> String? {
-        switch kind {
-        case .claude: return ClaudeToolNames.canonical(normalized)
-        case .codex:  return CodexToolNames.canonical(normalized)
-        case .gemini: return GeminiToolNames.canonical(normalized)
-        }
-    }
 }
 
 /// Controls which providers' usage cells are shown in the status bar strip.

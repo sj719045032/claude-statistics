@@ -1,4 +1,5 @@
 import AppKit
+import ClaudeStatisticsKit
 import Foundation
 
 struct ITermTerminalCapability: TerminalCapability, TerminalLaunching, TerminalFocusCapabilityProviding, TerminalDirectFocusing, TerminalReadinessProviding {

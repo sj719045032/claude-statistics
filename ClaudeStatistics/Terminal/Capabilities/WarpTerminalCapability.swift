@@ -1,4 +1,5 @@
 import AppKit
+import ClaudeStatisticsKit
 import Foundation
 
 struct WarpTerminalCapability: TerminalCapability, TerminalLaunching, TerminalReadinessProviding {

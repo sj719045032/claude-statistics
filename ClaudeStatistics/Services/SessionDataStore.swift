@@ -233,12 +233,21 @@ final class SessionDataStore: ObservableObject {
                 let processedCount = processed
                 let shouldRebucket = processedCount % 20 < batchSize || processedCount == total
                 await MainActor.run {
+                    // Stage all parsedStats writes from this 8-session batch
+                    // into a local copy and assign once. ObservableObject
+                    // would otherwise fire `objectWillChange` per write
+                    // (8x per batch) — SwiftUI does coalesce per RunLoop
+                    // turn but Combine subscribers and downstream
+                    // `removeDuplicates()` chains do not, so the staged
+                    // assign also helps `@Published` consumers.
+                    var staged = self.parsedStats
                     for result in results {
                         self.handleParseRetryState(for: result.sessionId, shouldRetry: result.shouldRetry)
                         if let stats = result.displayStats {
-                            self.parsedStats[result.sessionId] = stats
+                            staged[result.sessionId] = stats
                         }
                     }
+                    self.parsedStats = staged
                     self.parseProgress = "Parsing \(processedCount)/\(total)"
                     self.parsePercent = Double(processedCount) / Double(total)
                     if shouldRebucket {

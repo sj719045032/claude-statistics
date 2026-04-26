@@ -37,6 +37,7 @@ final class AttentionBridge {
                 self.serverFd = -1
             }
             unlink(self.socketPath)
+            AttentionBridgeAuth.clearPid()
         }
     }
 
@@ -102,6 +103,11 @@ final class AttentionBridge {
         }
         source.resume()
         listenSource = source
+
+        // Heartbeat for HookCLI watchdog: hook subprocesses read this to
+        // detect host death and abort their long-blocking permission-
+        // response reads instead of leaving CLIs hung.
+        AttentionBridgeAuth.writePid()
     }
 
     private func handleConnection(_ fd: Int32) {

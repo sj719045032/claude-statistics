@@ -719,6 +719,14 @@ private func sendToSocket(
 
     guard expectsResponse else { return Data() }
 
+    // Host-liveness watchdog: while we block on the long permission-
+    // response read (up to 280s), poll `AttentionBridgeAuth.livePid()`
+    // every few seconds. If the host died, `shutdown(fd, SHUT_RDWR)`
+    // forces our read to return EOF immediately so the CLI doesn't hang.
+    let watchdog = HookHostWatchdog(fd: fd)
+    watchdog.start()
+    defer { watchdog.stop() }
+
     var response = Data()
     var byte: UInt8 = 0
     while true {
@@ -732,7 +740,15 @@ private func sendToSocket(
             )
             return nil
         }
-        if bytesRead == 0 { break }
+        if bytesRead == 0 {
+            if watchdog.didInterrupt {
+                DiagnosticLogger.shared.warning(
+                    "HookCLI host died mid-wait provider=\(diagnosticContext.provider.rawValue) event=\(diagnosticContext.event) session=\(diagnosticContext.sessionId) toolUseId=\(diagnosticContext.toolUseId) path=\(path)"
+                )
+                return nil
+            }
+            break
+        }
         if byte == 0x0A { break }
         response.append(byte)
     }
@@ -872,4 +888,63 @@ private func nonEmpty(_ value: String?) -> String? {
 
 private func hookGhosttyLog(_ message: String) {
     DiagnosticLogger.shared.info("Hook ghostty \(message)")
+}
+
+/// Background poller that aborts a HookCLI socket read once the host
+/// app stops listening. The host's `AttentionBridge.start()` writes its
+/// pid to `AttentionBridgeAuth.pidPath` and clears it on stop; if either
+/// the file disappears or `kill(pid, 0)` reports ESRCH, we
+/// `shutdown(SHUT_RDWR)` the socket so the blocking `read()` returns
+/// EOF instead of waiting out the full 280s permission timeout.
+final class HookHostWatchdog {
+    private let fd: Int32
+    private let lock = NSLock()
+    private var stopped = false
+    private var interrupted = false
+    private let pollInterval: TimeInterval
+
+    init(fd: Int32, pollInterval: TimeInterval = 5.0) {
+        self.fd = fd
+        self.pollInterval = pollInterval
+    }
+
+    var didInterrupt: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return interrupted
+    }
+
+    func start() {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            while let self {
+                self.lock.lock()
+                let shouldStop = self.stopped
+                self.lock.unlock()
+                if shouldStop { return }
+
+                Thread.sleep(forTimeInterval: self.pollInterval)
+
+                self.lock.lock()
+                let stillRunning = !self.stopped
+                self.lock.unlock()
+                if !stillRunning { return }
+
+                if AttentionBridgeAuth.livePid() == nil {
+                    self.lock.lock()
+                    self.interrupted = true
+                    self.stopped = true
+                    self.lock.unlock()
+                    // Wake the blocking read with EOF. SHUT_RDWR is safer
+                    // than close(fd) here because the main thread still
+                    // holds fd via `defer { close(fd) }`.
+                    shutdown(self.fd, SHUT_RDWR)
+                    return
+                }
+            }
+        }
+    }
+
+    func stop() {
+        lock.lock(); defer { lock.unlock() }
+        stopped = true
+    }
 }

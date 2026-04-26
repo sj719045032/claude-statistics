@@ -1,25 +1,10 @@
 import AppKit
 import Foundation
+import ClaudeStatisticsKit
 
-enum TerminalCapabilityCategory {
-    case terminal
-    case editor
-}
-
-/// How precisely this terminal can focus a specific session's tab/pane when
-/// the user clicks "Return to terminal" from the notch.
-enum TerminalTabFocusPrecision {
-    /// Deterministic: we always land on the exact tab/pane for the session.
-    case exact
-    /// Usually works but can fail — e.g. Ghostty when session ids expire
-    /// after an app restart, or split panes where multiple panes live in
-    /// the same tab.
-    case bestEffort
-    /// Only raises the app to the foreground; the user still has to pick
-    /// the right tab manually (e.g. Warp's closed automation surface,
-    /// Alacritty's accessibility-only path with identical titles).
-    case appOnly
-}
+// `TerminalCapabilityCategory` and `TerminalTabFocusPrecision` live in
+// `ClaudeStatisticsKit` so plugins can declare descriptor metadata
+// without depending on the host bundle.
 
 protocol TerminalCapability {
     var optionID: String? { get }

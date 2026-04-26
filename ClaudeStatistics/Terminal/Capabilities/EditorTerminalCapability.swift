@@ -1,4 +1,5 @@
 import AppKit
+import ClaudeStatisticsKit
 import Foundation
 
 struct EditorTerminalCapability: TerminalCapability, TerminalLaunching, TerminalReadinessProviding {

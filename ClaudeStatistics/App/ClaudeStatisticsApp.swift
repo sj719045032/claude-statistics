@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import TelemetryDeck
+import ClaudeStatisticsKit
 
 private enum DefaultSettings {
     static func register() {
@@ -33,6 +34,14 @@ final class AppState: ObservableObject {
     let providerContexts: ProviderContextRegistry
     let usageVMs: UsageVMRegistry
     let notchRuntime: NotchRuntimeCoordinator
+
+    /// Stage-3D dogfood: the v4.0 plugin registry runs alongside the
+    /// legacy `ProviderRegistry` / `TerminalRegistry` (which still drive
+    /// the kernel's switch-based dispatch). Stage 4 migrates the kernel
+    /// over and the legacy registries are retired. Until then this is a
+    /// no-op slot — instantiated so the API surface is exercised but no
+    /// builtin plugins are registered yet.
+    let pluginRegistry = PluginRegistry()
 
     /// Convenience: the primary usage VM (bound to the current
     /// provider). Many existing call sites still reference

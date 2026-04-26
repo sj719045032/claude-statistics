@@ -1,4 +1,5 @@
 import AppKit
+import ClaudeStatisticsKit
 import Foundation
 
 struct GhosttyTerminalCapability: TerminalCapability, TerminalLaunching, TerminalFocusCapabilityProviding, TerminalDirectFocusing, TerminalFocusIdentityProviding, TerminalReadinessProviding {

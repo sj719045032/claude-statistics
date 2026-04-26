@@ -1,4 +1,5 @@
 import AppKit
+import ClaudeStatisticsKit
 import Foundation
 
 struct KittyTerminalCapability: TerminalCapability, TerminalLaunching, TerminalFocusing, TerminalFocusCapabilityProviding, TerminalDirectFocusing, TerminalSetupProviding, TerminalReadinessProviding {

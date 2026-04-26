@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 struct AppleTerminalCapability: TerminalCapability, TerminalLaunching, TerminalFocusCapabilityProviding, TerminalDirectFocusing, TerminalReadinessProviding {
     let optionID: String? = TerminalPreferences.terminalOptionID

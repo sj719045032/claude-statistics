@@ -1,4 +1,5 @@
 import AppKit
+import ClaudeStatisticsKit
 import Foundation
 
 struct WezTermTerminalCapability: TerminalCapability, TerminalLaunching, TerminalFocusing, TerminalFocusCapabilityProviding, TerminalDirectFocusing, TerminalReadinessProviding {

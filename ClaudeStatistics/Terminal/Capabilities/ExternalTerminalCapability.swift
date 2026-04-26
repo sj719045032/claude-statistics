@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 struct ExternalTerminalCapability: TerminalCapability {
     let optionID: String?
