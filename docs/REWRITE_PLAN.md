@@ -1,8 +1,8 @@
 # Claude Statistics 架构与重写计划
 
 > 最后更新：2026-04-26
-> 当前版本：v3.1.0 + v4.0-alpha（SDK 协议表面已就位，bundle 加载待 M2）
-> SDK 现状：`ClaudeStatisticsKit` 48 文件 / 2882 行；769 测试通过
+> 当前版本：v3.1.0 + v4.0-alpha（SDK 协议表面已就位）+ v4.0-beta 启动（M2 .csplugin 加载机制完整能力就位，1 个 chat-app 样本运行）
+> SDK 现状：`ClaudeStatisticsKit` 51 文件 / 3300+ 行；795 测试通过
 > 目标版本：v4.0（插件化架构）
 
 本文档是项目的**单一权威架构文档**，合并了原 `ARCHITECTURE.md`（现状描述）与 `ARCHITECTURE_REVIEW.md`（优化评估），并在此基础上规划了 v4.0 的插件化重写。
@@ -1312,21 +1312,29 @@ graph LR
 #### 余下工作（不在 v4.0-alpha 范围内）
 
 - ⏸️ Terminal plugin behavior 第二波协议接口已搬完（readiness + setup wizard）；8 个 builtin terminal capability 的具体行为代码下沉到独立 plugin target 仍待阶段 4 完成
-- ⏸️ 删除 `TerminalFocusRoute` enum + `TerminalFocusRouteRegistry`：当前 plugin 工厂仍通过 `TerminalFocusRouteRegistry.handler(for: capability.route)` 查 strategy，第三方 plugin 加载（M2）后可直接持有自己的 strategy 实例，届时 route layer 即可退役
+- ⏸️ 删除 `TerminalFocusRoute` enum + `TerminalFocusRouteRegistry`：plugin 工厂层已不再查 registry（直接 instantiate strategy）；coordinator/target 仍持有 fallback 引用，等 builtin plugin 下沉到 .csplugin 后即可退役
 - ⏸️ Share role plugin（拆分 1177 行 `ShareRoleEngine` 为 9 个独立 RoleScorer，搬到 `OfficialShareRolesPlugin`）— 阶段 4 子任务
-- ✅ Bundle (`.csplugin`) 加载机制 + `disable-library-validation` entitlement — M2 第一波样本（`ClaudeAppPlugin` + `CodexAppPlugin`）已切换为 bundle target，输出 `Contents/PlugIns/<Name>.csplugin`，主 App 启动期 `PluginLoader.loadAll(...)` 扫两路（Bundle.main.builtInPlugInsURL + `~/Library/.../Claude Statistics/Plugins`）成功加载注册；entitlement 已加进 `ClaudeStatistics.entitlements` 并由 `run-debug.sh` 在 ad-hoc 重签时透传
-- ✅ Plugin trust gate 落地（`TrustStore` + SHA-256 of Info.plist + `trust.json` 持久化）；首次加载 prompt UI 仍是 ⏸️（S5b），当前 user-installed plugin 走 allow-by-default + record，等 prompt sheet 上线后再翻 default
-- ⏸️ 8 terminal + 3 provider 内置插件抽出为 `.csplugin`：M2 模板已成熟，按 chat-app 样本逐个搬可逐项独立 PR
+- ⏸️ 8 terminal + 3 provider 内置插件抽出 .csplugin（M2 模板已成熟；按 chat-app 样本逐个独立 PR）
+- ✅ Bundle (`.csplugin`) 加载机制 — M2 完整能力链路就位：
+  - `PluginLoader.loadAll(...)` 双路扫描（`Bundle.main.builtInPlugInsURL` + `~/Library/.../Claude Statistics/Plugins`），失败原因 `SkipReason` 全分类
+  - `PluginLoader.loadOne(...)` 公开供 hot-load 路径使用
+  - `PluginRegistry` 加 `PluginSource`（`.host` / `.bundled` / `.user`）+ `unregister(id:)` 实现 plugin 撤销
+  - 第一批 .csplugin 样本：`ClaudeAppPlugin` + `CodexAppPlugin`（bundle target，`WRAPPER_EXTENSION = csplugin`，Info.plist 嵌 `CSPluginManifest`）
+- ✅ Plugin trust gate 完整闭环：
+  - `TrustStore`（SHA-256 of Info.plist + `trust.json` 持久化）
+  - `PluginTrustGate` host 端：未知 plugin 入队 → 启动后 NSAlert prompt → 用户 Allow 即时 hot-load + 触发 `onPluginHotLoaded` 让 host refresh dynamic registries / Deny 持久化拒绝
+  - `disable(manifest:bundleURL:)` 撤销已加载 plugin（持久化 `.denied` + `unregister` + `onPluginDisabled`）
+- ✅ Settings → Plugins 面板：列出 manifest（id / version / kind / permissions）+ 来源 pill（built-in / bundled / user）+ 路径；user plugin 行有 Disable 按钮；底部 "Reset all plugin trust decisions" 一键重置 trust.json
+- ⏸️ entitlement `disable-library-validation` — S7 commit (`3b8f2cb`) 已加，但 working tree 中外部恢复成空 dict（debug 不需要因为 hardened runtime OFF；release notarization 时再补反向 commit）
 - ✅ `ProviderRegistry.provider(for:)` switch → plugin lookup（NSLock-guarded dynamic store；switch 保留为 fallback）
 
-**结论**：v4.0-alpha 协议表面工作圆满收尾。核心成就 — 第三方开发者已可基于 `ClaudeStatisticsKit` 构建完整 provider plugin，无需任何 host 类型依赖。下一步重点转向 Terminal/Share plugin 拆分（阶段 4）和 bundle 加载（阶段 5）。
+**结论**：v4.0-alpha + M2 主线收尾 — 第三方开发者已可基于 `ClaudeStatisticsKit` 构建完整的 `.csplugin`，主 App 端到端流程跑通：拷贝到 user 目录 → 重启弹 prompt → Allow 即时加载（无需重启）/ Deny 持久化拒绝 → Settings 看列表/路径/来源 → 一键 Disable 或 Reset trust。后续 M2 收尾仅剩 11 个 builtin plugin 的逐个抽出（按现有 chat-app 模板独立 PR）；M3 工作（仓库分离 / SDK 文档 / 签名公证）在 M2 dogfood 期后启动。
 
 #### 当前 runtime 状态
 
-- 769 测试全部通过
+- 795 测试全部通过
 - App 启动正常（`run-debug.sh`）
-- Working tree clean
-- Plugin dogfood 链路 end-to-end 跑通
+- Plugin 完整链路 end-to-end 跑通：`PluginRegistry dogfood: providers=3 terminals=10`（host 8 + 2 个 .csplugin），`PluginLoader (bundled): loaded=2 skipped=0`
 
 #### 第三方 plugin 已可起步的能力清单
 
