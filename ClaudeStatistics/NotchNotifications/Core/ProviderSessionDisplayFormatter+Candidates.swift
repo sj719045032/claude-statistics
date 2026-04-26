@@ -52,10 +52,21 @@ extension ProviderSessionDisplayFormatter {
     /// tool list below (when present) owns the per-target specifics for tools
     /// still in flight.
     var activeToolsSummaryCandidate: (text: String?, symbol: String) {
+        let symbol = session.activeSubagentCount > 0 ? "wand.and.stars" : "wrench.and.screwdriver"
+        // When no tools are actively in-flight AND we have a recorded
+        // batch-finished timestamp, only show within the afterglow window
+        // so the aggregate doesn't linger while Claude thinks. If the
+        // batch is still in flight (`turnToolBucketCountsAt == nil`)
+        // we always show the aggregate so the row stays populated for
+        // the whole turn.
+        if session.activeTools.isEmpty,
+           let at = session.turnToolBucketCountsAt,
+           Date().timeIntervalSince(at) > ActiveSession.turnToolBucketAfterglow {
+            return (nil, symbol)
+        }
         let text = ActiveToolsAggregator.aggregateText(
             turnCounts: session.turnToolBucketCounts ?? [:]
         )
-        let symbol = session.activeSubagentCount > 0 ? "wand.and.stars" : "wrench.and.screwdriver"
         return (text, symbol)
     }
 

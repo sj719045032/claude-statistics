@@ -54,31 +54,25 @@ have the shared code switch on the canonical value instead.
 ## Release a New Version
 
 ```bash
-# 1. Build DMG + ZIP + Sparkle deltas, regenerate appcast.xml
-bash scripts/build-dmg.sh <version>   # e.g. bash scripts/build-dmg.sh 1.5.0
-# The script prints a ready-to-paste `gh release create ...` command at the end
-# with ALL assets to upload (DMG, ZIP, and any delta files).
+# One-command release (build → commit → publish)
+bash scripts/release.sh <version>
+# e.g. bash scripts/release.sh 2.10.0
 
-# 2. Commit and push
-git add ClaudeStatistics.xcodeproj/project.pbxproj appcast.xml
-git commit -m "chore: update appcast for v<version>"
-git push
-
-# 3. Switch to publish account and run the `gh release create` command the
-#    script printed. It looks like:
-gh auth switch --hostname github.com --user sj719045032
-gh release create v<version> build/ClaudeStatistics-<version>.dmg \
-  build/ClaudeStatistics-<version>.zip \
-  build/releases-archive/*<version>*.delta \
-  --title "v<version>" --notes "<release notes>"
-
-# 4. Switch back to default account
-gh auth switch --hostname github.com --user tinystone007
+# $EDITOR opens for release notes if --notes / --notes-file not given.
+# Notes must be bilingual (English section + ## 中文 section).
+# Pass inline:
+bash scripts/release.sh 2.10.0 --notes $'## What\'s New\n- ...\n\n## 中文\n- ...'
+# Or from file:
+bash scripts/release.sh 2.10.0 --notes-file /tmp/notes.md
 ```
 
+The script handles all steps automatically:
+1. Runs `build-dmg.sh` (builds Release app, creates DMG + ZIP, generates Sparkle deltas + appcast.xml)
+2. Commits `appcast.xml`, `project.pbxproj`, `project.yml` and pushes
+3. Switches to `sj719045032`, creates the GitHub release with all assets, switches back
+
 **Notes:**
-- GitHub release must be published under `sj719045032` account (repo owner)
-- If `gh release create` fails with workflow scope error: `gh auth refresh -h github.com -s workflow`
+- GitHub release is published under `sj719045032` account (repo owner)
 - DMG is not Apple signed/notarized. Users run: `xattr -cr /Applications/Claude\ Statistics.app`
 - **Release notes must be bilingual**: English section followed by `## 中文` section. Applies to every release.
 

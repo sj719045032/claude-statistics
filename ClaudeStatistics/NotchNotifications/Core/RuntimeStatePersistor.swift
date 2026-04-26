@@ -85,6 +85,23 @@ final class RuntimeStatePersistor {
             var value = entry
             value.sessionId = canonicalSessionID(provider: value.provider, sessionId: value.sessionId)
             let key = key(provider: value.provider, sessionId: value.sessionId)
+            // Clear ephemeral in-flight state — after a restart no PostToolUse
+            // will ever arrive, so these fields are always stale.
+            value.activeTools = [:]
+            value.recentlyCompletedTools = nil
+            value.turnToolBucketCounts = nil
+            value.turnToolBucketCountsAt = nil
+            value.currentToolName = nil
+            value.currentToolDetail = nil
+            value.currentToolStartedAt = nil
+            value.currentToolUseId = nil
+            value.currentOperation = nil
+            value.approvalToolName = nil
+            value.approvalToolDetail = nil
+            value.approvalStartedAt = nil
+            value.approvalToolUseId = nil
+            value.activeSubagentCount = 0
+            value.backgroundShellCount = 0
 
             if let existing = normalized[key] {
                 normalized[key] = preferred(existing: existing, candidate: value)
