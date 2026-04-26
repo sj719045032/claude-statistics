@@ -10,6 +10,30 @@ import Foundation
 /// the kernel's existing `ProviderRegistry` and `TerminalRegistry`
 /// look-ups to read from here. Until then the registry is constructed
 /// but unused — the kernel keeps its current code paths.
+/// How a plugin reached the registry. Lets the Settings panel
+/// (and diagnostics) tell host-resident plugins apart from on-disk
+/// `.csplugin` bundles, and bundled samples apart from user
+/// installs.
+public enum PluginSource: Sendable, Equatable {
+    /// Class compiled into the host binary — e.g. the dogfood
+    /// wrappers for the 3 provider + 8 builtin terminal adapters.
+    case host
+    /// `.csplugin` shipped inside the host's `Contents/PlugIns`
+    /// directory; implicitly trusted.
+    case bundled(url: URL)
+    /// `.csplugin` discovered under
+    /// `~/Library/Application Support/Claude Statistics/Plugins`;
+    /// gated by `TrustStore`.
+    case user(url: URL)
+
+    public var bundleURL: URL? {
+        switch self {
+        case .host: return nil
+        case .bundled(let url), .user(let url): return url
+        }
+    }
+}
+
 @MainActor
 public final class PluginRegistry {
     public init() {}
@@ -22,12 +46,22 @@ public final class PluginRegistry {
     public private(set) var shareRoles:  [String: any Plugin] = [:]
     public private(set) var shareThemes: [String: any Plugin] = [:]
 
+    /// Per-id record of how each plugin reached the registry. Source
+    /// information is keyed by `manifest.id` — `.both` plugins land
+    /// in two buckets but share one source entry.
+    public private(set) var sources: [String: PluginSource] = [:]
+
     /// Register a freshly-instantiated plugin. The registry stores it
     /// against `manifest.id` in the bucket(s) implied by `manifest.kind`.
     /// Re-registration with the same id throws — duplicate ids signal
     /// either a config mistake or a clash between two plugins claiming
     /// the same vendor namespace.
-    public func register(_ plugin: any Plugin) throws {
+    ///
+    /// `source` defaults to `.host` since most callers (the dogfood
+    /// wrappers in `AppState`) compile the plugin directly. The loader
+    /// passes `.bundled(...)` or `.user(...)` so the Settings panel
+    /// can show the on-disk origin.
+    public func register(_ plugin: any Plugin, source: PluginSource = .host) throws {
         let manifest = type(of: plugin).manifest
         switch manifest.kind {
         case .provider:
@@ -42,6 +76,11 @@ public final class PluginRegistry {
             try insert(plugin, into: &providers, id: manifest.id, bucket: "provider")
             try insert(plugin, into: &terminals, id: manifest.id, bucket: "terminal")
         }
+        sources[manifest.id] = source
+    }
+
+    public func source(for pluginID: String) -> PluginSource? {
+        sources[pluginID]
     }
 
     // MARK: - Typed look-ups

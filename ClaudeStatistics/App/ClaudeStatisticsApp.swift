@@ -77,7 +77,8 @@ final class AppState: ObservableObject {
             let report = PluginLoader.loadAll(
                 from: pluginsDir,
                 into: registry,
-                trustEvaluator: { _, _ in true }
+                trustEvaluator: { _, _ in true },
+                sourceKind: .bundled
             )
             DiagnosticLogger.shared.info(
                 "PluginLoader (bundled): loaded=\(report.loaded.count) skipped=\(report.skipped.count)"
@@ -91,7 +92,8 @@ final class AppState: ObservableObject {
         let userReport = PluginLoader.loadAll(
             from: PluginLoader.defaultDirectory,
             into: registry,
-            trustEvaluator: PluginTrustGate.evaluate
+            trustEvaluator: PluginTrustGate.evaluate,
+            sourceKind: .user
         )
         DiagnosticLogger.shared.info(
             "PluginLoader (user): loaded=\(userReport.loaded.count) skipped=\(userReport.skipped.count) pending=\(PluginTrustGate.snapshotPending().count)"

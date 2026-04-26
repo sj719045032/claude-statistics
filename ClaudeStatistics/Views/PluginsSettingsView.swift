@@ -13,8 +13,35 @@ struct PluginsSettingsView: View {
     @State private var showResetConfirmation = false
     @State private var resetMessage: String?
 
-    private var manifests: [PluginManifest] {
-        pluginRegistry.loadedManifests().sorted { $0.id < $1.id }
+    private struct Row: Identifiable {
+        let manifest: PluginManifest
+        let source: PluginSource?
+        var id: String { manifest.id }
+    }
+
+    private var rows: [Row] {
+        pluginRegistry.loadedManifests()
+            .sorted { $0.id < $1.id }
+            .map { Row(manifest: $0, source: pluginRegistry.source(for: $0.id)) }
+    }
+
+    private func sourceLabel(_ source: PluginSource?) -> String {
+        switch source {
+        case .none, .host:
+            return NSLocalizedString("settings.plugins.source.host", comment: "")
+        case .bundled:
+            return NSLocalizedString("settings.plugins.source.bundled", comment: "")
+        case .user:
+            return NSLocalizedString("settings.plugins.source.user", comment: "")
+        }
+    }
+
+    private func sourceTint(_ source: PluginSource?) -> Color {
+        switch source {
+        case .none, .host: return .secondary
+        case .bundled: return .blue
+        case .user: return .orange
+        }
     }
 
     var body: some View {
@@ -41,17 +68,17 @@ struct PluginsSettingsView: View {
 
             Form {
                 Section {
-                    if manifests.isEmpty {
+                    if rows.isEmpty {
                         Text("settings.plugins.empty")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(manifests, id: \.id) { manifest in
-                            pluginRow(manifest)
+                        ForEach(rows) { row in
+                            pluginRow(row.manifest, source: row.source)
                         }
                     }
                 } header: {
-                    Text(String(format: NSLocalizedString("settings.plugins.loaded.count", comment: ""), manifests.count))
+                    Text(String(format: NSLocalizedString("settings.plugins.loaded.count", comment: ""), rows.count))
                 }
 
                 Section("settings.plugins.trust") {
@@ -88,7 +115,7 @@ struct PluginsSettingsView: View {
     }
 
     @ViewBuilder
-    private func pluginRow(_ manifest: PluginManifest) -> some View {
+    private func pluginRow(_ manifest: PluginManifest, source: PluginSource?) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Image(systemName: kindGlyph(manifest.kind))
@@ -96,6 +123,13 @@ struct PluginsSettingsView: View {
                     .foregroundStyle(.secondary)
                 Text(manifest.displayName)
                     .font(.system(size: 12, weight: .semibold))
+                Text(sourceLabel(source))
+                    .font(.system(size: 9, weight: .medium))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(sourceTint(source).opacity(0.15))
+                    .foregroundStyle(sourceTint(source))
+                    .clipShape(Capsule())
                 Spacer()
                 Text("v\(manifest.version)")
                     .font(.system(size: 10, design: .monospaced))
@@ -114,6 +148,13 @@ struct PluginsSettingsView: View {
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
+            }
+            if let url = source?.bundleURL {
+                Text(url.path)
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
         }
         .padding(.vertical, 2)

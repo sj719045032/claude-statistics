@@ -248,6 +248,9 @@
 "settings.plugins.resetTrust.confirmMessage" = "Every user-installed plugin will be re-prompted on the next launch. Bundled plugins inside the app are not affected.";
 "settings.plugins.resetTrust.confirmButton" = "Reset";
 "settings.plugins.resetTrust.done" = "Trust file cleared. Restart Claude Statistics to re-prompt for installed plugins.";
+"settings.plugins.source.host" = "built-in";
+"settings.plugins.source.bundled" = "bundled";
+"settings.plugins.source.user" = "user";
 "settings.developer.rebuildIndexes" = "Rebuild Data";
 "settings.developer.rebuildProviderIndex" = "Rebuild %@ Index";
 "settings.developer.rebuildProviderIndexHint" = "Deletes cached parsed data and rebuilds the search index for this provider.";

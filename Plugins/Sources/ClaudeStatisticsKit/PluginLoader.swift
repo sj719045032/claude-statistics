@@ -65,11 +65,20 @@ public enum PluginLoader {
     public typealias TrustEvaluator =
         @MainActor (_ manifest: PluginManifest, _ bundleURL: URL) -> Bool
 
+    /// `sourceKind` controls how the registry tags each loaded plugin:
+    /// pass `.bundled` when scanning `Contents/PlugIns/` and `.user`
+    /// (default) when scanning the per-user plugin directory.
+    public enum SourceKind: Sendable {
+        case bundled
+        case user
+    }
+
     @discardableResult
     public static func loadAll(
         from directory: URL,
         into registry: PluginRegistry,
-        trustEvaluator: TrustEvaluator = { _, _ in true }
+        trustEvaluator: TrustEvaluator = { _, _ in true },
+        sourceKind: SourceKind = .user
     ) -> Report {
         var loaded: [PluginManifest] = []
         var skipped: [SkippedEntry] = []
@@ -83,7 +92,8 @@ public enum PluginLoader {
         }
 
         for url in entries.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
-            switch loadOne(at: url, into: registry, trustEvaluator: trustEvaluator) {
+            let source: PluginSource = sourceKind == .bundled ? .bundled(url: url) : .user(url: url)
+            switch loadOne(at: url, into: registry, trustEvaluator: trustEvaluator, source: source) {
             case .success(let manifest):
                 loaded.append(manifest)
             case .failure(let reason):
@@ -106,11 +116,19 @@ public enum PluginLoader {
     /// picks Allow). The trust evaluator can be a no-op `{ _, _ in true }`
     /// in the hot-load case because the user just answered the prompt
     /// — `TrustStore` is updated separately.
+    ///
+    /// `source` is forwarded to `PluginRegistry.register` so the
+    /// Settings panel can show whether a plugin shipped inside the
+    /// `.app` (`.bundled`) or was installed by the user
+    /// (`.user`). When the caller doesn't care, the default is
+    /// `.user(url: url)` — most external callers are user-install
+    /// paths.
     @discardableResult
     public static func loadOne(
         at url: URL,
         into registry: PluginRegistry,
-        trustEvaluator: TrustEvaluator = { _, _ in true }
+        trustEvaluator: TrustEvaluator = { _, _ in true },
+        source: PluginSource? = nil
     ) -> Result<PluginManifest, SkipReason> {
         guard url.pathExtension == "csplugin" else {
             return .failure(.notACSplugin)
@@ -139,7 +157,7 @@ public enum PluginLoader {
         }
         let plugin = pluginType.init()
         do {
-            try registry.register(plugin)
+            try registry.register(plugin, source: source ?? .user(url: url))
             return .success(manifest)
         } catch let PluginRegistryError.duplicateId(id, bucket) {
             return .failure(.duplicateId(id: id, bucket: bucket))
