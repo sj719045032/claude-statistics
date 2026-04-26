@@ -67,42 +67,9 @@ protocol TerminalFocusIdentityProviding {
     ) -> Bool
 }
 
-protocol TerminalReadinessProviding {
-    func installationStatus() -> TerminalInstallationStatus
-    func setupRequirements() -> [TerminalRequirement]
-    func setupActions() -> [TerminalSetupAction]
-}
-
-protocol TerminalSetupProviding {
-    var setupTitle: String { get }
-    var setupActionTitle: String { get }
-    var setupConfigURL: URL? { get }
-    func setupStatus() -> TerminalSetupStatus
-    func ensureSetup() throws -> TerminalSetupResult
-}
-
-struct TerminalSetupStatus: Equatable {
-    let isReady: Bool
-    let isAvailable: Bool
-    let summary: String
-    let detail: String?
-}
-
-struct TerminalSetupResult: Equatable {
-    let changed: Bool
-    let message: String
-    let backupURL: URL?
-}
-
-extension TerminalReadinessProviding {
-    func readiness() -> TerminalReadiness {
-        TerminalReadiness(
-            installation: installationStatus(),
-            unmetRequirements: setupRequirements(),
-            actions: setupActions()
-        )
-    }
-}
+// `TerminalReadinessProviding` and `TerminalSetupProviding` live in
+// `ClaudeStatisticsKit` so plugins can declare readiness/setup
+// behaviour without depending on the host bundle.
 
 extension TerminalFocusIdentityProviding {
     func shouldUseCachedIdentity(

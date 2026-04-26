@@ -33,6 +33,12 @@ final class AlacrittyPlugin: TerminalPlugin {
     func makeLauncher() -> (any TerminalLauncher)? {
         capability as? any TerminalLauncher
     }
+    func makeReadinessProvider() -> (any TerminalReadinessProviding)? {
+        capability as? any TerminalReadinessProviding
+    }
+    func makeSetupWizard() -> (any TerminalSetupProviding)? {
+        capability as? any TerminalSetupProviding
+    }
 
     init() {}
 }

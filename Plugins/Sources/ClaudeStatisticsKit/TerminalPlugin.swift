@@ -5,12 +5,12 @@ import Foundation
 ///
 /// `descriptor` and `detectInstalled()` are required (the host needs
 /// metadata + installation status before it can surface the plugin in
-/// any UI). The three behaviour factories (`makeFocusStrategy` /
-/// `makeLauncher` / `makeSetupWizard`) are optional — a plugin that
-/// only declares the descriptor without a focus strategy still slots
-/// into the menu / settings pickers, but the host's focus pipeline
-/// falls back to its registered legacy route handler for the
-/// matching bundle id.
+/// any UI). The four behaviour factories (`makeFocusStrategy` /
+/// `makeLauncher` / `makeReadinessProvider` / `makeSetupWizard`) are
+/// optional — a plugin that only declares the descriptor without a
+/// focus strategy still slots into the menu / settings pickers, but
+/// the host's focus pipeline falls back to its registered legacy
+/// route handler for the matching bundle id.
 ///
 /// Stage 4 migrates the host's existing 8 builtin terminal
 /// capabilities to author their plugin via these factories so
@@ -35,10 +35,23 @@ public protocol TerminalPlugin: Plugin {
     /// terminals that only handle focus return (e.g. attached editors
     /// invoked via `--goto`).
     func makeLauncher() -> (any TerminalLauncher)?
+
+    /// Readiness inspector that reports installation status and unmet
+    /// setup requirements (CLI helper missing, config not patched,
+    /// etc.). `nil` means the host falls back to a generic "is the app
+    /// bundle installed?" probe.
+    func makeReadinessProvider() -> (any TerminalReadinessProviding)?
+
+    /// Setup wizard that drives the in-app "fix this terminal" sheet.
+    /// `nil` for terminals that need no special setup beyond having
+    /// the app installed.
+    func makeSetupWizard() -> (any TerminalSetupProviding)?
 }
 
 extension TerminalPlugin {
     public func detectInstalled() -> Bool { true }
     public func makeFocusStrategy() -> (any TerminalFocusStrategy)? { nil }
     public func makeLauncher() -> (any TerminalLauncher)? { nil }
+    public func makeReadinessProvider() -> (any TerminalReadinessProviding)? { nil }
+    public func makeSetupWizard() -> (any TerminalSetupProviding)? { nil }
 }

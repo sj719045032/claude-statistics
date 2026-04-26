@@ -31,6 +31,12 @@ final class ITermPlugin: TerminalPlugin {
     func makeLauncher() -> (any TerminalLauncher)? {
         capability as? any TerminalLauncher
     }
+    func makeReadinessProvider() -> (any TerminalReadinessProviding)? {
+        capability as? any TerminalReadinessProviding
+    }
+    func makeSetupWizard() -> (any TerminalSetupProviding)? {
+        capability as? any TerminalSetupProviding
+    }
     init() {}
 }
 
@@ -52,6 +58,12 @@ final class AppleTerminalPlugin: TerminalPlugin {
     }
     func makeLauncher() -> (any TerminalLauncher)? {
         capability as? any TerminalLauncher
+    }
+    func makeReadinessProvider() -> (any TerminalReadinessProviding)? {
+        capability as? any TerminalReadinessProviding
+    }
+    func makeSetupWizard() -> (any TerminalSetupProviding)? {
+        capability as? any TerminalSetupProviding
     }
     init() {}
 }
@@ -75,6 +87,12 @@ final class GhosttyPlugin: TerminalPlugin {
     func makeLauncher() -> (any TerminalLauncher)? {
         capability as? any TerminalLauncher
     }
+    func makeReadinessProvider() -> (any TerminalReadinessProviding)? {
+        capability as? any TerminalReadinessProviding
+    }
+    func makeSetupWizard() -> (any TerminalSetupProviding)? {
+        capability as? any TerminalSetupProviding
+    }
     init() {}
 }
 
@@ -96,6 +114,12 @@ final class KittyPlugin: TerminalPlugin {
     }
     func makeLauncher() -> (any TerminalLauncher)? {
         capability as? any TerminalLauncher
+    }
+    func makeReadinessProvider() -> (any TerminalReadinessProviding)? {
+        capability as? any TerminalReadinessProviding
+    }
+    func makeSetupWizard() -> (any TerminalSetupProviding)? {
+        capability as? any TerminalSetupProviding
     }
     init() {}
 }
@@ -119,6 +143,12 @@ final class WezTermPlugin: TerminalPlugin {
     func makeLauncher() -> (any TerminalLauncher)? {
         capability as? any TerminalLauncher
     }
+    func makeReadinessProvider() -> (any TerminalReadinessProviding)? {
+        capability as? any TerminalReadinessProviding
+    }
+    func makeSetupWizard() -> (any TerminalSetupProviding)? {
+        capability as? any TerminalSetupProviding
+    }
     init() {}
 }
 
@@ -141,6 +171,12 @@ final class WarpPlugin: TerminalPlugin {
     func makeLauncher() -> (any TerminalLauncher)? {
         capability as? any TerminalLauncher
     }
+    func makeReadinessProvider() -> (any TerminalReadinessProviding)? {
+        capability as? any TerminalReadinessProviding
+    }
+    func makeSetupWizard() -> (any TerminalSetupProviding)? {
+        capability as? any TerminalSetupProviding
+    }
     init() {}
 }
 
@@ -162,6 +198,12 @@ final class EditorPlugin: TerminalPlugin {
     }
     func makeLauncher() -> (any TerminalLauncher)? {
         capability as? any TerminalLauncher
+    }
+    func makeReadinessProvider() -> (any TerminalReadinessProviding)? {
+        capability as? any TerminalReadinessProviding
+    }
+    func makeSetupWizard() -> (any TerminalSetupProviding)? {
+        capability as? any TerminalSetupProviding
     }
     init() {}
 }

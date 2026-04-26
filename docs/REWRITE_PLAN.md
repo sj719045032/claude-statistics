@@ -2,7 +2,7 @@
 
 > 最后更新：2026-04-26
 > 当前版本：v3.1.0 + v4.0-alpha（SDK 协议表面已就位，bundle 加载待 M2）
-> SDK 现状：`ClaudeStatisticsKit` 45 文件 / 2638 行；769 测试通过
+> SDK 现状：`ClaudeStatisticsKit` 48 文件 / 2882 行；769 测试通过
 > 目标版本：v4.0（插件化架构）
 
 本文档是项目的**单一权威架构文档**，合并了原 `ARCHITECTURE.md`（现状描述）与 `ARCHITECTURE_REVIEW.md`（优化评估），并在此基础上规划了 v4.0 的插件化重写。
@@ -1281,9 +1281,14 @@ graph LR
 - ✅ `TerminalPlugin` 加 `makeFocusStrategy()` / `makeLauncher()` 工厂；8 个 builtin terminal plugin 实现工厂返回 route registry handler
 - ✅ `TerminalFocusCoordinator` Phase 4 派发改造：优先 plugin 查找，回退 route registry — 通过 `setPluginStrategyResolver` 钩子由 `AppState` 注入
 
+**阶段 3++ Terminal plugin behavior 协议第二波**
+- ✅ Terminal readiness 数据组搬到 SDK：`TerminalInstallationStatus` / `TerminalReadinessState` / `TerminalRequirement` / `TerminalSetupAction`(+`Kind`) / `TerminalSetupActionOutcome` / `TerminalReadiness` / `TerminalSetupStatus` / `TerminalSetupResult`
+- ✅ `TerminalReadinessProviding` / `TerminalSetupProviding` 协议搬到 SDK（含 `readiness()` 默认实现）
+- ✅ `TerminalPlugin` 加 `makeReadinessProvider()` / `makeSetupWizard()` 工厂；8 个 builtin terminal plugin wrapper 通过 cast 暴露 capability 上的实现
+
 #### v4.0-alpha 视角下已完成
 
-**SDK 接口面已全部就位**（42 文件 / 2404 行）：第三方 plugin 可在 SDK 接口面上端到端编写完整 provider plugin（descriptor + 5 窄协议 + 所有数据模型）。
+**SDK 接口面已全部就位**（48 文件 / 2882 行）：第三方 plugin 可在 SDK 接口面上端到端编写完整 provider plugin（descriptor + 5 窄协议 + 所有数据模型），并可声明完整的 terminal readiness/setup 行为。
 
 **`ProviderKind` enum 状态**：按 §12.3 原决策保留为 host-only 兼容 shim — 所有 SDK 协议已不依赖它，`switch self` 也已全部转发到 descriptor。host-internal 的 `switch case .claude/.codex/.gemini` 模式保留（HookCLI hook normalizer dispatch / AccountManagers / DisplayTextClassifier 等），这些是 provider-specific 行为分发，enum-based dispatch 是合适的内部抽象。
 
@@ -1291,7 +1296,7 @@ graph LR
 
 #### 余下工作（不在 v4.0-alpha 范围内）
 
-- ⏸️ Terminal plugin behavior 第二波协议（`TerminalSetupWizard` / `TerminalContextProbe`）+ 8 个 builtin terminal capability 行为代码搬迁到独立 plugin target — 阶段 4 子任务（数据/接口已就绪，仅剩具体行为代码下沉）
+- ⏸️ Terminal plugin behavior 第二波协议接口已搬完（readiness + setup wizard）；8 个 builtin terminal capability 的具体行为代码下沉到独立 plugin target 仍待阶段 4 完成
 - ⏸️ 删除 `TerminalFocusRoute` enum + `TerminalFocusRouteRegistry`：当前 plugin 工厂仍通过 `TerminalFocusRouteRegistry.handler(for: capability.route)` 查 strategy，第三方 plugin 加载（M2）后可直接持有自己的 strategy 实例，届时 route layer 即可退役
 - ⏸️ Share role plugin（拆分 1177 行 `ShareRoleEngine` 为 9 个独立 RoleScorer，搬到 `OfficialShareRolesPlugin`）— 阶段 4 子任务
 - ⏸️ Bundle (`.csplugin`) 加载机制 + `disable-library-validation` entitlement — 阶段 5 (M2)

@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 struct TerminalSetupIssue: Identifiable {
     enum Source {

@@ -1,4 +1,5 @@
 import SwiftUI
+import ClaudeStatisticsKit
 
 struct TerminalSetupSheetView: View {
     let issue: TerminalSetupIssue
