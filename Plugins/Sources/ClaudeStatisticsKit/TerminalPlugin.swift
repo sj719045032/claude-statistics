@@ -46,6 +46,16 @@ public protocol TerminalPlugin: Plugin {
     /// `nil` for terminals that need no special setup beyond having
     /// the app installed.
     func makeSetupWizard() -> (any TerminalSetupProviding)?
+
+    /// Active-session filters owned by this terminal host. Use cases
+    /// are GUI-host quirks: e.g. Codex.app spawns its own background
+    /// `codex-cli` subprocess to generate "Ambient Suggestions" with a
+    /// fixed templated prompt — those rows shouldn't appear in the
+    /// notch session list. The filter belongs here (not on the codex
+    /// `ProviderPlugin`) because the behaviour is contributed by *this*
+    /// terminal host: removing the host removes the synthetic sessions.
+    /// Default: `[]`.
+    func makeSessionFilters() -> [any SessionEventFilter]
 }
 
 extension TerminalPlugin {
@@ -54,4 +64,5 @@ extension TerminalPlugin {
     public func makeLauncher() -> (any TerminalLauncher)? { nil }
     public func makeReadinessProvider() -> (any TerminalReadinessProviding)? { nil }
     public func makeSetupWizard() -> (any TerminalSetupProviding)? { nil }
+    public func makeSessionFilters() -> [any SessionEventFilter] { [] }
 }

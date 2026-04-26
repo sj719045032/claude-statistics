@@ -42,6 +42,23 @@ public final class CodexAppPlugin: NSObject, TerminalPlugin {
     public func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
         CodexAppFocusStrategy()
     }
+
+    /// Codex.app fires a fresh `codex-cli` subprocess (with a new
+    /// session id) every time it generates "Ambient Suggestions" for
+    /// the current project; the prompt is a fixed template the host
+    /// app injects. The behaviour is owned by the host (codex-cli
+    /// alone never produces these), so the filter ships with this
+    /// terminal plugin — install Codex.app, get the filter; remove
+    /// it, the rule goes too.
+    public func makeSessionFilters() -> [any SessionEventFilter] {
+        [
+            SyntheticPromptFilter(
+                id: "codex-app.ambient-suggestions",
+                providerId: "codex",
+                prefixes: ["Generate 0 to 3 ambient suggestions"]
+            )
+        ]
+    }
 }
 
 struct CodexAppFocusStrategy: TerminalFocusStrategy {

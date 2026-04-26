@@ -22,6 +22,7 @@
 		0DE603B43CE5C46E0A3E53ED /* TerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66851A558CEC1E024AAC87E6 /* TerminalCapability.swift */; };
 		11368A70DC7D3E8FB244A360 /* HookProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD92CF4E1DC514CEDE539FDD /* HookProvider.swift */; };
 		123A7C30556D89B77A29D544 /* WireMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 805E37589FAEC2B84328D36A /* WireMessage.swift */; };
+		12D053D4C71C3776B5341A4D /* TerminalFocusableFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A641F34952BE78023D0FB94E /* TerminalFocusableFilter.swift */; };
 		12D7CA772BC61D1A326BA9DA /* ProviderSessionDisplayFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8132C4E4069A5B948316CCF6 /* ProviderSessionDisplayFormatter.swift */; };
 		12EC494D81F51B865094B844 /* ActiveToolsAggregator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B781AB1E0AD0CC70F783E1F7 /* ActiveToolsAggregator.swift */; };
 		1386DA5988E3BA59D802B154 /* ToolActivityFormatter+Permissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00B22ECE4D683B12838FAF26 /* ToolActivityFormatter+Permissions.swift */; };
@@ -60,6 +61,7 @@
 		2F83F61733323C3D00215158 /* SkipConfirmKeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D09F01402459E00EA228AF6 /* SkipConfirmKeyMonitor.swift */; };
 		3055EFB90B07E9A7824E77EB /* CodexStatusLineInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = C069BA3F5161E12CD1295E1B /* CodexStatusLineInstaller.swift */; };
 		30F89B07F29815CD8F866B46 /* ClaudeStatisticsKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		327E97FCAE851D21F494E518 /* PluginsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92102BACD66FCBC76D328044 /* PluginsSettingsView.swift */; };
 		32F0A0C3AC1BB4D4422EA5D9 /* SessionStats+Pricing.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF82F2AEB2D29D2F8EE3391F /* SessionStats+Pricing.swift */; };
 		3366C73918A1592DAF515CAF /* RuntimeSessionEventApplier.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8D22D6E017B129B416B5A0E /* RuntimeSessionEventApplier.swift */; };
 		34A9401E132F4ABEA53988D7 /* ProviderKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF5BCA9439BEAF2D53992A0 /* ProviderKind.swift */; };
@@ -90,6 +92,7 @@
 		45A6E616AE59B788E2E060B0 /* ProviderSessionDisplayFormatter+Filters.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDD81B5645107DB493B28671 /* ProviderSessionDisplayFormatter+Filters.swift */; };
 		46DAF4D49E051526F8F5AC55 /* EditorTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08D0262FC6126091E6321EE0 /* EditorTerminalCapability.swift */; };
 		4734910CD82A2F831E344A1C /* ActivateFocuser.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD33F591AEEB93C40913AC8F /* ActivateFocuser.swift */; };
+		47A83054A930EBE901475499 /* SessionEventFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E8E4DC8B420779A317D82BC /* SessionEventFilter.swift */; };
 		47CD3FFD29021D5E276726EC /* TerminalLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 627DB5506169F425D07E46D4 /* TerminalLauncher.swift */; };
 		480C7AC744109467B48A6A47 /* ClaudeProviderAccountCardAccessory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669DD3F7CA0ACD5A8FFF69A3 /* ClaudeProviderAccountCardAccessory.swift */; };
 		4841EE61F68CFF9A626C33CB /* NotchPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B6504163929CC0E60E99B3E /* NotchPreferences.swift */; };
@@ -240,6 +243,7 @@
 		D99027587C25DA018DE94928 /* ActiveSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E023CB9F472AC7C93777B50 /* ActiveSession.swift */; };
 		DD7C095838B9FA06B94D9DFA /* GeminiAccountManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8938B8C0465ECC95BC0D9BAF /* GeminiAccountManager.swift */; };
 		DE0235CC9D9671CEA84DB392 /* WarpTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9106D93553358D8AFE4C3EE6 /* WarpTerminalCapability.swift */; };
+		DF30CD5504F391E42C582602 /* PluginTrustGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBF2E6F7720B297179A63812 /* PluginTrustGate.swift */; };
 		DFB7E8400551BE83B025A6A4 /* ShareMetricsBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F0F61EEF95C517CC0B363C3 /* ShareMetricsBuilder.swift */; };
 		E04B621B671D090DB9155348 /* LanguageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1519B833F38D44123500B58 /* LanguageManager.swift */; };
 		E0DB60E0DF083742C57F76C8 /* ActiveToolsAggregatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 947363ADD9A5EBADB39651B2 /* ActiveToolsAggregatorTests.swift */; };
@@ -427,6 +431,7 @@
 		2C1C75DCADED926320D04BC3 /* CodexTranscriptParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexTranscriptParserTests.swift; sourceTree = "<group>"; };
 		2D75041CC7940EEFCCEE54FA /* GeminiUsageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiUsageService.swift; sourceTree = "<group>"; };
 		2E023CB9F472AC7C93777B50 /* ActiveSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveSession.swift; sourceTree = "<group>"; };
+		2E8E4DC8B420779A317D82BC /* SessionEventFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionEventFilter.swift; sourceTree = "<group>"; };
 		2EDF09CC0594DB9C35748FF4 /* AggregateStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AggregateStats.swift; sourceTree = "<group>"; };
 		30A2C90E33CD4B1328D25897 /* TranscriptParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptParserTests.swift; sourceTree = "<group>"; };
 		32FE333B9AD0368698B9A39F /* UsageAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageAPIService.swift; sourceTree = "<group>"; };
@@ -534,6 +539,7 @@
 		8E9A3697D7E3B8F0CF99B610 /* ToolActivityFormatterCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolActivityFormatterCoreTests.swift; sourceTree = "<group>"; };
 		907576DD936254F8D2574A2E /* ClaudeStatisticsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClaudeStatisticsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9106D93553358D8AFE4C3EE6 /* WarpTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WarpTerminalCapability.swift; sourceTree = "<group>"; };
+		92102BACD66FCBC76D328044 /* PluginsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginsSettingsView.swift; sourceTree = "<group>"; };
 		92645B8FEE030EB0D65F618C /* ProviderSessionDisplayFormatter+Candidates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProviderSessionDisplayFormatter+Candidates.swift"; sourceTree = "<group>"; };
 		93CE07D7E98CD2B87F87C0E0 /* PricingFetchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PricingFetchService.swift; sourceTree = "<group>"; };
 		947363ADD9A5EBADB39651B2 /* ActiveToolsAggregatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveToolsAggregatorTests.swift; sourceTree = "<group>"; };
@@ -556,6 +562,7 @@
 		A3CC4F1B31EE86B755D8A88A /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
 		A51BA7586FEEB898B1FE9ED8 /* TerminalFocusCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalFocusCoordinator.swift; sourceTree = "<group>"; };
 		A5E2079B7A7714C7BC618C2A /* AlacrittyTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlacrittyTerminalCapability.swift; sourceTree = "<group>"; };
+		A641F34952BE78023D0FB94E /* TerminalFocusableFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalFocusableFilter.swift; sourceTree = "<group>"; };
 		A7538BF07592B7D765AF1C22 /* ExternalTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalTerminalCapability.swift; sourceTree = "<group>"; };
 		A776ADBF033757E89353F9E2 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		A7C96479A32A5A1C4D1A624B /* ShareRoleEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRoleEngine.swift; sourceTree = "<group>"; };
@@ -592,6 +599,7 @@
 		C9B269891E67AA3FB9D53E64 /* WezTermTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WezTermTerminalCapability.swift; sourceTree = "<group>"; };
 		CA7D5709A13CDC7751084AAF /* TerminalPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPreferences.swift; sourceTree = "<group>"; };
 		CAF9A88BAC1F779F77E517EB /* SessionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListView.swift; sourceTree = "<group>"; };
+		CBF2E6F7720B297179A63812 /* PluginTrustGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginTrustGate.swift; sourceTree = "<group>"; };
 		CCCCC8EACB9240A254704441 /* SkipConfirmShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkipConfirmShortcut.swift; sourceTree = "<group>"; };
 		CCF8FD132C6328D09C336FB9 /* CodexProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexProvider.swift; sourceTree = "<group>"; };
 		CD0415091A24EBCDA6840A49 /* SessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetailView.swift; sourceTree = "<group>"; };
@@ -842,6 +850,7 @@
 				DBBEE45A24DCB72DA07ECD79 /* SemVer.swift */,
 				B63838C3755C7D084DD73D95 /* Session.swift */,
 				9475E31557D267CDA75C200B /* SessionDataProvider.swift */,
+				2E8E4DC8B420779A317D82BC /* SessionEventFilter.swift */,
 				05910C259A7BE5163F0F348F /* SessionLauncher.swift */,
 				D758CE8D0B6780C973E35221 /* SessionQuickStats.swift */,
 				563283ED216FE68D0E3B11EA /* SessionStats.swift */,
@@ -917,6 +926,7 @@
 				E7CDF939858DF7A343D5387F /* RuntimeSession.swift */,
 				C8D22D6E017B129B416B5A0E /* RuntimeSessionEventApplier.swift */,
 				9BB59E8417BC110113E9E5CA /* RuntimeStatePersistor.swift */,
+				A641F34952BE78023D0FB94E /* TerminalFocusableFilter.swift */,
 				B71EA214A4CBCF6BFE070E4A /* TerminalIdentityResolver.swift */,
 				D74BEFC175DFC5CD3999DBE1 /* ToolActivityFormatter.swift */,
 				EF76C0BD045510B9035C9733 /* ToolActivityFormatter+Completion.swift */,
@@ -1130,6 +1140,7 @@
 				BF23C58F1F4E3E5605623ECE /* Info.plist */,
 				15809DA1BE38EFE9D002FB73 /* main.swift */,
 				06379230FC976FFF3DCD0718 /* NotchRuntimeCoordinator.swift */,
+				CBF2E6F7720B297179A63812 /* PluginTrustGate.swift */,
 				0AD3D99C9F42189EFF639E71 /* ProviderContextRegistry.swift */,
 				C3374C538E77CED126DE3016 /* StatusBarController.swift */,
 				F5486873DBEC29739725E366 /* StatusBarPanel.swift */,
@@ -1175,6 +1186,7 @@
 				41054FA7DE043B7E25B4A88E /* MenuBarView.swift */,
 				BDA63237DD4854F868A0DCE4 /* ModifierRecorderRow.swift */,
 				6618F7DEA731482B556A431E /* PanelContentView.swift */,
+				92102BACD66FCBC76D328044 /* PluginsSettingsView.swift */,
 				E61FA41EAFBAE59342A3A526 /* ProjectAnalyticsView.swift */,
 				CD0415091A24EBCDA6840A49 /* SessionDetailView.swift */,
 				CAF9A88BAC1F779F77E517EB /* SessionListView.swift */,
@@ -1529,6 +1541,8 @@
 				7CD9C8820D5C77BDC5DE0E35 /* PendingResponse.swift in Sources */,
 				3BED6D466169435AA6DCE604 /* PermissionRequestCard.swift in Sources */,
 				78D29B62500CB98D0FA18D5B /* PermissionRequestRegistry.swift in Sources */,
+				DF30CD5504F391E42C582602 /* PluginTrustGate.swift in Sources */,
+				327E97FCAE851D21F494E518 /* PluginsSettingsView.swift in Sources */,
 				45713102A127B294274B48AB /* PricingFetchService.swift in Sources */,
 				887B628E7C964D59454E184C /* ProcessTreeWalker.swift in Sources */,
 				0BD1DED6EC1DFF9326A1CAE5 /* ProfileViewModel.swift in Sources */,
@@ -1579,6 +1593,7 @@
 				8A47113825B15370391C1135 /* TerminalFocusRoute.swift in Sources */,
 				871E27060B953A2929FB1580 /* TerminalFocusRouteHandler.swift in Sources */,
 				56242266D3D70E01E2A22FCA /* TerminalFocusTarget.swift in Sources */,
+				12D053D4C71C3776B5341A4D /* TerminalFocusableFilter.swift in Sources */,
 				7E48B08D0513149CA87ADE4C /* TerminalIdentityResolver.swift in Sources */,
 				BE4FDED4356AA89774DF4B8A /* TerminalPreferences.swift in Sources */,
 				28BC2444287AB7D7A32B68A3 /* TerminalReadiness.swift in Sources */,
@@ -1646,6 +1661,7 @@
 				1FFDAA9375AEB76CB9862CF3 /* SemVer.swift in Sources */,
 				28B30EDA1771A39B023BCAC7 /* Session.swift in Sources */,
 				93297DA896BDA0FD88E5F706 /* SessionDataProvider.swift in Sources */,
+				47A83054A930EBE901475499 /* SessionEventFilter.swift in Sources */,
 				8B4432890B802501408DEB41 /* SessionLauncher.swift in Sources */,
 				EC812B09D005001919618FB5 /* SessionQuickStats.swift in Sources */,
 				2D03585C91016BBA7C5E390C /* SessionStats.swift in Sources */,

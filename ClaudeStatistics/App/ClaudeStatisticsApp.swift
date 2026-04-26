@@ -469,19 +469,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.handleIslandShortcut() ?? false
         }
         appState.notchCenter.activeSessionsTracker = appState.activeSessionsTracker
-        // Wire the plugin-driven synthetic-prompt detector. Each
-        // `ProviderPlugin` may override `isSyntheticPrompt(_:)` to flag
-        // host-app background tasks (e.g. Codex.app ambient suggestions)
-        // so they're dropped from the active session list. Adding a new
-        // provider rule means overriding that one method on its plugin —
-        // the tracker stays provider-agnostic.
-        let registry = appState.pluginRegistry
-        appState.activeSessionsTracker.syntheticPromptDetector = { [registry] provider, prompt in
-            guard let plugin = registry.providerPlugin(id: provider.rawValue) else {
-                return false
-            }
-            return plugin.isSyntheticPrompt(prompt)
+        // Build the active-session filter chain. Sources:
+        //   1. Host-internal filters — e.g. `TerminalFocusableFilter`
+        //      drops rows whose terminal can't be focused back.
+        //   2. Each `TerminalPlugin.makeSessionFilters()` — terminal
+        //      hosts contribute filters for *their own* synthetic
+        //      sessions (Codex.app's ambient-suggestion task etc.).
+        //      Removing the plugin removes its filter automatically.
+        //   3. Each `ProviderPlugin.makeSessionFilters()` — reserved
+        //      for CLI-intrinsic synthetic patterns (rare today).
+        // Logical-AND: any `false` hides the row.
+        var filters: [any SessionEventFilter] = [TerminalFocusableFilter()]
+        for plugin in appState.pluginRegistry.terminals.values {
+            guard let terminalPlugin = plugin as? any TerminalPlugin else { continue }
+            filters.append(contentsOf: terminalPlugin.makeSessionFilters())
         }
+        for plugin in appState.pluginRegistry.providers.values {
+            guard let providerPlugin = plugin as? any ProviderPlugin else { continue }
+            filters.append(contentsOf: providerPlugin.makeSessionFilters())
+        }
+        appState.activeSessionsTracker.sessionFilters = filters
+        DiagnosticLogger.shared.info(
+            "ActiveSession filters wired: [\(filters.map(\.id).joined(separator: ","))]"
+        )
 
         applyNotchProviderPreferences()
 

@@ -322,9 +322,18 @@ struct NotchContainerView: View {
                 pendingIdlePeekCloseStart = nil
                 pendingIdlePeekClose?.cancel()
                 pendingIdlePeekClose = nil
-                // Reset measurement when the shown card changes so the frame
-                // doesn't linger at the previous card's height.
-                measuredCardHeight = 0
+                // Intentionally do NOT reset measuredCardHeight here. Resetting
+                // forces the panel to fall back to the per-kind base height
+                // until the next intrinsic measurement arrives — but SwiftUI's
+                // `.onPreferenceChange` only fires when the aggregated value
+                // actually changes. If the new card's intrinsic height happens
+                // to equal the previous card's (very common between same-kind
+                // cards in a queued burst), the listener never re-fires after
+                // the reset, leaving `measuredCardHeight = 0` and clipping the
+                // bottom action row behind the outer `.clipped()`. Keeping the
+                // previous measurement as the initial value yields a pixel-
+                // perfect frame when sizes match; if the new card differs, the
+                // preference value changes and the listener updates normally.
                 // Snapshot whether the user was already peeking when this event
                 // arrived; close paths use this to decide whether to restore
                 // the peek or suppress reentry.

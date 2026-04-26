@@ -28,8 +28,20 @@ public protocol ProviderPlugin: Plugin {
     /// override this to return their `*.shared` singleton; third-party
     /// plugins typically construct a fresh instance on each call.
     func makeProvider() -> (any BundledSessionProvider)?
+
+    /// Filters that hide rows from the active session list. Each
+    /// plugin contributes its own set — e.g. Codex.app's ambient
+    /// suggestion task is filtered by a `SyntheticPromptFilter`
+    /// configured with the templated prompt prefix. The host runs
+    /// every filter (its own + every plugin's) against incoming
+    /// hooks and persisted runtime; any `false` hides the row.
+    ///
+    /// Default returns `[]`; plugins without filtering needs (most)
+    /// don't override.
+    func makeSessionFilters() -> [any SessionEventFilter]
 }
 
 extension ProviderPlugin {
     public func makeProvider() -> (any BundledSessionProvider)? { nil }
+    public func makeSessionFilters() -> [any SessionEventFilter] { [] }
 }

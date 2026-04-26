@@ -46,6 +46,22 @@ final class ActiveSessionsTracker: ObservableObject {
     // Sessions evicted by same-tab displacement stay hidden for one activeWindow
     // so stale persisted runtime cannot briefly reappear after a tab switches CLIs.
     private var displacedSessionIds: [String: Date] = [:]
+    // Cache for `terminal_name` inferred from a hook's pid via ProcessTreeWalker.
+    // Filled when a hook arrives without `terminal_name` (e.g. Codex.app embeds
+    // codex-cli with no PTY → no TERM_PROGRAM → no alias to filter on). Walking
+    // the process chain runs `/bin/ps` so it must stay off the main path; we
+    // resolve once per pid asynchronously and replay through `refresh()`.
+    private var inferredTerminalNameByPid: [pid_t: String] = [:]
+    private var pidInferenceInFlight: Set<pid_t> = []
+
+    /// Filter chain run against every incoming hook and persisted
+    /// runtime. Built at startup from host-internal filters plus every
+    /// `ProviderPlugin.makeSessionFilters()`. Logical-AND: row is shown
+    /// only when every filter returns `true`.
+    var sessionFilters: [any SessionEventFilter] = []
+    /// Session ids any filter has dropped. Persisted in memory only —
+    /// rebuilt on restart by re-running the chain on persisted runtimes.
+    private var droppedSessionIds: Set<String> = []
 
     init() {
         self.runtimeByKey = TerminalIdentityResolver.sanitizedGhosttyCollisions(
@@ -214,6 +230,23 @@ final class ActiveSessionsTracker: ObservableObject {
     func record(event: AttentionEvent) {
         guard !event.sessionId.isEmpty else { return }
 
+        // Run the filter chain. Any filter returning false drops the
+        // session — pre-built runtime from earlier hooks (SessionStart
+        // hits before UserPromptSubmit, so synthetic prompts are caught
+        // on the second event) is purged so the row vanishes.
+        let filterCtx = filterContext(forEvent: event)
+        if !sessionFilters.allSatisfy({ $0.shouldDisplay(filterCtx) }) {
+            droppedSessionIds.insert(event.sessionId)
+        }
+        if droppedSessionIds.contains(event.sessionId) {
+            let key = Self.key(provider: event.provider, sessionId: event.sessionId)
+            if runtimeByKey.removeValue(forKey: key) != nil {
+                persistRuntime()
+                refresh()
+            }
+            return
+        }
+
         let key = Self.key(provider: event.provider, sessionId: event.sessionId)
         if event.kind == .sessionEnd {
             runtimeByKey.removeValue(forKey: key)
@@ -351,6 +384,17 @@ final class ActiveSessionsTracker: ObservableObject {
         runtime.tty = incomingTTY ?? runtime.tty
         runtime.pid = event.pid ?? runtime.pid
         runtime.terminalName = incomingTerminalName
+        // Fallback for hosts that fire hooks without TERM_PROGRAM (e.g.
+        // Codex.app embeds codex-cli with no PTY). When the hook's pid maps
+        // to a registered terminal/plugin via the parent process chain, keep
+        // the row alive instead of letting the focus filter drop it.
+        if (runtime.terminalName?.nilIfEmpty == nil), let pid = runtime.pid {
+            if let cached = inferredTerminalNameByPid[pid] {
+                runtime.terminalName = cached
+            } else {
+                kickOffTerminalNameInference(forPid: pid)
+            }
+        }
         runtime.terminalSocket = event.terminalSocket?.nilIfEmpty ?? runtime.terminalSocket
         if shouldAcceptTerminalIdentity {
             runtime.terminalWindowID = event.terminalWindowID?.nilIfEmpty ?? runtime.terminalWindowID
@@ -448,6 +492,63 @@ final class ActiveSessionsTracker: ObservableObject {
         )
     }
 
+    private func filterContext(forEvent event: AttentionEvent) -> SessionFilterContext {
+        SessionFilterContext(
+            providerId: event.provider.rawValue,
+            sessionId: event.sessionId,
+            prompt: event.livePrompt,
+            tty: event.tty,
+            pid: event.pid,
+            terminalName: event.terminalName,
+            projectPath: event.projectPath
+        )
+    }
+
+    private func filterContext(forRuntime runtime: RuntimeSession) -> SessionFilterContext {
+        SessionFilterContext(
+            providerId: runtime.provider.rawValue,
+            sessionId: runtime.sessionId,
+            prompt: runtime.latestPrompt,
+            tty: runtime.tty,
+            pid: runtime.pid,
+            terminalName: runtime.terminalName,
+            projectPath: runtime.projectPath
+        )
+    }
+
+    private func kickOffTerminalNameInference(forPid pid: pid_t) {
+        guard !pidInferenceInFlight.contains(pid) else { return }
+        pidInferenceInFlight.insert(pid)
+        Task.detached(priority: .background) { [weak self] in
+            let proc = ProcessTreeWalker.findTerminalProcessSynchronously(startingAt: pid)
+            await MainActor.run {
+                guard let self else { return }
+                self.pidInferenceInFlight.remove(pid)
+                guard let bundleId = proc?.bundleId,
+                      let alias = TerminalRegistry.primaryTerminalNameAlias(forBundleId: bundleId) else {
+                    return
+                }
+                self.inferredTerminalNameByPid[pid] = alias
+                self.backfillTerminalName(forPid: pid, alias: alias)
+                self.refresh()
+            }
+        }
+    }
+
+    private func backfillTerminalName(forPid pid: pid_t, alias: String) {
+        var changed = false
+        for (key, runtime) in runtimeByKey
+            where runtime.pid == pid && (runtime.terminalName?.nilIfEmpty == nil) {
+            var updated = runtime
+            updated.terminalName = alias
+            runtimeByKey[key] = TerminalIdentityResolver.sanitized(updated)
+            changed = true
+        }
+        if changed {
+            persistRuntime()
+        }
+    }
+
     private func schedulePostStopExitCheck(key: String, pid: Int32) {
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 250_000_000)
@@ -467,6 +568,19 @@ final class ActiveSessionsTracker: ObservableObject {
     func refresh() {
         let now = Date()
         let cutoff = now.addingTimeInterval(-activeWindow)
+        // Re-evaluate persisted runtimes against the filter chain. Catches
+        // rows persisted before a filter existed (e.g. an upgraded plugin
+        // adds a new synthetic-prompt rule) so a restart cleans them up
+        // rather than indefinitely carrying stale rows.
+        if !sessionFilters.isEmpty {
+            for (key, runtime) in runtimeByKey {
+                let ctx = filterContext(forRuntime: runtime)
+                if !sessionFilters.allSatisfy({ $0.shouldDisplay(ctx) }) {
+                    droppedSessionIds.insert(runtime.sessionId)
+                    runtimeByKey.removeValue(forKey: key)
+                }
+            }
+        }
         runtimeByKey = TerminalIdentityResolver.sanitizedGhosttyCollisions(runtimeByKey
             .filter { shouldKeep(runtime: $0.value, cutoff: cutoff, now: now) }
             .mapValues { TerminalIdentityResolver.sanitized($0) })
@@ -482,7 +596,6 @@ final class ActiveSessionsTracker: ObservableObject {
         }
 
         let fresh = Array(merged.values)
-            .filter { TerminalRegistry.canFocusBackToTerminal(named: $0.terminalName) }
             .sorted {
                 if $0.hasFocusHint != $1.hasFocusHint {
                     return $0.hasFocusHint && !$1.hasFocusHint

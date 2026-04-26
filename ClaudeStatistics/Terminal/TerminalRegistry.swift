@@ -196,6 +196,21 @@ enum TerminalRegistry {
         bundleId(forTerminalName: terminalName) != nil
     }
 
+    /// Reverse lookup: given a bundle id (from e.g. `ProcessTreeWalker`),
+    /// return one of its `terminalNameAliases`. Used as a host-side fallback
+    /// when a hook arrives with no `terminal_name` (e.g. Codex.app embedding
+    /// codex-cli with no PTY) — we walk the process tree, find the GUI host
+    /// bundle id, then map it back to the canonical alias the rest of the
+    /// pipeline already knows how to handle.
+    static func primaryTerminalNameAlias(forBundleId bundleId: String?) -> String? {
+        guard let bundleId, !bundleId.isEmpty else { return nil }
+        if let cap = capabilities.first(where: { $0.ownsBundleIdentifier(bundleId) }),
+           let alias = cap.terminalNameAliases.sorted().first {
+            return alias
+        }
+        return dynamicBundles.firstAlias(forBundleId: bundleId)
+    }
+
     static func isTerminalProcessName(_ processName: String?) -> Bool {
         bundleId(forProcessName: processName) != nil
     }
@@ -292,5 +307,15 @@ private final class DynamicBundleStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return nameToBundleId[normalized]
+    }
+
+    func firstAlias(forBundleId bundleId: String) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return nameToBundleId.lazy
+            .filter { $0.value == bundleId }
+            .map(\.key)
+            .sorted()
+            .first
     }
 }
