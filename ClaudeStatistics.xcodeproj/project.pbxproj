@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		01686B843F57F415D991361F /* TranscriptDisplayMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 630E94D819F3948CF3D57365 /* TranscriptDisplayMessage.swift */; };
 		0403F7B265465E6743499C52 /* TranscriptParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = E59B402C6902996368A65A6F /* TranscriptParser.swift */; };
 		04FBF379E0DD62D75FBAFD17 /* ClaudeStatisticsKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; };
 		0508E2412893BA974CD32DAD /* GhosttyTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89661CA17E93D43C4B68FC23 /* GhosttyTerminalCapability.swift */; };
@@ -128,6 +127,7 @@
 		78D29B62500CB98D0FA18D5B /* PermissionRequestRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 852FDD0C73454C36E0024C94 /* PermissionRequestRegistry.swift */; };
 		78EA265074EEB931AB16B1AF /* GeminiHookNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18ABF65F6A4D53F6441FB50C /* GeminiHookNormalizer.swift */; };
 		7A6DC1B86241A8A90AB91897 /* TerminalPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F81931C824888B412AEA051E /* TerminalPlugin.swift */; };
+		7B647CA03E39E1B7CDB94D42 /* TranscriptDisplayMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EBA6E09EEB67ED884B4504F /* TranscriptDisplayMessage.swift */; };
 		7CD9C8820D5C77BDC5DE0E35 /* PendingResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A3701AFF5252558AFDD027 /* PendingResponse.swift */; };
 		7DDF1FCD20AD18EFE47F3067 /* ToolActivityFormatterCompletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F10B1989F38BD8829116BBE /* ToolActivityFormatterCompletionTests.swift */; };
 		7E48B08D0513149CA87ADE4C /* TerminalIdentityResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B71EA214A4CBCF6BFE070E4A /* TerminalIdentityResolver.swift */; };
@@ -393,7 +393,6 @@
 		61361192CBF13D3D64E6E20A /* AppleTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleTerminalCapability.swift; sourceTree = "<group>"; };
 		623F6F9C65341AB301CF1B20 /* GeminiHookInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiHookInstaller.swift; sourceTree = "<group>"; };
 		62572A1901D430E3E24CB02D /* ProviderPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderPlugin.swift; sourceTree = "<group>"; };
-		630E94D819F3948CF3D57365 /* TranscriptDisplayMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptDisplayMessage.swift; sourceTree = "<group>"; };
 		645A6AB9436D7D2577DAE9D8 /* AppleScriptFocuser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleScriptFocuser.swift; sourceTree = "<group>"; };
 		6470B331BB31EF4AE6E5CF51 /* GeminiProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiProvider.swift; sourceTree = "<group>"; };
 		652CCA3656340142820CB27A /* UsageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageData.swift; sourceTree = "<group>"; };
@@ -453,6 +452,7 @@
 		99EA37388B7B02AEDF9C7A78 /* AllTimeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllTimeView.swift; sourceTree = "<group>"; };
 		9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = ClaudeStatisticsKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		9BB59E8417BC110113E9E5CA /* RuntimeStatePersistor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeStatePersistor.swift; sourceTree = "<group>"; };
+		9EBA6E09EEB67ED884B4504F /* TranscriptDisplayMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptDisplayMessage.swift; sourceTree = "<group>"; };
 		9F10B1989F38BD8829116BBE /* ToolActivityFormatterCompletionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolActivityFormatterCompletionTests.swift; sourceTree = "<group>"; };
 		A0C7C98F9FB93519DCD7D594 /* ClaudeHookNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHookNormalizer.swift; sourceTree = "<group>"; };
 		A337A8A5F00CF27D753FA581 /* TerminalRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalRegistry.swift; sourceTree = "<group>"; };
@@ -711,6 +711,7 @@
 				0ECBB3BD210EF8857D8C47D5 /* TerminalDescriptor.swift */,
 				44B525D19903D64B4730721F /* TerminalLaunchRequest.swift */,
 				F81931C824888B412AEA051E /* TerminalPlugin.swift */,
+				9EBA6E09EEB67ED884B4504F /* TranscriptDisplayMessage.swift */,
 				F5CD3EF8FA91298047B26D20 /* TrendDataPoint.swift */,
 				652CCA3656340142820CB27A /* UsageData.swift */,
 				A3CC4F1B31EE86B755D8A88A /* UserProfile.swift */,
@@ -991,7 +992,6 @@
 				EF82F2AEB2D29D2F8EE3391F /* SessionStats+Pricing.swift */,
 				FA8B62A57C9E8AD16345458A /* ShareMetrics.swift */,
 				4E1858F23256C6FEBB750A08 /* ShareRole.swift */,
-				630E94D819F3948CF3D57365 /* TranscriptDisplayMessage.swift */,
 				42AB2ACAC763533BC9654BE5 /* TranscriptEntry.swift */,
 				7436B6045F6682BD8D483E81 /* TrendDataPoint+StatsPeriod.swift */,
 				370D33AC086199C95EC1E2CD /* UsageData.swift */,
@@ -1347,7 +1347,6 @@
 				1386DA5988E3BA59D802B154 /* ToolActivityFormatter+Permissions.swift in Sources */,
 				7FF6E85B58542CC7284AA3D0 /* ToolActivityFormatter.swift in Sources */,
 				D98C48521859A7AF6E45A504 /* ToolOutputCleaning.swift in Sources */,
-				01686B843F57F415D991361F /* TranscriptDisplayMessage.swift in Sources */,
 				5B8F2BC01D7A4526CD0AEAA4 /* TranscriptEntry.swift in Sources */,
 				0403F7B265465E6743499C52 /* TranscriptParser.swift in Sources */,
 				7674AC8643AF2C6126880D3C /* TranscriptView.swift in Sources */,
@@ -1398,6 +1397,7 @@
 				958399C6649B42239B5909AE /* TerminalDescriptor.swift in Sources */,
 				C8359F096BA8063C42EBC8BD /* TerminalLaunchRequest.swift in Sources */,
 				7A6DC1B86241A8A90AB91897 /* TerminalPlugin.swift in Sources */,
+				7B647CA03E39E1B7CDB94D42 /* TranscriptDisplayMessage.swift in Sources */,
 				B94C016E1EDF5D5940A78026 /* TrendDataPoint.swift in Sources */,
 				21EF5A2037616D54E592AED4 /* UsageData.swift in Sources */,
 				25AC67EB7CBD7A011DEA88B7 /* UserProfile.swift in Sources */,

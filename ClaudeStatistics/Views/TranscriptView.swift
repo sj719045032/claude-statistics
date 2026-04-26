@@ -1,4 +1,5 @@
 import SwiftUI
+import ClaudeStatisticsKit
 import MarkdownView
 
 // MARK: - Scaled MarkdownView fonts
