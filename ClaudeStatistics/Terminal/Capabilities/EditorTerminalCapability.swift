@@ -2,27 +2,26 @@ import AppKit
 import ClaudeStatisticsKit
 import Foundation
 
+/// Legacy umbrella editor capability. Per-vendor editor plugins
+/// (VSCodePlugin already extracted; Cursor / Windsurf / Trae / Zed
+/// follow) own VSCode + Insiders themselves; once all five are
+/// extracted this whole struct + the EditorPlugin wrapper +
+/// EditorApp + the TerminalPreferences.editorOptionID seam can be
+/// deleted in one go.
 struct EditorTerminalCapability: TerminalCapability, TerminalLauncher, TerminalReadinessProviding {
     let optionID: String? = TerminalPreferences.editorOptionID
     let category: TerminalCapabilityCategory = .editor
     let displayName = "Editor"
     let bundleIdentifiers: Set<String> = [
-        "com.microsoft.VSCode",
-        "com.microsoft.VSCodeInsiders",
         "com.todesktop.230313mzl4w4u92",
         "com.exafunction.windsurf",
         "com.trae.app",
         "dev.zed.Zed"
     ]
     let terminalNameAliases: Set<String> = [
-        "vscode", "visual studio code", "code",
-        "vscode-insiders", "code-insiders",
         "cursor", "windsurf", "trae", "zed"
     ]
     let processNameHints: Set<String> = [
-        "visual studio code",
-        "code - insiders",
-        "code-insiders",
         "cursor",
         "windsurf",
         "trae",

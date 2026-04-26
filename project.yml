@@ -115,6 +115,43 @@ targets:
         CODE_SIGN_STYLE: Automatic
         SWIFT_STRICT_CONCURRENCY: minimal
 
+  VSCodePlugin:
+    type: bundle
+    platform: macOS
+    sources:
+      - path: Plugins/Sources/VSCodePlugin
+    dependencies:
+      - target: ClaudeStatisticsKit
+    info:
+      path: Plugins/Sources/VSCodePlugin/Info.plist
+      properties:
+        CFBundleIdentifier: com.tinystone.VSCodePlugin
+        CFBundleName: VSCodePlugin
+        CFBundleExecutable: VSCodePlugin
+        CFBundlePackageType: BNDL
+        NSPrincipalClass: VSCodePlugin
+        CSPluginManifest:
+          id: com.microsoft.VSCode
+          kind: terminal
+          displayName: VSCode
+          version: 1.0.0
+          minHostAPIVersion: 0.1.0
+          permissions: []
+          principalClass: VSCodePlugin
+          category: editor-integration
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tinystone.VSCodePlugin
+        PRODUCT_NAME: VSCodePlugin
+        WRAPPER_EXTENSION: csplugin
+        MACH_O_TYPE: mh_bundle
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SKIP_INSTALL: NO
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_STRICT_CONCURRENCY: minimal
+
   ClaudeStatistics:
     type: application
     platform: macOS
@@ -128,6 +165,10 @@ targets:
           destination: plugins
           subpath: ""
       - target: CodexAppPlugin
+        copy:
+          destination: plugins
+          subpath: ""
+      - target: VSCodePlugin
         copy:
           destination: plugins
           subpath: ""
