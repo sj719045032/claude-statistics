@@ -1,7 +1,8 @@
 # Claude Statistics 架构与重写计划
 
 > 最后更新：2026-04-26
-> 当前版本：v3.1.0（140 个 Swift 文件 / 8400 行测试）
+> 当前版本：v3.1.0 + v4.0-alpha（SDK 协议表面已就位，bundle 加载待 M2）
+> SDK 现状：`ClaudeStatisticsKit` 45 文件 / 2638 行；769 测试通过
 > 目标版本：v4.0（插件化架构）
 
 本文档是项目的**单一权威架构文档**，合并了原 `ARCHITECTURE.md`（现状描述）与 `ARCHITECTURE_REVIEW.md`（优化评估），并在此基础上规划了 v4.0 的插件化重写。

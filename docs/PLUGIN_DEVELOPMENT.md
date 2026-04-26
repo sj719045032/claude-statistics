@@ -10,12 +10,20 @@ plugin model lets you contribute a new AI coding CLI provider, a new
 terminal-emulator adapter, a share-card role set, or a share-card
 visual theme — all without modifying the host app's source code.
 
-> **Status**: v4.0-alpha. The SDK metadata + data-model surface is
-> complete and stable enough to author a plugin against. Five behaviour
-> protocols (`SessionDataProvider` / `SessionLauncher` / `UsageProvider` /
-> `HookProvider` / `HookInstalling`) and the `Session` struct still live
-> in the host bundle and will migrate in stage-4. See
-> [§"Current limitations"](#current-limitations) for what works today.
+> **Status**: v4.0-alpha. The full SDK protocol surface is in place —
+> all 5 narrow capability protocols (`SessionDataProvider` /
+> `SessionLauncher` / `UsageProvider` / `HookProvider` /
+> `AccountProvider`) plus their support types (`HookInstalling` /
+> `ProviderUsageSource` / `ProviderPricingFetching` /
+> `ModelPricingRates` / etc.) and the `Session` struct ship in
+> `ClaudeStatisticsKit`. Terminal plugins also have a complete focus +
+> launch contract (`TerminalFocusStrategy` / `TerminalLauncher`).
+>
+> Third-party plugins compile against `ClaudeStatisticsKit` only — no
+> host coupling. What's still missing for a shippable third-party
+> plugin is the loading mechanism: `.csplugin` bundle support lands in
+> M2, runtime permission gating in M3. See
+> [§"Current limitations"](#current-limitations) for the cleanup list.
 
 ---
 
@@ -422,18 +430,62 @@ final class TabbyPlugin: TerminalPlugin {
 }
 ```
 
-### Behaviour (still host-side in v4.0-alpha)
+### Behaviour: focus + launch
 
-Focus return + launching is currently driven by the host's
-`TerminalCapability` protocol family in `ClaudeStatistics/Terminal/`.
-Stage-4 introduces SDK-level `TerminalFocusStrategy`,
-`TerminalLauncher`, `TerminalSetupWizard`, and `TerminalContextProbe`
-factories on `TerminalPlugin`.
+`TerminalPlugin` exposes two optional behaviour factories:
 
-For now, write the behaviour side as a host-internal `TerminalCapability`
-struct (the way the builtin Terminal plugins do under
-`ClaudeStatistics/Terminal/Capabilities/`) and have your `TerminalPlugin`
-forward the descriptor.
+```swift
+public protocol TerminalPlugin: Plugin {
+    var descriptor: TerminalDescriptor { get }
+    func detectInstalled() -> Bool
+
+    func makeFocusStrategy() -> (any TerminalFocusStrategy)?
+    func makeLauncher() -> (any TerminalLauncher)?
+}
+```
+
+Both default to `nil`. A plugin that only declares the descriptor still
+slots into the menu / settings pickers; the host falls back to its
+legacy route registry for the matching `bundleIdentifiers`.
+
+#### `TerminalFocusStrategy`
+
+```swift
+public protocol TerminalFocusStrategy: Sendable {
+    func capability(for target: TerminalFocusTarget) -> TerminalFocusCapability
+    func directFocus(target: TerminalFocusTarget) async -> TerminalFocusExecutionResult?
+    func resolvedFocus(target: TerminalFocusTarget) async -> TerminalFocusExecutionResult?
+}
+```
+
+The host invokes the strategy in three stages:
+
+- `capability(for:)` — synchronous probe used by the UI before any focus
+  attempt. No side effects.
+- `directFocus(target:)` — fast path using the recorded identity (tab
+  id / window id / surface id / socket). Return `nil` to fall back.
+- `resolvedFocus(target:)` — slow path; may activate the app, query
+  Accessibility, walk the process tree, etc. Returns the freshly
+  resolved capability + stable id so the host can update its cache.
+
+#### `TerminalLauncher`
+
+```swift
+public protocol TerminalLauncher: Sendable {
+    func launch(_ request: TerminalLaunchRequest)
+}
+```
+
+Fire-and-forget — log failures via `DiagnosticLogger`; the host has no
+fallback chain at the launch call site.
+
+#### Still scheduled for stage-4
+
+`TerminalSetupWizard` (Kitty's `kitty.conf` injection, etc.) and
+`TerminalContextProbe` (Ghostty's surface-id env probe) still live as
+host-internal protocols. Plugins that need either should expose the
+relevant logic through host-internal hooks until those protocols
+migrate.
 
 ---
 
@@ -505,7 +557,7 @@ public struct ShareCardThemeDescriptor: Sendable, Hashable {
 
 ## 9. SDK type reference
 
-All public types in `ClaudeStatisticsKit` (32 files / 1893 lines as
+All public types in `ClaudeStatisticsKit` (45 files / 2638 lines as
 of v4.0-alpha):
 
 ### Plugin core
@@ -513,10 +565,16 @@ of v4.0-alpha):
 `SDKInfo` · `SemVer` · `Plugin` · `PluginManifest` · `PluginKind` ·
 `PluginPermission` · `PluginRegistry` · `PluginRegistryError`
 
-### Provider API
+### Provider API — narrow capability protocols
 
 `ProviderPlugin` · `ProviderDescriptor` · `ProviderCapabilities` ·
-`AccountProvider` · `StatusLineInstalling` ·
+`SessionDataProvider` · `SessionLauncher` · `UsageProvider` ·
+`HookProvider` · `AccountProvider` · `StatusLineInstalling` ·
+`HookInstalling` · `HookInstallResult`
+
+### Provider API — usage + pricing
+
+`ProviderUsageSource` · `ProviderPricingFetching` · `ModelPricingRates` ·
 `ProviderUsagePresentation` · `ProviderUsageDisplayMode` ·
 `ProviderUsageWindowPresentation` · `ProviderUsageTrendPresentation` ·
 `ProviderUsageSnapshot`
@@ -525,7 +583,9 @@ of v4.0-alpha):
 
 `TerminalPlugin` · `TerminalDescriptor` · `TerminalCapabilityCategory` ·
 `TerminalTabFocusPrecision` · `TerminalLaunchRequest` ·
-`TerminalShellCommand`
+`TerminalShellCommand` · `TerminalLauncher` · `TerminalFocusStrategy` ·
+`TerminalFocusTarget` · `TerminalFocusCapability` · `TerminalProcess` ·
+`TerminalFocusExecutionResult`
 
 ### Share API
 
@@ -534,8 +594,8 @@ of v4.0-alpha):
 
 ### Data models
 
-`Session*` family: `SessionStats` · `SessionQuickStats` · `DaySlice` ·
-`ModelTokenStats` · `ModelUsage`
+`Session*` family: `Session` · `SessionStats` · `SessionQuickStats` ·
+`DaySlice` · `ModelTokenStats` · `ModelUsage`
 
 `Usage*` family: `UsageData` · `UsageWindow` · `ProviderUsageBucket` ·
 `ExtraUsage`
@@ -666,7 +726,10 @@ examples:
   `ClaudeStatistics/Terminal/Capabilities/BuiltinTerminalPlugins.swift`
   (iTerm / AppleTerminal / Ghostty / Kitty / WezTerm / Warp / Editor)
 
-Each is a thin wrapper that exposes a `descriptor` from an existing
-host-side `TerminalCapability` or `ProviderDescriptor` instance — the
-same shape your third-party plugin will follow until stage-4 brings
-the behaviour protocols into the SDK.
+Each provider dogfood wrapper exposes the `descriptor` from a host-side
+`ProviderDescriptor` instance; each terminal dogfood wrapper exposes the
+`descriptor` plus `makeFocusStrategy()` / `makeLauncher()` factories
+that thread through the existing host capability. Stage 4 collapses
+these wrappers as each builtin's behaviour code moves out of
+`ClaudeStatistics/` into a standalone `Plugins/Sources/<Name>Plugin/`
+target — the same shape a third-party plugin already follows.
