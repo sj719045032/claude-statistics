@@ -13,7 +13,8 @@ import Foundation
 /// deep link instead of just activating the app — Claude.app exposes
 /// `claude://claude.ai/resume?session=<id>` natively for CLI sessions,
 /// and the CLI's transcript file name uses that same UUID.
-public final class ClaudeAppPlugin: TerminalPlugin {
+@objc(ClaudeAppPlugin)
+public final class ClaudeAppPlugin: NSObject, TerminalPlugin {
     public static let manifest = PluginManifest(
         id: "com.anthropic.claudefordesktop",
         kind: .terminal,
@@ -35,7 +36,7 @@ public final class ClaudeAppPlugin: TerminalPlugin {
         autoLaunchPriority: nil
     )
 
-    public init() {}
+    public override init() { super.init() }
 
     public func detectInstalled() -> Bool {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: descriptor.bundleIdentifiers.first ?? "") != nil

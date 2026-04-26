@@ -12,7 +12,8 @@ import Foundation
 /// the wrappers expose only the descriptor + install detection — the
 /// kernel still reaches the legacy capabilities directly.
 
-final class ITermPlugin: TerminalPlugin {
+@objc(ITermPlugin)
+final class ITermPlugin: NSObject, TerminalPlugin {
     static let manifest = PluginManifest(
         id: "com.googlecode.iterm2",
         kind: .terminal,
@@ -37,10 +38,11 @@ final class ITermPlugin: TerminalPlugin {
     func makeSetupWizard() -> (any TerminalSetupProviding)? {
         capability as? any TerminalSetupProviding
     }
-    init() {}
+    override init() { super.init() }
 }
 
-final class AppleTerminalPlugin: TerminalPlugin {
+@objc(AppleTerminalPlugin)
+final class AppleTerminalPlugin: NSObject, TerminalPlugin {
     static let manifest = PluginManifest(
         id: "com.apple.Terminal",
         kind: .terminal,
@@ -65,10 +67,11 @@ final class AppleTerminalPlugin: TerminalPlugin {
     func makeSetupWizard() -> (any TerminalSetupProviding)? {
         capability as? any TerminalSetupProviding
     }
-    init() {}
+    override init() { super.init() }
 }
 
-final class GhosttyPlugin: TerminalPlugin {
+@objc(GhosttyPlugin)
+final class GhosttyPlugin: NSObject, TerminalPlugin {
     static let manifest = PluginManifest(
         id: "com.mitchellh.ghostty",
         kind: .terminal,
@@ -93,10 +96,11 @@ final class GhosttyPlugin: TerminalPlugin {
     func makeSetupWizard() -> (any TerminalSetupProviding)? {
         capability as? any TerminalSetupProviding
     }
-    init() {}
+    override init() { super.init() }
 }
 
-final class KittyPlugin: TerminalPlugin {
+@objc(KittyPlugin)
+final class KittyPlugin: NSObject, TerminalPlugin {
     static let manifest = PluginManifest(
         id: "net.kovidgoyal.kitty",
         kind: .terminal,
@@ -121,10 +125,11 @@ final class KittyPlugin: TerminalPlugin {
     func makeSetupWizard() -> (any TerminalSetupProviding)? {
         capability as? any TerminalSetupProviding
     }
-    init() {}
+    override init() { super.init() }
 }
 
-final class WezTermPlugin: TerminalPlugin {
+@objc(WezTermPlugin)
+final class WezTermPlugin: NSObject, TerminalPlugin {
     static let manifest = PluginManifest(
         id: "com.github.wez.wezterm",
         kind: .terminal,
@@ -149,10 +154,11 @@ final class WezTermPlugin: TerminalPlugin {
     func makeSetupWizard() -> (any TerminalSetupProviding)? {
         capability as? any TerminalSetupProviding
     }
-    init() {}
+    override init() { super.init() }
 }
 
-final class WarpPlugin: TerminalPlugin {
+@objc(WarpPlugin)
+final class WarpPlugin: NSObject, TerminalPlugin {
     static let manifest = PluginManifest(
         id: "dev.warp.Warp-Stable",
         kind: .terminal,
@@ -177,10 +183,11 @@ final class WarpPlugin: TerminalPlugin {
     func makeSetupWizard() -> (any TerminalSetupProviding)? {
         capability as? any TerminalSetupProviding
     }
-    init() {}
+    override init() { super.init() }
 }
 
-final class EditorPlugin: TerminalPlugin {
+@objc(EditorPlugin)
+final class EditorPlugin: NSObject, TerminalPlugin {
     static let manifest = PluginManifest(
         id: "com.tinystone.editor",
         kind: .terminal,
@@ -205,5 +212,5 @@ final class EditorPlugin: TerminalPlugin {
     func makeSetupWizard() -> (any TerminalSetupProviding)? {
         capability as? any TerminalSetupProviding
     }
-    init() {}
+    override init() { super.init() }
 }

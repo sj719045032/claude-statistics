@@ -1,6 +1,8 @@
 import XCTest
 @testable import Claude_Statistics
 @testable import ClaudeStatisticsKit
+import ClaudeAppPlugin
+import CodexAppPlugin
 
 final class SemVerTests: XCTestCase {
     func testParsesValidString() {
@@ -75,7 +77,7 @@ final class PluginManifestTests: XCTestCase {
 
 @MainActor
 final class PluginRegistryTests: XCTestCase {
-    private final class FakeProviderPlugin: Plugin {
+    private final class FakeProviderPlugin: NSObject, Plugin {
         static let manifest = PluginManifest(
             id: "com.test.alpha",
             kind: .provider,
@@ -85,10 +87,10 @@ final class PluginRegistryTests: XCTestCase {
             permissions: [],
             principalClass: "FakeProviderPlugin"
         )
-        init() {}
+        override init() { super.init() }
     }
 
-    private final class FakeTerminalPlugin: Plugin {
+    private final class FakeTerminalPlugin: NSObject, Plugin {
         static let manifest = PluginManifest(
             id: "com.test.beta",
             kind: .terminal,
@@ -98,10 +100,10 @@ final class PluginRegistryTests: XCTestCase {
             permissions: [.accessibility],
             principalClass: "FakeTerminalPlugin"
         )
-        init() {}
+        override init() { super.init() }
     }
 
-    private final class FakeBothPlugin: Plugin {
+    private final class FakeBothPlugin: NSObject, Plugin {
         static let manifest = PluginManifest(
             id: "com.test.combo",
             kind: .both,
@@ -111,7 +113,7 @@ final class PluginRegistryTests: XCTestCase {
             permissions: [],
             principalClass: "FakeBothPlugin"
         )
-        init() {}
+        override init() { super.init() }
     }
 
     func testRegisterByKind() throws {
@@ -150,7 +152,7 @@ final class PluginRegistryTests: XCTestCase {
         XCTAssertEqual(SDKInfo.apiVersion, SemVer(major: 0, minor: 1, patch: 0))
     }
 
-    private final class FakeProviderPluginImpl: ProviderPlugin {
+    private final class FakeProviderPluginImpl: NSObject, ProviderPlugin {
         static let manifest = PluginManifest(
             id: "com.test.provider",
             kind: .provider,
@@ -168,10 +170,10 @@ final class PluginRegistryTests: XCTestCase {
             notchEnabledDefaultsKey: "notch.enabled.test",
             resolveToolAlias: { _ in nil }
         )
-        init() {}
+        override init() { super.init() }
     }
 
-    private final class FakeTerminalPluginImpl: TerminalPlugin {
+    private final class FakeTerminalPluginImpl: NSObject, TerminalPlugin {
         static let manifest = PluginManifest(
             id: "com.test.terminal",
             kind: .terminal,
@@ -191,7 +193,7 @@ final class PluginRegistryTests: XCTestCase {
             focusPrecision: .appOnly,
             autoLaunchPriority: nil
         )
-        init() {}
+        override init() { super.init() }
     }
 
     func testTypedLookupsReturnConcretePlugin() throws {
@@ -253,5 +255,65 @@ final class ShareDescriptorTests: XCTestCase {
         let a = ShareCardThemeDescriptor(id: "id", displayName: "Theme")
         let b = ShareCardThemeDescriptor(id: "id", displayName: "Theme")
         XCTAssertEqual(a, b)
+    }
+}
+
+/// Validates the plumbing the M2 `.csplugin` loader will rely on:
+/// every shipping plugin must expose a stable Objective-C runtime
+/// name matching its manifest's `principalClass`, so
+/// `NSClassFromString` resolves and the cast to
+/// `(NSObject & Plugin).Type` succeeds. Drift between the manifest
+/// string and the `@objc(<Name>)` attribute would silently break the
+/// loader at runtime — these tests catch it at build time.
+final class PluginReflectionTests: XCTestCase {
+    private static let registeredPluginClasses: [(declared: String, cls: AnyClass)] = [
+        (ClaudePluginDogfood.manifest.principalClass, ClaudePluginDogfood.self),
+        (CodexPluginDogfood.manifest.principalClass, CodexPluginDogfood.self),
+        (GeminiPluginDogfood.manifest.principalClass, GeminiPluginDogfood.self),
+        (ITermPlugin.manifest.principalClass, ITermPlugin.self),
+        (AppleTerminalPlugin.manifest.principalClass, AppleTerminalPlugin.self),
+        (GhosttyPlugin.manifest.principalClass, GhosttyPlugin.self),
+        (KittyPlugin.manifest.principalClass, KittyPlugin.self),
+        (WezTermPlugin.manifest.principalClass, WezTermPlugin.self),
+        (WarpPlugin.manifest.principalClass, WarpPlugin.self),
+        (EditorPlugin.manifest.principalClass, EditorPlugin.self),
+        (AlacrittyPlugin.manifest.principalClass, AlacrittyPlugin.self),
+        (ClaudeAppPlugin.manifest.principalClass, ClaudeAppPlugin.self),
+        (CodexAppPlugin.manifest.principalClass, CodexAppPlugin.self)
+    ]
+
+    func testManifestPrincipalClassMatchesObjcRuntimeName() {
+        for (declared, cls) in Self.registeredPluginClasses {
+            let runtimeName = NSStringFromClass(cls)
+            XCTAssertEqual(
+                declared, runtimeName,
+                "Manifest principalClass '\(declared)' must equal Objective-C runtime name '\(runtimeName)'"
+            )
+        }
+    }
+
+    func testPrincipalClassResolvesViaNSClassFromString() {
+        for (declared, _) in Self.registeredPluginClasses {
+            XCTAssertNotNil(
+                NSClassFromString(declared),
+                "Plugin '\(declared)' must be exposed to ObjC runtime via @objc(\(declared))"
+            )
+        }
+    }
+
+    func testInstantiatePluginViaObjcRuntime() throws {
+        // End-to-end of what PluginLoader will do: take principalClass
+        // string from the manifest, look up via NSClassFromString,
+        // cast to (NSObject & Plugin).Type, then init().
+        guard let cls = NSClassFromString("ClaudeAppPlugin") else {
+            return XCTFail("ClaudeAppPlugin not found in ObjC runtime")
+        }
+        guard let pluginType = cls as? (NSObject & Plugin).Type else {
+            return XCTFail("ClaudeAppPlugin must conform to NSObject & Plugin")
+        }
+        let instance = pluginType.init()
+        XCTAssertEqual(type(of: instance).manifest.id, "com.anthropic.claudefordesktop")
+        XCTAssertEqual(type(of: instance).manifest.principalClass, "ClaudeAppPlugin")
+        XCTAssertTrue(instance is any TerminalPlugin)
     }
 }

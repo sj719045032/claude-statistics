@@ -14,7 +14,8 @@ import Foundation
 /// contributor) folded into the plugin's own factory methods. Until
 /// then these wrappers only carry the descriptor.
 
-final class ClaudePluginDogfood: ProviderPlugin {
+@objc(ClaudePluginDogfood)
+final class ClaudePluginDogfood: NSObject, ProviderPlugin {
     static let manifest = PluginManifest(
         id: "com.anthropic.claude",
         kind: .provider,
@@ -26,10 +27,11 @@ final class ClaudePluginDogfood: ProviderPlugin {
     )
     var descriptor: ProviderDescriptor { .claude }
     func makeProvider() -> (any BundledSessionProvider)? { ClaudeProvider.shared }
-    init() {}
+    override init() { super.init() }
 }
 
-final class CodexPluginDogfood: ProviderPlugin {
+@objc(CodexPluginDogfood)
+final class CodexPluginDogfood: NSObject, ProviderPlugin {
     static let manifest = PluginManifest(
         id: "com.openai.codex",
         kind: .provider,
@@ -41,10 +43,11 @@ final class CodexPluginDogfood: ProviderPlugin {
     )
     var descriptor: ProviderDescriptor { .codex }
     func makeProvider() -> (any BundledSessionProvider)? { CodexProvider.shared }
-    init() {}
+    override init() { super.init() }
 }
 
-final class GeminiPluginDogfood: ProviderPlugin {
+@objc(GeminiPluginDogfood)
+final class GeminiPluginDogfood: NSObject, ProviderPlugin {
     static let manifest = PluginManifest(
         id: "com.google.gemini",
         kind: .provider,
@@ -56,5 +59,5 @@ final class GeminiPluginDogfood: ProviderPlugin {
     )
     var descriptor: ProviderDescriptor { .gemini }
     func makeProvider() -> (any BundledSessionProvider)? { GeminiProvider.shared }
-    init() {}
+    override init() { super.init() }
 }

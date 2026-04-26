@@ -12,7 +12,8 @@ import Foundation
 /// `makeLauncher()` factories. Until then the wrapper just exposes
 /// the descriptor — the kernel still reaches the legacy capability
 /// directly.
-final class AlacrittyPlugin: TerminalPlugin {
+@objc(AlacrittyPlugin)
+final class AlacrittyPlugin: NSObject, TerminalPlugin {
     static let manifest = PluginManifest(
         id: "org.alacritty",
         kind: .terminal,
@@ -40,5 +41,5 @@ final class AlacrittyPlugin: TerminalPlugin {
         capability as? any TerminalSetupProviding
     }
 
-    init() {}
+    override init() { super.init() }
 }

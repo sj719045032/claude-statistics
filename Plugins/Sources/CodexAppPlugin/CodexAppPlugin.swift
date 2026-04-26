@@ -10,7 +10,8 @@ import Foundation
 /// rollout filename embeds the same UUID — so the notch click can
 /// land directly on the matching thread instead of merely activating
 /// the app.
-public final class CodexAppPlugin: TerminalPlugin {
+@objc(CodexAppPlugin)
+public final class CodexAppPlugin: NSObject, TerminalPlugin {
     public static let manifest = PluginManifest(
         id: "com.openai.codex",
         kind: .terminal,
@@ -32,7 +33,7 @@ public final class CodexAppPlugin: TerminalPlugin {
         autoLaunchPriority: nil
     )
 
-    public init() {}
+    public override init() { super.init() }
 
     public func detectInstalled() -> Bool {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: descriptor.bundleIdentifiers.first ?? "") != nil
