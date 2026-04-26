@@ -44,43 +44,73 @@ targets:
         SWIFT_STRICT_CONCURRENCY: minimal
 
   ClaudeAppPlugin:
-    type: framework
+    type: bundle
     platform: macOS
     sources:
       - path: Plugins/Sources/ClaudeAppPlugin
     dependencies:
       - target: ClaudeStatisticsKit
+    info:
+      path: Plugins/Sources/ClaudeAppPlugin/Info.plist
+      properties:
+        CFBundleIdentifier: com.tinystone.ClaudeAppPlugin
+        CFBundleName: ClaudeAppPlugin
+        CFBundleExecutable: ClaudeAppPlugin
+        CFBundlePackageType: BNDL
+        NSPrincipalClass: ClaudeAppPlugin
+        CSPluginManifest:
+          id: com.anthropic.claudefordesktop
+          kind: terminal
+          displayName: Claude
+          version: 1.0.0
+          minHostAPIVersion: 0.1.0
+          permissions: []
+          principalClass: ClaudeAppPlugin
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tinystone.ClaudeAppPlugin
         PRODUCT_NAME: ClaudeAppPlugin
+        WRAPPER_EXTENSION: csplugin
+        MACH_O_TYPE: mh_bundle
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
-        DEFINES_MODULE: YES
-        BUILD_LIBRARY_FOR_DISTRIBUTION: YES
         SKIP_INSTALL: NO
-        GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_STYLE: Automatic
         SWIFT_STRICT_CONCURRENCY: minimal
 
   CodexAppPlugin:
-    type: framework
+    type: bundle
     platform: macOS
     sources:
       - path: Plugins/Sources/CodexAppPlugin
     dependencies:
       - target: ClaudeStatisticsKit
+    info:
+      path: Plugins/Sources/CodexAppPlugin/Info.plist
+      properties:
+        CFBundleIdentifier: com.tinystone.CodexAppPlugin
+        CFBundleName: CodexAppPlugin
+        CFBundleExecutable: CodexAppPlugin
+        CFBundlePackageType: BNDL
+        NSPrincipalClass: CodexAppPlugin
+        CSPluginManifest:
+          id: com.openai.codex
+          kind: terminal
+          displayName: Codex
+          version: 1.0.0
+          minHostAPIVersion: 0.1.0
+          permissions: []
+          principalClass: CodexAppPlugin
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tinystone.CodexAppPlugin
         PRODUCT_NAME: CodexAppPlugin
+        WRAPPER_EXTENSION: csplugin
+        MACH_O_TYPE: mh_bundle
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
-        DEFINES_MODULE: YES
-        BUILD_LIBRARY_FOR_DISTRIBUTION: YES
         SKIP_INSTALL: NO
-        GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_STYLE: Automatic
         SWIFT_STRICT_CONCURRENCY: minimal
@@ -94,9 +124,13 @@ targets:
       - target: ClaudeStatisticsKit
         embed: true
       - target: ClaudeAppPlugin
-        embed: true
+        copy:
+          destination: plugins
+          subpath: ""
       - target: CodexAppPlugin
-        embed: true
+        copy:
+          destination: plugins
+          subpath: ""
       - package: Sparkle
       - package: MarkdownView
         product: MarkdownView

@@ -2,8 +2,6 @@ import SwiftUI
 import Combine
 import TelemetryDeck
 import ClaudeStatisticsKit
-import ClaudeAppPlugin
-import CodexAppPlugin
 
 private enum DefaultSettings {
     static func register() {
@@ -57,9 +55,7 @@ final class AppState: ObservableObject {
             KittyPlugin(),
             WezTermPlugin(),
             WarpPlugin(),
-            EditorPlugin(),
-            ClaudeAppPlugin(),
-            CodexAppPlugin()
+            EditorPlugin()
         ]
         for plugin in plugins {
             do {
@@ -70,6 +66,49 @@ final class AppState: ObservableObject {
                 )
             }
         }
+        // Discover .csplugin bundles. Bundled samples live in
+        // Contents/PlugIns (shipped inside the .app, implicitly trusted);
+        // user-installed plugins live under
+        // ~/Library/Application Support/Claude Statistics/Plugins (gated
+        // by TrustStore — currently allow-by-default until S5b lands the
+        // first-run prompt UI).
+        let trustStore = TrustStore()
+        if let pluginsDir = Bundle.main.builtInPlugInsURL {
+            let report = PluginLoader.loadAll(
+                from: pluginsDir,
+                into: registry,
+                trustEvaluator: { _, _ in true }
+            )
+            DiagnosticLogger.shared.info(
+                "PluginLoader (bundled): loaded=\(report.loaded.count) skipped=\(report.skipped.count)"
+            )
+            for skip in report.skipped {
+                DiagnosticLogger.shared.warning(
+                    "PluginLoader skipped \(skip.url.lastPathComponent): \(skip.reason)"
+                )
+            }
+        }
+        let userReport = PluginLoader.loadAll(
+            from: PluginLoader.defaultDirectory,
+            into: registry,
+            trustEvaluator: { manifest, url in
+                switch trustStore.decision(for: manifest, bundleURL: url) {
+                case .allowed: return true
+                case .denied: return false
+                case .none:
+                    // S5b TODO: prompt the user. Until the UI lands, an
+                    // unknown user-installed plugin is auto-allowed AND
+                    // recorded so the file accumulates real decisions
+                    // even before the prompt exists. Flip this default
+                    // to false the moment the prompt sheet ships.
+                    trustStore.record(.allowed, for: manifest, bundleURL: url)
+                    return true
+                }
+            }
+        )
+        DiagnosticLogger.shared.info(
+            "PluginLoader (user): loaded=\(userReport.loaded.count) skipped=\(userReport.skipped.count)"
+        )
         // Teach `TerminalRegistry` about every terminal plugin's bundle
         // ids and `terminalNameAliases`. Bundle ids let `ProcessTreeWalker`
         // accept external plugins (e.g. the chat-app plugins above) as focus
@@ -399,6 +438,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.handleIslandShortcut() ?? false
         }
         appState.notchCenter.activeSessionsTracker = appState.activeSessionsTracker
+        // Wire the plugin-driven synthetic-prompt detector. Each
+        // `ProviderPlugin` may override `isSyntheticPrompt(_:)` to flag
+        // host-app background tasks (e.g. Codex.app ambient suggestions)
+        // so they're dropped from the active session list. Adding a new
+        // provider rule means overriding that one method on its plugin —
+        // the tracker stays provider-agnostic.
+        let registry = appState.pluginRegistry
+        appState.activeSessionsTracker.syntheticPromptDetector = { [registry] provider, prompt in
+            guard let plugin = registry.providerPlugin(id: provider.rawValue) else {
+                return false
+            }
+            return plugin.isSyntheticPrompt(prompt)
+        }
 
         applyNotchProviderPreferences()
 

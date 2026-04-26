@@ -1,8 +1,6 @@
 import XCTest
 @testable import Claude_Statistics
 @testable import ClaudeStatisticsKit
-import ClaudeAppPlugin
-import CodexAppPlugin
 
 final class SemVerTests: XCTestCase {
     func testParsesValidString() {
@@ -454,6 +452,10 @@ final class PluginLoaderTests: XCTestCase {
 /// string and the `@objc(<Name>)` attribute would silently break the
 /// loader at runtime — these tests catch it at build time.
 final class PluginReflectionTests: XCTestCase {
+    // Host-resident plugin classes only. ClaudeAppPlugin / CodexAppPlugin
+    // ship as `.csplugin` bundles (S3) and don't expose a Swift module the
+    // test target can `import`; the loader exercises them at runtime via
+    // NSClassFromString once the bundle is dlopen'd.
     private static let registeredPluginClasses: [(declared: String, cls: AnyClass)] = [
         (ClaudePluginDogfood.manifest.principalClass, ClaudePluginDogfood.self),
         (CodexPluginDogfood.manifest.principalClass, CodexPluginDogfood.self),
@@ -465,9 +467,7 @@ final class PluginReflectionTests: XCTestCase {
         (WezTermPlugin.manifest.principalClass, WezTermPlugin.self),
         (WarpPlugin.manifest.principalClass, WarpPlugin.self),
         (EditorPlugin.manifest.principalClass, EditorPlugin.self),
-        (AlacrittyPlugin.manifest.principalClass, AlacrittyPlugin.self),
-        (ClaudeAppPlugin.manifest.principalClass, ClaudeAppPlugin.self),
-        (CodexAppPlugin.manifest.principalClass, CodexAppPlugin.self)
+        (AlacrittyPlugin.manifest.principalClass, AlacrittyPlugin.self)
     ]
 
     func testManifestPrincipalClassMatchesObjcRuntimeName() {
@@ -492,16 +492,19 @@ final class PluginReflectionTests: XCTestCase {
     func testInstantiatePluginViaObjcRuntime() throws {
         // End-to-end of what PluginLoader will do: take principalClass
         // string from the manifest, look up via NSClassFromString,
-        // cast to (NSObject & Plugin).Type, then init().
-        guard let cls = NSClassFromString("ClaudeAppPlugin") else {
-            return XCTFail("ClaudeAppPlugin not found in ObjC runtime")
+        // cast to (NSObject & Plugin).Type, then init(). Use a
+        // host-resident plugin (KittyPlugin) so this works without
+        // dlopen — the .csplugin path is exercised by integration
+        // tests once the bundles ship.
+        guard let cls = NSClassFromString("KittyPlugin") else {
+            return XCTFail("KittyPlugin not found in ObjC runtime")
         }
         guard let pluginType = cls as? (NSObject & Plugin).Type else {
-            return XCTFail("ClaudeAppPlugin must conform to NSObject & Plugin")
+            return XCTFail("KittyPlugin must conform to NSObject & Plugin")
         }
         let instance = pluginType.init()
-        XCTAssertEqual(type(of: instance).manifest.id, "com.anthropic.claudefordesktop")
-        XCTAssertEqual(type(of: instance).manifest.principalClass, "ClaudeAppPlugin")
+        XCTAssertEqual(type(of: instance).manifest.id, "net.kovidgoyal.kitty")
+        XCTAssertEqual(type(of: instance).manifest.principalClass, "KittyPlugin")
         XCTAssertTrue(instance is any TerminalPlugin)
     }
 }
