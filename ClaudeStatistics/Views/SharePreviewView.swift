@@ -280,9 +280,9 @@ struct SharePreviewView: View {
     }
 
     private var roleVariants: [ShareRoleResult] {
-        ShareRoleID.allCases.map { role in
+        ShareRoleID.allBuiltins.map { role in
             var scores = [ShareRoleScore(roleID: role, score: 0.88)]
-            scores.append(contentsOf: ShareRoleID.allCases
+            scores.append(contentsOf: ShareRoleID.allBuiltins
                 .filter { $0 != role }
                 .prefix(2)
                 .enumerated()

@@ -60,6 +60,14 @@ extension ShareRoleEngine {
                 "share.role.steadyBuilder.subtitle.2",
                 "share.role.steadyBuilder.subtitle.3"
             ]
+        default:
+            // Plugin role with no host-side subtitle table — try the
+            // plugin's own localized key (`share.role.<id>.subtitle.1`)
+            // and fall back to a generic builder line if it's missing.
+            options = [
+                "share.role.\(role.rawValue).subtitle.1",
+                "share.role.steadyBuilder.subtitle.1"
+            ]
         }
         let key = options[stableIndex(seed: "\(role.rawValue)-\(metrics.scopeLabel)-\(metrics.sessionCount)-\(metrics.totalTokens)", count: options.count)]
         return localized(key)
@@ -85,6 +93,12 @@ extension ShareRoleEngine {
             return localized("share.role.efficientOperator.summary", TimeFormatter.tokenCount(metrics.totalTokens), formatCost(metrics.totalCost))
         case .steadyBuilder:
             return localized("share.role.steadyBuilder.summary")
+        default:
+            // Plugin role: try its own summary key, else fall back to
+            // the steadyBuilder line so the card has something to show.
+            let key = "share.role.\(role.rawValue).summary"
+            let resolved = localized(key)
+            return resolved == key ? localized("share.role.steadyBuilder.summary") : resolved
         }
     }
 
@@ -185,6 +199,15 @@ extension ShareRoleEngine {
                 metric("\(metrics.messageCount)", "share.metric.messages", "message.fill"),
                 metric(TimeFormatter.tokenCount(Int(metrics.averageTokensPerSession)), "share.metric.avgTokensPerSession", "number"),
                 metric("\(Int(metrics.activeDayCoverage * 100))%", "share.metric.dayCoverage", "calendar.badge.clock")
+            ]
+        default:
+            // Plugin role: emit a generic activity-volume column set so
+            // the card has six proof metrics like the builtins.
+            return leading + [
+                metric("\(metrics.sessionCount)", "share.metric.sessions", "list.bullet"),
+                metric("\(metrics.messageCount)", "share.metric.messages", "message.fill"),
+                metric("\(metrics.projectCount)", "share.metric.projects", "folder.fill"),
+                metric("\(metrics.activeDayCount)", "share.metric.activeDays", "calendar")
             ]
         }
     }

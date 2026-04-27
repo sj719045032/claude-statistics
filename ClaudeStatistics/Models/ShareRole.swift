@@ -1,15 +1,37 @@
 import SwiftUI
 
-enum ShareRoleID: String, CaseIterable, Identifiable {
-    case vibeCodingKing
-    case toolSummoner
-    case contextBeastTamer
-    case nightShiftEngineer
-    case multiModelDirector
-    case sprintHacker
-    case fullStackPathfinder
-    case efficientOperator
-    case steadyBuilder
+/// Open string-id wrapper for share-card roles. Builtin role ids are
+/// exposed as `static let` constants; plugin-contributed roles
+/// construct any string id via `init(rawValue:)`. `kind == .vibeCodingKing`
+/// / `case .vibeCodingKing:` keep working because the struct is
+/// Equatable. Theme defaults to `steadyBuilder` for unknown ids so a
+/// plugin-supplied role without its own theme still renders sensibly.
+struct ShareRoleID: RawRepresentable, Hashable, Codable, Identifiable, Sendable {
+    let rawValue: String
+
+    init?(rawValue: String) {
+        guard !rawValue.isEmpty else { return nil }
+        self.rawValue = rawValue
+    }
+
+    static let vibeCodingKing      = ShareRoleID(rawValue: "vibeCodingKing")!
+    static let toolSummoner        = ShareRoleID(rawValue: "toolSummoner")!
+    static let contextBeastTamer   = ShareRoleID(rawValue: "contextBeastTamer")!
+    static let nightShiftEngineer  = ShareRoleID(rawValue: "nightShiftEngineer")!
+    static let multiModelDirector  = ShareRoleID(rawValue: "multiModelDirector")!
+    static let sprintHacker        = ShareRoleID(rawValue: "sprintHacker")!
+    static let fullStackPathfinder = ShareRoleID(rawValue: "fullStackPathfinder")!
+    static let efficientOperator   = ShareRoleID(rawValue: "efficientOperator")!
+    static let steadyBuilder       = ShareRoleID(rawValue: "steadyBuilder")!
+
+    /// Replaces enum's auto-derived `allCases`. Iteration order is the
+    /// canonical display order. Plugin roles are not included here —
+    /// they reach the engine through a separate plugin scoring path.
+    static let allBuiltins: [ShareRoleID] = [
+        .vibeCodingKing, .toolSummoner, .contextBeastTamer,
+        .nightShiftEngineer, .multiModelDirector, .sprintHacker,
+        .fullStackPathfinder, .efficientOperator, .steadyBuilder
+    ]
 
     var id: String { rawValue }
 
@@ -22,25 +44,30 @@ enum ShareRoleID: String, CaseIterable, Identifiable {
     }
 
     var theme: ShareVisualTheme {
-        switch self {
-        case .vibeCodingKing:
+        switch rawValue {
+        case "vibeCodingKing":
             return ShareVisualTheme(backgroundTop: .orange, backgroundBottom: .yellow, accent: .black, titleGradient: [.black, .orange, .yellow], titleForeground: .black, titleOutline: .white.opacity(0.28), titleShadowOpacity: 0.08, prefersLightQRCode: false, symbolName: "crown.fill", decorationSymbols: ["terminal", "bolt.fill", "sparkles"], mascotPrimarySymbol: "person.crop.circle.fill", mascotSecondarySymbols: ["crown.fill", "bolt.fill", "terminal.fill"])
-        case .toolSummoner:
+        case "toolSummoner":
             return ShareVisualTheme(backgroundTop: .indigo, backgroundBottom: .blue, accent: .white, titleGradient: [.white, .cyan, .mint], titleForeground: .white, titleOutline: .black.opacity(0.24), titleShadowOpacity: 0.16, prefersLightQRCode: true, symbolName: "wand.and.stars.inverse", decorationSymbols: ["wrench.and.screwdriver.fill", "chevron.left.forwardslash.chevron.right", "sparkles"], mascotPrimarySymbol: "person.crop.circle.fill", mascotSecondarySymbols: ["wand.and.stars", "wrench.and.screwdriver.fill", "sparkles"])
-        case .contextBeastTamer:
+        case "contextBeastTamer":
             return ShareVisualTheme(backgroundTop: .teal, backgroundBottom: .indigo, accent: .white, titleGradient: [.white, .mint, .cyan], titleForeground: .white, titleOutline: .black.opacity(0.24), titleShadowOpacity: 0.16, prefersLightQRCode: true, symbolName: "aqi.medium", decorationSymbols: ["rectangle.stack.fill", "scroll.fill", "tortoise.fill"], mascotPrimarySymbol: "person.crop.circle.fill", mascotSecondarySymbols: ["rectangle.stack.fill", "scroll.fill", "sparkles"])
-        case .nightShiftEngineer:
+        case "nightShiftEngineer":
             return ShareVisualTheme(backgroundTop: .black, backgroundBottom: .blue, accent: .green, titleGradient: [.green, .cyan, .white], titleForeground: .white, titleOutline: .black.opacity(0.26), titleShadowOpacity: 0.18, prefersLightQRCode: true, symbolName: "moon.stars.fill", decorationSymbols: ["terminal.fill", "moon.fill", "sparkles"], mascotPrimarySymbol: "person.crop.circle.fill", mascotSecondarySymbols: ["moon.stars.fill", "terminal.fill", "sparkles"])
-        case .multiModelDirector:
+        case "multiModelDirector":
             return ShareVisualTheme(backgroundTop: .pink, backgroundBottom: .indigo, accent: .white, titleGradient: [.white, .pink, .purple], titleForeground: .white, titleOutline: .black.opacity(0.24), titleShadowOpacity: 0.16, prefersLightQRCode: true, symbolName: "theatermasks.fill", decorationSymbols: ["camera.fill", "cpu.fill", "square.stack.3d.up.fill"], mascotPrimarySymbol: "person.crop.circle.fill", mascotSecondarySymbols: ["theatermasks.fill", "camera.fill", "cpu.fill"])
-        case .sprintHacker:
+        case "sprintHacker":
             return ShareVisualTheme(backgroundTop: .red, backgroundBottom: .orange, accent: .white, titleGradient: [.white, .yellow, .orange], titleForeground: .white, titleOutline: .black.opacity(0.24), titleShadowOpacity: 0.16, prefersLightQRCode: true, symbolName: "bolt.circle.fill", decorationSymbols: ["flame.fill", "speedometer", "bolt.fill"], mascotPrimarySymbol: "hare.fill", mascotSecondarySymbols: ["bolt.fill", "flame.fill", "sparkles"])
-        case .fullStackPathfinder:
+        case "fullStackPathfinder":
             return ShareVisualTheme(backgroundTop: .green, backgroundBottom: .mint, accent: .black, titleGradient: [.black, .green, .mint], titleForeground: .black, titleOutline: .white.opacity(0.28), titleShadowOpacity: 0.08, prefersLightQRCode: false, symbolName: "map.fill", decorationSymbols: ["flag.fill", "point.3.connected.trianglepath.dotted", "shippingbox.fill"], mascotPrimarySymbol: "figure.walk", mascotSecondarySymbols: ["map.fill", "flag.fill", "shippingbox.fill"])
-        case .efficientOperator:
+        case "efficientOperator":
             return ShareVisualTheme(backgroundTop: .cyan, backgroundBottom: .mint, accent: .black, titleGradient: [.black, .cyan, .mint], titleForeground: .black, titleOutline: .white.opacity(0.28), titleShadowOpacity: 0.08, prefersLightQRCode: false, symbolName: "dial.high.fill", decorationSymbols: ["gauge.with.dots.needle.50percent", "chart.xyaxis.line", "checkmark.seal.fill"], mascotPrimarySymbol: "person.crop.circle.fill", mascotSecondarySymbols: ["dial.high.fill", "checkmark.seal.fill", "chart.line.uptrend.xyaxis"])
-        case .steadyBuilder:
+        case "steadyBuilder":
             return ShareVisualTheme(backgroundTop: .gray, backgroundBottom: .blue, accent: .white, titleGradient: [.white, .cyan, .blue], titleForeground: .white, titleOutline: .black.opacity(0.24), titleShadowOpacity: 0.16, prefersLightQRCode: true, symbolName: "hammer.fill", decorationSymbols: ["building.columns.fill", "square.stack.3d.up.fill", "checkmark.circle.fill"], mascotPrimarySymbol: "person.crop.circle.fill", mascotSecondarySymbols: ["hammer.fill", "building.columns.fill", "checkmark.circle.fill"])
+        default:
+            // Plugin role with no host-side theme — fall back to the
+            // neutral steadyBuilder palette so the card still renders.
+            // Plugin themes proper land alongside the scoring path.
+            return ShareRoleID.steadyBuilder.theme
         }
     }
 }

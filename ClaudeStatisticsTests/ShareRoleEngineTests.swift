@@ -173,7 +173,7 @@ final class ShareRoleEngineTests: XCTestCase {
         )
         XCTAssertEqual(
             Set(result.scores.map(\.roleID)).count,
-            ShareRoleID.allCases.count,
+            ShareRoleID.allBuiltins.count,
             "all-time ranking includes every role"
         )
     }
@@ -225,7 +225,7 @@ final class ShareRoleEngineTests: XCTestCase {
             metrics: metrics(scope: .weekly),
             baseline: nil
         )
-        XCTAssertEqual(result.scores.count, ShareRoleID.allCases.count)
+        XCTAssertEqual(result.scores.count, ShareRoleID.allBuiltins.count)
     }
 
     func test_resultIncludesAllRolesMinusOne_dailyScope() {
@@ -234,6 +234,6 @@ final class ShareRoleEngineTests: XCTestCase {
             metrics: metrics(scope: .daily),
             baseline: nil
         )
-        XCTAssertEqual(result.scores.count, ShareRoleID.allCases.count - 1)
+        XCTAssertEqual(result.scores.count, ShareRoleID.allBuiltins.count - 1)
     }
 }

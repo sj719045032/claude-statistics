@@ -136,6 +136,10 @@ extension ShareRoleEngine {
             case .consistencyMachine, .projectHopper, .costMinimalist: return 0.08
             default: return 0
             }
+        default:
+            // Plugin role: no host-side affinity table; let the plugin's
+            // own scoring carry the weighting.
+            return 0
         }
     }
 }
