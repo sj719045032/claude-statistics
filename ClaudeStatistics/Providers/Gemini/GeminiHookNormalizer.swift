@@ -164,7 +164,7 @@ extension HookRunner {
 
     private func canonicalGeminiToolName(_ raw: String?) -> String? {
         guard let raw else { return nil }
-        return ProviderKind.gemini.canonicalToolName(raw)
+        return ProviderKind.gemini.descriptor.canonicalToolName(raw)
     }
 
     private func normalizeGeminiToolInput(_ rawInput: Any?) -> [String: Any]? {

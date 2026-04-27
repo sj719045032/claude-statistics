@@ -76,12 +76,12 @@ struct ActiveSessionRow: View {
                             .foregroundStyle(.white.opacity(session.hasFocusHint ? 0.92 : 0.62))
                             .lineLimit(1)
                             .truncationMode(.middle)
-                        Text(session.provider.displayName)
+                        Text(session.provider.descriptor.displayName)
                             .font(.system(size: 8, weight: .semibold, design: .rounded))
-                            .foregroundStyle(session.provider.badgeColor.opacity(0.92))
+                            .foregroundStyle(session.provider.descriptor.badgeColor.opacity(0.92))
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
-                            .background(session.provider.badgeColor.opacity(0.16), in: Capsule())
+                            .background(session.provider.descriptor.badgeColor.opacity(0.16), in: Capsule())
                         if session.activeSubagentCount > 0 {
                             HStack(spacing: 2) {
                                 Image(systemName: "wand.and.stars")

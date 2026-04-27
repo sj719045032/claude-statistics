@@ -9,9 +9,9 @@ enum NotchPreferences {
     // Thin per-provider key aliases so `@AppStorage(NotchPreferences.claudeKey)`
     // in views reads cleanly. All delegate to the provider's own rawValue-based
     // key — no per-provider branching here.
-    static var claudeKey: String { ProviderKind.claude.notchEnabledDefaultsKey }
-    static var codexKey:  String { ProviderKind.codex.notchEnabledDefaultsKey }
-    static var geminiKey: String { ProviderKind.gemini.notchEnabledDefaultsKey }
+    static var claudeKey: String { ProviderKind.claude.descriptor.notchEnabledDefaultsKey }
+    static var codexKey:  String { ProviderKind.codex.descriptor.notchEnabledDefaultsKey }
+    static var geminiKey: String { ProviderKind.gemini.descriptor.notchEnabledDefaultsKey }
     static let screenSelectionKey = "notch.screen.selection"
     static let mainScreenSelection = "main"
     /// Master switch for keyboard-driven notch interaction: island hotkey
@@ -35,7 +35,7 @@ enum NotchPreferences {
 
     /// Reads the master switch for a provider. Default is on.
     static func isEnabled(_ kind: ProviderKind) -> Bool {
-        isEnabled(defaultsKey: kind.notchEnabledDefaultsKey)
+        isEnabled(defaultsKey: kind.descriptor.notchEnabledDefaultsKey)
     }
 
     /// Plugin-aware variant: any descriptor (builtin or
@@ -55,7 +55,7 @@ enum NotchPreferences {
     /// Flips the master switch for a provider and posts `stateChangedNotification`
     /// so the AppDelegate can reconcile the island stack.
     static func setEnabled(_ enabled: Bool, for kind: ProviderKind) {
-        UserDefaults.standard.set(enabled, forKey: kind.notchEnabledDefaultsKey)
+        UserDefaults.standard.set(enabled, forKey: kind.descriptor.notchEnabledDefaultsKey)
         NotificationCenter.default.post(name: stateChangedNotification, object: nil)
     }
 
@@ -91,7 +91,7 @@ enum NotchPreferences {
         // Only populate keys the user hasn't explicitly set, so a second
         // migration pass never clobbers a deliberate flip.
         for kind in ProviderKind.allCases {
-            let key = kind.notchEnabledDefaultsKey
+            let key = kind.descriptor.notchEnabledDefaultsKey
             if d.object(forKey: key) == nil {
                 d.set(legacyOn, forKey: key)
             }

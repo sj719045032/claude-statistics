@@ -314,7 +314,7 @@ private struct MenuBarUsageCell: View {
 
     var body: some View {
         HStack(spacing: 5) {
-            Image(kind.statusIconAssetName)
+            Image(kind.descriptor.iconAssetName)
                 .resizable()
                 .renderingMode(.template)
                 .aspectRatio(contentMode: .fit)
@@ -331,7 +331,7 @@ private struct MenuBarUsageCell: View {
             .minimumScaleFactor(0.7)
         }
         .frame(width: Self.cellWidth, alignment: .leading)
-        .help(kind.displayName)
+        .help(kind.descriptor.displayName)
     }
 
     private var segments: [MenuBarStripSegment] {

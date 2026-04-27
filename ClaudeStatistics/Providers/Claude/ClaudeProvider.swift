@@ -6,7 +6,7 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
 
     let kind: ProviderKind = .claude
     var providerId: String { kind.rawValue }
-    let displayName = ProviderKind.claude.displayName
+    let displayName = ProviderKind.claude.descriptor.displayName
     let capabilities = ProviderCapabilities.claude
     let usageSource: (any ProviderUsageSource)? = UsageAPIService.shared
     let configDirectory = (NSHomeDirectory() as NSString).appendingPathComponent(".claude")

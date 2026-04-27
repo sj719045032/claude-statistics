@@ -311,7 +311,7 @@ struct ActiveSession: Identifiable, Equatable {
         case .waiting: return Color(red: 0.98, green: 0.72, blue: 0.20)   // amber
         case .done:    return Color(red: 0.42, green: 0.70, blue: 1.00)   // blue
         case .failed:  return Color(red: 0.95, green: 0.35, blue: 0.35)   // red
-        case .idle:    return provider.badgeColor.opacity(0.5)
+        case .idle:    return provider.descriptor.badgeColor.opacity(0.5)
         }
     }
 

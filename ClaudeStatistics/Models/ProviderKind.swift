@@ -2,6 +2,11 @@ import Foundation
 import SwiftUI
 import ClaudeStatisticsKit
 
+/// Closed enum left over as a thin namespace for the three builtin
+/// provider ids. All real provider behaviour now lives in
+/// `ProviderDescriptor`; callers go through `kind.descriptor.<field>`.
+/// Removing this enum entirely is a separate, larger surgery; this file
+/// no longer hosts any per-case dispatch beyond the descriptor lookup.
 enum ProviderKind: String, CaseIterable, Identifiable, Codable {
     case claude
     case codex
@@ -9,56 +14,15 @@ enum ProviderKind: String, CaseIterable, Identifiable, Codable {
 
     var id: String { rawValue }
 
-    /// The descriptor for this kind. Stage-1A introduces this as the new
-    /// single source of truth; the legacy property accessors below now
-    /// forward to it. Stage 1D migrates all `switch self` consumers to
-    /// read `descriptor.<field>` directly and the legacy accessors will
-    /// be deprecated once those migrations land.
+    /// Builtin descriptor for this id. Plugin-contributed providers
+    /// reach descriptors through `PluginRegistry` / `ProviderRegistry`,
+    /// not through this property.
     var descriptor: ProviderDescriptor {
         switch self {
         case .claude: return .claude
         case .codex:  return .codex
         case .gemini: return .gemini
         }
-    }
-
-    var displayName: String { descriptor.displayName }
-
-    /// UserDefaults key for this provider's notch master switch. Anchored on
-    /// the enum's rawValue so adding a new provider needs no central table
-    /// edit — each provider owns its own string.
-    var notchEnabledDefaultsKey: String { descriptor.notchEnabledDefaultsKey }
-
-    /// Asset name of the monochrome template icon used to represent this
-    /// provider in the menu bar strip. Template-rendered so the icon
-    /// inherits the status bar's tint across dark/light mode.
-    var statusIconAssetName: String { descriptor.iconAssetName }
-
-    /// Brand accent color — used as a subtle tint for the provider icon
-    /// when not inheriting the status bar's template color.
-    var accentColor: Color { descriptor.accentColor }
-}
-
-extension ProviderKind {
-    /// Lower-cased canonical tool name for this provider's raw tool name —
-    /// `Edit` / `apply_patch` / `replace` all collapse to `"edit"`, `Read` /
-    /// `read_file` collapse to `"read"`, etc. The alias tables live in each
-    /// provider's own file (`ClaudeToolNames` / `CodexToolNames` /
-    /// `GeminiToolNames`) and are exposed through `ProviderDescriptor
-    /// .resolveToolAlias` so adding a new provider does not touch this
-    /// shared code. Unknown names pass through as lower-cased.
-    func canonicalToolName(_ raw: String?) -> String {
-        guard let raw else { return "" }
-        let normalized = raw
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-            .replacingOccurrences(of: "-", with: "_")
-            .replacingOccurrences(of: " ", with: "_")
-        guard !normalized.isEmpty else { return "" }
-        if let mapped = descriptor.resolveToolAlias(normalized) {
-            return mapped
-        }
-        return normalized
     }
 }
 

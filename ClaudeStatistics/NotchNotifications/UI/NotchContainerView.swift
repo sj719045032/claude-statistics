@@ -1371,7 +1371,7 @@ struct NotchContainerView: View {
     private func compactContent(for event: AttentionEvent) -> some View {
         HStack(spacing: 8) {
             Circle()
-                .fill(event.provider.badgeColor)
+                .fill(event.provider.descriptor.badgeColor)
                 .frame(width: 7, height: 7)
             Text(compactSummary(for: event))
                 .font(.system(size: 11, weight: .medium))
@@ -1395,15 +1395,15 @@ struct NotchContainerView: View {
         case .permissionRequest(let tool, _, _, _):
             return String(format: LanguageManager.localizedString("notch.compact.permission"), tool)
         case .waitingInput:
-            return String(format: LanguageManager.localizedString("notch.compact.waiting"), event.provider.displayName)
+            return String(format: LanguageManager.localizedString("notch.compact.waiting"), event.provider.descriptor.displayName)
         case .taskDone:
             return LanguageManager.localizedString("notch.compact.done")
         case .taskFailed:
             return LanguageManager.localizedString("notch.compact.failed")
         case .sessionStart:
-            return String(format: LanguageManager.localizedString("notch.compact.sessionStart"), event.provider.displayName)
+            return String(format: LanguageManager.localizedString("notch.compact.sessionStart"), event.provider.descriptor.displayName)
         case .activityPulse, .sessionEnd:
-            return event.provider.displayName
+            return event.provider.descriptor.displayName
         }
     }
 

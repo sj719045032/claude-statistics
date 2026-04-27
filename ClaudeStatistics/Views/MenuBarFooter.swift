@@ -55,7 +55,7 @@ struct ProviderSwitcherButton: View {
 
     var body: some View {
         Button(action: onTap) {
-            Text(kind.displayName)
+            Text(kind.descriptor.displayName)
                 .font(.system(size: 10 * fontScale, weight: isCurrent ? .semibold : .regular))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 2.5)
@@ -65,6 +65,6 @@ struct ProviderSwitcherButton: View {
         }
         .buttonStyle(.plain)
         .disabled(!isInstalled)
-        .help(isInstalled ? kind.displayName : "\(kind.displayName) not installed")
+        .help(isInstalled ? kind.descriptor.displayName : "\(kind.descriptor.displayName) not installed")
     }
 }

@@ -193,7 +193,7 @@ struct ProviderSessionDisplayFormatter {
             return (
                 String(
                     format: LanguageManager.localizedString("notch.compact.permission"),
-                    DisplayTextClassifier.prettyToolName(session.approvalToolName ?? session.provider.displayName)
+                    DisplayTextClassifier.prettyToolName(session.approvalToolName ?? session.provider.descriptor.displayName)
                 ),
                 "lock.fill"
             )

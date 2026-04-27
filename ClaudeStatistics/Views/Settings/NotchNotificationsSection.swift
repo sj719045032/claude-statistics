@@ -31,7 +31,7 @@ struct NotchNotificationsSection: View {
         String(
             format: LanguageManager.localizedString("notch.settings.title.provider"),
             locale: LanguageManager.currentLocale,
-            provider.displayName
+            provider.descriptor.displayName
         )
     }
 
@@ -112,7 +112,7 @@ struct NotchNotificationsDetailView: View {
         String(
             format: LanguageManager.localizedString("notch.settings.title.provider"),
             locale: LanguageManager.currentLocale,
-            provider.displayName
+            provider.descriptor.displayName
         )
     }
 

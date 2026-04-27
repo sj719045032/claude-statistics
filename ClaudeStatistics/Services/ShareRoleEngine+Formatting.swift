@@ -90,10 +90,10 @@ extension ShareRoleEngine {
 
     static func providerSummary(for metrics: ShareMetrics) -> String {
         if metrics.providerCount <= 1 {
-            return metrics.dominantProvider?.displayName ?? localized("share.provider.unknown")
+            return metrics.dominantProvider?.descriptor.displayName ?? localized("share.provider.unknown")
         }
         let labels = metrics.providerKinds
-            .map(\.displayName)
+            .map { $0.descriptor.displayName }
             .sorted()
         return labels.joined(separator: " + ")
     }

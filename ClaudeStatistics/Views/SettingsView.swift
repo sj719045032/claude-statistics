@@ -370,13 +370,13 @@ struct SettingsView: View {
                         )
                     )
                     .frame(width: 36, height: 36)
-                Text(String(provider.kind.displayName.prefix(1)))
+                Text(String(provider.kind.descriptor.displayName.prefix(1)))
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.blue)
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(provider.kind.displayName)
+                Text(provider.kind.descriptor.displayName)
                     .font(.system(size: 13, weight: .medium))
                 Text(provider.capabilities.supportsUsage ? "Local session parsing and usage snapshots" : "Local session parsing only")
                     .font(.system(size: 11))
@@ -1063,9 +1063,9 @@ private struct DeveloperSettingsView: View {
                         SettingsRowButton(action: { pendingRebuildProvider = kind }) {
                             HStack(spacing: 8) {
                                 SettingsRowIcon(name: "arrow.triangle.2.circlepath")
-                                    .foregroundStyle(kind.accentColor)
+                                    .foregroundStyle(kind.descriptor.accentColor)
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(String(format: LanguageManager.localizedString("settings.developer.rebuildProviderIndex"), kind.displayName))
+                                    Text(String(format: LanguageManager.localizedString("settings.developer.rebuildProviderIndex"), kind.descriptor.displayName))
                                         .font(.system(size: 12, weight: .medium))
                                     Text("settings.developer.rebuildProviderIndexHint")
                                         .font(.system(size: 11))
@@ -1095,7 +1095,7 @@ private struct DeveloperSettingsView: View {
         ) {
             if let pendingRebuildProvider {
                 Button(
-                    String(format: LanguageManager.localizedString("settings.developer.rebuildConfirmButton"), pendingRebuildProvider.displayName),
+                    String(format: LanguageManager.localizedString("settings.developer.rebuildConfirmButton"), pendingRebuildProvider.descriptor.displayName),
                     role: .destructive
                 ) {
                     rebuild(provider: pendingRebuildProvider)
@@ -1106,14 +1106,14 @@ private struct DeveloperSettingsView: View {
             }
         } message: {
             if let pendingRebuildProvider {
-                Text(String(format: LanguageManager.localizedString("settings.developer.rebuildConfirmMessage"), pendingRebuildProvider.displayName))
+                Text(String(format: LanguageManager.localizedString("settings.developer.rebuildConfirmMessage"), pendingRebuildProvider.descriptor.displayName))
             }
         }
     }
 
     private func rebuild(provider: ProviderKind) {
         appState.rebuildSessionCache(for: provider)
-        statusMessage = String(format: LanguageManager.localizedString("settings.developer.rebuildStarted"), provider.displayName)
+        statusMessage = String(format: LanguageManager.localizedString("settings.developer.rebuildStarted"), provider.descriptor.displayName)
         pendingRebuildProvider = nil
     }
 

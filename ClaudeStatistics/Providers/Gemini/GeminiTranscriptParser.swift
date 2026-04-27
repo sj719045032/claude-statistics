@@ -466,7 +466,7 @@ final class GeminiTranscriptParser {
     }
 
     private func normalizedToolName(_ toolCall: GeminiToolCall) -> String {
-        let canonical = ProviderKind.gemini.canonicalToolName(toolCall.name)
+        let canonical = ProviderKind.gemini.descriptor.canonicalToolName(toolCall.name)
         // Keep Gemini's own displayName when the alias table didn't match —
         // `displayName(for:)` would otherwise title-case an unknown key.
         if canonical.isEmpty || canonical == toolCall.name.lowercased() {

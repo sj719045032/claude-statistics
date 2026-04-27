@@ -163,15 +163,15 @@ struct WaitingInputCard: View {
             return String(format: LanguageManager.localizedString(key), tool)
         case .waitingInput(let msg):
             if let msg, !msg.isEmpty { return msg }
-            return String(format: LanguageManager.localizedString("notch.waiting.title"), event.provider.displayName)
+            return String(format: LanguageManager.localizedString("notch.waiting.title"), event.provider.descriptor.displayName)
         case .taskDone:
             return LanguageManager.localizedString("notch.done.title")
         case .taskFailed(let summary):
             return summary ?? LanguageManager.localizedString("notch.failed.title")
         case .sessionStart:
-            return String(format: LanguageManager.localizedString("notch.sessionStart.title"), event.provider.displayName)
+            return String(format: LanguageManager.localizedString("notch.sessionStart.title"), event.provider.descriptor.displayName)
         case .activityPulse, .sessionEnd:
-            return event.provider.displayName
+            return event.provider.descriptor.displayName
         }
     }
 
@@ -335,9 +335,9 @@ struct CardHeader: View {
     var body: some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(event.provider.badgeColor)
+                .fill(event.provider.descriptor.badgeColor)
                 .frame(width: 8, height: 8)
-            Text(event.provider.displayName)
+            Text(event.provider.descriptor.displayName)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.white.opacity(0.55))
             Spacer()

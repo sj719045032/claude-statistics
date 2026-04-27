@@ -6,7 +6,7 @@ final class GeminiProvider: SessionProvider, @unchecked Sendable {
 
     let kind: ProviderKind = .gemini
     var providerId: String { kind.rawValue }
-    let displayName = ProviderKind.gemini.displayName
+    let displayName = ProviderKind.gemini.descriptor.displayName
     let capabilities = ProviderCapabilities.gemini
     let usageSource: (any ProviderUsageSource)? = GeminiUsageService.shared
     let configDirectory = (NSHomeDirectory() as NSString).appendingPathComponent(".gemini")

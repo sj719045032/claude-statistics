@@ -542,7 +542,7 @@ final class CodexTranscriptParser {
     }
 
     private func normalizedToolName(_ rawName: String) -> String {
-        let canonical = ProviderKind.codex.canonicalToolName(rawName)
+        let canonical = ProviderKind.codex.descriptor.canonicalToolName(rawName)
         let pretty = CanonicalToolName.displayName(for: canonical)
         // `displayName(for:)` title-cases unknown canonicals, which would turn
         // a pass-through name like `view_image` into `View_image`. Keep the

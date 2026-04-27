@@ -6,7 +6,7 @@ final class CodexProvider: SessionProvider, @unchecked Sendable {
 
     let kind: ProviderKind = .codex
     var providerId: String { kind.rawValue }
-    let displayName = ProviderKind.codex.displayName
+    let displayName = ProviderKind.codex.descriptor.displayName
     let capabilities = ProviderCapabilities.codex
     let usageSource: (any ProviderUsageSource)? = CodexUsageService.shared
     let configDirectory = (NSHomeDirectory() as NSString).appendingPathComponent(".codex")

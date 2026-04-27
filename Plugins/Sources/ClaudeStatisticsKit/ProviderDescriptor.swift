@@ -126,4 +126,24 @@ public struct ProviderDescriptor: Sendable {
     public func canonicalSessionID(_ sessionId: String) -> String {
         canonicalizeSessionID?(sessionId) ?? sessionId
     }
+
+    /// Lower-cased canonical tool name for this provider's raw tool name.
+    /// `Edit` / `apply_patch` / `replace` collapse to `"edit"`, `Read` /
+    /// `read_file` collapse to `"read"`, etc. The alias table comes from
+    /// `resolveToolAlias`, so adding a provider plugin contributes its
+    /// tool vocabulary without editing any shared switch. Unknown names
+    /// pass through as lower-cased; nil/empty returns empty string.
+    public func canonicalToolName(_ raw: String?) -> String {
+        guard let raw else { return "" }
+        let normalized = raw
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "-", with: "_")
+            .replacingOccurrences(of: " ", with: "_")
+        guard !normalized.isEmpty else { return "" }
+        if let mapped = resolveToolAlias(normalized) {
+            return mapped
+        }
+        return normalized
+    }
 }
