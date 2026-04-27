@@ -99,22 +99,19 @@ enum ProviderRegistry {
         supportedProviders.filter { provider(for: $0).isInstalled }
     }
 
-    /// Plugin-aware variant: also drops builtins whose `ProviderPlugin`
-    /// has been disabled or uninstalled (no longer in
-    /// `plugins.providers`). Callers with a `PluginRegistry` in scope
-    /// — every UI surface, the startup bootstrap, the notch
-    /// reconciliation — should prefer this signature so a
-    /// kill-switched provider really disappears from the host.
+    /// Plugin-aware variant: pulls every currently-enabled provider out
+    /// of `allKnownDescriptors(plugins:)` (so disabled builtins drop
+    /// out and third-party `ProviderPlugin` ids are included), then
+    /// filters by each provider's own `isInstalled` check. Callers with
+    /// a `PluginRegistry` in scope — every UI surface, the startup
+    /// bootstrap, the notch reconciliation — should prefer this
+    /// signature so a kill-switched provider really disappears from
+    /// the host and a hot-loaded plugin one shows up automatically.
     @MainActor
     static func availableProviders(plugins: PluginRegistry?) -> [ProviderKind] {
-        supportedProviders.filter { kind in
-            guard provider(for: kind).isInstalled else { return false }
-            guard let plugins else { return true }
-            let descriptorId = kind.descriptor.id
-            return plugins.providers.values.contains { plugin in
-                guard let providerPlugin = plugin as? any ProviderPlugin else { return false }
-                return providerPlugin.descriptor.id == descriptorId
-            }
+        allKnownDescriptors(plugins: plugins).compactMap { descriptor -> ProviderKind? in
+            guard let kind = ProviderKind(rawValue: descriptor.id) else { return nil }
+            return provider(for: kind).isInstalled ? kind : nil
         }
     }
 

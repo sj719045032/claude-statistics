@@ -327,9 +327,9 @@ final class AppState: ObservableObject {
         let selectedKind = ProviderRegistry.selectedProviderKind()
         providerKind = selectedKind
         let availableKinds = Set(ProviderRegistry.availableProviders(plugins: pluginRegistry))
-        let startupKinds = ProviderRegistry.supportedProviders.filter { kind in
-            availableKinds.contains(kind) || kind == selectedKind
-        }
+        let startupKinds = ProviderRegistry.allKnownDescriptors(plugins: pluginRegistry)
+            .compactMap { ProviderKind(rawValue: $0.id) }
+            .filter { availableKinds.contains($0) || $0 == selectedKind }
 
         let tracker = ActiveSessionsTracker()
         self.activeSessionsTracker = tracker
@@ -755,9 +755,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let enabledProviders = Set(availableKinds.filter {
             NotchPreferences.isEnabled($0)
         })
-        let disabledProviders = ProviderRegistry.supportedProviders.filter {
-            !enabledProviders.contains($0)
-        }
+        let disabledProviders = ProviderRegistry.allKnownDescriptors(plugins: appState.pluginRegistry)
+            .compactMap { ProviderKind(rawValue: $0.id) }
+            .filter { !enabledProviders.contains($0) }
         let providersToRestore = lastEnabledNotchProviders.map {
             Array(enabledProviders.subtracting($0))
         } ?? Array(enabledProviders)

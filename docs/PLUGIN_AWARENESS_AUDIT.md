@@ -84,9 +84,9 @@
 
 | file:line | 描述 |
 |---|---|
-| `ClaudeStatistics/App/ClaudeStatisticsApp.swift:15` | 状态行安装器刷新 `for kind in ProviderRegistry.supportedProviders` |
-| `ClaudeStatistics/App/ClaudeStatisticsApp.swift:195` | bootstrap 启动 `startupKinds = supportedProviders.filter` |
-| `ClaudeStatistics/App/ClaudeStatisticsApp.swift:608-612` | `applyNotchProviderPreferences` 两次过滤 `supportedProviders` |
+| ~~`ClaudeStatistics/App/ClaudeStatisticsApp.swift:15`~~ | ~~状态行安装器刷新~~ → 早已走 `availableProviders(plugins:)`（plugin-aware after this commit） |
+| ~~`ClaudeStatistics/App/ClaudeStatisticsApp.swift:330`~~ | ~~bootstrap 启动 `startupKinds = supportedProviders.filter`~~ → 走 `allKnownDescriptors(plugins:)`（2026-04-27）|
+| ~~`ClaudeStatistics/App/ClaudeStatisticsApp.swift:758`~~ | ~~`applyNotchProviderPreferences` 过滤 `supportedProviders`~~ → 走 `allKnownDescriptors(plugins:)`（2026-04-27）|
 | `ClaudeStatistics/Models/Session.swift:38-40` | 内置 model pricing 表 `supportedProviders.reduce` |
 | `ClaudeStatistics/NotchNotifications/Hooks/CodexHookInstaller.swift:299-301` | `ProviderKind.allCases.compactMap` 收集 hook 安装器 |
 | `ClaudeStatistics/Models/ProviderKind.swift:72` | 工具名规范化 `ProviderKind.allCases.map(\.descriptor)` |
