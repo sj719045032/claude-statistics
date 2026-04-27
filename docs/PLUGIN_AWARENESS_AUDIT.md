@@ -109,15 +109,17 @@ CRITICAL 4（含 1 项已纠正为非缺陷）/ SCHEMA 7 / ROUTING 16 / STARTUP 
 
 ### 4.1 CRITICAL — 8 个 builtin 之外的 TerminalPlugin 完全看不到
 
-| file:line | 描述 |
-|---|---|
-| `ClaudeStatistics/Terminal/TerminalRegistry.swift:5-14` | `appCapabilities` 字面量 8 个 capability，整个 Registry 派生于此 |
-| `ClaudeStatistics/Terminal/TerminalRegistry.swift:38-46` | `externalCapabilities` 字面量含 Hyper 一项 |
-| `ClaudeStatistics/Terminal/TerminalRegistry.swift:52-62` | `launchOptions` 仅来自 `appCapabilities` |
-| `ClaudeStatistics/Terminal/TerminalRegistry.swift:64-80` | `readinessOptions` 仅来自 `appCapabilities`（Default Terminal Picker 数据源） |
-| `ClaudeStatistics/Terminal/TerminalRegistry.swift:82-84` | `setupProviders` 同上 |
-| `ClaudeStatistics/Terminal/TerminalRegistry.swift:86-88` | `launchingProviders` 同上 |
-| `ClaudeStatistics/Views/SettingsView.swift:611` | Default Terminal Picker `ForEach(TerminalRegistry.readinessOptions)` |
+> **已落地**（pre-2026-04-27）：`TerminalRegistry` 引入 `pluginCapabilitiesStore`（`PluginBackedTerminalCapability` 适配器），`enabledSelectableCapabilities(forProvider:)` 合并 builtin + plugin + 过滤 disabled ids；`launchOptions / readinessOptions / setupProviders / launchingProviders / capabilities` 全部派生自这个统一入口。下表中的字面量数组仍是 builtin baseline，但 plugin 终端通过 `setPluginCapabilities(_:)` 由 AppState 注入后即等价进入所有用户可见路径。
+
+| file:line | 描述 | 状态 |
+|---|---|---|
+| `TerminalRegistry.swift:5-14` | `appCapabilities` 字面量 8 个 builtin | by design (builtin baseline) |
+| `TerminalRegistry.swift:38-46` | `externalCapabilities` Hyper 一项 | by design |
+| ~~`TerminalRegistry.swift:52-62`~~ | ~~`launchOptions` 仅 builtin~~ | → `enabledSelectableCapabilities(forProvider:)` |
+| ~~`TerminalRegistry.swift:64-80`~~ | ~~`readinessOptions` 仅 builtin~~ | → 同上 |
+| ~~`TerminalRegistry.swift:82-84`~~ | ~~`setupProviders` 同上~~ | → 同上 |
+| ~~`TerminalRegistry.swift:86-88`~~ | ~~`launchingProviders` 同上~~ | → 同上 |
+| ~~`SettingsView.swift:611` Picker~~ | ~~`ForEach(TerminalRegistry.readinessOptions)`~~ | → `readinessOptions(forProvider: appState.providerKind.descriptor.id)` |
 
 ### 4.2 ROUTING — bundleId 字面量分支 / 无 default
 
