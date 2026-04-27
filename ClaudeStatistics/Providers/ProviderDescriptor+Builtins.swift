@@ -41,7 +41,8 @@ extension ProviderDescriptor {
         notchEnabledDefaultsKey: "notch.enabled.codex",
         capabilities: .codex,
         resolveToolAlias: { CodexToolNames.canonical($0) },
-        postStopExitGrace: 0.25
+        postStopExitGrace: 0.25,
+        syncsTranscriptToActiveSessions: true
     )
 
     static let gemini = ProviderDescriptor(

@@ -65,8 +65,8 @@
 | `ClaudeStatistics/Models/ProviderKind.swift:18-22` | `descriptor` 三 case switch，无 default |
 | `ClaudeStatistics/Models/ProviderKind.swift:50-62` | `canonicalToolName(_:)` 走 switch 而不是 `descriptor.resolveToolAlias` |
 | `ClaudeStatistics/Providers/ProviderRegistry.swift:57-68` | `provider(for:)` 走 dynamic 优先 + 三 case fallback；新 enum case 必须改 switch |
-| `ClaudeStatistics/App/AccountManagers.swift:17-25` | `switch kind` 三 case 无 default，新 case 编译错 |
-| `ClaudeStatistics/App/ProviderContextRegistry.swift:103` | `guard kind == .codex else` 仅 Codex 走特殊 runtime bridge |
+| `ClaudeStatistics/App/AccountManagers.swift:17-25` | `switch kind` 三 case 无 default，新 case 编译错（已半解决：`reload(for:)` 走 descriptor.id-keyed dict；剩 4 个 hard-typed 属性待后续）|
+| ~~`ClaudeStatistics/App/ProviderContextRegistry.swift:103`~~ | ~~`guard kind == .codex else` 仅 Codex 走特殊 runtime bridge~~ → 走 `descriptor.syncsTranscriptToActiveSessions` (2026-04-27) |
 | `ClaudeStatistics/HookCLI/HookCLI.swift:57-64` | CLI hook dispatcher `switch provider` 三 case |
 | `ClaudeStatistics/Utilities/DisplayTextClassifier.swift:11-16` | display mode 工厂 switch 三 case |
 | `ClaudeStatistics/Utilities/DisplayTextClassifier.swift:47-52` | mode 进一步细分时再次分组 switch |
@@ -349,15 +349,26 @@ Chat-app launchers
 
 - Claude session 数据回查 fallback（`ActiveSessionsTracker.swift:763` `ProviderKind(rawValue:) ?? .claude`）— 需要 string-based id 流上线后整改，留待后续。
 
-### 明天起点：P1 第二刀
+### 2026-04-27 (P1 第三刀：Codex transcript runtime bridge)
 
-**未碰过的 P1 项**（都还在 §3.3 表里）：
+**已完成**：
 
-- `AccountManagers.swift:17-25` switch — 候选 capability：`descriptor.makeAccountManager()`
-- `ProviderContextRegistry.swift:103` `guard kind == .codex else` — Codex-specific runtime bridge
-- `HookCLI.swift:57-64` 三 case switch
-- `DisplayTextClassifier` / `ToolActivityFormatter` / `ProviderSessionDisplayFormatter` 内部分组 switch
-- `WireEventTranslator.swift:67-73` `default → .claude` 兜底（短期评估为低收益，暂缓）
+- ✅ `ProviderDescriptor.syncsTranscriptToActiveSessions: Bool`（默认 false）。Codex builtin 设 `true`。
+- ✅ `ProviderContextRegistry.bindRuntimeBridge` 改 `guard kind.descriptor.syncsTranscriptToActiveSessions else { ... }`，注释更新到描述行为而非 provider。第三方 ProviderPlugin 若也是 transcript-only 信号源，可单字段开启相同 bridge。
+- ✅ `import ClaudeStatisticsKit` 加到 `ProviderContextRegistry.swift`（之前没用 SDK 类型）。
+- ✅ 820 测试全部通过；run-debug.sh 启动正常。
+
+**HookCLI 三 case switch 暂不动**：
+- `HookCLI.swift:57-64` 在 subprocess 跑（CLI 工具），不参与 plugin loading，`REWRITE_PLAN.md §16.4` 已说明"host-internal `switch case .claude/.codex/.gemini` 在 HookCLI 是合适的内部抽象"，保留。
+
+### 明天起点：P1 第四刀
+
+**未碰过的 P1 项**：
+
+- `AccountManagers.swift` 的 4 个 hard-typed 属性（`claude` / `independentClaude` / `codex` / `gemini`）—— `reload(for:)` 已 plugin-aware；Settings accessories 直接 reach 这 4 个属性。需要把 Settings 端依赖改走 dict 或 SDK 协议后才能拆。
+- `ProviderContextRegistry.runtimeBridgeCancellables` 仍是 `[ProviderKind: AnyCancellable]`（dict key 是 enum）—— 第三方 plugin 暂时还没法走这个 bridge；需把 dict 改成 `[String: AnyCancellable]` 按 descriptor.id 索引。
+- `DisplayTextClassifier` / `ToolActivityFormatter` / `ProviderSessionDisplayFormatter` 内部分组 switch（每个都涉及多个 helper，需要逐个评估）。
+- `WireEventTranslator.swift:67-73` `default → .claude` 兜底（短期评估为低收益，暂缓）。
 
 ---
 

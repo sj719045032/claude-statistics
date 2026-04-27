@@ -1,3 +1,4 @@
+import ClaudeStatisticsKit
 import Combine
 import Foundation
 
@@ -91,16 +92,18 @@ final class ProviderContextRegistry {
         }
     }
 
-    // MARK: Runtime bridge (Codex transcript → ActiveSessionsTracker)
+    // MARK: Runtime bridge (transcript → ActiveSessionsTracker)
 
-    /// Codex needs transcript signals (sessions/quickStats/parsedStats)
-    /// piped into the active-sessions tracker so the notch's idle-peek
-    /// row reflects in-flight tool activity. Other providers get this
-    /// info through hooks directly, so there's no bridge for them.
+    /// Providers that don't deliver in-flight activity through hooks
+    /// (`descriptor.syncsTranscriptToActiveSessions == true`, e.g. Codex)
+    /// need transcript signals (sessions/quickStats/parsedStats) piped
+    /// into the active-sessions tracker so the notch's idle-peek row
+    /// reflects current tool activity. Other providers get this info
+    /// through hooks directly, so there's no bridge for them.
     private func bindRuntimeBridge(for kind: ProviderKind, store: SessionDataStore) {
         runtimeBridgeCancellables[kind]?.cancel()
 
-        guard kind == .codex else {
+        guard kind.descriptor.syncsTranscriptToActiveSessions else {
             runtimeBridgeCancellables[kind] = nil
             return
         }

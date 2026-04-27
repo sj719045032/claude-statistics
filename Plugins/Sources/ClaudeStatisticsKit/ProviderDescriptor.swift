@@ -59,6 +59,13 @@ public struct ProviderDescriptor: Sendable {
     /// clean exit instead of waiting for the next 2 s liveness poll.
     /// `nil` opts out (the default).
     public let postStopExitGrace: TimeInterval?
+    /// Set to `true` for providers that don't deliver in-flight tool
+    /// activity through hooks and therefore need transcript-derived
+    /// signals piped back into the active-sessions tracker so the notch
+    /// reflects current activity. Codex is the only builtin that turns
+    /// this on. `false` means the provider already feeds the tracker
+    /// directly through hooks.
+    public let syncsTranscriptToActiveSessions: Bool
 
     public init(
         id: String,
@@ -78,7 +85,8 @@ public struct ProviderDescriptor: Sendable {
         ),
         resolveToolAlias: @escaping @Sendable (String) -> String?,
         canonicalizeSessionID: (@Sendable (String) -> String)? = nil,
-        postStopExitGrace: TimeInterval? = nil
+        postStopExitGrace: TimeInterval? = nil,
+        syncsTranscriptToActiveSessions: Bool = false
     ) {
         self.id = id
         self.displayName = displayName
@@ -90,6 +98,7 @@ public struct ProviderDescriptor: Sendable {
         self.resolveToolAlias = resolveToolAlias
         self.canonicalizeSessionID = canonicalizeSessionID
         self.postStopExitGrace = postStopExitGrace
+        self.syncsTranscriptToActiveSessions = syncsTranscriptToActiveSessions
     }
 
     /// Returns the canonical session id for this provider. Falls back to
