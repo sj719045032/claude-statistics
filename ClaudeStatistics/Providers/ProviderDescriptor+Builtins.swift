@@ -29,7 +29,8 @@ extension ProviderDescriptor {
                 return sessionId
             }
             return rawID
-        }
+        },
+        notchProcessingHintKey: "notch.operation.thinking"
     )
 
     static let codex = ProviderDescriptor(
@@ -42,7 +43,8 @@ extension ProviderDescriptor {
         capabilities: .codex,
         resolveToolAlias: { CodexToolNames.canonical($0) },
         postStopExitGrace: 0.25,
-        syncsTranscriptToActiveSessions: true
+        syncsTranscriptToActiveSessions: true,
+        commandFilteredNotchPreview: true
     )
 
     static let gemini = ProviderDescriptor(
@@ -53,6 +55,8 @@ extension ProviderDescriptor {
         badgeColor: Color(red: 0.27, green: 0.51, blue: 0.96),
         notchEnabledDefaultsKey: "notch.enabled.gemini",
         capabilities: .gemini,
-        resolveToolAlias: { GeminiToolNames.canonical($0) }
+        resolveToolAlias: { GeminiToolNames.canonical($0) },
+        commandFilteredNotchPreview: true,
+        notchNoisePrefixes: ["process group pgid:", "background pids:"]
     )
 }

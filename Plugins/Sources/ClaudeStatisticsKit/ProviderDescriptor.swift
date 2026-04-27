@@ -66,6 +66,20 @@ public struct ProviderDescriptor: Sendable {
     /// this on. `false` means the provider already feeds the tracker
     /// directly through hooks.
     public let syncsTranscriptToActiveSessions: Bool
+    /// When true the notch's preview row strips command-line/tool prefix
+    /// noise from the latest assistant snippet (Codex / Gemini emit raw
+    /// shell wrappers). Claude leaves the preview untouched.
+    public let commandFilteredNotchPreview: Bool
+    /// Lowercased prefixes whose presence in a hook-payload string
+    /// signals shell metadata that should be hidden from the notch
+    /// triptych. Gemini emits "process group pgid:" / "background pids:"
+    /// banners; other providers contribute nothing here.
+    public let notchNoisePrefixes: [String]
+    /// Localization key for the notch's static "still working" hint
+    /// shown when no operation text is available. Claude uses
+    /// `"notch.operation.thinking"`; Codex / Gemini use the more
+    /// neutral `"notch.operation.working"` (the default).
+    public let notchProcessingHintKey: String
 
     public init(
         id: String,
@@ -86,7 +100,10 @@ public struct ProviderDescriptor: Sendable {
         resolveToolAlias: @escaping @Sendable (String) -> String?,
         canonicalizeSessionID: (@Sendable (String) -> String)? = nil,
         postStopExitGrace: TimeInterval? = nil,
-        syncsTranscriptToActiveSessions: Bool = false
+        syncsTranscriptToActiveSessions: Bool = false,
+        commandFilteredNotchPreview: Bool = false,
+        notchNoisePrefixes: [String] = [],
+        notchProcessingHintKey: String = "notch.operation.working"
     ) {
         self.id = id
         self.displayName = displayName
@@ -99,6 +116,9 @@ public struct ProviderDescriptor: Sendable {
         self.canonicalizeSessionID = canonicalizeSessionID
         self.postStopExitGrace = postStopExitGrace
         self.syncsTranscriptToActiveSessions = syncsTranscriptToActiveSessions
+        self.commandFilteredNotchPreview = commandFilteredNotchPreview
+        self.notchNoisePrefixes = notchNoisePrefixes
+        self.notchProcessingHintKey = notchProcessingHintKey
     }
 
     /// Returns the canonical session id for this provider. Falls back to

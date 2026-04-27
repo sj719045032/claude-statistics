@@ -12,12 +12,10 @@ extension ProviderSessionDisplayFormatter {
     }
 
     var latestPreviewCandidate: (text: String?, symbol: String) {
-        switch displayMode {
-        case .codex, .gemini:
-            return (commandFilteredPreviewLine, "sparkles")
-        case .claude:
-            return (session.previewLine, "sparkles")
-        }
+        let text = providerDescriptor.commandFilteredNotchPreview
+            ? commandFilteredPreviewLine
+            : session.previewLine
+        return (text, "sparkles")
     }
 
     var latestProgressNoteCandidate: (text: String?, symbol: String) {

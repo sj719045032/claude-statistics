@@ -5,41 +5,42 @@ import XCTest
 final class DisplayTextClassifierTests: XCTestCase {
     // MARK: - isNoiseValue
 
+    private static let geminiNoisePrefixes = ProviderKind.gemini.descriptor.notchNoisePrefixes
+
     func test_isNoiseValue_genericTokens() {
         for raw in ["true", "false", "null", "nil", "text", "---", "--", "...", "…", "TRUE", "  Null  "] {
             XCTAssertTrue(
-                DisplayTextClassifier.isNoiseValue(raw, mode: .claude),
+                DisplayTextClassifier.isNoiseValue(raw),
                 "expected '\(raw)' to be noise"
             )
         }
     }
 
     func test_isNoiseValue_pureSymbolsAreNoise() {
-        XCTAssertTrue(DisplayTextClassifier.isNoiseValue("***", mode: .claude))
-        XCTAssertTrue(DisplayTextClassifier.isNoiseValue("???", mode: .claude))
-        XCTAssertTrue(DisplayTextClassifier.isNoiseValue("====", mode: .claude))
+        XCTAssertTrue(DisplayTextClassifier.isNoiseValue("***"))
+        XCTAssertTrue(DisplayTextClassifier.isNoiseValue("???"))
+        XCTAssertTrue(DisplayTextClassifier.isNoiseValue("===="))
     }
 
     func test_isNoiseValue_realTextIsNotNoise() {
-        XCTAssertFalse(DisplayTextClassifier.isNoiseValue("hello world", mode: .claude))
-        XCTAssertFalse(DisplayTextClassifier.isNoiseValue("file.swift", mode: .claude))
+        XCTAssertFalse(DisplayTextClassifier.isNoiseValue("hello world"))
+        XCTAssertFalse(DisplayTextClassifier.isNoiseValue("file.swift"))
     }
 
     func test_isNoiseValue_jsonBlobAlwaysNoise() {
         let blob = #"{"foo": "bar", "baz": 42}"#
-        XCTAssertTrue(DisplayTextClassifier.isNoiseValue(blob, mode: .claude))
-        XCTAssertTrue(DisplayTextClassifier.isNoiseValue(blob, mode: .codex))
-        XCTAssertTrue(DisplayTextClassifier.isNoiseValue(blob, mode: .gemini))
+        XCTAssertTrue(DisplayTextClassifier.isNoiseValue(blob))
+        XCTAssertTrue(DisplayTextClassifier.isNoiseValue(blob, noisePrefixes: Self.geminiNoisePrefixes))
     }
 
     func test_isNoiseValue_geminiShellMetadataPrefixes() {
-        XCTAssertTrue(DisplayTextClassifier.isNoiseValue("Process group pgid: 12345", mode: .gemini))
-        XCTAssertTrue(DisplayTextClassifier.isNoiseValue("Background PIDs: 4321, 5678", mode: .gemini))
+        XCTAssertTrue(DisplayTextClassifier.isNoiseValue("Process group pgid: 12345", noisePrefixes: Self.geminiNoisePrefixes))
+        XCTAssertTrue(DisplayTextClassifier.isNoiseValue("Background PIDs: 4321, 5678", noisePrefixes: Self.geminiNoisePrefixes))
     }
 
     func test_isNoiseValue_geminiPrefixesAreFineForOtherModes() {
-        XCTAssertFalse(DisplayTextClassifier.isNoiseValue("Process group pgid: 1", mode: .claude))
-        XCTAssertFalse(DisplayTextClassifier.isNoiseValue("Background PIDs: 1", mode: .codex))
+        XCTAssertFalse(DisplayTextClassifier.isNoiseValue("Process group pgid: 1"))
+        XCTAssertFalse(DisplayTextClassifier.isNoiseValue("Background PIDs: 1"))
     }
 
     // MARK: - isJsonLikeBlob
@@ -334,11 +335,22 @@ final class DisplayTextClassifierTests: XCTestCase {
         XCTAssertFalse(DisplayTextClassifier.isCodeLikeSnippet("   "))
     }
 
-    // MARK: - ProviderSessionDisplayMode.forProvider
+    // MARK: - Provider notch capability defaults
 
-    func test_displayMode_mapsAllProviders() {
-        XCTAssertEqual(ProviderSessionDisplayMode.forProvider(.claude), .claude)
-        XCTAssertEqual(ProviderSessionDisplayMode.forProvider(.codex), .codex)
-        XCTAssertEqual(ProviderSessionDisplayMode.forProvider(.gemini), .gemini)
+    func test_providerDescriptor_carriesNotchCapabilities() {
+        XCTAssertFalse(ProviderKind.claude.descriptor.commandFilteredNotchPreview)
+        XCTAssertTrue(ProviderKind.codex.descriptor.commandFilteredNotchPreview)
+        XCTAssertTrue(ProviderKind.gemini.descriptor.commandFilteredNotchPreview)
+
+        XCTAssertEqual(ProviderKind.claude.descriptor.notchProcessingHintKey, "notch.operation.thinking")
+        XCTAssertEqual(ProviderKind.codex.descriptor.notchProcessingHintKey, "notch.operation.working")
+        XCTAssertEqual(ProviderKind.gemini.descriptor.notchProcessingHintKey, "notch.operation.working")
+
+        XCTAssertTrue(ProviderKind.claude.descriptor.notchNoisePrefixes.isEmpty)
+        XCTAssertTrue(ProviderKind.codex.descriptor.notchNoisePrefixes.isEmpty)
+        XCTAssertEqual(
+            Set(ProviderKind.gemini.descriptor.notchNoisePrefixes),
+            Set(["process group pgid:", "background pids:"])
+        )
     }
 }

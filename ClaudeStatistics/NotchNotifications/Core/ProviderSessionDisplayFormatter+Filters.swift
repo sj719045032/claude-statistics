@@ -39,7 +39,7 @@ extension ProviderSessionDisplayFormatter {
             .trimmingCharacters(in: .whitespacesAndNewlines),
               !text.isEmpty,
               !DisplayTextClassifier.isInternalMarkupValue(text),
-              !DisplayTextClassifier.isNoiseValue(text, mode: displayMode) else { return nil }
+              !DisplayTextClassifier.isNoiseValue(text, noisePrefixes: providerDescriptor.notchNoisePrefixes) else { return nil }
         return text
     }
 

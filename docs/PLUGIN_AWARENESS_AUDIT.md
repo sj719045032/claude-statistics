@@ -68,11 +68,11 @@
 | `ClaudeStatistics/App/AccountManagers.swift:17-25` | `switch kind` 三 case 无 default，新 case 编译错（已半解决：`reload(for:)` 走 descriptor.id-keyed dict；剩 4 个 hard-typed 属性待后续）|
 | ~~`ClaudeStatistics/App/ProviderContextRegistry.swift:103`~~ | ~~`guard kind == .codex else` 仅 Codex 走特殊 runtime bridge~~ → 走 `descriptor.syncsTranscriptToActiveSessions` (2026-04-27) |
 | `ClaudeStatistics/HookCLI/HookCLI.swift:57-64` | CLI hook dispatcher `switch provider` 三 case |
-| `ClaudeStatistics/Utilities/DisplayTextClassifier.swift:11-16` | display mode 工厂 switch 三 case |
-| `ClaudeStatistics/Utilities/DisplayTextClassifier.swift:47-52` | mode 进一步细分时再次分组 switch |
-| `ClaudeStatistics/NotchNotifications/Core/ToolActivityFormatter.swift:234-239` | `switch provider { case .claude / case .codex, .gemini }` |
+| ~~`ClaudeStatistics/Utilities/DisplayTextClassifier.swift:11-16`~~ | ~~display mode 工厂 switch 三 case~~ → `ProviderSessionDisplayMode` enum 整体删除 (2026-04-27) |
+| ~~`ClaudeStatistics/Utilities/DisplayTextClassifier.swift:47-52`~~ | ~~mode 进一步细分时再次分组 switch~~ → `descriptor.notchNoisePrefixes` (2026-04-27) |
+| ~~`ClaudeStatistics/NotchNotifications/Core/ToolActivityFormatter.swift:234-239`~~ | ~~`switch provider { case .claude / case .codex, .gemini }`~~ → `descriptor.notchProcessingHintKey` (2026-04-27) |
 | `ClaudeStatistics/NotchNotifications/Core/WireEventTranslator.swift:68-72` | `switch raw { case "codex": / case "gemini": / default: .claude }` 默认回落 Claude |
-| `ClaudeStatistics/NotchNotifications/Core/ProviderSessionDisplayFormatter+Candidates.swift:15-20` | `switch displayMode` 分组 case |
+| ~~`ClaudeStatistics/NotchNotifications/Core/ProviderSessionDisplayFormatter+Candidates.swift:15-20`~~ | ~~`switch displayMode` 分组 case~~ → `descriptor.commandFilteredNotchPreview` (2026-04-27) |
 | ~~`ClaudeStatistics/NotchNotifications/Core/RuntimeStatePersistor.swift:167`~~ | ~~`guard provider == .claude else { return sessionId }` Claude-only 规范化~~ → 走 `descriptor.canonicalSessionID(_:)` (2026-04-27) |
 | ~~`ClaudeStatistics/NotchNotifications/Core/ActiveSessionsTracker.swift:414`~~ | ~~Codex-only `taskDone` 进程退出宽限期~~ → 走 `descriptor.postStopExitGrace` (2026-04-27) |
 | ~~`ClaudeStatistics/NotchNotifications/Core/ActiveSessionsTracker.swift:558`~~ | ~~Codex-only liveness 检查~~ → 走 `descriptor.postStopExitGrace != nil` (2026-04-27) |
@@ -348,6 +348,18 @@ Chat-app launchers
 **仍待启动**：
 
 - Claude session 数据回查 fallback（`ActiveSessionsTracker.swift:763` `ProviderKind(rawValue:) ?? .claude`）— 需要 string-based id 流上线后整改，留待后续。
+
+### 2026-04-27 (P1 第四刀：notch display 分发去 enum)
+
+**已完成**：
+
+- ✅ `ProviderDescriptor` 加 3 个 notch capability 字段：`commandFilteredNotchPreview: Bool` / `notchNoisePrefixes: [String]` / `notchProcessingHintKey: String`，全部带默认。
+- ✅ Builtin 三家分别配置：Claude `notchProcessingHintKey = "notch.operation.thinking"`；Codex `commandFilteredNotchPreview = true`；Gemini 同 + `notchNoisePrefixes = ["process group pgid:", "background pids:"]`。
+- ✅ `ProviderSessionDisplayMode` enum + `forProvider(_:)` 删除（host）。`ProviderSessionDisplayFormatter.displayMode` 改为 `providerDescriptor: ProviderDescriptor`。
+- ✅ `DisplayTextClassifier.isNoiseValue(_, mode:)` 改签名为 `isNoiseValue(_, noisePrefixes:)`，接受任意 prefix 列表（来自 descriptor 而非 enum 分支）。
+- ✅ `ToolActivityFormatter.fallbackProcessingText(for:)` 用 `provider.descriptor.notchProcessingHintKey`，删除三 case switch。
+- ✅ `DisplayTextClassifierTests` 改造：mode-based 调用全部去掉，新增 `test_providerDescriptor_carriesNotchCapabilities` 验证三家 builtin 字段值。
+- ✅ 820 测试全部通过；run-debug.sh 启动正常。
 
 ### 2026-04-27 (P0 收尾：Terminal picker plugin 来源徽章)
 

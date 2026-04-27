@@ -1,22 +1,5 @@
 import Foundation
 
-/// Per-provider rendering mode used by the notch display layer. Codex and
-/// Gemini share most filter behaviour (preview command-stripping); only
-/// Gemini has its own shell-metadata noise prefixes.
-enum ProviderSessionDisplayMode {
-    case claude
-    case codex
-    case gemini
-
-    static func forProvider(_ provider: ProviderKind) -> ProviderSessionDisplayMode {
-        switch provider {
-        case .claude: return .claude
-        case .codex:  return .codex
-        case .gemini: return .gemini
-        }
-    }
-}
-
 /// Pure text classifiers for the notch triptych display layer. Every input
 /// is a `String` and every output is a `Bool` or `String?` — no `ActiveSession`
 /// dependency — so each function is independently testable. Used by
@@ -25,9 +8,11 @@ enum ProviderSessionDisplayMode {
 enum DisplayTextClassifier {
     /// True when the text is a noise marker that should be hidden from the
     /// triptych — generic boolean/null tokens, dashes, JSON blobs that leaked
-    /// from a stringified hook payload, and a couple of Gemini-specific shell
-    /// metadata headers.
-    static func isNoiseValue(_ text: String, mode: ProviderSessionDisplayMode) -> Bool {
+    /// from a stringified hook payload, plus any provider-contributed
+    /// shell-metadata banners passed in via `noisePrefixes` (Gemini's
+    /// "process group pgid:" / "background pids:" lines, for example).
+    /// Prefixes are matched case-insensitively against the normalized text.
+    static func isNoiseValue(_ text: String, noisePrefixes: [String] = []) -> Bool {
         let normalized = text
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
@@ -43,14 +28,10 @@ enum DisplayTextClassifier {
             || normalized.allSatisfy { !$0.isLetter && !$0.isNumber }
         if genericNoise { return true }
         if isJsonLikeBlob(normalized) { return true }
-
-        switch mode {
-        case .gemini:
-            return normalized.hasPrefix("process group pgid:")
-                || normalized.hasPrefix("background pids:")
-        case .claude, .codex:
-            return false
+        for prefix in noisePrefixes where normalized.hasPrefix(prefix.lowercased()) {
+            return true
         }
+        return false
     }
 
     /// Raw JSON blobs leak into preview when hook payloads stringify an

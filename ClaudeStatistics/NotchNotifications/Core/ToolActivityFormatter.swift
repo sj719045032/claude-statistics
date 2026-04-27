@@ -1,3 +1,4 @@
+import ClaudeStatisticsKit
 import Foundation
 
 enum ToolActivityFormatter {
@@ -231,12 +232,7 @@ enum ToolActivityFormatter {
     }
 
     private static func fallbackProcessingText(for provider: ProviderKind) -> String {
-        switch provider {
-        case .claude:
-            return localized("notch.operation.thinking")
-        case .codex, .gemini:
-            return localized("notch.operation.working")
-        }
+        localized(provider.descriptor.notchProcessingHintKey)
     }
 
     private static func preferredKeys(for tool: String) -> [String] {

@@ -1,3 +1,4 @@
+import ClaudeStatisticsKit
 import Foundation
 
 struct ProviderSessionDisplayContent {
@@ -178,8 +179,8 @@ struct ProviderSessionDisplayFormatter {
         return commentaryAt >= promptAt
     }
 
-    var displayMode: ProviderSessionDisplayMode {
-        .forProvider(session.provider)
+    var providerDescriptor: ProviderDescriptor {
+        session.provider.descriptor
     }
 
     /// Row 2 static fallback: a short status phrase derived from displayStatus.
