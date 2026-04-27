@@ -637,11 +637,13 @@ struct SettingsView: View {
                 ForEach(TerminalRegistry.readinessOptions(
                     forProvider: appState.providerKind.descriptor.id
                 )) { option in
+                    let badge = terminalSourceBadge(forOptionID: option.id)
+                    let displayTitle = badge.map { "\(option.title) (\($0))" } ?? option.title
                     if option.id != TerminalPreferences.autoOptionID && !option.isInstalled {
-                        Text("settings.notFound \(option.title)")
+                        Text("settings.notFound \(displayTitle)")
                             .tag(option.id)
                     } else {
-                        Text(option.title)
+                        Text(displayTitle)
                             .tag(option.id)
                     }
                 }
@@ -749,8 +751,22 @@ struct SettingsView: View {
         guard let plugin = appState.pluginRegistry.providers.values.first(where: {
             ($0 as? any ProviderPlugin)?.descriptor.id == descriptorID
         }) else { return nil }
-        let manifestId = type(of: plugin).manifest.id
-        switch appState.pluginRegistry.source(for: manifestId) {
+        return pluginSourceBadge(forManifestID: type(of: plugin).manifest.id)
+    }
+
+    /// Same idea as `providerSourceBadge` but for terminal options.
+    /// `optionID` matches `TerminalPlugin.descriptor.id`, so `.csplugin`
+    /// terminals (chat-app / editor wrappers) light up automatically;
+    /// host-bundled builtins return nil.
+    private func terminalSourceBadge(forOptionID optionID: String) -> String? {
+        guard let plugin = appState.pluginRegistry.terminals.values.first(where: {
+            ($0 as? any TerminalPlugin)?.descriptor.id == optionID
+        }) else { return nil }
+        return pluginSourceBadge(forManifestID: type(of: plugin).manifest.id)
+    }
+
+    private func pluginSourceBadge(forManifestID id: String) -> String? {
+        switch appState.pluginRegistry.source(for: id) {
         case .none, .host:
             return nil
         case .bundled:

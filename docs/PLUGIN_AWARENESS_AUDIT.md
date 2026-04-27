@@ -330,9 +330,9 @@ Chat-app launchers
 
 **剩余待办**：
 
-- ⏳ Terminal picker 加 `(plugin)` 来源徽章（与 §3.1 / 4.1 收尾）。已有 7 个 csplugin，做这个有意义。
+- ✅ ~~Terminal picker 加 `(plugin)` 来源徽章~~ → 完成于 2026-04-27 （见后文 P0 收尾日志）
 - ⏳ Chat-app new-session / resume deep-link：当前 `ActivateAppLauncher` 仅拉前台。需要调研 `codex://` / `claude://` 是否有 new-session URL；resume 路径理论上可用 `codex://threads/<id>` / `claude://claude.ai/resume?session=<id>`，但当前 launcher 不读 sessionId。
-- ⏳ `AccountManagers.swift:17-25` 之外的 P1 项（`ProviderContextRegistry.swift:103` Codex-only bridge / `HookCLI.swift:57-64` 三 case switch / `DisplayTextClassifier` 等内部 switch / `WireEventTranslator.swift:67-73` 兜底）。
+- ⏳ `AccountManagers.swift:17-25` 之外的 P1 项（`ProviderContextRegistry.swift:103` Codex-only bridge ✅ 已完成 / `HookCLI.swift:57-64` 三 case switch / `DisplayTextClassifier` 等内部 switch / `WireEventTranslator.swift:67-73` 兜底）。
 
 ### 2026-04-27 (P1 第一刀：sessionID 规范化 + Codex postStopExitGrace)
 
@@ -348,6 +348,15 @@ Chat-app launchers
 **仍待启动**：
 
 - Claude session 数据回查 fallback（`ActiveSessionsTracker.swift:763` `ProviderKind(rawValue:) ?? .claude`）— 需要 string-based id 流上线后整改，留待后续。
+
+### 2026-04-27 (P0 收尾：Terminal picker plugin 来源徽章)
+
+**已完成**：
+
+- ✅ `SettingsView.terminalSourceBadge(forOptionID:)` helper（与现有 `providerSourceBadge(for:)` 平行），共用新提的 `pluginSourceBadge(forManifestID:)` 内部 dispatch。`option.id` 直接对应 `TerminalPlugin.descriptor.id`，匹配关系无歧义。
+- ✅ `terminalSection` Picker row 渲染：badge 非 nil 时把 `(\(badge))` 拼到 title。`settings.notFound` 模板分支同样附加，所以未安装的 plugin 终端也会带徽章。
+- ✅ Builtin 7 个（iTerm2 / Terminal / Warp / WezTerm / Kitty / Ghostty / Alacritty）source = `.host` → 无徽章。Editor 5 个 csplugin（VSCode / Cursor / Windsurf / Trae / Zed）+ Chat-app 2 个 csplugin（ClaudeApp / CodexApp）source = `.bundled` → "(bundled)" 徽章。用户安装的第三方 csplugin → "(user)"。
+- ✅ 820 测试全部通过；run-debug.sh 启动正常。
 
 ### 2026-04-27 (P1 第三刀：Codex transcript runtime bridge)
 
