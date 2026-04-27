@@ -203,6 +203,13 @@ enum ProviderRegistry {
             return CodexProvider.shared
         case .gemini:
             return GeminiProvider.shared
+        default:
+            // Unknown ProviderKind id reaching this fallback means a
+            // plugin-registered provider missed the dynamic lookup
+            // above. Returning the Claude shared instance preserves
+            // the legacy "default to Claude" behaviour the rawValue
+            // init? path used to give us.
+            return ClaudeProvider.shared
         }
     }
 }

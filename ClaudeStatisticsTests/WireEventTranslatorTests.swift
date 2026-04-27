@@ -146,8 +146,19 @@ final class WireEventTranslatorTests: XCTestCase {
         XCTAssertEqual(WireEventTranslator.translateProvider(nil), .claude)
     }
 
-    func test_translateProvider_unknownDefaultsToClaude() {
-        XCTAssertEqual(WireEventTranslator.translateProvider("aurora"), .claude)
+    func test_translateProvider_unknownIDPassesThrough() {
+        // ProviderKind is now an open string wrapper, so unknown ids
+        // (e.g. third-party plugin providers) flow through verbatim
+        // instead of getting squashed onto the Claude builtin. Only
+        // empty/nil still falls back to Claude.
+        XCTAssertEqual(
+            WireEventTranslator.translateProvider("aurora"),
+            ProviderKind(rawValue: "aurora")
+        )
+    }
+
+    func test_translateProvider_emptyStringDefaultsToClaude() {
+        XCTAssertEqual(WireEventTranslator.translateProvider(""), .claude)
     }
 
     // MARK: - parseIsoTimestamp

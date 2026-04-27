@@ -90,7 +90,7 @@ enum NotchPreferences {
         let legacyOn = d.bool(forKey: legacyKey)
         // Only populate keys the user hasn't explicitly set, so a second
         // migration pass never clobbers a deliberate flip.
-        for kind in ProviderKind.allCases {
+        for kind in ProviderKind.allBuiltins {
             let key = kind.descriptor.notchEnabledDefaultsKey
             if d.object(forKey: key) == nil {
                 d.set(legacyOn, forKey: key)

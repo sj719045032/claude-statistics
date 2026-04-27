@@ -60,12 +60,14 @@ enum WireEventTranslator {
         }
     }
 
-    /// Map the wire `provider` string into the canonical enum. Unknown
-    /// or absent values default to `.claude` (matching the historical
+    /// Map the wire `provider` string into the canonical id. Empty or
+    /// absent values default to `.claude` (matching the historical
     /// behavior of the bridge — Claude is the original provider and the
-    /// wire format predates the multi-provider split). Adding a new
-    /// `ProviderKind` case lights up automatically through `rawValue:`
-    /// without editing this dispatch.
+    /// wire format predates the multi-provider split). Non-empty ids
+    /// pass through verbatim, including ids contributed by third-party
+    /// `ProviderPlugin`s — `ProviderKind` is now an open string wrapper
+    /// so the wire format is no longer restricted to the three builtin
+    /// case names.
     static func translateProvider(_ raw: String?) -> ProviderKind {
         raw.flatMap(ProviderKind.init(rawValue:)) ?? .claude
     }

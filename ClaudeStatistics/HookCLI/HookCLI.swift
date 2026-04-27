@@ -61,6 +61,8 @@ struct HookRunner {
             action = buildCodexAction(payload: payload)
         case .gemini:
             action = buildGeminiAction(payload: payload)
+        default:
+            action = nil
         }
 
         guard let action else { return 0 }

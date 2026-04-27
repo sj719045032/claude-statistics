@@ -2,26 +2,37 @@ import Foundation
 import SwiftUI
 import ClaudeStatisticsKit
 
-/// Closed enum left over as a thin namespace for the three builtin
-/// provider ids. All real provider behaviour now lives in
-/// `ProviderDescriptor`; callers go through `kind.descriptor.<field>`.
-/// Removing this enum entirely is a separate, larger surgery; this file
-/// no longer hosts any per-case dispatch beyond the descriptor lookup.
-enum ProviderKind: String, CaseIterable, Identifiable, Codable {
-    case claude
-    case codex
-    case gemini
+/// Open string-id wrapper, formerly a closed enum. Builtin ids are
+/// exposed as `static let` constants so `kind == .claude` / dot-syntax
+/// keep working, but any string is now constructible — third-party
+/// plugin descriptors flow through the same type. The `var descriptor`
+/// accessor falls back to the Claude descriptor for unknown ids,
+/// matching the legacy "default to Claude" contract that historically
+/// lived in `ProviderKind(rawValue:) ?? .claude` callsites.
+struct ProviderKind: RawRepresentable, Hashable, Codable, Identifiable, Sendable {
+    let rawValue: String
+
+    init?(rawValue: String) {
+        guard !rawValue.isEmpty else { return nil }
+        self.rawValue = rawValue
+    }
+
+    static let claude = ProviderKind(rawValue: "claude")!
+    static let codex  = ProviderKind(rawValue: "codex")!
+    static let gemini = ProviderKind(rawValue: "gemini")!
+
+    /// Replaces enum's auto-derived `allCases`. Iteration order is the
+    /// canonical display order Claude / Codex / Gemini.
+    static let allBuiltins: [ProviderKind] = [.claude, .codex, .gemini]
 
     var id: String { rawValue }
 
-    /// Builtin descriptor for this id. Plugin-contributed providers
-    /// reach descriptors through `PluginRegistry` / `ProviderRegistry`,
-    /// not through this property.
     var descriptor: ProviderDescriptor {
-        switch self {
-        case .claude: return .claude
-        case .codex:  return .codex
-        case .gemini: return .gemini
+        switch rawValue {
+        case "claude": return .claude
+        case "codex":  return .codex
+        case "gemini": return .gemini
+        default:       return .claude
         }
     }
 }
@@ -33,7 +44,7 @@ enum ProviderKind: String, CaseIterable, Identifiable, Codable {
 /// directly with the desired descriptor set.
 enum HostCanonicalToolName {
     static func resolve(_ raw: String?) -> String {
-        CanonicalToolName.resolve(raw, descriptors: ProviderKind.allCases.map(\.descriptor))
+        CanonicalToolName.resolve(raw, descriptors: ProviderKind.allBuiltins.map(\.descriptor))
     }
 }
 
@@ -61,7 +72,7 @@ enum MenuBarPreferences {
     /// `registerDefault(forDescriptorID:)` below.
     static func register() {
         var defaults: [String: Any] = [:]
-        for kind in ProviderKind.allCases {
+        for kind in ProviderKind.allBuiltins {
             defaults[key(for: kind)] = true
         }
         UserDefaults.standard.register(defaults: defaults)
@@ -95,7 +106,7 @@ enum MenuBarPreferences {
     }
 
     static func visibleKinds() -> [ProviderKind] {
-        ProviderKind.allCases.filter { isVisible($0) }
+        ProviderKind.allBuiltins.filter { isVisible($0) }
     }
 }
 
