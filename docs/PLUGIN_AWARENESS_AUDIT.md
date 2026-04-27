@@ -87,9 +87,9 @@
 | ~~`ClaudeStatistics/App/ClaudeStatisticsApp.swift:15`~~ | ~~状态行安装器刷新~~ → 早已走 `availableProviders(plugins:)`（plugin-aware after this commit） |
 | ~~`ClaudeStatistics/App/ClaudeStatisticsApp.swift:330`~~ | ~~bootstrap 启动 `startupKinds = supportedProviders.filter`~~ → 走 `allKnownDescriptors(plugins:)`（2026-04-27）|
 | ~~`ClaudeStatistics/App/ClaudeStatisticsApp.swift:758`~~ | ~~`applyNotchProviderPreferences` 过滤 `supportedProviders`~~ → 走 `allKnownDescriptors(plugins:)`（2026-04-27）|
-| `ClaudeStatistics/Models/Session.swift:38-40` | 内置 model pricing 表 `supportedProviders.reduce` |
-| `ClaudeStatistics/NotchNotifications/Hooks/CodexHookInstaller.swift:299-301` | `ProviderKind.allCases.compactMap` 收集 hook 安装器 |
-| `ClaudeStatistics/Models/ProviderKind.swift:72` | 工具名规范化 `ProviderKind.allCases.map(\.descriptor)` |
+| `ClaudeStatistics/Models/Session.swift:38-40` | 内置 model pricing 表 `supportedProviders.reduce` — **by design**：plugin pricing 走 `ProviderRegistry.extraPluginPricing()` 旁路（`merged.merge(extraPluginPricing())` on next line），不需要走 builtin 循环 |
+| ~~`ClaudeStatistics/NotchNotifications/Hooks/CodexHookInstaller.swift:299-301`~~ | ~~`ProviderKind.allCases.compactMap` 收集 hook 安装器~~ → 早已走 `availableProviders(plugins:)`，文档行号过时 |
+| `ClaudeStatistics/Models/ProviderKind.swift:47` | `HostCanonicalToolName.resolve` 走 `allBuiltins.map(\.descriptor)` — **by design**：这是 nonisolated registry-free fallback，plugin-aware 替代是 `CanonicalToolName.resolve(_:descriptors:)`（注释里已说明）|
 
 ### 3.5 COSMETIC — 装饰名硬编码
 
