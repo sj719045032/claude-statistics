@@ -60,16 +60,14 @@ enum WireEventTranslator {
         }
     }
 
-    /// Map the wire `provider` string into the canonical enum. Anything
-    /// other than "codex" / "gemini" defaults to `.claude` (matching the
-    /// historical behavior of the bridge — Claude is the original provider
-    /// and the wire format predates the multi-provider split).
+    /// Map the wire `provider` string into the canonical enum. Unknown
+    /// or absent values default to `.claude` (matching the historical
+    /// behavior of the bridge — Claude is the original provider and the
+    /// wire format predates the multi-provider split). Adding a new
+    /// `ProviderKind` case lights up automatically through `rawValue:`
+    /// without editing this dispatch.
     static func translateProvider(_ raw: String?) -> ProviderKind {
-        switch raw {
-        case "codex":  return .codex
-        case "gemini": return .gemini
-        default:       return .claude
-        }
+        raw.flatMap(ProviderKind.init(rawValue:)) ?? .claude
     }
 
     /// Build the full `AttentionEvent`, including all wire field copies and

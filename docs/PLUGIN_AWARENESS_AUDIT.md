@@ -71,7 +71,7 @@
 | ~~`ClaudeStatistics/Utilities/DisplayTextClassifier.swift:11-16`~~ | ~~display mode 工厂 switch 三 case~~ → `ProviderSessionDisplayMode` enum 整体删除 (2026-04-27) |
 | ~~`ClaudeStatistics/Utilities/DisplayTextClassifier.swift:47-52`~~ | ~~mode 进一步细分时再次分组 switch~~ → `descriptor.notchNoisePrefixes` (2026-04-27) |
 | ~~`ClaudeStatistics/NotchNotifications/Core/ToolActivityFormatter.swift:234-239`~~ | ~~`switch provider { case .claude / case .codex, .gemini }`~~ → `descriptor.notchProcessingHintKey` (2026-04-27) |
-| `ClaudeStatistics/NotchNotifications/Core/WireEventTranslator.swift:68-72` | `switch raw { case "codex": / case "gemini": / default: .claude }` 默认回落 Claude |
+| ~~`ClaudeStatistics/NotchNotifications/Core/WireEventTranslator.swift:68-72`~~ | ~~`switch raw { case "codex": / case "gemini": / default: .claude }`~~ → `ProviderKind(rawValue:) ?? .claude`，新 case 自动启用 (2026-04-27) |
 | ~~`ClaudeStatistics/NotchNotifications/Core/ProviderSessionDisplayFormatter+Candidates.swift:15-20`~~ | ~~`switch displayMode` 分组 case~~ → `descriptor.commandFilteredNotchPreview` (2026-04-27) |
 | ~~`ClaudeStatistics/NotchNotifications/Core/RuntimeStatePersistor.swift:167`~~ | ~~`guard provider == .claude else { return sessionId }` Claude-only 规范化~~ → 走 `descriptor.canonicalSessionID(_:)` (2026-04-27) |
 | ~~`ClaudeStatistics/NotchNotifications/Core/ActiveSessionsTracker.swift:414`~~ | ~~Codex-only `taskDone` 进程退出宽限期~~ → 走 `descriptor.postStopExitGrace` (2026-04-27) |
