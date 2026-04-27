@@ -555,7 +555,15 @@ final class AppState: ObservableObject {
             scopeLabel: LanguageManager.localizedString("share.scope.lastYear"),
             period: DateInterval(start: baselineStart, end: end)
         )
-        return ShareRoleEngine.makeAllTimeRoleResult(metrics: mergedMetrics, baseline: mergedBaseline)
+        let pluginScores = SharePluginScoring.scores(
+            plugins: pluginRegistry,
+            context: mergedMetrics.evaluationContext(baseline: mergedBaseline)
+        )
+        return ShareRoleEngine.makeAllTimeRoleResult(
+            metrics: mergedMetrics,
+            baseline: mergedBaseline,
+            pluginScores: pluginScores
+        )
     }
 
     private func configureUsageState(for provider: any SessionProvider) {

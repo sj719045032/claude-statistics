@@ -80,6 +80,7 @@
 		37869D180C4DB3C69261C9F4 /* StatusLineLegend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674E66F9A30A6F1F06738D75 /* StatusLineLegend.swift */; };
 		3984119891F7BF33DEFA170B /* CodexAccountManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 684978AF102DA512FCD3D129 /* CodexAccountManager.swift */; };
 		3A28E84ED0B7490923FA86B0 /* ShareMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA8B62A57C9E8AD16345458A /* ShareMetrics.swift */; };
+		3ACC92DD795C4CCC1B9ED295 /* SharePluginScoring.swift in Sources */ = {isa = PBXBuildFile; fileRef = 806EBE2626FDBEC34484CEEC /* SharePluginScoring.swift */; };
 		3AD8ED72F8D42B9DB0614F77 /* UpdaterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7AD5E89B648F5018E34233A /* UpdaterService.swift */; };
 		3B999876C754DFF2C3409CF8 /* UsageVMRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB7C0918B3E022C679ECD9CD /* UsageVMRegistry.swift */; };
 		3B9A964005C3F7C930946293 /* CodexTranscriptParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C1C75DCADED926320D04BC3 /* CodexTranscriptParserTests.swift */; };
@@ -317,6 +318,7 @@
 		E3520EEEBFD2FB2FACC19D45 /* ProviderContextRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AD3D99C9F42189EFF639E71 /* ProviderContextRegistry.swift */; };
 		E37D4BFF022181A1AF159CD9 /* AppTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBD75397BB200D96BF189CEB /* AppTab.swift */; };
 		E45AD6199CAB1661300675D6 /* SessionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0415091A24EBCDA6840A49 /* SessionDetailView.swift */; };
+		E497442123AF33C4184AB992 /* ShareMetrics+Evaluation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1B172A49401EA28223A83C0 /* ShareMetrics+Evaluation.swift */; };
 		E5818AC985038DCC7CB7123A /* ClaudeStatisticsKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; };
 		E58B6A3A03084C0705C450F5 /* ProviderRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AE7C2A2D6731BCD2D826C90 /* ProviderRegistry.swift */; };
 		E6EFB7589EEC1AFD2C58C748 /* SmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EBE4F4448DEBA3C067FBC16 /* SmokeTests.swift */; };
@@ -708,6 +710,7 @@
 		7F4D9370C84C4AFB66D25201 /* ToolOutputCleaning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolOutputCleaning.swift; sourceTree = "<group>"; };
 		7F675DD2E08BB0AC4ADBB101 /* AttentionEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionEvent.swift; sourceTree = "<group>"; };
 		805E37589FAEC2B84328D36A /* WireMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WireMessage.swift; sourceTree = "<group>"; };
+		806EBE2626FDBEC34484CEEC /* SharePluginScoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharePluginScoring.swift; sourceTree = "<group>"; };
 		808F166AA1B5F781858856E1 /* TerminalSetupCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSetupCoordinator.swift; sourceTree = "<group>"; };
 		8132C4E4069A5B948316CCF6 /* ProviderSessionDisplayFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderSessionDisplayFormatter.swift; sourceTree = "<group>"; };
 		84C6E039B436786047A1D605 /* TranscriptParserCommons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptParserCommons.swift; sourceTree = "<group>"; };
@@ -814,6 +817,7 @@
 		D0CA06E1C8046BE97A74F7C3 /* IndependentClaudeAccountManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndependentClaudeAccountManager.swift; sourceTree = "<group>"; };
 		D1519B833F38D44123500B58 /* LanguageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageManager.swift; sourceTree = "<group>"; };
 		D19D69DBF01C9D344A830887 /* TabButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabButton.swift; sourceTree = "<group>"; };
+		D1B172A49401EA28223A83C0 /* ShareMetrics+Evaluation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShareMetrics+Evaluation.swift"; sourceTree = "<group>"; };
 		D74BEFC175DFC5CD3999DBE1 /* ToolActivityFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolActivityFormatter.swift; sourceTree = "<group>"; };
 		D758CE8D0B6780C973E35221 /* SessionQuickStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionQuickStats.swift; sourceTree = "<group>"; };
 		D7A55E899B9748E80EF1CA53 /* ProviderDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderDescriptor.swift; sourceTree = "<group>"; };
@@ -1123,7 +1127,9 @@
 				0B6B0E05647AAB784A323B00 /* SessionDeduplicator.swift */,
 				1C648DD36956F633E7BABC7F /* SessionParseValidator.swift */,
 				CD05FEC4C1832D8F37A115B6 /* SessionTrendAggregator.swift */,
+				D1B172A49401EA28223A83C0 /* ShareMetrics+Evaluation.swift */,
 				6F0F61EEF95C517CC0B363C3 /* ShareMetricsBuilder.swift */,
+				806EBE2626FDBEC34484CEEC /* SharePluginScoring.swift */,
 				A7C96479A32A5A1C4D1A624B /* ShareRoleEngine.swift */,
 				06FC7AFEDE795F1D5BF22169 /* ShareRoleEngine+Badges.swift */,
 				44906B5E92FE48C21912D41F /* ShareRoleEngine+Formatting.swift */,
@@ -2180,8 +2186,10 @@
 				E26C6870A1E9540BCA9E7045 /* SettingsView.swift in Sources */,
 				19BCF9602F4555F5E007C0EA /* ShareCardView.swift in Sources */,
 				CD199764729FDA8146948C4C /* ShareImageExporter.swift in Sources */,
+				E497442123AF33C4184AB992 /* ShareMetrics+Evaluation.swift in Sources */,
 				3A28E84ED0B7490923FA86B0 /* ShareMetrics.swift in Sources */,
 				DFB7E8400551BE83B025A6A4 /* ShareMetricsBuilder.swift in Sources */,
+				3ACC92DD795C4CCC1B9ED295 /* SharePluginScoring.swift in Sources */,
 				BB9902B8A5E35FB7C78F63F0 /* SharePreviewView.swift in Sources */,
 				58946ED75833B063091E2FC7 /* SharePreviewWindowController.swift in Sources */,
 				425E1709E0DB410412C38880 /* ShareRole.swift in Sources */,

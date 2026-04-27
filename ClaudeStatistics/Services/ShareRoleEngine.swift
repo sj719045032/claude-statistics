@@ -1,16 +1,56 @@
+import ClaudeStatisticsKit
 import Foundation
 
 enum ShareRoleEngine {
-    static func makeRoleResult(metrics: ShareMetrics, baseline: ShareMetrics?) -> ShareRoleResult {
-        let ranked = rankedRoles(metrics: metrics, baseline: baseline)
+    /// Plugin-contributed scores merge into the ranked list as a final
+    /// step. They participate in `choosePrimaryRole` selection just
+    /// like builtin scores, so a plugin role with a high enough score
+    /// can win the card. The host clamps each score to `[0, 1]` and
+    /// silently drops entries whose `roleID` is empty.
+    static func makeRoleResult(
+        metrics: ShareMetrics,
+        baseline: ShareMetrics?,
+        pluginScores: [ShareRoleScoreEntry] = []
+    ) -> ShareRoleResult {
+        let ranked = mergePluginScores(into: rankedRoles(metrics: metrics, baseline: baseline), pluginScores: pluginScores)
         let primary = choosePrimaryRole(from: ranked, metrics: metrics)
         return buildRoleResult(primary: primary, ranked: ranked, metrics: metrics)
     }
 
-    static func makeAllTimeRoleResult(metrics: ShareMetrics, baseline: ShareMetrics?) -> ShareRoleResult {
-        let ranked = rankedAllTimeRoles(metrics: metrics, baseline: baseline)
+    static func makeAllTimeRoleResult(
+        metrics: ShareMetrics,
+        baseline: ShareMetrics?,
+        pluginScores: [ShareRoleScoreEntry] = []
+    ) -> ShareRoleResult {
+        let ranked = mergePluginScores(into: rankedAllTimeRoles(metrics: metrics, baseline: baseline), pluginScores: pluginScores)
         let primary = chooseAllTimePrimaryRole(from: ranked, metrics: metrics)
         return buildRoleResult(primary: primary, ranked: ranked, metrics: metrics)
+    }
+
+    /// Append plugin scores to the host-computed ranking, then re-sort.
+    /// Empty plugin scores leave the input untouched (zero-cost path).
+    private static func mergePluginScores(
+        into hostRanked: [ShareRoleScore],
+        pluginScores: [ShareRoleScoreEntry]
+    ) -> [ShareRoleScore] {
+        guard !pluginScores.isEmpty else { return hostRanked }
+        let existingIDs = Set(hostRanked.map(\.roleID))
+        let pluginEntries = pluginScores.compactMap { entry -> ShareRoleScore? in
+            guard let id = ShareRoleID(rawValue: entry.roleID) else { return nil }
+            // Plugin can't override a builtin id — silently drop the
+            // collision so a misconfigured plugin can't hijack the
+            // ranking. Plugins should namespace ids reverse-DNS style.
+            guard !existingIDs.contains(id) else { return nil }
+            let clamped = min(max(entry.score, 0), 1)
+            return ShareRoleScore(roleID: id, score: clamped)
+        }
+        guard !pluginEntries.isEmpty else { return hostRanked }
+        return (hostRanked + pluginEntries).sorted { lhs, rhs in
+            if lhs.score == rhs.score {
+                return lhs.roleID.rawValue < rhs.roleID.rawValue
+            }
+            return lhs.score > rhs.score
+        }
     }
 
     static func buildRoleResult(primary: ShareRoleID, ranked: [ShareRoleScore], metrics: ShareMetrics) -> ShareRoleResult {

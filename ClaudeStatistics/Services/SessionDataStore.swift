@@ -888,7 +888,11 @@ final class SessionDataStore: ObservableObject {
     func buildShareRoleResult(for period: PeriodStats, periodType: StatsPeriod) -> ShareRoleResult? {
         guard let metrics = buildShareMetrics(for: period, periodType: periodType) else { return nil }
         let baseline = buildShareBaselineMetrics(for: period, periodType: periodType)
-        return ShareRoleEngine.makeRoleResult(metrics: metrics, baseline: baseline)
+        let pluginScores = SharePluginScoring.scores(
+            plugins: ProviderRegistry.currentSharedPluginRegistry(),
+            context: metrics.evaluationContext(baseline: baseline)
+        )
+        return ShareRoleEngine.makeRoleResult(metrics: metrics, baseline: baseline, pluginScores: pluginScores)
     }
 
     func buildAllTimeShareRoleResult() -> ShareRoleResult? {
@@ -898,7 +902,11 @@ final class SessionDataStore: ObservableObject {
             return nil
         }
         let baseline = buildAllTimeShareBaselineMetrics()
-        return ShareRoleEngine.makeAllTimeRoleResult(metrics: metrics, baseline: baseline)
+        let pluginScores = SharePluginScoring.scores(
+            plugins: ProviderRegistry.currentSharedPluginRegistry(),
+            context: metrics.evaluationContext(baseline: baseline)
+        )
+        return ShareRoleEngine.makeAllTimeRoleResult(metrics: metrics, baseline: baseline, pluginScores: pluginScores)
     }
 
     func buildAllTimeShareMetrics(scopeLabel: String? = nil) -> ShareMetrics? {
