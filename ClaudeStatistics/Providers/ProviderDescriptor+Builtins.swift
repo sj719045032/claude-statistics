@@ -18,7 +18,18 @@ extension ProviderDescriptor {
         badgeColor: Color(red: 0.89, green: 0.55, blue: 0.36),
         notchEnabledDefaultsKey: "notch.enabled.claude",
         capabilities: .claude,
-        resolveToolAlias: { ClaudeToolNames.canonical($0) }
+        resolveToolAlias: { ClaudeToolNames.canonical($0) },
+        canonicalizeSessionID: { sessionId in
+            // Some Claude session sources emit composite ids of the form
+            // `prefix::rawID`; the runtime key uses the raw id so hook
+            // events match what the watcher recorded.
+            guard sessionId.contains("::"),
+                  let rawID = sessionId.components(separatedBy: "::").last,
+                  !rawID.isEmpty else {
+                return sessionId
+            }
+            return rawID
+        }
     )
 
     static let codex = ProviderDescriptor(
@@ -29,7 +40,8 @@ extension ProviderDescriptor {
         badgeColor: Color(red: 0.18, green: 0.80, blue: 0.44),
         notchEnabledDefaultsKey: "notch.enabled.codex",
         capabilities: .codex,
-        resolveToolAlias: { CodexToolNames.canonical($0) }
+        resolveToolAlias: { CodexToolNames.canonical($0) },
+        postStopExitGrace: 0.25
     )
 
     static let gemini = ProviderDescriptor(

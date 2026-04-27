@@ -83,7 +83,7 @@ final class RuntimeStatePersistor {
 
         for entry in runtime.values {
             var value = entry
-            value.sessionId = canonicalSessionID(provider: value.provider, sessionId: value.sessionId)
+            value.sessionId = value.provider.descriptor.canonicalSessionID(value.sessionId)
             let key = key(provider: value.provider, sessionId: value.sessionId)
             // Clear ephemeral in-flight state — after a restart no PostToolUse
             // will ever arrive, so these fields are always stale.
@@ -161,19 +161,6 @@ final class RuntimeStatePersistor {
 
     private static func key(provider: ProviderKind, sessionId: String) -> String {
         "\(provider.rawValue):\(sessionId)"
-    }
-
-    private static func canonicalSessionID(provider: ProviderKind, sessionId: String) -> String {
-        guard provider == .claude else { return sessionId }
-        return canonicalClaudeSessionID(sessionId)
-    }
-
-    private static func canonicalClaudeSessionID(_ sessionId: String) -> String {
-        guard sessionId.contains("::"),
-              let rawID = sessionId.components(separatedBy: "::").last?.nilIfEmpty else {
-            return sessionId
-        }
-        return rawID
     }
 }
 

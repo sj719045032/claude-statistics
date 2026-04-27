@@ -73,11 +73,11 @@
 | `ClaudeStatistics/NotchNotifications/Core/ToolActivityFormatter.swift:234-239` | `switch provider { case .claude / case .codex, .gemini }` |
 | `ClaudeStatistics/NotchNotifications/Core/WireEventTranslator.swift:68-72` | `switch raw { case "codex": / case "gemini": / default: .claude }` 默认回落 Claude |
 | `ClaudeStatistics/NotchNotifications/Core/ProviderSessionDisplayFormatter+Candidates.swift:15-20` | `switch displayMode` 分组 case |
-| `ClaudeStatistics/NotchNotifications/Core/RuntimeStatePersistor.swift:167` | `guard provider == .claude else { return sessionId }` Claude-only 规范化 |
-| `ClaudeStatistics/NotchNotifications/Core/ActiveSessionsTracker.swift:414` | Codex-only `taskDone` 进程退出宽限期 |
-| `ClaudeStatistics/NotchNotifications/Core/ActiveSessionsTracker.swift:558` | Codex-only liveness 检查 |
-| `ClaudeStatistics/NotchNotifications/Core/ActiveSessionsTracker.swift:764` | `ProviderKind(rawValue:) ?? .claude` 兜底回 Claude |
-| `ClaudeStatistics/NotchNotifications/Core/ActiveSessionsTracker.swift:769` | Claude-only session id 规范化 |
+| ~~`ClaudeStatistics/NotchNotifications/Core/RuntimeStatePersistor.swift:167`~~ | ~~`guard provider == .claude else { return sessionId }` Claude-only 规范化~~ → 走 `descriptor.canonicalSessionID(_:)` (2026-04-27) |
+| ~~`ClaudeStatistics/NotchNotifications/Core/ActiveSessionsTracker.swift:414`~~ | ~~Codex-only `taskDone` 进程退出宽限期~~ → 走 `descriptor.postStopExitGrace` (2026-04-27) |
+| ~~`ClaudeStatistics/NotchNotifications/Core/ActiveSessionsTracker.swift:558`~~ | ~~Codex-only liveness 检查~~ → 走 `descriptor.postStopExitGrace != nil` (2026-04-27) |
+| `ClaudeStatistics/NotchNotifications/Core/ActiveSessionsTracker.swift:763` | `ProviderKind(rawValue:) ?? .claude` 兜底回 Claude（待 string-id 流上线后整改）|
+| ~~`ClaudeStatistics/NotchNotifications/Core/ActiveSessionsTracker.swift:769`~~ | ~~Claude-only session id 规范化~~ → 同 RuntimeStatePersistor 行（2026-04-27） |
 | `ClaudeStatistics/NotchNotifications/Hooks/CodexHookInstaller.swift:313` | `ProviderKind(rawValue:) ?? .claude` 安装器 id 兜底 |
 
 ### 3.4 STARTUP — 启动期循环固定数组
@@ -334,24 +334,22 @@ Chat-app launchers
 - ⏳ Chat-app new-session / resume deep-link：当前 `ActivateAppLauncher` 仅拉前台。需要调研 `codex://` / `claude://` 是否有 new-session URL；resume 路径理论上可用 `codex://threads/<id>` / `claude://claude.ai/resume?session=<id>`，但当前 launcher 不读 sessionId。
 - ⏳ `AccountManagers.swift:17-25` 之外的 P1 项（`ProviderContextRegistry.swift:103` Codex-only bridge / `HookCLI.swift:57-64` 三 case switch / `DisplayTextClassifier` 等内部 switch / `WireEventTranslator.swift:67-73` 兜底）。
 
-### 明天起点：P1 第一刀
+### 2026-04-27 (P1 第一刀：sessionID 规范化 + Codex postStopExitGrace)
 
-**目标**：把 host 里几处 provider-specific behavior 特判（绕开 ProviderKind enum 比较）capability 化到 `ProviderDescriptor`。这些是真正的"行为差异"，不是 routing 派发，做成 capability flag 后插件可选启用。
+**已完成**：
 
-**候选切片（已勘察）**：
+- ✅ `ProviderDescriptor.canonicalizeSessionID: (@Sendable (String) -> String)?` + `canonicalSessionID(_:)` instance helper（默认 nil → identity）。Claude builtin 提供剥 `prefix::rawID` 的 closure。
+- ✅ `RuntimeStatePersistor.normalize` 与 `ActiveSessionsTracker.runtimeSessionID(for:)` 各自的 private static `canonicalSessionID` / `canonicalClaudeSessionID` 删除，统一走 `kind.descriptor.canonicalSessionID(_:)`。两处 byte-for-byte 等价实现合并完成。
+- ✅ `ProviderDescriptor.postStopExitGrace: TimeInterval?`（默认 nil）。Codex builtin 设 `0.25`。
+- ✅ `ActiveSessionsTracker` 后调度入口改成 `if let grace = event.provider.descriptor.postStopExitGrace, ...`；`schedulePostStopExitCheck(key:pid:grace:)` 接收 grace 参数；grace 内重检查改读 descriptor，不再 enum 比较。
+- ✅ 现有 `RuntimeStatePersistorTests` 三组测试覆盖 `prefix::rawID` 剥取 + Codex `::` 透传 + 无 `::` 不重写——均在 byte-for-byte 等价的实现下不变。
+- ✅ Build 通过，run-debug.sh 启动正常。
 
-| 行为 | 现状 | 建议接口 |
-|---|---|---|
-| Claude session ID 规范化（剥 `prefix::rawID` 复合 ID）| `RuntimeStatePersistor.swift:166-177` + `ActiveSessionsTracker.swift:763-779` 各有一份 `canonicalSessionID(provider:sessionId:)` Claude-only 实现 | `ProviderDescriptor.canonicalizeSessionID: ((String) -> String)?`，nil 表示 raw 即 canonical |
-| Codex TUI 进程退出宽限期 | `ActiveSessionsTracker.swift:414` Codex-only `taskDone` 后 schedulePostStopExitCheck | `ProviderDescriptor.postStopExitGrace: TimeInterval?` |
-| Codex liveness 检查在宽限期内的二次确认 | `ActiveSessionsTracker.swift:558` `runtime.provider == .codex` | 同上字段配套 |
-| Claude session 数据回查 fallback | `ActiveSessionsTracker.swift:764` `ProviderKind(rawValue:) ?? .claude` | 维度 A 3.3 末尾，需要 string-based id 流上线后整改 |
+**仍待启动**：
 
-**实施顺序建议**：
+- Claude session 数据回查 fallback（`ActiveSessionsTracker.swift:763` `ProviderKind(rawValue:) ?? .claude`）— 需要 string-based id 流上线后整改，留待后续。
 
-1. 先做 sessionID 规范化（最 self-contained，两处实现完全相同，合并到 descriptor 一处）。
-2. 再做 Codex 进程退出宽限期（一对相关字段）。
-3. 文档同步把 §3.3 ROUTING 对应行划掉。
+### 明天起点：P1 第二刀
 
 **未碰过的 P1 项**（都还在 §3.3 表里）：
 

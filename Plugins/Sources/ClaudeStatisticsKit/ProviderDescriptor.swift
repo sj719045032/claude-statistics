@@ -46,6 +46,19 @@ public struct ProviderDescriptor: Sendable {
     /// keep the original name. Stage 3 will replace this closure with
     /// a structured `ToolAliasTable` value type.
     public let resolveToolAlias: @Sendable (String) -> String?
+    /// Strips provider-specific composite prefixes off a session id so
+    /// the canonical form (used as the on-disk runtime key) matches the
+    /// raw id reported by hooks. `nil` means "raw id is already canonical".
+    /// Claude uses this to drop the `prefix::rawID` shape historically
+    /// emitted by some session sources.
+    public let canonicalizeSessionID: (@Sendable (String) -> String)?
+    /// Some TUIs (notably Codex) exit their process shortly after the
+    /// final `taskDone` event. Setting a non-nil value tells the active
+    /// sessions tracker to schedule a fast pid-liveness check this many
+    /// seconds after Stop, so the session disappears immediately on a
+    /// clean exit instead of waiting for the next 2 s liveness poll.
+    /// `nil` opts out (the default).
+    public let postStopExitGrace: TimeInterval?
 
     public init(
         id: String,
@@ -63,7 +76,9 @@ public struct ProviderDescriptor: Sendable {
             supportsResume: false,
             supportsNewSession: false
         ),
-        resolveToolAlias: @escaping @Sendable (String) -> String?
+        resolveToolAlias: @escaping @Sendable (String) -> String?,
+        canonicalizeSessionID: (@Sendable (String) -> String)? = nil,
+        postStopExitGrace: TimeInterval? = nil
     ) {
         self.id = id
         self.displayName = displayName
@@ -73,5 +88,13 @@ public struct ProviderDescriptor: Sendable {
         self.notchEnabledDefaultsKey = notchEnabledDefaultsKey
         self.capabilities = capabilities
         self.resolveToolAlias = resolveToolAlias
+        self.canonicalizeSessionID = canonicalizeSessionID
+        self.postStopExitGrace = postStopExitGrace
+    }
+
+    /// Returns the canonical session id for this provider. Falls back to
+    /// the raw value when the descriptor declares no normalizer.
+    public func canonicalSessionID(_ sessionId: String) -> String {
+        canonicalizeSessionID?(sessionId) ?? sessionId
     }
 }

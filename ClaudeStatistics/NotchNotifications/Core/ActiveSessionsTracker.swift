@@ -407,12 +407,15 @@ final class ActiveSessionsTracker: ObservableObject {
 
         refresh()
 
-        // Codex TUI often exits the process shortly after the final Stop event.
-        // Give it a brief grace period and then drop the session if the pid is
-        // already gone — this catches the clean-exit case quickly, without
-        // waiting for the 2 s liveness poll.
-        if event.provider == .codex, case .taskDone = event.kind, let pid = event.pid {
-            schedulePostStopExitCheck(key: key, pid: pid)
+        // Some TUIs (e.g. Codex) exit shortly after the final Stop event;
+        // those providers declare `postStopExitGrace` and we run a fast
+        // pid-liveness check after the configured grace window so the
+        // session disappears immediately on clean exit instead of
+        // waiting for the next 2 s liveness poll.
+        if let grace = event.provider.descriptor.postStopExitGrace,
+           case .taskDone = event.kind,
+           let pid = event.pid {
+            schedulePostStopExitCheck(key: key, pid: pid, grace: grace)
         }
 
     }
@@ -549,13 +552,14 @@ final class ActiveSessionsTracker: ObservableObject {
         }
     }
 
-    private func schedulePostStopExitCheck(key: String, pid: Int32) {
+    private func schedulePostStopExitCheck(key: String, pid: Int32, grace: TimeInterval) {
+        let nanos = UInt64(max(0, grace) * 1_000_000_000)
         Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 250_000_000)
+            try? await Task.sleep(nanoseconds: nanos)
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 guard let runtime = self.runtimeByKey[key],
-                      runtime.provider == .codex,
+                      runtime.provider.descriptor.postStopExitGrace != nil,
                       runtime.pid == pid,
                       !LivenessChecker.isProcessAlive(pid) else { return }
                 self.runtimeByKey.removeValue(forKey: key)
@@ -762,20 +766,8 @@ final class ActiveSessionsTracker: ObservableObject {
 
     private static func runtimeSessionID(for session: Session) -> String {
         let kind = ProviderKind(rawValue: session.provider) ?? .claude
-        return canonicalSessionID(provider: kind, sessionId: session.externalID.nilIfEmpty ?? session.id)
-    }
-
-    private static func canonicalSessionID(provider: ProviderKind, sessionId: String) -> String {
-        guard provider == .claude else { return sessionId }
-        return canonicalClaudeSessionID(sessionId)
-    }
-
-    private static func canonicalClaudeSessionID(_ sessionId: String) -> String {
-        guard sessionId.contains("::"),
-              let rawID = sessionId.components(separatedBy: "::").last?.nilIfEmpty else {
-            return sessionId
-        }
-        return rawID
+        let raw = session.externalID.nilIfEmpty ?? session.id
+        return kind.descriptor.canonicalSessionID(raw)
     }
 
 }
