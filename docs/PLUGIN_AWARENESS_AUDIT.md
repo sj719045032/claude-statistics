@@ -95,7 +95,7 @@
 
 | file:line | 描述 |
 |---|---|
-| `ClaudeStatistics/Providers/ProviderDescriptor+Builtins.swift:16/27/38` | 三个 `iconAssetName: "ClaudeProviderIcon"` 等字面量 |
+| `ClaudeStatistics/Providers/ProviderDescriptor+Builtins.swift:16/27/38` | 三个 `iconAssetName: "ClaudeProviderIcon"` 等字面量 — **by design**：每个 builtin descriptor 自带 asset 名是其声明的一部分；plugin 自己声明 asset 名（在 plugin bundle resource）。 |
 
 ### 3.6 维度 A 小计
 
@@ -142,7 +142,7 @@ CRITICAL 4（含 1 项已纠正为非缺陷）/ SCHEMA 7 / ROUTING 16 / STARTUP 
 
 | file:line | 描述 |
 |---|---|
-| `ClaudeStatistics/Terminal/TerminalPreferences.swift:50-57` | `ghosttyOptionID / iTermOptionID …` 8 个字符串常量 |
+| `ClaudeStatistics/Terminal/TerminalPreferences.swift:50-57` | `ghosttyOptionID / iTermOptionID …` 8 个字符串常量 — **by design**：builtin terminal id 命名空间，第三方 plugin 通过自己的 descriptor.id 注册（`PluginBackedTerminalCapability.optionID = descriptor.id`），不需要进入这个常量表 |
 
 ### 4.5 维度 B 小计
 
