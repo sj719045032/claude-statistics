@@ -104,10 +104,6 @@ enum MenuBarPreferences {
     static func setVisible(_ kind: ProviderKind, _ visible: Bool) {
         setVisible(descriptorID: kind.rawValue, visible)
     }
-
-    static func visibleKinds() -> [ProviderKind] {
-        ProviderKind.allBuiltins.filter { isVisible($0) }
-    }
 }
 
 /// Builtin provider capability constants. The `ProviderCapabilities`

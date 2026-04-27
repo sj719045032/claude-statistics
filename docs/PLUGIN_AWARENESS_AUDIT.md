@@ -40,10 +40,10 @@
 
 | file:line | 描述 |
 |---|---|
-| `ClaudeStatistics/Views/SettingsView.swift:22-24` | 三个 `@AppStorage(MenuBarPreferences.key(for: .claude/.codex/.gemini))` 写死 binding |
-| `ClaudeStatistics/Views/SettingsView.swift:577-583` | 菜单栏 Toggle 块 `providerToggleLabel("Claude"/"Codex"/"Gemini", asset: …)` 三行字面量 |
+| ~~`ClaudeStatistics/Views/SettingsView.swift:22-24`~~ | ~~三个 `@AppStorage(MenuBarPreferences.key(for: .claude/.codex/.gemini))` 写死 binding~~ → 替换为 `menuBarRevision` + `menuBarBinding(forDescriptorID:)` 通用 binding（已落地） |
+| ~~`ClaudeStatistics/Views/SettingsView.swift:577-583`~~ | ~~菜单栏 Toggle 块~~ → 已改成 `ForEach(menuBarDescriptors)` 迭代，覆盖 plugin-contributed providers（已落地） |
 | ~~`ClaudeStatistics/Views/SettingsView.swift:979`~~ | ~~Developer Settings → Rebuild Index~~ — **非缺陷**：rebuild 操作的是 host 内部 SessionStore index，第三方 ProviderPlugin 的 session 数据流暂未接入 SessionStore，列出 `supportedProviders` 是语义正确。等 P1/P2 把 plugin session 接入数据流后再视情况调整。 |
-| `ClaudeStatistics/Models/ProviderKind.swift:101` | `visibleKinds()` 过滤 `ProviderKind.allCases`；UI 显示/隐藏受 enum 限制 |
+| ~~`ClaudeStatistics/Models/ProviderKind.swift:101`~~ | ~~`visibleKinds()` 过滤 `ProviderKind.allCases`~~ → dead code，已删除（`StatusBarController.visibleKinds` 自己走 `allKnownDescriptors`）|
 | `ClaudeStatistics/Providers/BuiltinProviderPlugins.swift:29/45/61` | 三个 dogfood `makeProvider()` 直接返回 `*Provider.shared` 单例 |
 
 ### 3.2 SCHEMA — UserDefaults / @AppStorage key 锚定在枚举
