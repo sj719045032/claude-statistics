@@ -18,11 +18,22 @@ public struct ShareRoleDescriptor: Sendable, Hashable {
 
 /// A plugin that contributes one or more share-card roles plus the
 /// scoring functions that decide which role wins for a given user's
-/// metrics. Stage 3 introduces the minimal protocol surface — just
-/// `roles` — so the host's `PluginRegistry` and any third-party
-/// plugin can interoperate at the metadata level. Stage 4 adds
-/// `evaluate(metrics:baseline:) -> [ShareRoleScore]` once
-/// `ShareMetrics` migrates into this SDK.
+/// metrics. The minimal protocol surface is `roles` (which descriptors
+/// the plugin contributes) and `evaluate(context:)` (how each role
+/// scores against an aggregate context). The default `evaluate`
+/// returns an empty array, so a plugin that only wants to declare
+/// roles for some other UI surface (without participating in the
+/// builtin ranking) can omit the method.
 public protocol ShareRolePlugin: Plugin {
     var roles: [ShareRoleDescriptor] { get }
+
+    /// Score each `roles` descriptor for the supplied evaluation
+    /// context. Returned `roleID`s should match descriptor ids the
+    /// plugin previously declared; unknown ids are dropped by the host
+    /// before merging. Scores are clamped to `[0, 1]`.
+    func evaluate(context: ShareRoleEvaluationContext) -> [ShareRoleScoreEntry]
+}
+
+public extension ShareRolePlugin {
+    func evaluate(context: ShareRoleEvaluationContext) -> [ShareRoleScoreEntry] { [] }
 }
