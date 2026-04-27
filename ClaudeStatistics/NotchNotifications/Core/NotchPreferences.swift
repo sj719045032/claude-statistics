@@ -6,12 +6,6 @@ import ClaudeStatisticsKit
 /// here — capability (which events a provider emits, whether an installer
 /// exists) is declared on each `SessionProvider`.
 enum NotchPreferences {
-    // Thin per-provider key aliases so `@AppStorage(NotchPreferences.claudeKey)`
-    // in views reads cleanly. All delegate to the provider's own rawValue-based
-    // key — no per-provider branching here.
-    static var claudeKey: String { ProviderKind.claude.descriptor.notchEnabledDefaultsKey }
-    static var codexKey:  String { ProviderKind.codex.descriptor.notchEnabledDefaultsKey }
-    static var geminiKey: String { ProviderKind.gemini.descriptor.notchEnabledDefaultsKey }
     static let screenSelectionKey = "notch.screen.selection"
     static let mainScreenSelection = "main"
     /// Master switch for keyboard-driven notch interaction: island hotkey

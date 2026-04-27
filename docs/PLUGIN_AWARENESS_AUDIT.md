@@ -50,13 +50,13 @@
 
 | file:line | 描述 |
 |---|---|
-| `ClaudeStatistics/Models/ProviderKind.swift:27-` | `MenuBarPreferences.key(for:)`、`NotchPreferences` 多个 helper 全部以 `ProviderKind` 为入参 |
-| `ClaudeStatistics/Models/ProviderKind.swift:86-89` | `MenuBarPreferences.register()` 循环 `ProviderKind.allCases` 写默认值 |
-| `ClaudeStatistics/NotchNotifications/Core/NotchPreferences.swift:12-14` | `claudeKey/codexKey/geminiKey` 三个静态 alias |
-| `ClaudeStatistics/NotchNotifications/Core/NotchPreferences.swift:53` | `anyProviderEnabled` 走 `ProviderKind.allCases.contains(where:)` |
-| `ClaudeStatistics/NotchNotifications/Core/NotchPreferences.swift:77-81` | 旧版 key 迁移循环仅遍历 enum |
-| `ClaudeStatistics/App/StatusBarController.swift:241-243` | 状态栏菜单可见性绑定再次复用三个 enum-keyed @AppStorage |
-| `ClaudeStatistics/NotchNotifications/Hooks/CodexHookInstaller.swift:5` | `providerId: String = ProviderKind.codex.rawValue` 用 enum 锚字符串 |
+| `ClaudeStatistics/Models/ProviderKind.swift:27-` | `MenuBarPreferences.key(for:)` / `NotchPreferences` ProviderKind-入参 helper — **non-issue**：`ProviderKind` 现已是 open string struct，第三方 plugin 通过 `ProviderKind(rawValue: id)` 即可调用；`key(forDescriptorID:)` / `isEnabled(descriptor:)` 也已就位 |
+| ~~`ClaudeStatistics/Models/ProviderKind.swift:86-89`~~ | ~~`MenuBarPreferences.register()` 循环 `ProviderKind.allCases` 写默认值~~ — **by design**：one-time launch defaults for builtin trio；plugin 通过 `registerDefault(forDescriptorID:)` 走自己的注册路径 |
+| ~~`ClaudeStatistics/NotchNotifications/Core/NotchPreferences.swift:12-14`~~ | ~~`claudeKey/codexKey/geminiKey` 三个静态 alias~~ → dead code，已删除 (2026-04-27) |
+| ~~`ClaudeStatistics/NotchNotifications/Core/NotchPreferences.swift:53`~~ | ~~`anyProviderEnabled` 走 `ProviderKind.allCases`~~ → 改 `allKnownDescriptors(plugins:).contains(isEnabled(descriptor:))`，plugin 自动参与（已落地）|
+| `ClaudeStatistics/NotchNotifications/Core/NotchPreferences.swift:77-81` | 旧版 key 迁移循环仅遍历 enum — **by design**：legacy single `notch.enabled` 迁移到 builtin 三个 per-provider key，plugin 没有 legacy concept 不需要进入 |
+| ~~`ClaudeStatistics/App/StatusBarController.swift:241-243`~~ | ~~状态栏菜单可见性绑定~~ → 已用 `preferenceRevision` + `allKnownDescriptors` 驱动（已落地）|
+| `ClaudeStatistics/NotchNotifications/Hooks/CodexHookInstaller.swift:5` | `providerId: String = ProviderKind.codex.rawValue` — **non-issue**：用类型常量代替魔法字符串是好实践 |
 
 ### 3.3 ROUTING — 无 default 的 switch / case-级别特判
 
