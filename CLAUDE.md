@@ -19,6 +19,14 @@ when missing, so the Debug app can keep a stable TCC identity across rebuilds.
 rm -rf ~/Library/Developer/Xcode/DerivedData/ClaudeStatistics-*/Build/Products/Debug/Claude\ Statistics.app
 ```
 
+## Running Tests
+
+```bash
+bash scripts/run-tests.sh
+```
+
+**IMPORTANT:** Never run raw `xcodebuild test ...` without `PRODUCT_BUNDLE_IDENTIFIER=com.tinystone.ClaudeStatistics.debug` overriding the default. The project's default bundle ID is `com.tinystone.ClaudeStatistics` — same as the installed Release app. `xcodebuild test` on macOS launches the host app (XCTest injects into it), so the raw command wakes up / re-registers over the Release `/Applications/Claude Statistics.app`. Use this script (or copy its override) instead. The script also `lsregister -u`'s the test bundle afterwards so Launch Services doesn't keep a stale `/tmp` pointer.
+
 ## Provider Code Organization
 
 The app supports three providers (Claude / Codex / Gemini). Provider-specific
