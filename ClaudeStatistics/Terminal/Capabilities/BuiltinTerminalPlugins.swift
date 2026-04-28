@@ -157,32 +157,3 @@ final class WezTermPlugin: NSObject, TerminalPlugin {
     override init() { super.init() }
 }
 
-@objc(WarpPlugin)
-final class WarpPlugin: NSObject, TerminalPlugin {
-    static let manifest = PluginManifest(
-        id: "dev.warp.Warp-Stable",
-        kind: .terminal,
-        displayName: "Warp",
-        version: SemVer(major: 1, minor: 0, patch: 0),
-        minHostAPIVersion: SDKInfo.apiVersion,
-        permissions: [],
-        principalClass: "WarpPlugin"
-    )
-    private let capability = WarpTerminalCapability()
-    var descriptor: TerminalDescriptor { capability.descriptor }
-    func detectInstalled() -> Bool { capability.isInstalled }
-    func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
-        AccessibilityTerminalFocusRouteHandler()
-    }
-    func makeLauncher() -> (any TerminalLauncher)? {
-        capability as? any TerminalLauncher
-    }
-    func makeReadinessProvider() -> (any TerminalReadinessProviding)? {
-        capability as? any TerminalReadinessProviding
-    }
-    func makeSetupWizard() -> (any TerminalSetupProviding)? {
-        capability as? any TerminalSetupProviding
-    }
-    override init() { super.init() }
-}
-

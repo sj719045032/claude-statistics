@@ -146,6 +146,7 @@
 		5BB6284456AC6029BBF8DE0D /* UsageHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E476D9F870BCC0644BC74FD3 /* UsageHistoryStore.swift */; };
 		5C10ED712F0303F6EFFD2081 /* ShareRoleEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A872F99484F4F48F8F878E49 /* ShareRoleEngineTests.swift */; };
 		5CDD29E21151F5CC8F466F4B /* IdlePeekCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E1B7BED272EFA6F7FB5C0B3 /* IdlePeekCard.swift */; };
+		6358C2762C6D6D85AC919DF8 /* WarpPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F49B383915AEEBCCDC916171 /* WarpPlugin.swift */; };
 		6381FDCEA8C711F7353696CE /* MessageRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DFE81229B8A87810C7DF58A /* MessageRow.swift */; };
 		64954F8535C5DA9FD1AE6D8B /* CostModelsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCA5C01E14873CBF3E6419F7 /* CostModelsCard.swift */; };
 		64F04CD80957EA08D6B2B1C7 /* ModelTokenStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52E462E75817E26A0FBF0558 /* ModelTokenStats.swift */; };
@@ -188,6 +189,7 @@
 		7B647CA03E39E1B7CDB94D42 /* TranscriptDisplayMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EBA6E09EEB67ED884B4504F /* TranscriptDisplayMessage.swift */; };
 		7B83C799735777CD72DB9A87 /* VSCodePlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 5AD2F29DA1EEA44E8B785C0A /* VSCodePlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		7C6F2559DC6E88F725FDE0A4 /* SessionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 695C93B3138170CBBA58E7FB /* SessionRow.swift */; };
+		7C84A261758C915B999EE6E3 /* ClaudeStatisticsKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; };
 		7CD9C8820D5C77BDC5DE0E35 /* PendingResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A3701AFF5252558AFDD027 /* PendingResponse.swift */; };
 		7DDF1FCD20AD18EFE47F3067 /* ToolActivityFormatterCompletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F10B1989F38BD8829116BBE /* ToolActivityFormatterCompletionTests.swift */; };
 		7E48B08D0513149CA87ADE4C /* TerminalIdentityResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B71EA214A4CBCF6BFE070E4A /* TerminalIdentityResolver.swift */; };
@@ -307,7 +309,6 @@
 		D98C48521859A7AF6E45A504 /* ToolOutputCleaning.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F4D9370C84C4AFB66D25201 /* ToolOutputCleaning.swift */; };
 		D99027587C25DA018DE94928 /* ActiveSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E023CB9F472AC7C93777B50 /* ActiveSession.swift */; };
 		DD7C095838B9FA06B94D9DFA /* GeminiAccountManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8938B8C0465ECC95BC0D9BAF /* GeminiAccountManager.swift */; };
-		DE0235CC9D9671CEA84DB392 /* WarpTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9106D93553358D8AFE4C3EE6 /* WarpTerminalCapability.swift */; };
 		DE4144CC6421F5ECD432A66C /* TranscriptParser+Trend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3184FFA7D8598D923510D8EE /* TranscriptParser+Trend.swift */; };
 		DED70E0C72C753C4492E8A84 /* WindsurfPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 40D1EFBD1FA452CAB2FC7DEC /* WindsurfPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		DF30CD5504F391E42C582602 /* PluginTrustGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBF2E6F7720B297179A63812 /* PluginTrustGate.swift */; };
@@ -341,6 +342,7 @@
 		F319BEBA588C70528472E710 /* DisplayTextClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1585E37EA4FB0491BA86CA2B /* DisplayTextClassifier.swift */; };
 		F324566F7B85AFF3C7E1EEAC /* CalendarHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1390435247ECA654A169EB3C /* CalendarHeatmap.swift */; };
 		F3272760285AF18F519D8E80 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41054FA7DE043B7E25B4A88E /* MenuBarView.swift */; };
+		F32FC3771216AB14B758D85C /* WarpPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 80332DBB29AEBEF37DADF439 /* WarpPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		F34E915FE87F63D8BB7181BD /* ClaudeAccountManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C931907E9B4996736E4A7373 /* ClaudeAccountManager.swift */; };
 		F36D40FE127E863FBF99E305 /* NotchWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96A67BCB46008F2465867BD4 /* NotchWindowController.swift */; };
 		F508F785ACD950DAA8453487 /* NotificationTimerStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 563272C01660D2FA4FBCBE13 /* NotificationTimerStoreTests.swift */; };
@@ -387,6 +389,13 @@
 			remoteGlobalIDString = 7219A5031D3C80D1C5682BA5;
 			remoteInfo = ClaudeAppPlugin;
 		};
+		4113395B0EBBEF3C30F20E65 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 18B1CC7C2F803601C447E6E4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0CF09A1D36F30D5CA3AD359E;
+			remoteInfo = WarpPlugin;
+		};
 		69FAD06793A2E60392EA5C09 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 18B1CC7C2F803601C447E6E4 /* Project object */;
@@ -409,6 +418,13 @@
 			remoteInfo = ZedPlugin;
 		};
 		7975F3850A9873CACC54BD72 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 18B1CC7C2F803601C447E6E4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DEB25A2406721FCABB7A5B97;
+			remoteInfo = ClaudeStatisticsKit;
+		};
+		7FB404D103F9A577293D8DC4 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 18B1CC7C2F803601C447E6E4 /* Project object */;
 			proxyType = 1;
@@ -512,6 +528,7 @@
 				DED70E0C72C753C4492E8A84 /* WindsurfPlugin.bundle in Embed Dependencies */,
 				A400D230F0DC4BE076682BCA /* TraePlugin.bundle in Embed Dependencies */,
 				67D886006A577EF42FBCDECC /* ZedPlugin.bundle in Embed Dependencies */,
+				F32FC3771216AB14B758D85C /* WarpPlugin.bundle in Embed Dependencies */,
 			);
 			name = "Embed Dependencies";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -712,6 +729,7 @@
 		7F2DF9762DDE871C2C51B049 /* ZedPlugin.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZedPlugin.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
 		7F4D9370C84C4AFB66D25201 /* ToolOutputCleaning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolOutputCleaning.swift; sourceTree = "<group>"; };
 		7F675DD2E08BB0AC4ADBB101 /* AttentionEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionEvent.swift; sourceTree = "<group>"; };
+		80332DBB29AEBEF37DADF439 /* WarpPlugin.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WarpPlugin.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
 		805E37589FAEC2B84328D36A /* WireMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WireMessage.swift; sourceTree = "<group>"; };
 		806EBE2626FDBEC34484CEEC /* SharePluginScoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharePluginScoring.swift; sourceTree = "<group>"; };
 		808F166AA1B5F781858856E1 /* TerminalSetupCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSetupCoordinator.swift; sourceTree = "<group>"; };
@@ -734,7 +752,6 @@
 		8FE62A428252AC30E71689F7 /* MarkdownFonts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownFonts.swift; sourceTree = "<group>"; };
 		907576DD936254F8D2574A2E /* ClaudeStatisticsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClaudeStatisticsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		90F512C526FE1749E3C057B6 /* PeriodModelBreakdownCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeriodModelBreakdownCard.swift; sourceTree = "<group>"; };
-		9106D93553358D8AFE4C3EE6 /* WarpTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WarpTerminalCapability.swift; sourceTree = "<group>"; };
 		91C96A74998EE00B79497160 /* VSCodePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VSCodePlugin.swift; sourceTree = "<group>"; };
 		92102BACD66FCBC76D328044 /* PluginsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginsSettingsView.swift; sourceTree = "<group>"; };
 		92645B8FEE030EB0D65F618C /* ProviderSessionDisplayFormatter+Candidates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProviderSessionDisplayFormatter+Candidates.swift"; sourceTree = "<group>"; };
@@ -848,6 +865,7 @@
 		E77D7C8475F613B82BA40646 /* CodexHookInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexHookInstaller.swift; sourceTree = "<group>"; };
 		E7CDF939858DF7A343D5387F /* RuntimeSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSession.swift; sourceTree = "<group>"; };
 		E7CF1FA30930F012CBB85B3D /* TerminalContextDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalContextDetector.swift; sourceTree = "<group>"; };
+		E82A4B656FB6D41DBE901D98 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		E87465C198566D18C4329220 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		E8E58160DD80E8C522C520D8 /* RecentSessionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentSessionRow.swift; sourceTree = "<group>"; };
 		E8E853418A761D4E7EE20D9A /* WaitingInputCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaitingInputCard.swift; sourceTree = "<group>"; };
@@ -874,6 +892,7 @@
 		F3BA52F0BB4EF6A31E3B0200 /* TraePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TraePlugin.swift; sourceTree = "<group>"; };
 		F3D7D7759B0623FB3A0EFA15 /* RuntimeSessionEventApplierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSessionEventApplierTests.swift; sourceTree = "<group>"; };
 		F4387E440942DCAE1B61C97F /* ITermTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ITermTerminalCapability.swift; sourceTree = "<group>"; };
+		F49B383915AEEBCCDC916171 /* WarpPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WarpPlugin.swift; sourceTree = "<group>"; };
 		F5486873DBEC29739725E366 /* StatusBarPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarPanel.swift; sourceTree = "<group>"; };
 		F5CD3EF8FA91298047B26D20 /* TrendDataPoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendDataPoint.swift; sourceTree = "<group>"; };
 		F67265718ACB26BE5322C36F /* MenuBarFooter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarFooter.swift; sourceTree = "<group>"; };
@@ -946,6 +965,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				3E80822F450B4C1AF25B6597 /* ClaudeStatisticsKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C761DF2B7A75ED43956D15F8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7C84A261758C915B999EE6E3 /* ClaudeStatisticsKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1075,6 +1102,7 @@
 				2C2B9D441D4C392C0F00863A /* CursorPlugin.bundle */,
 				23C67298966CCB82BB03EF9C /* TraePlugin.bundle */,
 				5AD2F29DA1EEA44E8B785C0A /* VSCodePlugin.bundle */,
+				80332DBB29AEBEF37DADF439 /* WarpPlugin.bundle */,
 				40D1EFBD1FA452CAB2FC7DEC /* WindsurfPlugin.bundle */,
 				7F2DF9762DDE871C2C51B049 /* ZedPlugin.bundle */,
 			);
@@ -1234,6 +1262,16 @@
 			path = ClaudeStatistics;
 			sourceTree = "<group>";
 		};
+		31DB8414E2C9C86C06B6F515 /* WarpPlugin */ = {
+			isa = PBXGroup;
+			children = (
+				E82A4B656FB6D41DBE901D98 /* Info.plist */,
+				F49B383915AEEBCCDC916171 /* WarpPlugin.swift */,
+			);
+			name = WarpPlugin;
+			path = Plugins/Sources/WarpPlugin;
+			sourceTree = "<group>";
+		};
 		325C8E62472A3F1EF0DDD0AF /* Core */ = {
 			isa = PBXGroup;
 			children = (
@@ -1366,7 +1404,6 @@
 				89661CA17E93D43C4B68FC23 /* GhosttyTerminalCapability.swift */,
 				F4387E440942DCAE1B61C97F /* ITermTerminalCapability.swift */,
 				86B78596315756EA65E43D80 /* KittyTerminalCapability.swift */,
-				9106D93553358D8AFE4C3EE6 /* WarpTerminalCapability.swift */,
 				C9B269891E67AA3FB9D53E64 /* WezTermTerminalCapability.swift */,
 			);
 			path = Capabilities;
@@ -1420,6 +1457,7 @@
 				185584B6C5BFE6702E9C2E9E /* CursorPlugin */,
 				90D91EB78F80AC03A52E6A6D /* TraePlugin */,
 				0DD94F1E5E9CB86DB74B681D /* VSCodePlugin */,
+				31DB8414E2C9C86C06B6F515 /* WarpPlugin */,
 				7C9D6D06931362BACB41FFC5 /* WindsurfPlugin */,
 				89013ED5A3F9D1F70BA0B016 /* ZedPlugin */,
 				1341AC1398085D0EADE92592 /* Frameworks */,
@@ -1652,6 +1690,25 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		0CF09A1D36F30D5CA3AD359E /* WarpPlugin */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 74EE1ED130086B4670624539 /* Build configuration list for PBXNativeTarget "WarpPlugin" */;
+			buildPhases = (
+				7B95A800FF8876B055304E2F /* Sources */,
+				C761DF2B7A75ED43956D15F8 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				9CC0EADFD3A3C225B351970F /* PBXTargetDependency */,
+			);
+			name = WarpPlugin;
+			packageProductDependencies = (
+			);
+			productName = WarpPlugin;
+			productReference = 80332DBB29AEBEF37DADF439 /* WarpPlugin.bundle */;
+			productType = "com.apple.product-type.bundle";
+		};
 		3600D65FD517F507E84B13F4 /* WindsurfPlugin */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = C619B00E1B29A829337A1AE6 /* Build configuration list for PBXNativeTarget "WindsurfPlugin" */;
@@ -1806,6 +1863,7 @@
 				7E6A29C8C2AD362F4CCF9B17 /* PBXTargetDependency */,
 				7D5D9C51E2EDB494E068BE32 /* PBXTargetDependency */,
 				9E327EB423305EFF95D64128 /* PBXTargetDependency */,
+				03A0C8E605F4EB357471FD9B /* PBXTargetDependency */,
 			);
 			name = ClaudeStatistics;
 			packageProductDependencies = (
@@ -1864,6 +1922,9 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
+					0CF09A1D36F30D5CA3AD359E = {
+						ProvisioningStyle = Automatic;
+					};
 					3600D65FD517F507E84B13F4 = {
 						ProvisioningStyle = Automatic;
 					};
@@ -1921,6 +1982,7 @@
 				44D7019F27E3E862125F144D /* CursorPlugin */,
 				3BF07BD1A9E6D172E5E10B75 /* TraePlugin */,
 				A5EA0ADFE2151E072E433A5E /* VSCodePlugin */,
+				0CF09A1D36F30D5CA3AD359E /* WarpPlugin */,
 				3600D65FD517F507E84B13F4 /* WindsurfPlugin */,
 				87DCF594EBA4E2D293793B07 /* ZedPlugin */,
 			);
@@ -1997,6 +2059,14 @@
 				7FE4347A1452269B1C4BA6BD /* TranscriptParserTests.swift in Sources */,
 				E8DE1057D8CA0EF0311CD390 /* UsageVMRegistryTests.swift in Sources */,
 				4C27C5DD7022DEE994CAA840 /* WireEventTranslatorTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7B95A800FF8876B055304E2F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6358C2762C6D6D85AC919DF8 /* WarpPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2268,7 +2338,6 @@
 				C48BDE19A5E58235BAB61F51 /* UsageViewModel.swift in Sources */,
 				F6601FAA89B6B7CE9A56779B /* UsageWindowRow.swift in Sources */,
 				663E5EC2269BC72FDE27ADB5 /* WaitingInputCard.swift in Sources */,
-				DE0235CC9D9671CEA84DB392 /* WarpTerminalCapability.swift in Sources */,
 				4CE3642E43CC24EF1EECFF65 /* WezTermTerminalCapability.swift in Sources */,
 				95C9B1EF669A91B5F178BA20 /* WireEventTranslator.swift in Sources */,
 				123A7C30556D89B77A29D544 /* WireMessage.swift in Sources */,
@@ -2345,6 +2414,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		03A0C8E605F4EB357471FD9B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0CF09A1D36F30D5CA3AD359E /* WarpPlugin */;
+			targetProxy = 4113395B0EBBEF3C30F20E65 /* PBXContainerItemProxy */;
+		};
 		1E79F6FD288CAD5044D1E220 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = DEB25A2406721FCABB7A5B97 /* ClaudeStatisticsKit */;
@@ -2389,6 +2463,11 @@
 			isa = PBXTargetDependency;
 			target = DEB25A2406721FCABB7A5B97 /* ClaudeStatisticsKit */;
 			targetProxy = E3447B6F680F2DA6FFD2B3B0 /* PBXContainerItemProxy */;
+		};
+		9CC0EADFD3A3C225B351970F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DEB25A2406721FCABB7A5B97 /* ClaudeStatisticsKit */;
+			targetProxy = 7FB404D103F9A577293D8DC4 /* PBXContainerItemProxy */;
 		};
 		9E327EB423305EFF95D64128 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -2504,6 +2583,52 @@
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.TraePlugin;
 				PRODUCT_NAME = TraePlugin;
+				SDKROOT = macosx;
+				SKIP_INSTALL = NO;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				WRAPPER_EXTENSION = csplugin;
+			};
+			name = Debug;
+		};
+		3A80D22228D4E85198A11E28 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Plugins/Sources/WarpPlugin/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACH_O_TYPE = mh_bundle;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.WarpPlugin;
+				PRODUCT_NAME = WarpPlugin;
+				SDKROOT = macosx;
+				SKIP_INSTALL = NO;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				WRAPPER_EXTENSION = csplugin;
+			};
+			name = Release;
+		};
+		4302B53CE16599109073A352 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Plugins/Sources/WarpPlugin/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACH_O_TYPE = mh_bundle;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.WarpPlugin;
+				PRODUCT_NAME = WarpPlugin;
 				SDKROOT = macosx;
 				SKIP_INSTALL = NO;
 				SWIFT_STRICT_CONCURRENCY = minimal;
@@ -3032,6 +3157,15 @@
 			buildConfigurations = (
 				7FD4B3782431D3116278BC9D /* Debug */,
 				DA2DA7FD5E62CF529DF8CB6A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		74EE1ED130086B4670624539 /* Build configuration list for PBXNativeTarget "WarpPlugin" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4302B53CE16599109073A352 /* Debug */,
+				3A80D22228D4E85198A11E28 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

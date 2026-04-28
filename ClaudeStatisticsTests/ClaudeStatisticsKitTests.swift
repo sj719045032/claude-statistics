@@ -1474,12 +1474,12 @@ final class PluginReflectionTests: XCTestCase {
         (GhosttyPlugin.manifest.principalClass, GhosttyPlugin.self),
         (KittyPlugin.manifest.principalClass, KittyPlugin.self),
         (WezTermPlugin.manifest.principalClass, WezTermPlugin.self),
-        (WarpPlugin.manifest.principalClass, WarpPlugin.self),
         (AlacrittyPlugin.manifest.principalClass, AlacrittyPlugin.self)
-        // Editor plugins (VSCode / Cursor / Windsurf / Trae / Zed) ship as
-        // `.csplugin` bundles, same as ClaudeAppPlugin / CodexAppPlugin —
-        // the loader exercises them at runtime via NSClassFromString once
-        // the bundle is dlopen'd, so they're not in this list.
+        // Editor plugins (VSCode / Cursor / Windsurf / Trae / Zed) and
+        // WarpPlugin ship as `.csplugin` bundles, same as ClaudeAppPlugin
+        // / CodexAppPlugin — the loader exercises them at runtime via
+        // NSClassFromString once the bundle is dlopen'd, so they're not
+        // in this list.
     ]
 
     func testManifestPrincipalClassMatchesObjcRuntimeName() {

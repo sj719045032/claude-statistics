@@ -68,8 +68,9 @@ final class AppState: ObservableObject {
         AppleTerminalPlugin.manifest.id:    { AppleTerminalPlugin() },
         GhosttyPlugin.manifest.id:          { GhosttyPlugin() },
         KittyPlugin.manifest.id:            { KittyPlugin() },
-        WezTermPlugin.manifest.id:          { WezTermPlugin() },
-        WarpPlugin.manifest.id:             { WarpPlugin() }
+        WezTermPlugin.manifest.id:          { WezTermPlugin() }
+        // WarpPlugin extracted to .csplugin (M2). Loaded via
+        // PluginLoader from Contents/PlugIns at runtime, not here.
     ]
 
     let pluginRegistry: PluginRegistry = {
