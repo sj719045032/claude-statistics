@@ -1,21 +1,33 @@
 import Foundation
-import ClaudeStatisticsKit
 import CoreServices
 
-final class FSEventsWatcher {
+/// FSEvents-backed `SessionWatcher` implementation. Lives in the SDK
+/// so plugin providers (Codex / Gemini / third-party) can reuse the
+/// same debounced FSEvents pump that the builtin Claude provider
+/// uses, without taking a host module dependency. All threading,
+/// debounce, and structural-vs-append differentiation logic stays
+/// here; callers only supply path + filter + onChange.
+public final class FSEventsWatcher {
     /// Differentiated debounce: single-file appends are surfaced quickly so
     /// the UI feels responsive after a CLI writes a new chunk; structural
     /// changes (creates / removes / renames / directory events) are
     /// debounced longer to coalesce bursts like `git checkout` switching a
     /// large folder of session logs.
-    struct DebounceConfig {
-        let fast: TimeInterval   // single-file append path
-        let slow: TimeInterval   // structural / directory path
-        static let `default` = DebounceConfig(fast: 0.2, slow: 2.0)
+    public struct DebounceConfig {
+        public let fast: TimeInterval   // single-file append path
+        public let slow: TimeInterval   // structural / directory path
+
+        public init(fast: TimeInterval, slow: TimeInterval) {
+            self.fast = fast
+            self.slow = slow
+        }
+
+        public static let `default` = DebounceConfig(fast: 0.2, slow: 2.0)
+
         /// Drop-in replacement for the legacy single-value debounce so
         /// existing call sites that pass a number still get a sensible
         /// configuration without behaviour drift.
-        static func legacy(_ value: TimeInterval) -> DebounceConfig {
+        public static func legacy(_ value: TimeInterval) -> DebounceConfig {
             DebounceConfig(fast: max(0.2, value * 0.1), slow: value)
         }
     }
@@ -32,7 +44,7 @@ final class FSEventsWatcher {
     private var fastWork: DispatchWorkItem?
     private var slowWork: DispatchWorkItem?
 
-    init(
+    public init(
         path: String,
         debounceSeconds: TimeInterval = 2.0,
         fileFilter: @escaping (String) -> Bool = { $0.hasSuffix(".jsonl") },
@@ -44,7 +56,7 @@ final class FSEventsWatcher {
         self.onChange = onChange
     }
 
-    init(
+    public init(
         path: String,
         debounce: DebounceConfig,
         fileFilter: @escaping (String) -> Bool = { $0.hasSuffix(".jsonl") },
@@ -56,7 +68,7 @@ final class FSEventsWatcher {
         self.onChange = onChange
     }
 
-    func start() {
+    public func start() {
         guard stream == nil else { return }
 
         let selfPtr = Unmanaged.passUnretained(self).toOpaque()
@@ -87,7 +99,7 @@ final class FSEventsWatcher {
         FSEventStreamStart(eventStream)
     }
 
-    func stop() {
+    public func stop() {
         fastWork?.cancel()
         slowWork?.cancel()
         fastWork = nil

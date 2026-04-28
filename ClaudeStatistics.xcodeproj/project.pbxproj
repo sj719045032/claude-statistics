@@ -251,6 +251,7 @@
 		AC2BF32B4E3AD3312561BF41 /* CursorPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A7BDC7BC722CCB4BFBDAEF4 /* CursorPlugin.swift */; };
 		AC5082113B4136915E426299 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 2710C957B5C3CF8708B02CC6 /* Localizable.strings */; };
 		AFE5B13BCD7D98DD27DF6EA0 /* GeminiProviderAccountCardAccessory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BD468B7884551FA250E5E0C /* GeminiProviderAccountCardAccessory.swift */; };
+		B0396884F0CF56BF174800CE /* FSEventsWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 751F9496F7CFE46913C4CEDF /* FSEventsWatcher.swift */; };
 		B04844AD3BA910295978D241 /* StatusBarPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5486873DBEC29739725E366 /* StatusBarPanel.swift */; };
 		B254C34493D9423B2010A88F /* ProviderUsagePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BCFE5BD947C85335BFC3783 /* ProviderUsagePresentation.swift */; };
 		B308C8501282F4C35D073282 /* GeminiHookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 623F6F9C65341AB301CF1B20 /* GeminiHookInstaller.swift */; };
@@ -356,7 +357,6 @@
 		F72B0F5DF1A5C91140456872 /* ActiveSessionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B57B82A4D2A78F05F1B1D7EC /* ActiveSessionRow.swift */; };
 		F7761B0329D579925F2DB98E /* UsageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3511F107E29217FB16567AF9 /* UsageView.swift */; };
 		F9A2EB368C20702F1D6E2FD4 /* MenuBarFooter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67265718ACB26BE5322C36F /* MenuBarFooter.swift */; };
-		FA20F885511C5F92715056F9 /* FSEventsWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35EC230BC5F1EF207A984D87 /* FSEventsWatcher.swift */; };
 		FA780917FC578D52FC305583 /* ModifierRecorderRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDA63237DD4854F868A0DCE4 /* ModifierRecorderRow.swift */; };
 		FBF2DAF01D66B86D4FF704B9 /* SessionDisplayDialogueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B842A348C3909C8D98C92B1 /* SessionDisplayDialogueTests.swift */; };
 		FC021C4982CCCCF7BE33A493 /* StatusLineScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC6EE5A2DBB624AC7941EBC0 /* StatusLineScript.swift */; };
@@ -686,7 +686,6 @@
 		33BC12E3CC3D917EBF49D537 /* Plugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugin.swift; sourceTree = "<group>"; };
 		3511F107E29217FB16567AF9 /* UsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageView.swift; sourceTree = "<group>"; };
 		352BD87D6827246B00AD2179 /* DestructiveConfirmation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestructiveConfirmation.swift; sourceTree = "<group>"; };
-		35EC230BC5F1EF207A984D87 /* FSEventsWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FSEventsWatcher.swift; sourceTree = "<group>"; };
 		36F9BBB23CB057720EA99A7B /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
 		370D33AC086199C95EC1E2CD /* UsageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageData.swift; sourceTree = "<group>"; };
 		397B635FE9ED8F8B01A5AD1A /* SharePluginThemes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharePluginThemes.swift; sourceTree = "<group>"; };
@@ -785,6 +784,7 @@
 		736108D4DB88CF8CCD52C603 /* ProviderBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderBadge.swift; sourceTree = "<group>"; };
 		73D3015C65881224ECFCC5BB /* TranscriptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptView.swift; sourceTree = "<group>"; };
 		7436B6045F6682BD8D483E81 /* TrendDataPoint+StatsPeriod.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrendDataPoint+StatsPeriod.swift"; sourceTree = "<group>"; };
+		751F9496F7CFE46913C4CEDF /* FSEventsWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FSEventsWatcher.swift; sourceTree = "<group>"; };
 		768B90604779E18157A73FBB /* IndependentClaudeCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndependentClaudeCredentialStore.swift; sourceTree = "<group>"; };
 		77339C38F26D780CFD6D03EB /* ClaudeStatistics.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClaudeStatistics.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7803032F49F6D004A094939E /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
@@ -1266,7 +1266,6 @@
 			isa = PBXGroup;
 			children = (
 				6749A9BF125AC2A04C7043D5 /* DatabaseService.swift */,
-				35EC230BC5F1EF207A984D87 /* FSEventsWatcher.swift */,
 				8C99C5F837066C3D1E5A2C0B /* SessionAllTimeAggregator.swift */,
 				3D5BA98DFF322E54A1E5B1F2 /* SessionDataStore.swift */,
 				0B6B0E05647AAB784A323B00 /* SessionDeduplicator.swift */,
@@ -1297,6 +1296,7 @@
 				5751B5879E1EAFCE00A80DAC /* DaySlice.swift */,
 				BF69875F08146D684A061030 /* DiagnosticLogger.swift */,
 				B109C795299FC3EF95E7AAD2 /* DisabledPluginsStore.swift */,
+				751F9496F7CFE46913C4CEDF /* FSEventsWatcher.swift */,
 				FFDDC93577A73B4D01F88B6A /* HookInstalling.swift */,
 				BD92CF4E1DC514CEDE539FDD /* HookProvider.swift */,
 				27777E73284A897EEB72F952 /* MenuBarStrip.swift */,
@@ -2426,7 +2426,6 @@
 				0AFA2A69E3254254B89CCD96 /* DestructiveConfirmation.swift in Sources */,
 				F319BEBA588C70528472E710 /* DisplayTextClassifier.swift in Sources */,
 				D1F0E7D54D71FD6B3F073609 /* ExternalTerminalCapability.swift in Sources */,
-				FA20F885511C5F92715056F9 /* FSEventsWatcher.swift in Sources */,
 				DD7C095838B9FA06B94D9DFA /* GeminiAccountManager.swift in Sources */,
 				B308C8501282F4C35D073282 /* GeminiHookInstaller.swift in Sources */,
 				78EA265074EEB931AB16B1AF /* GeminiHookNormalizer.swift in Sources */,
@@ -2615,6 +2614,7 @@
 				21492C1C67351582F64D20A1 /* DaySlice.swift in Sources */,
 				0A9AE4C18CF4EF95C9D5E793 /* DiagnosticLogger.swift in Sources */,
 				358900B6CF78E90B2D723B5B /* DisabledPluginsStore.swift in Sources */,
+				B0396884F0CF56BF174800CE /* FSEventsWatcher.swift in Sources */,
 				7AC6A56F2665F81ED453AF4A /* HookInstalling.swift in Sources */,
 				11368A70DC7D3E8FB244A360 /* HookProvider.swift in Sources */,
 				CD37F1D530329EE443219A6B /* MenuBarStrip.swift in Sources */,
