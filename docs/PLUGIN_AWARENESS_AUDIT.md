@@ -213,13 +213,13 @@ P0 主要项已完成。第三方 ProviderPlugin 装上 `.csplugin` 后，Settin
 
 ### P1 — 路由层去枚举依赖（中风险，touch 面广）
 
-| 工作项 | 影响范围 |
-|---|---|
-| 把 `switch provider` 全部迁到 `descriptor.<capability>` 接口（descriptor protocol 已经存在） | 维度 A 3.3 |
-| `RuntimeStatePersistor` / `ActiveSessionsTracker` 内部的 Claude/Codex 特判改成 descriptor 上的 hook | 维度 A 3.3 后段 |
-| `TerminalFocusCoordinator` / `AppleScriptFocuser` / `TerminalFocusRouteHandler` 改成 `TerminalCapability & TerminalFocusStrategy` 接口聚合，`switch bundleId` 退场 | 维度 B 4.2 |
-| `HookCLI` 的 builtin terminal name 检测下沉到 capability/plugin | 维度 B 4.2 后两行 |
-| `WireEventTranslator` 把 `default → .claude` 兜底改成 plugin 注册的 raw value 表 | 维度 A 3.3 |
+| 工作项 | 影响范围 | 状态 |
+|---|---|---|
+| 把 `switch provider` 全部迁到 `descriptor.<capability>` 接口（descriptor protocol 已经存在） | 维度 A 3.3 | ✅ 已完成（多 commit 累计 — 见进度日志） |
+| `RuntimeStatePersistor` / `ActiveSessionsTracker` 内部的 Claude/Codex 特判改成 descriptor 上的 hook | 维度 A 3.3 后段 | ✅ 已完成（`canonicalizeSessionID` / `postStopExitGrace` 等 capability hook 落地） |
+| `TerminalFocusCoordinator` / `AppleScriptFocuser` / `TerminalFocusRouteHandler` 改成 `TerminalCapability & TerminalFocusStrategy` 接口聚合，`switch bundleId` 退场 | 维度 B 4.2 | ✅ **已完成** (2026-04-28)：3 个 host 协议 (`TerminalFrontmostSessionProbing` / `TerminalAppleScriptContainsProbing` / `TerminalAppleScriptFocusing`) + 3 个 capability conformance (Apple/iTerm/Ghostty) + `TerminalRegistry.{frontmostSessionProber,appleScriptContainsProber,appleScriptFocusProber}(for:)` lookup。`AppleScriptFocuser` 472 → 90 行；`TerminalFocusCoordinator.isSessionFocused` 14 行内变 9 行；零硬编码 `switch bundleId`。`TerminalFocusRouteHandler` 不需要动（capability 接管后它只是 legacy 兼容层）。 |
+| `HookCLI` 的 builtin terminal name 检测下沉到 capability/plugin | 维度 B 4.2 后两行 | ⏳ 待办：HookCLI 在 main app 二进制以 CLI 模式运行（`main.swift:4`），**不能用 PluginRegistry**（registry 只在 SwiftUI app 进程构建）；下沉得做成「编译期可达的 builtin capability 列表」（host 端 builtin capability struct 直接 import）。 |
+| `WireEventTranslator` 把 `default → .claude` 兜底改成 plugin 注册的 raw value 表 | 维度 A 3.3 | ✅ 已完成（commit `eb6930b`） |
 
 ### P2 — 拓宽到第三类 PluginKind（设计 + 落地）
 
@@ -461,10 +461,29 @@ Chat-app launchers
 
 **P1 真正剩余**（下次 session 起点）：
 
-- `AppleScriptFocuser` 的 `switch bundleId` 退场（line 20 + line 182 各一道）：每个 case 内部含完整的 osascript 模板字符串（Apple Terminal / iTerm2 / Ghostty 三段独立逻辑）。下沉路径：SDK 加 `TerminalAppleScriptFocusing` 协议（`containsScript(...)` / `focusScript(...)`），3 个 capability struct 实现，`AppleScriptFocuser` 改为查 capability。需保证 osascript byte-equivalent。
-- `TerminalFocusCoordinator.isSessionFocused` 同样的 `switch bundleId`（line 500），逻辑更简单（直接 dispatch 到 3 个 host 函数）；可与上面合并到同一协议或单独 capability hook。
-- `HookCLI` `TerminalContextDetector` builtin terminal 检测下沉：env 检测（`KITTY_*` / `WEZTERM_*` / `ITERM_*`）+ Ghostty osascript fan-out。注意 HookCLI 在主 app 二进制以 CLI 模式运行（`main.swift:4`），**不能用 `PluginRegistry`**（plugin registry 只在 SwiftUI app 进程构建）；下沉得做成「编译期可达的 builtin capability 列表」（host 端 builtin capability struct 直接 import 即可）。
-- M2: 8 个 builtin terminal 抽 `.csplugin`（每个需 self-contain capability + launch + readiness 实现）。当前 builtin terminal capability 已经足够 plugin-aware，但仍编译进主二进制；抽出后 host 完全不区分 builtin / 第三方。
+- ~~`AppleScriptFocuser` 的 `switch bundleId` 退场~~ → ✅ 完成 (2026-04-28)：3 个协议 + 3 个 capability conformance；focuser 472 → 90 行。
+- ~~`TerminalFocusCoordinator.isSessionFocused` 同样的 `switch bundleId`~~ → ✅ 完成 (2026-04-28)：`TerminalFrontmostSessionProbing` 协议 + capability lookup。
+- ⏳ `HookCLI` `TerminalContextDetector` builtin terminal 检测下沉：env 检测（`KITTY_*` / `WEZTERM_*` / `ITERM_*`）+ Ghostty osascript fan-out。注意 HookCLI 在主 app 二进制以 CLI 模式运行（`main.swift:4`），**不能用 `PluginRegistry`**（plugin registry 只在 SwiftUI app 进程构建）；下沉得做成「编译期可达的 builtin capability 列表」（host 端 builtin capability struct 直接 import 即可）。
+- ⏳ M2: 8 个 builtin terminal 抽 `.csplugin`（每个需 self-contain capability + launch + readiness 实现）。当前 builtin terminal capability 已经足够 plugin-aware，但仍编译进主二进制；抽出后 host 完全不区分 builtin / 第三方。
+
+### 2026-04-28 (P1 收尾：terminal focus 三刀 + P3 cosmetic)
+
+**Terminal focus pipeline switch-bundleId 退场**（commits `14953df` / `677d716` / `8d6e629`）：
+
+- ✅ `TerminalFocusCoordinator.isSessionFocused`（line 500 旧代码）：新协议 `TerminalFrontmostSessionProbing`，3 个 AppleScript-able capability 各自提供 `frontmostFocusedSessionScript`，coordinator 改为 `TerminalRegistry.frontmostSessionProber(for:)` lookup + 共享 `focusedSessionOutputMatches` 解析。
+- ✅ `AppleScriptFocuser.contains`（旧 line 20，~140 行嵌入式 osascript）：协议 `TerminalAppleScriptContainsProbing.containsSessionScript(...)`，3 个 capability 实现；新增 `AppleScriptHelpers` 文件级 helper（escape / ttyListLiteral / pathListLiteral）让 capability 端复用。
+- ✅ `AppleScriptFocuser.focus`（旧 line 182，~200 行 helper script + parser fan-out）：协议 `TerminalAppleScriptFocusing` 含 `focusSessionScript` + `parseFocusOutput`（默认 `output == "ok"` parser，Ghostty override 解析 `ok|<stableID>`）。focuser 从 472 → 90 行，零硬编码；零 osascript 模板。
+- 测试：823 全过 ×3 commit；Debug 重启验证 ×3。
+
+**P3 cosmetic**（commit `41da23d`）：
+
+- ✅ 删 7 个 `TerminalPreferences.<x>OptionID` terminal-specific 常量，capability struct 直接用字面量。`autoOptionID` 保留（sentinel）。
+- ✅ `iconAssetName` / 老 UserDefaults key 迁移已落地，doc 回填。
+
+**剩余 P1**：
+
+- HookCLI `TerminalContextDetector` 下沉：CLI 模式不能用 PluginRegistry，需要编译期可达 builtin 列表。
+- M2 builtin terminal `.csplugin` 化：每个 plugin self-contain capability + launch + readiness（最大件，单独 session）。
 
 ---
 
