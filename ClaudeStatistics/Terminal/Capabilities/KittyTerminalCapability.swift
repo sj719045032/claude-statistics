@@ -3,7 +3,7 @@ import ClaudeStatisticsKit
 import Foundation
 
 struct KittyTerminalCapability: TerminalCapability, TerminalLauncher, TerminalFocusing, TerminalFocusCapabilityProviding, TerminalDirectFocusing, TerminalSetupProviding, TerminalReadinessProviding {
-    let optionID: String? = TerminalPreferences.kittyOptionID
+    let optionID: String? = "Kitty"
     let category: TerminalCapabilityCategory = .terminal
     let displayName = "Kitty"
     let bundleIdentifiers: Set<String> = ["net.kovidgoyal.kitty"]

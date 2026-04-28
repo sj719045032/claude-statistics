@@ -3,7 +3,7 @@ import ClaudeStatisticsKit
 import Foundation
 
 struct WarpTerminalCapability: TerminalCapability, TerminalLauncher, TerminalReadinessProviding {
-    let optionID: String? = TerminalPreferences.warpOptionID
+    let optionID: String? = "Warp"
     let category: TerminalCapabilityCategory = .terminal
     let displayName = "Warp"
     let bundleIdentifiers: Set<String> = ["dev.warp.Warp-Stable", "dev.warp.Warp"]

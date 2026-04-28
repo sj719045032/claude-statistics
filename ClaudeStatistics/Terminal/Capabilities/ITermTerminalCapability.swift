@@ -3,7 +3,7 @@ import ClaudeStatisticsKit
 import Foundation
 
 struct ITermTerminalCapability: TerminalCapability, TerminalLauncher, TerminalFocusCapabilityProviding, TerminalDirectFocusing, TerminalReadinessProviding {
-    let optionID: String? = TerminalPreferences.iTermOptionID
+    let optionID: String? = "iTerm2"
     let category: TerminalCapabilityCategory = .terminal
     let displayName = "iTerm2"
     let bundleIdentifiers: Set<String> = ["com.googlecode.iterm2"]

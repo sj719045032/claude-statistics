@@ -3,7 +3,7 @@ import ClaudeStatisticsKit
 import Foundation
 
 struct WezTermTerminalCapability: TerminalCapability, TerminalLauncher, TerminalFocusing, TerminalFocusCapabilityProviding, TerminalDirectFocusing, TerminalReadinessProviding {
-    let optionID: String? = TerminalPreferences.wezTermOptionID
+    let optionID: String? = "WezTerm"
     let category: TerminalCapabilityCategory = .terminal
     let displayName = "WezTerm"
     let bundleIdentifiers: Set<String> = ["com.github.wez.wezterm"]

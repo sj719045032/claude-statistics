@@ -3,7 +3,7 @@ import ClaudeStatisticsKit
 import Foundation
 
 struct AlacrittyTerminalCapability: TerminalCapability, TerminalLauncher, TerminalReadinessProviding {
-    let optionID: String? = TerminalPreferences.alacrittyOptionID
+    let optionID: String? = "Alacritty"
     let category: TerminalCapabilityCategory = .terminal
     let displayName = "Alacritty"
     let bundleIdentifiers: Set<String> = ["org.alacritty", "io.alacritty"]

@@ -2,7 +2,7 @@ import Foundation
 import ClaudeStatisticsKit
 
 struct AppleTerminalCapability: TerminalCapability, TerminalLauncher, TerminalFocusCapabilityProviding, TerminalDirectFocusing, TerminalReadinessProviding {
-    let optionID: String? = TerminalPreferences.terminalOptionID
+    let optionID: String? = "Terminal"
     let category: TerminalCapabilityCategory = .terminal
     let displayName = "Terminal"
     let bundleIdentifiers: Set<String> = ["com.apple.Terminal"]

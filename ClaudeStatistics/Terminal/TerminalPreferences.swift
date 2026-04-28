@@ -20,14 +20,13 @@ struct TerminalPreferenceOption: Identifiable, Equatable {
 ///     choice when they first launch this build.
 enum TerminalPreferences {
     static let preferredTerminalKey = "preferredTerminal"
+    /// Sentinel optionID used by the "Auto" picker entry — it does not
+    /// belong to any specific terminal capability and means "let the
+    /// host pick the frontmost / installed terminal at launch time".
+    /// Per-capability ids (Ghostty / iTerm2 / Terminal / Warp / Kitty
+    /// / WezTerm / Alacritty / VSCode / Cursor / …) are owned by each
+    /// capability struct's own `optionID` field, not centralized here.
     static let autoOptionID = "Auto"
-    static let ghosttyOptionID = "Ghostty"
-    static let iTermOptionID = "iTerm2"
-    static let terminalOptionID = "Terminal"
-    static let warpOptionID = "Warp"
-    static let kittyOptionID = "Kitty"
-    static let wezTermOptionID = "WezTerm"
-    static let alacrittyOptionID = "Alacritty"
 
     private static func perProviderKey(_ providerID: String) -> String {
         "\(preferredTerminalKey).\(providerID)"

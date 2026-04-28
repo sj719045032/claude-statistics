@@ -3,7 +3,7 @@ import ClaudeStatisticsKit
 import Foundation
 
 struct GhosttyTerminalCapability: TerminalCapability, TerminalLauncher, TerminalFocusCapabilityProviding, TerminalDirectFocusing, TerminalFocusIdentityProviding, TerminalReadinessProviding {
-    let optionID: String? = TerminalPreferences.ghosttyOptionID
+    let optionID: String? = "Ghostty"
     let category: TerminalCapabilityCategory = .terminal
     let displayName = "Ghostty"
     let bundleIdentifiers: Set<String> = ["com.mitchellh.ghostty"]
