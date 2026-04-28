@@ -107,3 +107,33 @@ extension AppleTerminalCapability: TerminalAppleScriptContainsProbing {
         """
     }
 }
+
+extension AppleTerminalCapability: TerminalAppleScriptFocusing {
+    func focusSessionScript(
+        tty: String?,
+        projectPath: String?,
+        terminalWindowID: String?,
+        terminalTabID: String?,
+        stableTerminalID: String?
+    ) -> String? {
+        guard let tty, !tty.isEmpty else { return nil }
+        return """
+        set targetTtys to \(AppleScriptHelpers.ttyListLiteral(tty))
+        tell application "Terminal"
+            activate
+            repeat with w in windows
+                repeat with t in tabs of w
+                    try
+                        if targetTtys contains (tty of t as text) then
+                            set selected of t to true
+                            set frontmost of w to true
+                            return "ok"
+                        end if
+                    end try
+                end repeat
+            end repeat
+        end tell
+        return "miss"
+        """
+    }
+}

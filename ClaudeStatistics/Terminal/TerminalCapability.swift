@@ -109,6 +109,33 @@ protocol TerminalAppleScriptContainsProbing {
     ) -> String?
 }
 
+/// Capability for terminals that can activate (focus) a session via
+/// AppleScript. `focusSessionScript` returns nil when the supplied
+/// locators are insufficient for this terminal (focuser then bails
+/// with `.failure` without running osascript). `parseFocusOutput`
+/// turns the raw stdout into an `AppleScriptFocusResult`; default
+/// implementation matches `output == "ok"` for terminals with no
+/// stableID round-trip — Ghostty overrides to parse `"ok|<stableID>"`.
+protocol TerminalAppleScriptFocusing {
+    func focusSessionScript(
+        tty: String?,
+        projectPath: String?,
+        terminalWindowID: String?,
+        terminalTabID: String?,
+        stableTerminalID: String?
+    ) -> String?
+
+    func parseFocusOutput(_ output: String) -> AppleScriptFocusResult
+}
+
+extension TerminalAppleScriptFocusing {
+    func parseFocusOutput(_ output: String) -> AppleScriptFocusResult {
+        output.trimmingCharacters(in: .whitespacesAndNewlines) == "ok"
+            ? .success(resolvedStableID: nil)
+            : .failure
+    }
+}
+
 extension TerminalFocusIdentityProviding {
     func shouldUseCachedIdentity(
         requestedWindowID: String?,

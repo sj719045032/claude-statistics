@@ -348,6 +348,14 @@ enum TerminalRegistry {
             .first { $0.ownsBundleIdentifier(bundleId) }
     }
 
+    /// Capability that builds the "activate this terminal's session"
+    /// AppleScript and parses the resulting "ok"/"ok|stableID"/"miss"
+    /// output for `AppleScriptFocuser.focus`.
+    static func appleScriptFocusProber(for bundleId: String?) -> (any TerminalCapability & TerminalAppleScriptFocusing)? {
+        capabilities.compactMap { $0 as? any TerminalCapability & TerminalAppleScriptFocusing }
+            .first { $0.ownsBundleIdentifier(bundleId) }
+    }
+
     private static func launchCapability(
         for preferredOptionID: String
     ) -> (any TerminalCapability & TerminalLauncher)? {

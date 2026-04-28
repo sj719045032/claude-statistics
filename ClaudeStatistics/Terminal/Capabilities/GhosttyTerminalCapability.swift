@@ -156,6 +156,141 @@ extension GhosttyTerminalCapability: TerminalFrontmostSessionProbing {
     }
 }
 
+extension GhosttyTerminalCapability: TerminalAppleScriptFocusing {
+    func focusSessionScript(
+        tty: String?,
+        projectPath: String?,
+        terminalWindowID: String?,
+        terminalTabID: String?,
+        stableTerminalID: String?
+    ) -> String? {
+        let trimmedWindow = terminalWindowID?.nilIfEmpty
+        let trimmedTab = terminalTabID?.nilIfEmpty
+        let trimmedStable = stableTerminalID?.nilIfEmpty
+        let trimmedPath = projectPath?.nilIfEmpty
+
+        // Match the original focuser logic: an explicit window/tab/stable
+        // locator is enough; otherwise we need a project path to scan
+        // working dirs against. With nothing useful, bail.
+        let hasExplicitLocator = trimmedWindow != nil || trimmedTab != nil || trimmedStable != nil
+        guard hasExplicitLocator || trimmedPath != nil else { return nil }
+
+        let stableIDClause: String
+        if let trimmedStable {
+            stableIDClause = """
+            if (id of terminalRef as text) is "\(AppleScriptHelpers.escape(trimmedStable))" then
+                select tab tabRef
+                activate window w
+                focus terminalRef
+                return "ok|" & (id of terminalRef as text)
+            end if
+            """
+        } else {
+            stableIDClause = ""
+        }
+
+        let workingDirectoryClause: String
+        if trimmedStable == nil {
+            workingDirectoryClause = """
+            set workingDirText to (working directory of terminalRef as text)
+            if my normalizePath(workingDirText) is in targetPaths then
+                select tab tabRef
+                activate window w
+                focus terminalRef
+                return "ok|" & (id of terminalRef as text)
+            end if
+            """
+        } else {
+            workingDirectoryClause = ""
+        }
+
+        let tabFocusClause: String
+        if trimmedStable == nil, let trimmedWindow, let trimmedTab {
+            tabFocusClause = """
+            try
+                set targetWindow to first window whose id is "\(AppleScriptHelpers.escape(trimmedWindow))"
+                set targetTab to first tab of targetWindow whose id is "\(AppleScriptHelpers.escape(trimmedTab))"
+                activate targetWindow
+                set terminalRef to focused terminal of targetTab
+                focus terminalRef
+                return "ok|" & (id of terminalRef as text)
+            end try
+            """
+        } else if trimmedStable == nil, trimmedPath == nil, let trimmedWindow {
+            tabFocusClause = """
+            try
+                activate (first window whose id is "\(AppleScriptHelpers.escape(trimmedWindow))")
+                return "ok|"
+            end try
+            """
+        } else {
+            tabFocusClause = ""
+        }
+
+        return """
+        set targetPaths to \(AppleScriptHelpers.pathListLiteral(projectPath))
+        tell application id "com.mitchellh.ghostty"
+            activate
+            repeat with w in windows
+                repeat with tabRef in tabs of w
+                    repeat with terminalRef in terminals of tabRef
+                        try
+                            \(stableIDClause)
+                            \(workingDirectoryClause)
+                        end try
+                    end repeat
+                end repeat
+            end repeat
+            \(tabFocusClause)
+        end tell
+        return "miss"
+
+        on normalizePath(rawValue)
+            set valueText to rawValue as text
+            if valueText starts with "file://" then
+                set valueText to text 8 thru -1 of valueText
+            end if
+            set valueText to my decodeURLText(valueText)
+            if valueText ends with "/" and valueText is not "/" then
+                set valueText to text 1 thru -2 of valueText
+            end if
+            return valueText
+        end normalizePath
+
+        on decodeURLText(valueText)
+            set decodedText to valueText
+            set decodedText to my replaceText("%20", " ", decodedText)
+            set decodedText to my replaceText("%2D", "-", decodedText)
+            set decodedText to my replaceText("%2E", ".", decodedText)
+            set decodedText to my replaceText("%2F", "/", decodedText)
+            set decodedText to my replaceText("%5F", "_", decodedText)
+            return decodedText
+        end decodeURLText
+
+        on replaceText(findText, replaceText, sourceText)
+            set AppleScript's text item delimiters to findText
+            set textItems to every text item of sourceText
+            set AppleScript's text item delimiters to replaceText
+            set rebuiltText to textItems as text
+            set AppleScript's text item delimiters to ""
+            return rebuiltText
+        end replaceText
+        """
+    }
+
+    /// Override the default `parseFocusOutput` to extract the
+    /// resolved-stableID round-trip (`"ok|<stableID>"`) Ghostty's
+    /// focus script returns. Apple Terminal / iTerm2 keep the
+    /// default `output == "ok"` parser.
+    func parseFocusOutput(_ output: String) -> AppleScriptFocusResult {
+        let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("ok") else { return .failure }
+        let parts = trimmed.split(separator: "|", maxSplits: 1).map(String.init)
+        let stableID = parts.count == 2 ? parts[1].nilIfEmpty : nil
+        return .success(resolvedStableID: stableID)
+    }
+}
+
 extension GhosttyTerminalCapability: TerminalAppleScriptContainsProbing {
     func containsSessionScript(
         tty: String?,
