@@ -280,6 +280,7 @@
 		C096DD401EB0F2A1E31EFFB9 /* GeminiProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6470B331BB31EF4AE6E5CF51 /* GeminiProvider.swift */; };
 		C1946155BDD0D0ABEB98F6B5 /* TelemetryDeck in Frameworks */ = {isa = PBXBuildFile; productRef = 0978977B964239E918826F41 /* TelemetryDeck */; };
 		C19FAC3501132B64FECBDB3F /* VSCodePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91C96A74998EE00B79497160 /* VSCodePlugin.swift */; };
+		C438293230E30B328E3B5B6A /* ProviderAccountUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE636182FF6DD94E82DAB93B /* ProviderAccountUI.swift */; };
 		C44D93FD163D5ACB677A0C2F /* TitleSanitizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF9DAF9AE28E22F14DFD7EA4 /* TitleSanitizer.swift */; };
 		C48BDE19A5E58235BAB61F51 /* UsageViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5306E49F4AF08425229312F0 /* UsageViewModel.swift */; };
 		C4CB7D03BBF5B8FB6E0753CB /* WezTermPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = CFED6A9AD6F9C6154A5FDC5C /* WezTermPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -969,6 +970,7 @@
 		FAAFBA5B9EEDC2BB22BAF700 /* AutoRefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoRefreshCoordinator.swift; sourceTree = "<group>"; };
 		FDD81B5645107DB493B28671 /* ProviderSessionDisplayFormatter+Filters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProviderSessionDisplayFormatter+Filters.swift"; sourceTree = "<group>"; };
 		FE48286336B9D3C392E19DB4 /* NotchNotificationsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchNotificationsSection.swift; sourceTree = "<group>"; };
+		FE636182FF6DD94E82DAB93B /* ProviderAccountUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderAccountUI.swift; sourceTree = "<group>"; };
 		FF2A749714584E4976171E9D /* StatusLineInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusLineInstaller.swift; sourceTree = "<group>"; };
 		FFB4818B78F8460BEA8B0BAA /* AttentionBridgeAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionBridgeAuth.swift; sourceTree = "<group>"; };
 		FFDDC93577A73B4D01F88B6A /* HookInstalling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookInstalling.swift; sourceTree = "<group>"; };
@@ -1312,6 +1314,7 @@
 				1D22B04AA6887462F066799E /* PluginManifest.swift */,
 				85BCB7D594E3ACE15472DF55 /* PluginManifestPlist.swift */,
 				880DBC8623214822DA25BA07 /* PluginRegistry.swift */,
+				FE636182FF6DD94E82DAB93B /* ProviderAccountUI.swift */,
 				2847A8C8A8678F33407AA32F /* ProviderCapabilities.swift */,
 				D7A55E899B9748E80EF1CA53 /* ProviderDescriptor.swift */,
 				62572A1901D430E3E24CB02D /* ProviderPlugin.swift */,
@@ -2630,6 +2633,7 @@
 				D0AA811ABFBE719E0E045FAB /* PluginManifest.swift in Sources */,
 				D5B93F546B65DC6CF48DFACF /* PluginManifestPlist.swift in Sources */,
 				B35C61F703B5F19516D17FF9 /* PluginRegistry.swift in Sources */,
+				C438293230E30B328E3B5B6A /* ProviderAccountUI.swift in Sources */,
 				E323E4002724430EC2954218 /* ProviderCapabilities.swift in Sources */,
 				81C19CCA48AB5D51EFE62459 /* ProviderDescriptor.swift in Sources */,
 				205CC763247D474FFE1ED691 /* ProviderPlugin.swift in Sources */,
