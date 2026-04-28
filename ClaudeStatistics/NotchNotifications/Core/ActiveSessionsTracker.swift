@@ -170,26 +170,34 @@ final class ActiveSessionsTracker: ObservableObject {
         guard !recentSessions.isEmpty else { return }
 
         var didRestore = false
-        var restoredProjectKeys: Set<String> = []
+        var restoredKeys: Set<String> = []
         for session in recentSessions {
-            let projectKey = normalizedRestoreProjectKey(for: session)
-            if restoredProjectKeys.contains(projectKey) {
-                continue
-            }
             let runtimeSessionID = Self.runtimeSessionID(for: session)
             let key = Self.key(provider: provider, sessionId: runtimeSessionID)
+            // De-dupe by runtime key (provider:sessionId), not by cwd —
+            // multiple concurrent CLIs can share a project directory and
+            // each needs its own runtime entry.
+            if restoredKeys.contains(key) { continue }
             let signals = RuntimeSessionEventApplier.signals(from: quickStats[session.id], stats: parsedStats[session.id])
 
             if var existing = runtimeByKey[key] {
                 // Already present (persisted JSON path). Backfill any nil
                 // text fields from stats so the UI has content immediately.
                 let before = existing
+                // Snap projectPath to the JSONL-derived launch dir. Hook
+                // payloads carry the CLI's *current* cwd, which drifts when
+                // the user moves focus mid-session (Claude's transcript shows
+                // multiple cwd values across one session); JSONL's first cwd
+                // entry is the stable launch dir we want as the row title.
+                if let launchDir = session.cwd?.nilIfEmpty {
+                    existing.projectPath = launchDir
+                }
                 RuntimeSessionEventApplier.merge(runtime: &existing, signals: signals)
                 if existing != before {
                     runtimeByKey[key] = TerminalIdentityResolver.sanitized(existing)
                     didRestore = true
                 }
-                restoredProjectKeys.insert(projectKey)
+                restoredKeys.insert(key)
                 continue
             }
 
@@ -218,7 +226,7 @@ final class ActiveSessionsTracker: ObservableObject {
             DiagnosticLogger.shared.verbose(
                 "Active restore provider=\(provider.rawValue) session=\(runtimeSessionID) sourceID=\(session.id) project=\(session.cwd?.nilIfEmpty ?? session.projectPath.nilIfEmpty ?? "-") lastModified=\(session.lastModified.timeIntervalSince1970) signals=\(signals.count)"
             )
-            restoredProjectKeys.insert(projectKey)
+            restoredKeys.insert(key)
             didRestore = true
         }
 
@@ -447,7 +455,14 @@ final class ActiveSessionsTracker: ObservableObject {
             progressNoteCount += signals.filter { $0.kind == .progressNote }.count
 
             let before = runtime
-            runtime.projectPath = runtime.projectPath ?? session.cwd?.nilIfEmpty ?? session.projectPath.nilIfEmpty
+            // Snap projectPath to JSONL launch dir (see restore comment above)
+            // — keep the row title stable on the entry directory even after
+            // hook events have nudged it to a focus subdir.
+            if let launchDir = session.cwd?.nilIfEmpty {
+                runtime.projectPath = launchDir
+            } else if runtime.projectPath == nil {
+                runtime.projectPath = session.projectPath.nilIfEmpty
+            }
             RuntimeSessionEventApplier.merge(runtime: &runtime, signals: signals)
 
             if runtime != before {
@@ -748,12 +763,6 @@ final class ActiveSessionsTracker: ObservableObject {
 
     private static func key(provider: ProviderKind, sessionId: String) -> String {
         "\(provider.rawValue):\(sessionId)"
-    }
-
-    private func normalizedRestoreProjectKey(for session: Session) -> String {
-        let path = session.cwd?.nilIfEmpty ?? session.projectPath.nilIfEmpty
-        guard let path else { return "session:\(session.id)" }
-        return "path:\((path as NSString).expandingTildeInPath)"
     }
 
     private func persistRuntime() {

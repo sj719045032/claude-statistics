@@ -10,6 +10,11 @@ struct TerminalFocusableFilter: SessionEventFilter {
     let id = "terminal-focusable"
 
     func shouldDisplay(_ context: SessionFilterContext) -> Bool {
-        TerminalRegistry.canFocusBackToTerminal(named: context.terminalName)
+        // Restore-warmed rows arrive from session metadata with no
+        // terminal_name yet — the next hook event fills it. Tolerate the
+        // unknown state so the row survives until then; only reject when
+        // a name *was* provided and didn't resolve.
+        guard let name = context.terminalName, !name.isEmpty else { return true }
+        return TerminalRegistry.canFocusBackToTerminal(named: name)
     }
 }
