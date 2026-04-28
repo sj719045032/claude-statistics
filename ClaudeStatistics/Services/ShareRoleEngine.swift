@@ -7,24 +7,34 @@ enum ShareRoleEngine {
     /// like builtin scores, so a plugin role with a high enough score
     /// can win the card. The host clamps each score to `[0, 1]` and
     /// silently drops entries whose `roleID` is empty.
+    ///
+    /// `pluginThemes` maps plugin role ids → their resolved
+    /// `ShareVisualTheme`. Used by `buildRoleResult` so a plugin role
+    /// that wins primary gets its own card palette instead of the
+    /// neutral steadyBuilder fallback. Host pre-resolves the dictionary
+    /// from `PluginRegistry` (see `SharePluginThemes.collect`) since
+    /// `ShareRoleEngine` is nonisolated and can't touch the
+    /// main-actor-bound registry.
     static func makeRoleResult(
         metrics: ShareMetrics,
         baseline: ShareMetrics?,
-        pluginScores: [ShareRoleScoreEntry] = []
+        pluginScores: [ShareRoleScoreEntry] = [],
+        pluginThemes: [String: ShareVisualTheme] = [:]
     ) -> ShareRoleResult {
         let ranked = mergePluginScores(into: rankedRoles(metrics: metrics, baseline: baseline), pluginScores: pluginScores)
         let primary = choosePrimaryRole(from: ranked, metrics: metrics)
-        return buildRoleResult(primary: primary, ranked: ranked, metrics: metrics)
+        return buildRoleResult(primary: primary, ranked: ranked, metrics: metrics, pluginThemes: pluginThemes)
     }
 
     static func makeAllTimeRoleResult(
         metrics: ShareMetrics,
         baseline: ShareMetrics?,
-        pluginScores: [ShareRoleScoreEntry] = []
+        pluginScores: [ShareRoleScoreEntry] = [],
+        pluginThemes: [String: ShareVisualTheme] = [:]
     ) -> ShareRoleResult {
         let ranked = mergePluginScores(into: rankedAllTimeRoles(metrics: metrics, baseline: baseline), pluginScores: pluginScores)
         let primary = chooseAllTimePrimaryRole(from: ranked, metrics: metrics)
-        return buildRoleResult(primary: primary, ranked: ranked, metrics: metrics)
+        return buildRoleResult(primary: primary, ranked: ranked, metrics: metrics, pluginThemes: pluginThemes)
     }
 
     /// Append plugin scores to the host-computed ranking, then re-sort.
@@ -53,11 +63,21 @@ enum ShareRoleEngine {
         }
     }
 
-    static func buildRoleResult(primary: ShareRoleID, ranked: [ShareRoleScore], metrics: ShareMetrics) -> ShareRoleResult {
+    static func buildRoleResult(
+        primary: ShareRoleID,
+        ranked: [ShareRoleScore],
+        metrics: ShareMetrics,
+        pluginThemes: [String: ShareVisualTheme] = [:]
+    ) -> ShareRoleResult {
         let badges = selectBadges(metrics: metrics, primaryRole: primary)
         let subtitle = subtitle(for: primary, metrics: metrics)
         let summary = summary(for: primary, metrics: metrics)
         let proofMetrics = proofMetrics(for: primary, metrics: metrics)
+        // Plugin role wins → use the plugin's resolved theme if it
+        // declared one. Builtin role ids never appear in `pluginThemes`
+        // (the resolver only walks `ShareRolePlugin.roles`), so the
+        // lookup short-circuits for the common case.
+        let visualTheme = pluginThemes[primary.rawValue] ?? primary.theme
 
         return ShareRoleResult(
             roleID: primary,
@@ -66,7 +86,7 @@ enum ShareRoleEngine {
             summary: summary,
             timeScopeLabel: metrics.scopeLabel,
             providerSummary: providerSummary(for: metrics),
-            visualTheme: primary.theme,
+            visualTheme: visualTheme,
             badges: badges,
             proofMetrics: proofMetrics,
             scores: ranked

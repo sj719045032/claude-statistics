@@ -9,10 +9,16 @@ public struct ShareRoleDescriptor: Sendable, Hashable {
     /// (e.g. `com.anthropic.role.night-shift`).
     public let id: String
     public let displayName: String
+    /// Optional reference to a `ShareCardThemeDescriptor.id` contributed
+    /// by some `ShareCardThemePlugin`. Nil means "use the host's neutral
+    /// fallback theme (steadyBuilder)". Unknown ids fall back the same
+    /// way — the host never crashes on a stale theme reference.
+    public let themeID: String?
 
-    public init(id: String, displayName: String) {
+    public init(id: String, displayName: String, themeID: String? = nil) {
         self.id = id
         self.displayName = displayName
+        self.themeID = themeID
     }
 }
 

@@ -888,11 +888,18 @@ final class SessionDataStore: ObservableObject {
     func buildShareRoleResult(for period: PeriodStats, periodType: StatsPeriod) -> ShareRoleResult? {
         guard let metrics = buildShareMetrics(for: period, periodType: periodType) else { return nil }
         let baseline = buildShareBaselineMetrics(for: period, periodType: periodType)
+        let plugins = ProviderRegistry.currentSharedPluginRegistry()
         let pluginScores = SharePluginScoring.scores(
-            plugins: ProviderRegistry.currentSharedPluginRegistry(),
+            plugins: plugins,
             context: metrics.evaluationContext(baseline: baseline)
         )
-        return ShareRoleEngine.makeRoleResult(metrics: metrics, baseline: baseline, pluginScores: pluginScores)
+        let pluginThemes = SharePluginThemes.collect(plugins: plugins)
+        return ShareRoleEngine.makeRoleResult(
+            metrics: metrics,
+            baseline: baseline,
+            pluginScores: pluginScores,
+            pluginThemes: pluginThemes
+        )
     }
 
     func buildAllTimeShareRoleResult() -> ShareRoleResult? {
@@ -902,11 +909,18 @@ final class SessionDataStore: ObservableObject {
             return nil
         }
         let baseline = buildAllTimeShareBaselineMetrics()
+        let plugins = ProviderRegistry.currentSharedPluginRegistry()
         let pluginScores = SharePluginScoring.scores(
-            plugins: ProviderRegistry.currentSharedPluginRegistry(),
+            plugins: plugins,
             context: metrics.evaluationContext(baseline: baseline)
         )
-        return ShareRoleEngine.makeAllTimeRoleResult(metrics: metrics, baseline: baseline, pluginScores: pluginScores)
+        let pluginThemes = SharePluginThemes.collect(plugins: plugins)
+        return ShareRoleEngine.makeAllTimeRoleResult(
+            metrics: metrics,
+            baseline: baseline,
+            pluginScores: pluginScores,
+            pluginThemes: pluginThemes
+        )
     }
 
     func buildAllTimeShareMetrics(scopeLabel: String? = nil) -> ShareMetrics? {

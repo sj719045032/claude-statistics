@@ -175,6 +175,7 @@
 		7536AF86F8AB0923C3247BDE /* PluginCatalogEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643403C4BAB580AAC546CC40 /* PluginCatalogEntry.swift */; };
 		7638F0F90283446588598B55 /* ShareRoleEngine+Scoring.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B5E7A34504AEC6D0A847DAC /* ShareRoleEngine+Scoring.swift */; };
 		7674AC8643AF2C6126880D3C /* TranscriptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73D3015C65881224ECFCC5BB /* TranscriptView.swift */; };
+		76A8026C31CD0B76319D9C1F /* SharePluginThemes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 397B635FE9ED8F8B01A5AD1A /* SharePluginThemes.swift */; };
 		77E8F54113FA69FB43B2CB39 /* ModelPricingRates.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD30D570EAFE66E26FBFB51C /* ModelPricingRates.swift */; };
 		782C13B8933AD2748F655738 /* CodexTranscriptParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C9349BA491065487D09AA0 /* CodexTranscriptParser.swift */; };
 		7843151598D9561667E57EF3 /* TerminalRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A337A8A5F00CF27D753FA581 /* TerminalRegistry.swift */; };
@@ -605,6 +606,7 @@
 		36F9BBB23CB057720EA99A7B /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
 		370D33AC086199C95EC1E2CD /* UsageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageData.swift; sourceTree = "<group>"; };
 		387E20F7F962C004AD38B92C /* KittyFocuser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KittyFocuser.swift; sourceTree = "<group>"; };
+		397B635FE9ED8F8B01A5AD1A /* SharePluginThemes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharePluginThemes.swift; sourceTree = "<group>"; };
 		398009672C963C1E8B72A03E /* GeminiPricingFetchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiPricingFetchService.swift; sourceTree = "<group>"; };
 		3BCFE5BD947C85335BFC3783 /* ProviderUsagePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderUsagePresentation.swift; sourceTree = "<group>"; };
 		3D5BA98DFF322E54A1E5B1F2 /* SessionDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDataStore.swift; sourceTree = "<group>"; };
@@ -1130,6 +1132,7 @@
 				D1B172A49401EA28223A83C0 /* ShareMetrics+Evaluation.swift */,
 				6F0F61EEF95C517CC0B363C3 /* ShareMetricsBuilder.swift */,
 				806EBE2626FDBEC34484CEEC /* SharePluginScoring.swift */,
+				397B635FE9ED8F8B01A5AD1A /* SharePluginThemes.swift */,
 				A7C96479A32A5A1C4D1A624B /* ShareRoleEngine.swift */,
 				06FC7AFEDE795F1D5BF22169 /* ShareRoleEngine+Badges.swift */,
 				44906B5E92FE48C21912D41F /* ShareRoleEngine+Formatting.swift */,
@@ -2190,6 +2193,7 @@
 				3A28E84ED0B7490923FA86B0 /* ShareMetrics.swift in Sources */,
 				DFB7E8400551BE83B025A6A4 /* ShareMetricsBuilder.swift in Sources */,
 				3ACC92DD795C4CCC1B9ED295 /* SharePluginScoring.swift in Sources */,
+				76A8026C31CD0B76319D9C1F /* SharePluginThemes.swift in Sources */,
 				BB9902B8A5E35FB7C78F63F0 /* SharePreviewView.swift in Sources */,
 				58946ED75833B063091E2FC7 /* SharePreviewWindowController.swift in Sources */,
 				425E1709E0DB410412C38880 /* ShareRole.swift in Sources */,

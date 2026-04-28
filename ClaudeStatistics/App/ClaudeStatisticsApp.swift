@@ -559,10 +559,12 @@ final class AppState: ObservableObject {
             plugins: pluginRegistry,
             context: mergedMetrics.evaluationContext(baseline: mergedBaseline)
         )
+        let pluginThemes = SharePluginThemes.collect(plugins: pluginRegistry)
         return ShareRoleEngine.makeAllTimeRoleResult(
             metrics: mergedMetrics,
             baseline: mergedBaseline,
-            pluginScores: pluginScores
+            pluginScores: pluginScores,
+            pluginThemes: pluginThemes
         )
     }
 

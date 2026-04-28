@@ -1,4 +1,5 @@
 import XCTest
+import ClaudeStatisticsKit
 
 @testable import Claude_Statistics
 
@@ -235,5 +236,72 @@ final class ShareRoleEngineTests: XCTestCase {
             baseline: nil
         )
         XCTAssertEqual(result.scores.count, ShareRoleID.allBuiltins.count - 1)
+    }
+
+    // MARK: - Plugin theme injection
+
+    /// Builtin role wins primary → builtin theme is used; the
+    /// `pluginThemes` map is consulted only for plugin role ids.
+    func test_pluginThemes_unusedWhenBuiltinPrimaryWins() {
+        // Strong activity → builtin primary wins (any builtin role is
+        // fine; the assertion only cares the result is *not* the
+        // plugin override).
+        let m = metrics(
+            sessionCount: 30, messageCount: 200,
+            totalTokens: 5_000_000, totalCost: 12,
+            projectCount: 4, toolUseCount: 200,
+            toolCategoryCount: 6, activeDayCount: 6,
+            totalDayCount: 7,
+            averageTokensPerSession: 150_000,
+            averageMessagesPerSession: 8,
+            longSessionCount: 4
+        )
+        let altTheme = ShareVisualTheme(
+            backgroundTop: .red, backgroundBottom: .red, accent: .red,
+            titleGradient: [.red], titleForeground: .red, titleOutline: .red,
+            titleShadowOpacity: 0, prefersLightQRCode: false,
+            symbolName: "x", decorationSymbols: [],
+            mascotPrimarySymbol: "x", mascotSecondarySymbols: []
+        )
+        // Map a fake plugin role id to the alt theme. Builtin roles
+        // never appear in this dictionary, so the override must be
+        // ignored — `result.visualTheme` follows the builtin switch.
+        let result = ShareRoleEngine.makeRoleResult(
+            metrics: m,
+            baseline: nil,
+            pluginThemes: ["com.example.fake": altTheme]
+        )
+        XCTAssertNotEqual(result.visualTheme.symbolName, "x", "builtin primary must not pick up plugin override")
+        XCTAssertEqual(result.visualTheme.symbolName, result.roleID.theme.symbolName)
+    }
+
+    /// Plugin role wins primary → plugin theme overrides the
+    /// steadyBuilder fallback the role would otherwise inherit.
+    func test_pluginThemes_overridesFallbackWhenPluginPrimaryWins() {
+        // Score-rich metrics so the plugin's clamped 1.0 score beats
+        // every builtin (no builtin reaches 1.0 with mid-range inputs).
+        let m = metrics(
+            sessionCount: 5, messageCount: 30,
+            totalTokens: 100_000, toolUseCount: 20
+        )
+        let pluginScores = [ShareRoleScoreEntry(roleID: "com.example.fake", score: 1.0)]
+        let altTheme = ShareVisualTheme(
+            backgroundTop: .red, backgroundBottom: .red, accent: .red,
+            titleGradient: [.red], titleForeground: .red, titleOutline: .red,
+            titleShadowOpacity: 0, prefersLightQRCode: false,
+            symbolName: "plugin.symbol", decorationSymbols: [],
+            mascotPrimarySymbol: "x", mascotSecondarySymbols: []
+        )
+        let result = ShareRoleEngine.makeRoleResult(
+            metrics: m,
+            baseline: nil,
+            pluginScores: pluginScores,
+            pluginThemes: ["com.example.fake": altTheme]
+        )
+        guard result.roleID.rawValue == "com.example.fake" else {
+            XCTFail("plugin role should have won primary, got \(result.roleID.rawValue)")
+            return
+        }
+        XCTAssertEqual(result.visualTheme.symbolName, "plugin.symbol")
     }
 }

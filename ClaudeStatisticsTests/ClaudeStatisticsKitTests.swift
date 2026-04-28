@@ -953,9 +953,30 @@ final class ShareDescriptorTests: XCTestCase {
     }
 
     func testThemeDescriptorEquality() {
-        let a = ShareCardThemeDescriptor(id: "id", displayName: "Theme")
-        let b = ShareCardThemeDescriptor(id: "id", displayName: "Theme")
+        let a = ShareCardThemeDescriptor.fixture(id: "id", displayName: "Theme")
+        let b = ShareCardThemeDescriptor.fixture(id: "id", displayName: "Theme")
         XCTAssertEqual(a, b)
+    }
+}
+
+private extension ShareCardThemeDescriptor {
+    static func fixture(id: String, displayName: String) -> ShareCardThemeDescriptor {
+        ShareCardThemeDescriptor(
+            id: id,
+            displayName: displayName,
+            backgroundTopHex: "#101010",
+            backgroundBottomHex: "#202020",
+            accentHex: "#FFFFFF",
+            titleGradientHex: ["#FFFFFF", "#101010"],
+            titleForegroundHex: "#FFFFFF",
+            titleOutlineHex: "#00000044",
+            titleShadowOpacity: 0.1,
+            prefersLightQRCode: true,
+            symbolName: "star.fill",
+            decorationSymbols: ["sparkles"],
+            mascotPrimarySymbol: "person.crop.circle.fill",
+            mascotSecondarySymbols: ["sparkles"]
+        )
     }
 }
 
