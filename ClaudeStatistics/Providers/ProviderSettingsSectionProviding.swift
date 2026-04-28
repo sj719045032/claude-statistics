@@ -1,27 +1,33 @@
 import SwiftUI
+import ClaudeStatisticsKit
 
+/// Host-side concrete implementation of the SDK's
+/// `ProviderAccountUIContext`. Plugins consume it through the SDK
+/// protocol — they never see `AppState` / `ProfileViewModel`.
+///
+/// While Claude / Codex / Gemini still ship their account card
+/// extensions inside the host module, those extensions cast back to
+/// `ProviderSettingsContext` to pull `appState.accounts.<x>` for the
+/// underlying manager (transition hack). After those provider files
+/// move into their own `.csplugin`, the casts go away — the plugin
+/// will hold its own manager and reach back through SDK context only
+/// for `currentProfileEmail` + `refreshAfterAccountChange()`.
 @MainActor
-struct ProviderSettingsContext {
+struct ProviderSettingsContext: ProviderAccountUIContext {
     let appState: AppState
     let profileViewModel: ProfileViewModel
-}
+    let providerKind: ProviderKind
 
-@MainActor
-protocol ProviderAccountCardSupplementProviding {
-    func makeAccountCardAccessory(context: ProviderSettingsContext) -> AnyView
-    func makeCompactAccountSwitcherAccessory(context: ProviderSettingsContext, triggerStyle: AccountSwitcherTriggerStyle) -> AnyView
-}
-
-extension ProviderAccountCardSupplementProviding {
-    func makeCompactAccountSwitcherAccessory(context: ProviderSettingsContext, triggerStyle: AccountSwitcherTriggerStyle) -> AnyView {
-        makeAccountCardAccessory(context: context)
+    var currentProfileEmail: String? {
+        guard let raw = profileViewModel.userProfile?.account?.email?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else { return nil }
+        return raw
     }
-}
 
-enum AccountSwitcherTriggerStyle {
-    case text
-    case icon
-    case chip(label: String, avatarInitial: String)
+    func refreshAfterAccountChange() {
+        appState.refreshProviderAfterAccountChange(providerKind)
+    }
 }
 
 struct AccountSwitcherAccessory<Account: Identifiable>: View {

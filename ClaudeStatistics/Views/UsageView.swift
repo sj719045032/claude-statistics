@@ -159,9 +159,13 @@ extension UsageView {
             ProgressView()
                 .scaleEffect(0.6)
                 .frame(width: 24, height: 24)
-        } else if let accountSwitcherProvider = store.provider as? any ProviderAccountCardSupplementProviding {
-            accountSwitcherProvider.makeCompactAccountSwitcherAccessory(
-                context: ProviderSettingsContext(appState: appState, profileViewModel: profileViewModel),
+        } else if let uiProvider = store.provider as? any ProviderAccountUIProviding {
+            uiProvider.makeAccountCardAccessory(
+                context: ProviderSettingsContext(
+                    appState: appState,
+                    profileViewModel: profileViewModel,
+                    providerKind: store.provider.kind
+                ),
                 triggerStyle: accountSwitcherTriggerStyle
             )
         }

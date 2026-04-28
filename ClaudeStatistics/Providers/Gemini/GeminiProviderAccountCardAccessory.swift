@@ -1,30 +1,31 @@
 import SwiftUI
+import ClaudeStatisticsKit
 
-extension GeminiProvider: ProviderAccountCardSupplementProviding {
-    func makeAccountCardAccessory(context: ProviderSettingsContext) -> AnyView {
-        AnyView(GeminiProviderAccountCardAccessory(
-            appState: context.appState,
-            accountManager: context.appState.accounts.gemini,
-            profileViewModel: context.profileViewModel,
-            triggerStyle: .text
-        ))
-    }
-
-    func makeCompactAccountSwitcherAccessory(context: ProviderSettingsContext, triggerStyle: AccountSwitcherTriggerStyle) -> AnyView {
-        AnyView(GeminiProviderAccountCardAccessory(
-            appState: context.appState,
-            accountManager: context.appState.accounts.gemini,
-            profileViewModel: context.profileViewModel,
-            triggerStyle: triggerStyle
+extension GeminiProvider: ProviderAccountUIProviding {
+    func makeAccountCardAccessory(
+        context: any ProviderAccountUIContext,
+        triggerStyle: AccountSwitcherTriggerStyle
+    ) -> AnyView {
+        // Transition cast: see CodexProviderAccountCardSupplement for
+        // the rationale. Goes away when GeminiProvider extracts to
+        // a `.csplugin`.
+        guard let hostContext = context as? ProviderSettingsContext else {
+            return AnyView(EmptyView())
+        }
+        return AnyView(GeminiProviderAccountCardAccessory(
+            accountManager: hostContext.appState.accounts.gemini,
+            profileViewModel: hostContext.profileViewModel,
+            triggerStyle: triggerStyle,
+            onAfterSwitch: context.refreshAfterAccountChange
         ))
     }
 }
 
 private struct GeminiProviderAccountCardAccessory: View {
-    @ObservedObject var appState: AppState
     @ObservedObject var accountManager: GeminiAccountManager
     @ObservedObject var profileViewModel: ProfileViewModel
     let triggerStyle: AccountSwitcherTriggerStyle
+    let onAfterSwitch: () -> Void
 
     private var fallbackCurrentEmail: String? {
         guard let email = profileViewModel.userProfile?.account?.email?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -50,7 +51,7 @@ private struct GeminiProviderAccountCardAccessory: View {
             cancelAddAccount: { accountManager.cancelAddAccount() },
             switchAccount: { await accountManager.switchToManagedAccount(id: $0.id) },
             removeAccount: { accountManager.removeManagedAccount(id: $0.id) },
-            afterSwitch: { appState.refreshProviderAfterAccountChange(.gemini) }
+            afterSwitch: onAfterSwitch
         )
     }
 }

@@ -1,33 +1,33 @@
 import SwiftUI
+import ClaudeStatisticsKit
 
-extension ClaudeProvider: ProviderAccountCardSupplementProviding {
-    func makeAccountCardAccessory(context: ProviderSettingsContext) -> AnyView {
-        AnyView(ClaudeProviderAccountCardAccessory(
-            appState: context.appState,
-            accountManager: context.appState.accounts.claude,
-            independentManager: context.appState.accounts.independentClaude,
-            profileViewModel: context.profileViewModel,
-            triggerStyle: .text
-        ))
-    }
-
-    func makeCompactAccountSwitcherAccessory(context: ProviderSettingsContext, triggerStyle: AccountSwitcherTriggerStyle) -> AnyView {
-        AnyView(ClaudeProviderAccountCardAccessory(
-            appState: context.appState,
-            accountManager: context.appState.accounts.claude,
-            independentManager: context.appState.accounts.independentClaude,
-            profileViewModel: context.profileViewModel,
-            triggerStyle: triggerStyle
+extension ClaudeProvider: ProviderAccountUIProviding {
+    func makeAccountCardAccessory(
+        context: any ProviderAccountUIContext,
+        triggerStyle: AccountSwitcherTriggerStyle
+    ) -> AnyView {
+        // Transition cast: see CodexProviderAccountCardSupplement for
+        // the rationale. Goes away when ClaudeProvider extracts to
+        // a `.csplugin`.
+        guard let hostContext = context as? ProviderSettingsContext else {
+            return AnyView(EmptyView())
+        }
+        return AnyView(ClaudeProviderAccountCardAccessory(
+            accountManager: hostContext.appState.accounts.claude,
+            independentManager: hostContext.appState.accounts.independentClaude,
+            profileViewModel: hostContext.profileViewModel,
+            triggerStyle: triggerStyle,
+            onAfterSwitch: context.refreshAfterAccountChange
         ))
     }
 }
 
 private struct ClaudeProviderAccountCardAccessory: View {
-    @ObservedObject var appState: AppState
     @ObservedObject var accountManager: ClaudeAccountManager
     @ObservedObject var independentManager: IndependentClaudeAccountManager
     @ObservedObject var profileViewModel: ProfileViewModel
     let triggerStyle: AccountSwitcherTriggerStyle
+    let onAfterSwitch: () -> Void
 
     @StateObject private var independentVM = IndependentClaudeAccountViewModel()
     @State private var mode: ClaudeAccountMode = ClaudeAccountModeController.shared.mode
@@ -64,7 +64,7 @@ private struct ClaudeProviderAccountCardAccessory: View {
                 independentVM.refresh()
                 independentManager.load()
             }
-            appState.refreshProviderAfterAccountChange(.claude)
+            onAfterSwitch()
         }
         .sheet(isPresented: $showingLoginSheet) {
             ClaudeOAuthLoginSheet(viewModel: independentVM)
@@ -72,7 +72,7 @@ private struct ClaudeProviderAccountCardAccessory: View {
                     independentVM.refresh()
                     independentManager.load()
                     independentManager.cancelAddAccount()
-                    appState.refreshProviderAfterAccountChange(.claude)
+                    onAfterSwitch()
                 }
         }
     }
@@ -100,11 +100,11 @@ private struct ClaudeProviderAccountCardAccessory: View {
             cancelAddAccount: { accountManager.cancelAddAccount() },
             switchAccount: { await accountManager.switchToManagedAccount(id: $0.id) },
             removeAccount: { accountManager.removeManagedAccount(id: $0.id) },
-            afterSwitch: { appState.refreshProviderAfterAccountChange(.claude) }
+            afterSwitch: onAfterSwitch
         )
         .onChange(of: accountManager.addedAccountID) { _, accountID in
             guard accountID != nil else { return }
-            appState.refreshProviderAfterAccountChange(.claude)
+            onAfterSwitch()
         }
     }
 
@@ -153,7 +153,7 @@ private struct ClaudeProviderAccountCardAccessory: View {
                 },
                 switchAccount: { await independentManager.switchToAccount(id: $0.id) },
                 removeAccount: { independentManager.removeAccount(id: $0.id) },
-                afterSwitch: { appState.refreshProviderAfterAccountChange(.claude) }
+                afterSwitch: onAfterSwitch
             )
         }
     }

@@ -1,30 +1,34 @@
 import SwiftUI
+import ClaudeStatisticsKit
 
-extension CodexProvider: ProviderAccountCardSupplementProviding {
-    func makeAccountCardAccessory(context: ProviderSettingsContext) -> AnyView {
-        AnyView(CodexProviderAccountCardAccessory(
-            appState: context.appState,
-            codexAccountManager: context.appState.accounts.codex,
-            profileViewModel: context.profileViewModel,
-            triggerStyle: .text
-        ))
-    }
-
-    func makeCompactAccountSwitcherAccessory(context: ProviderSettingsContext, triggerStyle: AccountSwitcherTriggerStyle) -> AnyView {
-        AnyView(CodexProviderAccountCardAccessory(
-            appState: context.appState,
-            codexAccountManager: context.appState.accounts.codex,
-            profileViewModel: context.profileViewModel,
-            triggerStyle: triggerStyle
+extension CodexProvider: ProviderAccountUIProviding {
+    func makeAccountCardAccessory(
+        context: any ProviderAccountUIContext,
+        triggerStyle: AccountSwitcherTriggerStyle
+    ) -> AnyView {
+        // Transition cast: while CodexProvider lives in the host
+        // module, the accessory needs `AppState.accounts.codex` for
+        // the underlying manager. Once Codex extracts to a
+        // `.csplugin` (next milestone), the plugin holds its own
+        // manager and this cast goes away — only the SDK protocol
+        // surface remains.
+        guard let hostContext = context as? ProviderSettingsContext else {
+            return AnyView(EmptyView())
+        }
+        return AnyView(CodexProviderAccountCardAccessory(
+            codexAccountManager: hostContext.appState.accounts.codex,
+            profileViewModel: hostContext.profileViewModel,
+            triggerStyle: triggerStyle,
+            onAfterSwitch: context.refreshAfterAccountChange
         ))
     }
 }
 
 private struct CodexProviderAccountCardAccessory: View {
-    @ObservedObject var appState: AppState
     @ObservedObject var codexAccountManager: CodexAccountManager
     @ObservedObject var profileViewModel: ProfileViewModel
     let triggerStyle: AccountSwitcherTriggerStyle
+    let onAfterSwitch: () -> Void
 
     private var fallbackCurrentEmail: String? {
         guard let email = profileViewModel.userProfile?.account?.email?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -50,7 +54,7 @@ private struct CodexProviderAccountCardAccessory: View {
             cancelAddAccount: { codexAccountManager.cancelAddAccount() },
             switchAccount: { await codexAccountManager.switchToManagedAccount(id: $0.id) },
             removeAccount: { codexAccountManager.removeManagedAccount(id: $0.id) },
-            afterSwitch: { appState.refreshProviderAfterAccountChange(.codex) }
+            afterSwitch: onAfterSwitch
         )
     }
 }

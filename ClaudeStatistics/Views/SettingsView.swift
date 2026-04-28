@@ -353,8 +353,15 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var providerAccountCardAccessory: some View {
-        if let supplementProvider = provider as? any ProviderAccountCardSupplementProviding {
-            supplementProvider.makeAccountCardAccessory(context: ProviderSettingsContext(appState: appState, profileViewModel: profileViewModel))
+        if let uiProvider = provider as? any ProviderAccountUIProviding {
+            uiProvider.makeAccountCardAccessory(
+                context: ProviderSettingsContext(
+                    appState: appState,
+                    profileViewModel: profileViewModel,
+                    providerKind: provider.kind
+                ),
+                triggerStyle: .text
+            )
         }
     }
 
