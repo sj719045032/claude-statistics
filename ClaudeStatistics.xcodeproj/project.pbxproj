@@ -146,6 +146,8 @@
 		5BB6284456AC6029BBF8DE0D /* UsageHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E476D9F870BCC0644BC74FD3 /* UsageHistoryStore.swift */; };
 		5C10ED712F0303F6EFFD2081 /* ShareRoleEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A872F99484F4F48F8F878E49 /* ShareRoleEngineTests.swift */; };
 		5CDD29E21151F5CC8F466F4B /* IdlePeekCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E1B7BED272EFA6F7FB5C0B3 /* IdlePeekCard.swift */; };
+		5D6E800F52E0D14E3DD5EC05 /* AlacrittyPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F1F1261B7DA6F39B8786B00 /* AlacrittyPlugin.swift */; };
+		5D785899FA06E4A00E4CC7A8 /* ClaudeStatisticsKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; };
 		6358C2762C6D6D85AC919DF8 /* WarpPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F49B383915AEEBCCDC916171 /* WarpPlugin.swift */; };
 		6381FDCEA8C711F7353696CE /* MessageRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DFE81229B8A87810C7DF58A /* MessageRow.swift */; };
 		64954F8535C5DA9FD1AE6D8B /* CostModelsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCA5C01E14873CBF3E6419F7 /* CostModelsCard.swift */; };
@@ -164,7 +166,6 @@
 		6CB9AC028D3C2D548F717E01 /* NotchContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAB0C3E8C901FF061718EB35 /* NotchContainerView.swift */; };
 		6D53771D8F61F6149FD50D46 /* ShareRolePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CF4AF3083144F9E8BD8D7B0 /* ShareRolePlugin.swift */; };
 		6D56C0EAAF4175166391D7EA /* KittyFocuser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 387E20F7F962C004AD38B92C /* KittyFocuser.swift */; };
-		6E325B8FC27E2BCE88033FAA /* AlacrittyPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0591709AD1369CB163770EC0 /* AlacrittyPlugin.swift */; };
 		6E50954F02E729F9586DC3E4 /* HookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 711926C1469F96FC6CF23888 /* HookInstaller.swift */; };
 		6F7855449E33E79371EF1AB9 /* PanelContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6618F7DEA731482B556A431E /* PanelContentView.swift */; };
 		6FE3F8B395E9A7F6DFAF5556 /* MenuBarBanners.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED35908F8D6A2C41A2A6E59 /* MenuBarBanners.swift */; };
@@ -260,6 +261,7 @@
 		B63B261872D1F6B4FA5D0E3E /* MarkdownFonts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FE62A428252AC30E71689F7 /* MarkdownFonts.swift */; };
 		B671E1405611DE6D70BE23EB /* KittyTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86B78596315756EA65E43D80 /* KittyTerminalCapability.swift */; };
 		B67485324065CEED99A923C2 /* LivenessCheckerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E077808ABF96135D9B76672B /* LivenessCheckerTests.swift */; };
+		B6E40DABE032CAD3C2B16A85 /* AlacrittyPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = F65F257EBB643FDD2327BF34 /* AlacrittyPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		B6E7557397A05A5477857084 /* ClaudeStatisticsKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; };
 		B872C0AE8B54239EEA84509E /* ClaudeAccountModeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD2C72B18AE30277C693576A /* ClaudeAccountModeController.swift */; };
 		B94C016E1EDF5D5940A78026 /* TrendDataPoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5CD3EF8FA91298047B26D20 /* TrendDataPoint.swift */; };
@@ -278,7 +280,6 @@
 		C096DD401EB0F2A1E31EFFB9 /* GeminiProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6470B331BB31EF4AE6E5CF51 /* GeminiProvider.swift */; };
 		C1946155BDD0D0ABEB98F6B5 /* TelemetryDeck in Frameworks */ = {isa = PBXBuildFile; productRef = 0978977B964239E918826F41 /* TelemetryDeck */; };
 		C19FAC3501132B64FECBDB3F /* VSCodePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91C96A74998EE00B79497160 /* VSCodePlugin.swift */; };
-		C37EC946871256BDC3D2370C /* AlacrittyTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E2079B7A7714C7BC618C2A /* AlacrittyTerminalCapability.swift */; };
 		C44D93FD163D5ACB677A0C2F /* TitleSanitizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF9DAF9AE28E22F14DFD7EA4 /* TitleSanitizer.swift */; };
 		C48BDE19A5E58235BAB61F51 /* UsageViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5306E49F4AF08425229312F0 /* UsageViewModel.swift */; };
 		C4EEDE0F0236FE4680A1B5CC /* NotchAutoAllowRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAB51505E677DA60C3533985 /* NotchAutoAllowRules.swift */; };
@@ -396,6 +397,13 @@
 			remoteGlobalIDString = 0CF09A1D36F30D5CA3AD359E;
 			remoteInfo = WarpPlugin;
 		};
+		66A659FCA5DA687E8DD8C483 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 18B1CC7C2F803601C447E6E4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DEB25A2406721FCABB7A5B97;
+			remoteInfo = ClaudeStatisticsKit;
+		};
 		69FAD06793A2E60392EA5C09 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 18B1CC7C2F803601C447E6E4 /* Project object */;
@@ -466,6 +474,13 @@
 			remoteGlobalIDString = 44D7019F27E3E862125F144D;
 			remoteInfo = CursorPlugin;
 		};
+		BC04BDDC58721A156EE66B79 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 18B1CC7C2F803601C447E6E4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B140FAE6B185E76A98220008;
+			remoteInfo = AlacrittyPlugin;
+		};
 		C4F7411AD0163CFA86929001 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 18B1CC7C2F803601C447E6E4 /* Project object */;
@@ -529,6 +544,7 @@
 				A400D230F0DC4BE076682BCA /* TraePlugin.bundle in Embed Dependencies */,
 				67D886006A577EF42FBCDECC /* ZedPlugin.bundle in Embed Dependencies */,
 				F32FC3771216AB14B758D85C /* WarpPlugin.bundle in Embed Dependencies */,
+				B6E40DABE032CAD3C2B16A85 /* AlacrittyPlugin.bundle in Embed Dependencies */,
 			);
 			name = "Embed Dependencies";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -554,7 +570,6 @@
 		03DF8D6D8A1022EF2721BE82 /* NotchNotificationCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchNotificationCenter.swift; sourceTree = "<group>"; };
 		044319D72CE45477BDDCBE97 /* AttentionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionBridge.swift; sourceTree = "<group>"; };
 		05910C259A7BE5163F0F348F /* SessionLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLauncher.swift; sourceTree = "<group>"; };
-		0591709AD1369CB163770EC0 /* AlacrittyPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlacrittyPlugin.swift; sourceTree = "<group>"; };
 		06379230FC976FFF3DCD0718 /* NotchRuntimeCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchRuntimeCoordinator.swift; sourceTree = "<group>"; };
 		06FC7AFEDE795F1D5BF22169 /* ShareRoleEngine+Badges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShareRoleEngine+Badges.swift"; sourceTree = "<group>"; };
 		081662154463AF8711652847 /* HookPayloadNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookPayloadNormalizer.swift; sourceTree = "<group>"; };
@@ -613,6 +628,7 @@
 		2E023CB9F472AC7C93777B50 /* ActiveSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveSession.swift; sourceTree = "<group>"; };
 		2E8E4DC8B420779A317D82BC /* SessionEventFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionEventFilter.swift; sourceTree = "<group>"; };
 		2EDF09CC0594DB9C35748FF4 /* AggregateStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AggregateStats.swift; sourceTree = "<group>"; };
+		2F1F1261B7DA6F39B8786B00 /* AlacrittyPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlacrittyPlugin.swift; sourceTree = "<group>"; };
 		30A2C90E33CD4B1328D25897 /* TranscriptParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptParserTests.swift; sourceTree = "<group>"; };
 		3184FFA7D8598D923510D8EE /* TranscriptParser+Trend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TranscriptParser+Trend.swift"; sourceTree = "<group>"; };
 		32FE333B9AD0368698B9A39F /* UsageAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageAPIService.swift; sourceTree = "<group>"; };
@@ -696,6 +712,7 @@
 		674E66F9A30A6F1F06738D75 /* StatusLineLegend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusLineLegend.swift; sourceTree = "<group>"; };
 		676FC849E787F0CC36A9CD37 /* StatusLineSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusLineSection.swift; sourceTree = "<group>"; };
 		67A6CC8A73A83B2478E9137B /* GeminiHookNormalizerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiHookNormalizerTests.swift; sourceTree = "<group>"; };
+		67EF43B5F48704BB52177B27 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		68083922F93D555879FAD90B /* ClaudeStatisticsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatisticsApp.swift; sourceTree = "<group>"; };
 		684978AF102DA512FCD3D129 /* CodexAccountManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexAccountManager.swift; sourceTree = "<group>"; };
 		695C93B3138170CBBA58E7FB /* SessionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRow.swift; sourceTree = "<group>"; };
@@ -780,7 +797,6 @@
 		A337A8A5F00CF27D753FA581 /* TerminalRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalRegistry.swift; sourceTree = "<group>"; };
 		A3CC4F1B31EE86B755D8A88A /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
 		A51BA7586FEEB898B1FE9ED8 /* TerminalFocusCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalFocusCoordinator.swift; sourceTree = "<group>"; };
-		A5E2079B7A7714C7BC618C2A /* AlacrittyTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlacrittyTerminalCapability.swift; sourceTree = "<group>"; };
 		A641F34952BE78023D0FB94E /* TerminalFocusableFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalFocusableFilter.swift; sourceTree = "<group>"; };
 		A7538BF07592B7D765AF1C22 /* ExternalTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalTerminalCapability.swift; sourceTree = "<group>"; };
 		A776ADBF033757E89353F9E2 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
@@ -895,6 +911,7 @@
 		F49B383915AEEBCCDC916171 /* WarpPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WarpPlugin.swift; sourceTree = "<group>"; };
 		F5486873DBEC29739725E366 /* StatusBarPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarPanel.swift; sourceTree = "<group>"; };
 		F5CD3EF8FA91298047B26D20 /* TrendDataPoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendDataPoint.swift; sourceTree = "<group>"; };
+		F65F257EBB643FDD2327BF34 /* AlacrittyPlugin.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AlacrittyPlugin.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
 		F67265718ACB26BE5322C36F /* MenuBarFooter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarFooter.swift; sourceTree = "<group>"; };
 		F81931C824888B412AEA051E /* TerminalPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPlugin.swift; sourceTree = "<group>"; };
 		FA8B62A57C9E8AD16345458A /* ShareMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareMetrics.swift; sourceTree = "<group>"; };
@@ -981,6 +998,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				495A92563C99A39A84FA043C /* ClaudeStatisticsKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D2EC536C74E1CC6ADFE87B17 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5D785899FA06E4A00E4CC7A8 /* ClaudeStatisticsKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1094,6 +1119,7 @@
 		1B498AB9E13809CA8F036D81 /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				F65F257EBB643FDD2327BF34 /* AlacrittyPlugin.bundle */,
 				9E5D8A2D6C14F2665A818236 /* ClaudeAppPlugin.bundle */,
 				77339C38F26D780CFD6D03EB /* ClaudeStatistics.app */,
 				9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */,
@@ -1396,8 +1422,6 @@
 		62699901DDA713E91E341575 /* Capabilities */ = {
 			isa = PBXGroup;
 			children = (
-				0591709AD1369CB163770EC0 /* AlacrittyPlugin.swift */,
-				A5E2079B7A7714C7BC618C2A /* AlacrittyTerminalCapability.swift */,
 				61361192CBF13D3D64E6E20A /* AppleTerminalCapability.swift */,
 				AF4F05A7A269AFD18AC995DF /* BuiltinTerminalPlugins.swift */,
 				A7538BF07592B7D765AF1C22 /* ExternalTerminalCapability.swift */,
@@ -1449,6 +1473,7 @@
 		79503F339D346E2E9123C7F3 = {
 			isa = PBXGroup;
 			children = (
+				ED03CFF4784BFCF2855D7CBF /* AlacrittyPlugin */,
 				42D42D4E763ECF472827B9FB /* ClaudeAppPlugin */,
 				2BCAA708931662EBE00EF601 /* ClaudeStatistics */,
 				2489CD3BC5CC01CED948DEAF /* ClaudeStatisticsKit */,
@@ -1620,6 +1645,16 @@
 				370D33AC086199C95EC1E2CD /* UsageData.swift */,
 			);
 			path = Models;
+			sourceTree = "<group>";
+		};
+		ED03CFF4784BFCF2855D7CBF /* AlacrittyPlugin */ = {
+			isa = PBXGroup;
+			children = (
+				2F1F1261B7DA6F39B8786B00 /* AlacrittyPlugin.swift */,
+				67EF43B5F48704BB52177B27 /* Info.plist */,
+			);
+			name = AlacrittyPlugin;
+			path = Plugins/Sources/AlacrittyPlugin;
 			sourceTree = "<group>";
 		};
 		EF5D5ED012ADD07CF37DD104 /* Views */ = {
@@ -1842,6 +1877,25 @@
 			productReference = 5AD2F29DA1EEA44E8B785C0A /* VSCodePlugin.bundle */;
 			productType = "com.apple.product-type.bundle";
 		};
+		B140FAE6B185E76A98220008 /* AlacrittyPlugin */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5CE734AD4D6CBFFE63673215 /* Build configuration list for PBXNativeTarget "AlacrittyPlugin" */;
+			buildPhases = (
+				C991680E87F35EB7B3605858 /* Sources */,
+				D2EC536C74E1CC6ADFE87B17 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BF721700ED36F4F8D573FFAC /* PBXTargetDependency */,
+			);
+			name = AlacrittyPlugin;
+			packageProductDependencies = (
+			);
+			productName = AlacrittyPlugin;
+			productReference = F65F257EBB643FDD2327BF34 /* AlacrittyPlugin.bundle */;
+			productType = "com.apple.product-type.bundle";
+		};
 		B496B55EE6E4610508DBE13C /* ClaudeStatistics */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 79ECD41CCAFB7AA4F5CEF3A4 /* Build configuration list for PBXNativeTarget "ClaudeStatistics" */;
@@ -1864,6 +1918,7 @@
 				7D5D9C51E2EDB494E068BE32 /* PBXTargetDependency */,
 				9E327EB423305EFF95D64128 /* PBXTargetDependency */,
 				03A0C8E605F4EB357471FD9B /* PBXTargetDependency */,
+				A72CB6BA9E1821AC478CF2A4 /* PBXTargetDependency */,
 			);
 			name = ClaudeStatistics;
 			packageProductDependencies = (
@@ -1946,6 +2001,9 @@
 					A5EA0ADFE2151E072E433A5E = {
 						ProvisioningStyle = Automatic;
 					};
+					B140FAE6B185E76A98220008 = {
+						ProvisioningStyle = Automatic;
+					};
 					B496B55EE6E4610508DBE13C = {
 						ProvisioningStyle = Automatic;
 					};
@@ -1974,6 +2032,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				B140FAE6B185E76A98220008 /* AlacrittyPlugin */,
 				7219A5031D3C80D1C5682BA5 /* ClaudeAppPlugin */,
 				B496B55EE6E4610508DBE13C /* ClaudeStatistics */,
 				DEB25A2406721FCABB7A5B97 /* ClaudeStatisticsKit */,
@@ -2094,6 +2153,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C991680E87F35EB7B3605858 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5D6E800F52E0D14E3DD5EC05 /* AlacrittyPlugin.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		CC3424D5523FEEA13217C0F3 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -2114,8 +2181,6 @@
 				A2F1B0B01CE980A41F32D377 /* ActiveSessionsTracker.swift in Sources */,
 				12EC494D81F51B865094B844 /* ActiveToolsAggregator.swift in Sources */,
 				59FB58B0D4D4298AF8A3A1A6 /* AggregateStats.swift in Sources */,
-				6E325B8FC27E2BCE88033FAA /* AlacrittyPlugin.swift in Sources */,
-				C37EC946871256BDC3D2370C /* AlacrittyTerminalCapability.swift in Sources */,
 				437AC945F5CE5337ED23DF9A /* AllTimeView.swift in Sources */,
 				F10B232939253D7B0F56D1ED /* AppPreferences.swift in Sources */,
 				BF1EFAB27138847B92339836 /* AppRuntimePaths.swift in Sources */,
@@ -2474,6 +2539,11 @@
 			target = 87DCF594EBA4E2D293793B07 /* ZedPlugin */;
 			targetProxy = 75C83E3B1A22BCE9F784C358 /* PBXContainerItemProxy */;
 		};
+		A72CB6BA9E1821AC478CF2A4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B140FAE6B185E76A98220008 /* AlacrittyPlugin */;
+			targetProxy = BC04BDDC58721A156EE66B79 /* PBXContainerItemProxy */;
+		};
 		A90CD46411F9121E4DFF8317 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = DEB25A2406721FCABB7A5B97 /* ClaudeStatisticsKit */;
@@ -2498,6 +2568,11 @@
 			isa = PBXTargetDependency;
 			target = DEB25A2406721FCABB7A5B97 /* ClaudeStatisticsKit */;
 			targetProxy = 7975F3850A9873CACC54BD72 /* PBXContainerItemProxy */;
+		};
+		BF721700ED36F4F8D573FFAC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DEB25A2406721FCABB7A5B97 /* ClaudeStatisticsKit */;
+			targetProxy = 66A659FCA5DA687E8DD8C483 /* PBXContainerItemProxy */;
 		};
 		DE36E19E2FA7965CB5454F0E /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -2524,6 +2599,29 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		1EEED7552928DA4DD5ED3331 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Plugins/Sources/AlacrittyPlugin/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACH_O_TYPE = mh_bundle;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.AlacrittyPlugin;
+				PRODUCT_NAME = AlacrittyPlugin;
+				SDKROOT = macosx;
+				SKIP_INSTALL = NO;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				WRAPPER_EXTENSION = csplugin;
+			};
+			name = Release;
+		};
 		222508A715EC80DDDF92BD82 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -2870,6 +2968,29 @@
 			};
 			name = Debug;
 		};
+		A3F4FAFDD86E6EC3A7EC3FC5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Plugins/Sources/AlacrittyPlugin/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACH_O_TYPE = mh_bundle;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.AlacrittyPlugin;
+				PRODUCT_NAME = AlacrittyPlugin;
+				SDKROOT = macosx;
+				SKIP_INSTALL = NO;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				WRAPPER_EXTENSION = csplugin;
+			};
+			name = Debug;
+		};
 		A4EF6A576AA5AF9B79CB9307 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -3157,6 +3278,15 @@
 			buildConfigurations = (
 				7FD4B3782431D3116278BC9D /* Debug */,
 				DA2DA7FD5E62CF529DF8CB6A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5CE734AD4D6CBFFE63673215 /* Build configuration list for PBXNativeTarget "AlacrittyPlugin" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A3F4FAFDD86E6EC3A7EC3FC5 /* Debug */,
+				1EEED7552928DA4DD5ED3331 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

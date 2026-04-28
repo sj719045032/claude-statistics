@@ -63,14 +63,14 @@ final class AppState: ObservableObject {
         ClaudePluginDogfood.manifest.id:    { ClaudePluginDogfood() },
         CodexPluginDogfood.manifest.id:     { CodexPluginDogfood() },
         GeminiPluginDogfood.manifest.id:    { GeminiPluginDogfood() },
-        AlacrittyPlugin.manifest.id:        { AlacrittyPlugin() },
         ITermPlugin.manifest.id:            { ITermPlugin() },
         AppleTerminalPlugin.manifest.id:    { AppleTerminalPlugin() },
         GhosttyPlugin.manifest.id:          { GhosttyPlugin() },
         KittyPlugin.manifest.id:            { KittyPlugin() },
         WezTermPlugin.manifest.id:          { WezTermPlugin() }
-        // WarpPlugin extracted to .csplugin (M2). Loaded via
-        // PluginLoader from Contents/PlugIns at runtime, not here.
+        // WarpPlugin / AlacrittyPlugin extracted to .csplugin (M2).
+        // Loaded via PluginLoader from Contents/PlugIns at runtime,
+        // not here.
     ]
 
     let pluginRegistry: PluginRegistry = {

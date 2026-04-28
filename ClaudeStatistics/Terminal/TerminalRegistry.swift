@@ -7,11 +7,11 @@ enum TerminalRegistry {
         WezTermTerminalCapability(),
         ITermTerminalCapability(),
         AppleTerminalCapability(),
-        // WarpTerminalCapability extracted to WarpPlugin.csplugin (M2);
-        // host now sees Warp through `pluginCapabilitiesStore`'s
+        // WarpTerminalCapability + AlacrittyTerminalCapability
+        // extracted to .csplugin bundles (M2). Host now sees them
+        // through `pluginCapabilitiesStore`'s
         // `PluginBackedTerminalCapability` adapter.
-        KittyTerminalCapability(),
-        AlacrittyTerminalCapability()
+        KittyTerminalCapability()
     ]
 
     /// Identifiers contributed by external `TerminalPlugin`s at runtime

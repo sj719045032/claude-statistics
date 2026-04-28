@@ -336,6 +336,42 @@ targets:
         CODE_SIGN_STYLE: Automatic
         SWIFT_STRICT_CONCURRENCY: minimal
 
+  AlacrittyPlugin:
+    type: bundle
+    platform: macOS
+    sources:
+      - path: Plugins/Sources/AlacrittyPlugin
+    dependencies:
+      - target: ClaudeStatisticsKit
+    info:
+      path: Plugins/Sources/AlacrittyPlugin/Info.plist
+      properties:
+        CFBundleIdentifier: com.tinystone.AlacrittyPlugin
+        CFBundleName: AlacrittyPlugin
+        CFBundleExecutable: AlacrittyPlugin
+        CFBundlePackageType: BNDL
+        NSPrincipalClass: AlacrittyPlugin
+        CSPluginManifest:
+          id: org.alacritty
+          kind: terminal
+          displayName: Alacritty
+          version: 1.0.0
+          minHostAPIVersion: 0.1.0
+          permissions: []
+          principalClass: AlacrittyPlugin
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tinystone.AlacrittyPlugin
+        PRODUCT_NAME: AlacrittyPlugin
+        WRAPPER_EXTENSION: csplugin
+        MACH_O_TYPE: mh_bundle
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SKIP_INSTALL: NO
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_STRICT_CONCURRENCY: minimal
+
   ClaudeStatistics:
     type: application
     platform: macOS
@@ -373,6 +409,10 @@ targets:
           destination: plugins
           subpath: ""
       - target: WarpPlugin
+        copy:
+          destination: plugins
+          subpath: ""
+      - target: AlacrittyPlugin
         copy:
           destination: plugins
           subpath: ""
