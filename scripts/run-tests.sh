@@ -33,11 +33,21 @@ xcodebuild test \
     PRODUCT_BUNDLE_IDENTIFIER="${DEBUG_BUNDLE_ID}" \
     >"${TEST_LOG}" 2>&1 || TEST_STATUS=$?
 
-# Unregister the test host app so Launch Services doesn't keep a stale entry
-# pointing at /tmp. The build may have left an `.app` here even on test
-# failure; clean it up either way.
+# Unregister + delete the test host app so Launch Services doesn't keep a
+# stale entry pointing at /tmp. The build may have left an `.app` here
+# even on test failure; clean it up either way.
+#
+# Why both `lsregister -u` AND `rm -rf`: `lsregister -u` only succeeds
+# while the path is still on disk, so we have to unregister before
+# deleting. If we left the bundle behind after unregistering, the next
+# Spotlight / LaunchServices rescan would re-register it — which is
+# how stale `Claude Statistics` rows ended up in System Settings →
+# Privacy after several test runs. Removing the bundle right after
+# unregister closes that re-discovery window. The Test bundle XCTest
+# wraps inside Plugins/ goes with it (xcodebuild rebuilds when needed).
 if [ -d "${TEST_APP_PATH}" ]; then
     ${LSREGISTER} -u "${TEST_APP_PATH}" 2>/dev/null || true
+    rm -rf "${TEST_APP_PATH}"
 fi
 
 if [ "${TEST_STATUS}" -ne 0 ]; then
