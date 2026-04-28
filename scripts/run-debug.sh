@@ -33,6 +33,20 @@ killall "${DEBUG_APP_NAME}" 2>/dev/null || true
 killall "${APP_NAME}" 2>/dev/null || true
 while pgrep -x "${DEBUG_APP_NAME}" >/dev/null 2>&1 || pgrep -x "${APP_NAME}" >/dev/null 2>&1; do sleep 0.2; done
 
+# 1b. Remove stale hook-bridge socket + pid files. The app's
+# `AttentionBridge.stop()` is supposed to unlink them on terminate, but a
+# SIGKILL'd or crashed instance never runs that cleanup, leaving an orphan
+# `attention.sock` on disk. The next bind() retry path can recover by
+# unlinking + rebinding (see `AttentionBridge.startListening`), but during
+# the rebuild window EVERY hook fired by a running CLI hits the orphan
+# socket and gets ECONNREFUSED instead of ENOENT — appearing to the user
+# as "frequent socket disconnects". Removing the files here closes that
+# window: hooks during the build see ENOENT (still buffered to pending,
+# but with no misleading "connection refused" log noise) and the next
+# launch's bind() succeeds on first try.
+rm -f "${HOME}/.claude-statistics-debug/run/attention.sock" \
+      "${HOME}/.claude-statistics-debug/run/attention.pid" 2>/dev/null || true
+
 # 2. Clean up any stale DerivedData builds to avoid bundle ID conflicts
 echo "==> Cleaning stale builds..."
 find ~/Library/Developer/Xcode/DerivedData -path "*/Debug/${APP_NAME}.app" -type d -exec rm -rf {} + 2>/dev/null || true

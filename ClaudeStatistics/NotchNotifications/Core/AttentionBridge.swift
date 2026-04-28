@@ -27,6 +27,20 @@ final class AttentionBridge {
     }
 
     func stop() {
+        // Filesystem cleanup runs SYNCHRONOUSLY on the caller's thread.
+        // `applicationWillTerminate` calls us and then returns — if we hand
+        // unlink/clearPid off to socketQueue the process can exit before the
+        // queue drains, leaving an orphan `attention.sock` + stale pid file.
+        // Hook clients on the next build window then see ECONNREFUSED instead
+        // of ENOENT, which misroutes them in the connect-failure handler and
+        // delays the rebind retry path until the file is finally removed.
+        unlink(socketPath)
+        AttentionBridgeAuth.clearPid()
+
+        // The listen source must be cancelled on its own queue (DispatchSource
+        // contract). The cancel handler closes the fd. After unlink above,
+        // any in-flight accept just sees the source go down — no new connects
+        // can land because the path is already gone.
         socketQueue.async { [weak self] in
             guard let self else { return }
             if let source = self.listenSource {
@@ -36,8 +50,6 @@ final class AttentionBridge {
                 close(self.serverFd)
                 self.serverFd = -1
             }
-            unlink(self.socketPath)
-            AttentionBridgeAuth.clearPid()
         }
     }
 
