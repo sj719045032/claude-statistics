@@ -6,11 +6,11 @@ enum TerminalRegistry {
         GhosttyTerminalCapability(),
         WezTermTerminalCapability(),
         ITermTerminalCapability(),
-        AppleTerminalCapability(),
-        // WarpTerminalCapability + AlacrittyTerminalCapability
-        // extracted to .csplugin bundles (M2). Host now sees them
-        // through `pluginCapabilitiesStore`'s
-        // `PluginBackedTerminalCapability` adapter.
+        // Warp / Alacritty / AppleTerminal extracted to .csplugin
+        // bundles (M2). Host now sees them through
+        // `pluginCapabilitiesStore`'s `PluginBackedTerminalCapability`
+        // adapter; their focus path goes through the plugin's own
+        // `makeFocusStrategy()` instance via `pluginStrategyResolver`.
         KittyTerminalCapability()
     ]
 

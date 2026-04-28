@@ -41,35 +41,6 @@ final class ITermPlugin: NSObject, TerminalPlugin {
     override init() { super.init() }
 }
 
-@objc(AppleTerminalPlugin)
-final class AppleTerminalPlugin: NSObject, TerminalPlugin {
-    static let manifest = PluginManifest(
-        id: "com.apple.Terminal",
-        kind: .terminal,
-        displayName: "Terminal",
-        version: SemVer(major: 1, minor: 0, patch: 0),
-        minHostAPIVersion: SDKInfo.apiVersion,
-        permissions: [.appleScript],
-        principalClass: "AppleTerminalPlugin"
-    )
-    private let capability = AppleTerminalCapability()
-    var descriptor: TerminalDescriptor { capability.descriptor }
-    func detectInstalled() -> Bool { capability.isInstalled }
-    func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
-        AppleScriptTerminalFocusRouteHandler()
-    }
-    func makeLauncher() -> (any TerminalLauncher)? {
-        capability as? any TerminalLauncher
-    }
-    func makeReadinessProvider() -> (any TerminalReadinessProviding)? {
-        capability as? any TerminalReadinessProviding
-    }
-    func makeSetupWizard() -> (any TerminalSetupProviding)? {
-        capability as? any TerminalSetupProviding
-    }
-    override init() { super.init() }
-}
-
 @objc(GhosttyPlugin)
 final class GhosttyPlugin: NSObject, TerminalPlugin {
     static let manifest = PluginManifest(

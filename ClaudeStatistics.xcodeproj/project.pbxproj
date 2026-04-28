@@ -28,6 +28,7 @@
 		12D7CA772BC61D1A326BA9DA /* ProviderSessionDisplayFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8132C4E4069A5B948316CCF6 /* ProviderSessionDisplayFormatter.swift */; };
 		12EC494D81F51B865094B844 /* ActiveToolsAggregator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B781AB1E0AD0CC70F783E1F7 /* ActiveToolsAggregator.swift */; };
 		1386DA5988E3BA59D802B154 /* ToolActivityFormatter+Permissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00B22ECE4D683B12838FAF26 /* ToolActivityFormatter+Permissions.swift */; };
+		13F0708507CB618404FD5515 /* AppleTerminalPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = B495F0A20575304ED89E2A2F /* AppleTerminalPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		1458F0ADB236E3CA0EDFAF4F /* PermissionRequestRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F1F7334EBE1509C248AE11 /* PermissionRequestRegistryTests.swift */; };
 		14E839BE2B963D0A207E39AC /* RecentSessionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8E58160DD80E8C522C520D8 /* RecentSessionRow.swift */; };
 		153B740448B314A3C47E8A9D /* TerminalReadinessProviding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BAC9F76093D5ACC349828D9 /* TerminalReadinessProviding.swift */; };
@@ -55,7 +56,6 @@
 		22A9355E56C02E23E2843566 /* RuntimeSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7CDF939858DF7A343D5387F /* RuntimeSession.swift */; };
 		22DCBBBC8A4BACCCD9C961F7 /* NotchStateMachineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB1DFC6E058CCC6A5552A8DD /* NotchStateMachineTests.swift */; };
 		2358E4D59FFEFE0FCAFE1042 /* TerminalSetupSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17F2AED2ECC53E6BF8F6A40D /* TerminalSetupSheetView.swift */; };
-		2412DFF76D3D61785F48C91B /* AppleTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61361192CBF13D3D64E6E20A /* AppleTerminalCapability.swift */; };
 		246A652A0495D52448061372 /* TerminalContextDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7CF1FA30930F012CBB85B3D /* TerminalContextDetector.swift */; };
 		254F8CC86CD84F8579D07564 /* UnifiedDiffView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9741C3203566854EFBB25B59 /* UnifiedDiffView.swift */; };
 		25AC67EB7CBD7A011DEA88B7 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3CC4F1B31EE86B755D8A88A /* UserProfile.swift */; };
@@ -102,6 +102,7 @@
 		437AC945F5CE5337ED23DF9A /* AllTimeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99EA37388B7B02AEDF9C7A78 /* AllTimeView.swift */; };
 		43F77DC1A91245709B224E22 /* SessionProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 993CBC30E02D8B4126EE22D5 /* SessionProvider.swift */; };
 		441A363E1658B6A3975BFE06 /* IdlePeekLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B6641481E7434C7D36B1CB /* IdlePeekLayout.swift */; };
+		449FC7E9D4A8F5FA3544E759 /* AppleTerminalPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 338877063527FA08CCDCE89E /* AppleTerminalPlugin.swift */; };
 		44E7A09BC65C965BF8866C76 /* ShareRoleEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C96479A32A5A1C4D1A624B /* ShareRoleEngine.swift */; };
 		452CF0878A952AAF60319431 /* ClaudeStatisticsKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25FAD30C4ED3FB7C010C8E96 /* ClaudeStatisticsKit.swift */; };
 		45389ED6B2BB7C7A180BE038 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 0065997B44AE9D9948026A26 /* Sparkle */; };
@@ -330,6 +331,7 @@
 		E7675692CADA29176784FA9D /* GhosttyInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 193523F08B5073E042F772E1 /* GhosttyInspector.swift */; };
 		E8DE1057D8CA0EF0311CD390 /* UsageVMRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109BA2D83C763E18D01DF5F8 /* UsageVMRegistryTests.swift */; };
 		E8E2CDA7C4ACA1ADAF4CB0BB /* CodexHookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = E77D7C8475F613B82BA40646 /* CodexHookInstaller.swift */; };
+		EBBF604B2C4DB09BBE50CBD2 /* ClaudeStatisticsKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; };
 		EC106CA33296979A453C7F0D /* ProviderUsageSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 583AE7C0806E183C5A3E7BEE /* ProviderUsageSnapshot.swift */; };
 		EC17520544A6FEEA8B3F3430 /* ClaudeProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AA9035C5B842200A3C1F84E /* ClaudeProvider.swift */; };
 		EC812B09D005001919618FB5 /* SessionQuickStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = D758CE8D0B6780C973E35221 /* SessionQuickStats.swift */; };
@@ -411,6 +413,13 @@
 			remoteGlobalIDString = DEB25A2406721FCABB7A5B97;
 			remoteInfo = ClaudeStatisticsKit;
 		};
+		6D088D9E0B9792D00379CB96 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 18B1CC7C2F803601C447E6E4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DEB25A2406721FCABB7A5B97;
+			remoteInfo = ClaudeStatisticsKit;
+		};
 		70F8AA14ABE98E61AC713199 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 18B1CC7C2F803601C447E6E4 /* Project object */;
@@ -431,6 +440,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = DEB25A2406721FCABB7A5B97;
 			remoteInfo = ClaudeStatisticsKit;
+		};
+		7A22B9EE79D8A91EC79B0644 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 18B1CC7C2F803601C447E6E4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FB2AB91C4CC49E4E0118B69F;
+			remoteInfo = AppleTerminalPlugin;
 		};
 		7FB404D103F9A577293D8DC4 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -545,6 +561,7 @@
 				67D886006A577EF42FBCDECC /* ZedPlugin.bundle in Embed Dependencies */,
 				F32FC3771216AB14B758D85C /* WarpPlugin.bundle in Embed Dependencies */,
 				B6E40DABE032CAD3C2B16A85 /* AlacrittyPlugin.bundle in Embed Dependencies */,
+				13F0708507CB618404FD5515 /* AppleTerminalPlugin.bundle in Embed Dependencies */,
 			);
 			name = "Embed Dependencies";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -633,6 +650,7 @@
 		3184FFA7D8598D923510D8EE /* TranscriptParser+Trend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TranscriptParser+Trend.swift"; sourceTree = "<group>"; };
 		32FE333B9AD0368698B9A39F /* UsageAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageAPIService.swift; sourceTree = "<group>"; };
 		3371B97F78B775313FF5398A /* TabOrderEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabOrderEditor.swift; sourceTree = "<group>"; };
+		338877063527FA08CCDCE89E /* AppleTerminalPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleTerminalPlugin.swift; sourceTree = "<group>"; };
 		33BC12E3CC3D917EBF49D537 /* Plugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugin.swift; sourceTree = "<group>"; };
 		3511F107E29217FB16567AF9 /* UsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageView.swift; sourceTree = "<group>"; };
 		352BD87D6827246B00AD2179 /* DestructiveConfirmation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestructiveConfirmation.swift; sourceTree = "<group>"; };
@@ -659,6 +677,7 @@
 		450392F75EF01359109269C9 /* DisplayTextClassifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayTextClassifierTests.swift; sourceTree = "<group>"; };
 		463F0DB7C81A00C10312E8D0 /* UsageQuotaBucketRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageQuotaBucketRow.swift; sourceTree = "<group>"; };
 		4705840BAD2350953636CF55 /* PluginBackedTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginBackedTerminalCapability.swift; sourceTree = "<group>"; };
+		475C6DCF2066C24BC0104710 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		479C9C530CFDAC7834C1A7F6 /* TerminalFocusStrategy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalFocusStrategy.swift; sourceTree = "<group>"; };
 		488C2018A8681C6E971CF6A8 /* GeminiTranscriptParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiTranscriptParser.swift; sourceTree = "<group>"; };
 		49C9349BA491065487D09AA0 /* CodexTranscriptParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexTranscriptParser.swift; sourceTree = "<group>"; };
@@ -695,7 +714,6 @@
 		5FEF23799BCF1EBD41B514D2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		6038163267F751B4F45C74FA /* ProviderUsageSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderUsageSource.swift; sourceTree = "<group>"; };
 		609271D9D2750E6DBBCFFAC5 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
-		61361192CBF13D3D64E6E20A /* AppleTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleTerminalCapability.swift; sourceTree = "<group>"; };
 		617B0905848AE0C8B5086C24 /* PluginLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginLoader.swift; sourceTree = "<group>"; };
 		623F6F9C65341AB301CF1B20 /* GeminiHookInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiHookInstaller.swift; sourceTree = "<group>"; };
 		62572A1901D430E3E24CB02D /* ProviderPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderPlugin.swift; sourceTree = "<group>"; };
@@ -814,6 +832,7 @@
 		B26EF311570AA2816D7357F2 /* CodexAppPlugin.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CodexAppPlugin.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
 		B2F24500B4C9F3F375B97402 /* TerminalAppleScriptRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalAppleScriptRunner.swift; sourceTree = "<group>"; };
 		B466FB316C76AB0C39E12E7B /* DiagnosticLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogger.swift; sourceTree = "<group>"; };
+		B495F0A20575304ED89E2A2F /* AppleTerminalPlugin.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AppleTerminalPlugin.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
 		B57B82A4D2A78F05F1B1D7EC /* ActiveSessionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveSessionRow.swift; sourceTree = "<group>"; };
 		B5C4223D247CA4D681A19D53 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B63838C3755C7D084DD73D95 /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
@@ -946,6 +965,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				6C2AEAB804F88DAB72D753DB /* ClaudeStatisticsKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		77862067755C1B6462CB5455 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EBBF604B2C4DB09BBE50CBD2 /* ClaudeStatisticsKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1120,6 +1147,7 @@
 			isa = PBXGroup;
 			children = (
 				F65F257EBB643FDD2327BF34 /* AlacrittyPlugin.bundle */,
+				B495F0A20575304ED89E2A2F /* AppleTerminalPlugin.bundle */,
 				9E5D8A2D6C14F2665A818236 /* ClaudeAppPlugin.bundle */,
 				77339C38F26D780CFD6D03EB /* ClaudeStatistics.app */,
 				9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */,
@@ -1422,7 +1450,6 @@
 		62699901DDA713E91E341575 /* Capabilities */ = {
 			isa = PBXGroup;
 			children = (
-				61361192CBF13D3D64E6E20A /* AppleTerminalCapability.swift */,
 				AF4F05A7A269AFD18AC995DF /* BuiltinTerminalPlugins.swift */,
 				A7538BF07592B7D765AF1C22 /* ExternalTerminalCapability.swift */,
 				89661CA17E93D43C4B68FC23 /* GhosttyTerminalCapability.swift */,
@@ -1474,6 +1501,7 @@
 			isa = PBXGroup;
 			children = (
 				ED03CFF4784BFCF2855D7CBF /* AlacrittyPlugin */,
+				E5E74F3CD44B2C4B773473B3 /* AppleTerminalPlugin */,
 				42D42D4E763ECF472827B9FB /* ClaudeAppPlugin */,
 				2BCAA708931662EBE00EF601 /* ClaudeStatistics */,
 				2489CD3BC5CC01CED948DEAF /* ClaudeStatisticsKit */,
@@ -1645,6 +1673,16 @@
 				370D33AC086199C95EC1E2CD /* UsageData.swift */,
 			);
 			path = Models;
+			sourceTree = "<group>";
+		};
+		E5E74F3CD44B2C4B773473B3 /* AppleTerminalPlugin */ = {
+			isa = PBXGroup;
+			children = (
+				338877063527FA08CCDCE89E /* AppleTerminalPlugin.swift */,
+				475C6DCF2066C24BC0104710 /* Info.plist */,
+			);
+			name = AppleTerminalPlugin;
+			path = Plugins/Sources/AppleTerminalPlugin;
 			sourceTree = "<group>";
 		};
 		ED03CFF4784BFCF2855D7CBF /* AlacrittyPlugin */ = {
@@ -1919,6 +1957,7 @@
 				9E327EB423305EFF95D64128 /* PBXTargetDependency */,
 				03A0C8E605F4EB357471FD9B /* PBXTargetDependency */,
 				A72CB6BA9E1821AC478CF2A4 /* PBXTargetDependency */,
+				E863D65E45E391F83C1C2EB1 /* PBXTargetDependency */,
 			);
 			name = ClaudeStatistics;
 			packageProductDependencies = (
@@ -1968,6 +2007,25 @@
 			productReference = 907576DD936254F8D2574A2E /* ClaudeStatisticsTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		FB2AB91C4CC49E4E0118B69F /* AppleTerminalPlugin */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FF8A863B0C4082819B696856 /* Build configuration list for PBXNativeTarget "AppleTerminalPlugin" */;
+			buildPhases = (
+				E0092E88A7358C68E86DDDFE /* Sources */,
+				77862067755C1B6462CB5455 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A239FE297E406882F8963D81 /* PBXTargetDependency */,
+			);
+			name = AppleTerminalPlugin;
+			packageProductDependencies = (
+			);
+			productName = AppleTerminalPlugin;
+			productReference = B495F0A20575304ED89E2A2F /* AppleTerminalPlugin.bundle */;
+			productType = "com.apple.product-type.bundle";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -2010,6 +2068,9 @@
 					DEB25A2406721FCABB7A5B97 = {
 						ProvisioningStyle = Automatic;
 					};
+					FB2AB91C4CC49E4E0118B69F = {
+						ProvisioningStyle = Automatic;
+					};
 				};
 			};
 			buildConfigurationList = 966C204BEC3B01F6672DE019 /* Build configuration list for PBXProject "ClaudeStatistics" */;
@@ -2033,6 +2094,7 @@
 			projectRoot = "";
 			targets = (
 				B140FAE6B185E76A98220008 /* AlacrittyPlugin */,
+				FB2AB91C4CC49E4E0118B69F /* AppleTerminalPlugin */,
 				7219A5031D3C80D1C5682BA5 /* ClaudeAppPlugin */,
 				B496B55EE6E4610508DBE13C /* ClaudeStatistics */,
 				DEB25A2406721FCABB7A5B97 /* ClaudeStatisticsKit */,
@@ -2169,6 +2231,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E0092E88A7358C68E86DDDFE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				449FC7E9D4A8F5FA3544E759 /* AppleTerminalPlugin.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		EEBADCFD08F8E7E8422CEDC9 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -2187,7 +2257,6 @@
 				E37D4BFF022181A1AF159CD9 /* AppTab.swift in Sources */,
 				BC65FB4B58BE9FD0EBB88C70 /* AppleScriptFocuser.swift in Sources */,
 				8866F67D597B25FE5F26485A /* AppleScriptHelpers.swift in Sources */,
-				2412DFF76D3D61785F48C91B /* AppleTerminalCapability.swift in Sources */,
 				FF97501E49AA0A80727611F2 /* AttentionBridge.swift in Sources */,
 				EE3493DDFB2070C49ADD989F /* AttentionBridgeAuth.swift in Sources */,
 				A63890A01AF570ADBA7E4E11 /* AttentionEvent.swift in Sources */,
@@ -2539,6 +2608,11 @@
 			target = 87DCF594EBA4E2D293793B07 /* ZedPlugin */;
 			targetProxy = 75C83E3B1A22BCE9F784C358 /* PBXContainerItemProxy */;
 		};
+		A239FE297E406882F8963D81 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DEB25A2406721FCABB7A5B97 /* ClaudeStatisticsKit */;
+			targetProxy = 6D088D9E0B9792D00379CB96 /* PBXContainerItemProxy */;
+		};
 		A72CB6BA9E1821AC478CF2A4 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = B140FAE6B185E76A98220008 /* AlacrittyPlugin */;
@@ -2583,6 +2657,11 @@
 			isa = PBXTargetDependency;
 			target = A5EA0ADFE2151E072E433A5E /* VSCodePlugin */;
 			targetProxy = 0FBBF536E6230EAA99CDC205 /* PBXContainerItemProxy */;
+		};
+		E863D65E45E391F83C1C2EB1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FB2AB91C4CC49E4E0118B69F /* AppleTerminalPlugin */;
+			targetProxy = 7A22B9EE79D8A91EC79B0644 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -2704,6 +2783,29 @@
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.WarpPlugin;
 				PRODUCT_NAME = WarpPlugin;
+				SDKROOT = macosx;
+				SKIP_INSTALL = NO;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				WRAPPER_EXTENSION = csplugin;
+			};
+			name = Release;
+		};
+		3F8985467A45B80A60A1EF26 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Plugins/Sources/AppleTerminalPlugin/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACH_O_TYPE = mh_bundle;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.AppleTerminalPlugin;
+				PRODUCT_NAME = AppleTerminalPlugin;
 				SDKROOT = macosx;
 				SKIP_INSTALL = NO;
 				SWIFT_STRICT_CONCURRENCY = minimal;
@@ -2872,6 +2974,29 @@
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.ZedPlugin;
 				PRODUCT_NAME = ZedPlugin;
+				SDKROOT = macosx;
+				SKIP_INSTALL = NO;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				WRAPPER_EXTENSION = csplugin;
+			};
+			name = Debug;
+		};
+		80FC7ABDB8DCCBCC2DE3E688 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Plugins/Sources/AppleTerminalPlugin/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACH_O_TYPE = mh_bundle;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.AppleTerminalPlugin;
+				PRODUCT_NAME = AppleTerminalPlugin;
 				SDKROOT = macosx;
 				SKIP_INSTALL = NO;
 				SWIFT_STRICT_CONCURRENCY = minimal;
@@ -3386,6 +3511,15 @@
 			buildConfigurations = (
 				98626130861412136B92B521 /* Debug */,
 				8E763FB09B103F40F5E47E9C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		FF8A863B0C4082819B696856 /* Build configuration list for PBXNativeTarget "AppleTerminalPlugin" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				80FC7ABDB8DCCBCC2DE3E688 /* Debug */,
+				3F8985467A45B80A60A1EF26 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

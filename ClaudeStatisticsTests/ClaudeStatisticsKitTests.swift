@@ -1470,7 +1470,6 @@ final class PluginReflectionTests: XCTestCase {
         (CodexPluginDogfood.manifest.principalClass, CodexPluginDogfood.self),
         (GeminiPluginDogfood.manifest.principalClass, GeminiPluginDogfood.self),
         (ITermPlugin.manifest.principalClass, ITermPlugin.self),
-        (AppleTerminalPlugin.manifest.principalClass, AppleTerminalPlugin.self),
         (GhosttyPlugin.manifest.principalClass, GhosttyPlugin.self),
         (KittyPlugin.manifest.principalClass, KittyPlugin.self),
         (WezTermPlugin.manifest.principalClass, WezTermPlugin.self)
