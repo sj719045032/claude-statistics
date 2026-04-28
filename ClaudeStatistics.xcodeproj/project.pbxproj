@@ -277,7 +277,6 @@
 		BDBBC60B4BA024F4BF03D8EF /* BuiltinProviderPlugins.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2365B90C4B9B32DEA0C8687B /* BuiltinProviderPlugins.swift */; };
 		BE4FDED4356AA89774DF4B8A /* TerminalPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7D5709A13CDC7751084AAF /* TerminalPreferences.swift */; };
 		BF14AA4EA1F0828EAFE4FA93 /* ShareRoleEngine+Signatures.swift in Sources */ = {isa = PBXBuildFile; fileRef = C44E317C50951CD1010919F3 /* ShareRoleEngine+Signatures.swift */; };
-		BF1EFAB27138847B92339836 /* AppRuntimePaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA072464D4CA170B290FA84E /* AppRuntimePaths.swift */; };
 		C096DD401EB0F2A1E31EFFB9 /* GeminiProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6470B331BB31EF4AE6E5CF51 /* GeminiProvider.swift */; };
 		C1946155BDD0D0ABEB98F6B5 /* TelemetryDeck in Frameworks */ = {isa = PBXBuildFile; productRef = 0978977B964239E918826F41 /* TelemetryDeck */; };
 		C19FAC3501132B64FECBDB3F /* VSCodePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91C96A74998EE00B79497160 /* VSCodePlugin.swift */; };
@@ -297,6 +296,7 @@
 		CD563F1C5E793187EEB05347 /* InformationalEventGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5657C95B75EDEA0DA7660426 /* InformationalEventGateTests.swift */; };
 		CE2A21F122971B1792CF548D /* ProviderSessionDisplayFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C94B6F432561CF7BD3D4FBD /* ProviderSessionDisplayFormatterTests.swift */; };
 		CF82020D3789B8CCE83B2DAA /* SessionParseValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C648DD36956F633E7BABC7F /* SessionParseValidator.swift */; };
+		CFE96ECE743C62FA99B92F23 /* AppRuntimePaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = B529AA80E4E380946F9AB4B7 /* AppRuntimePaths.swift */; };
 		D05B30BF6C0E4B0AB8AE3EB8 /* InformationalEventGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C120104D02EE6397B7344DE2 /* InformationalEventGate.swift */; };
 		D06D7B513EFFD60742C93431 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B5C4223D247CA4D681A19D53 /* Assets.xcassets */; };
 		D0AA811ABFBE719E0E045FAB /* PluginManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D22B04AA6887462F066799E /* PluginManifest.swift */; };
@@ -863,6 +863,7 @@
 		B26EF311570AA2816D7357F2 /* CodexAppPlugin.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CodexAppPlugin.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
 		B2F24500B4C9F3F375B97402 /* TerminalAppleScriptRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalAppleScriptRunner.swift; sourceTree = "<group>"; };
 		B495F0A20575304ED89E2A2F /* AppleTerminalPlugin.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AppleTerminalPlugin.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
+		B529AA80E4E380946F9AB4B7 /* AppRuntimePaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRuntimePaths.swift; sourceTree = "<group>"; };
 		B57B82A4D2A78F05F1B1D7EC /* ActiveSessionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveSessionRow.swift; sourceTree = "<group>"; };
 		B5C4223D247CA4D681A19D53 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B63838C3755C7D084DD73D95 /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
@@ -912,7 +913,6 @@
 		D908D872738DD762E0632F3E /* TranscriptParser+SearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TranscriptParser+SearchIndex.swift"; sourceTree = "<group>"; };
 		D922135FFC7EA58D322F5BC4 /* KittyPlugin.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KittyPlugin.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
 		D9D13F949F9557AC75AAC3B1 /* ShareCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardView.swift; sourceTree = "<group>"; };
-		DA072464D4CA170B290FA84E /* AppRuntimePaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRuntimePaths.swift; sourceTree = "<group>"; };
 		DA847F7AAA8B25206BA33E25 /* ClaudeManagedAccountStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeManagedAccountStore.swift; sourceTree = "<group>"; };
 		DBBEE45A24DCB72DA07ECD79 /* SemVer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemVer.swift; sourceTree = "<group>"; };
 		DC3A33B6B13FE8262C5C6281 /* CodexUsageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsageService.swift; sourceTree = "<group>"; };
@@ -1246,7 +1246,6 @@
 			isa = PBXGroup;
 			children = (
 				CE1124931992403EA0EBD95E /* AppPreferences.swift */,
-				DA072464D4CA170B290FA84E /* AppRuntimePaths.swift */,
 				FAAFBA5B9EEDC2BB22BAF700 /* AutoRefreshCoordinator.swift */,
 				1585E37EA4FB0491BA86CA2B /* DisplayTextClassifier.swift */,
 				5B4066C394B5E23322D32189 /* GlobalHotKeyManager.swift */,
@@ -1291,6 +1290,7 @@
 			children = (
 				561139B5156918EA6069C129 /* AccountProvider.swift */,
 				283CB0DBC7A756B87201BB54 /* ActivateAppHelpers.swift */,
+				B529AA80E4E380946F9AB4B7 /* AppRuntimePaths.swift */,
 				0F23EB1047050D22FF96E2B2 /* CanonicalToolName.swift */,
 				25FAD30C4ED3FB7C010C8E96 /* ClaudeStatisticsKit.swift */,
 				5751B5879E1EAFCE00A80DAC /* DaySlice.swift */,
@@ -2384,7 +2384,6 @@
 				59FB58B0D4D4298AF8A3A1A6 /* AggregateStats.swift in Sources */,
 				437AC945F5CE5337ED23DF9A /* AllTimeView.swift in Sources */,
 				F10B232939253D7B0F56D1ED /* AppPreferences.swift in Sources */,
-				BF1EFAB27138847B92339836 /* AppRuntimePaths.swift in Sources */,
 				E37D4BFF022181A1AF159CD9 /* AppTab.swift in Sources */,
 				BC65FB4B58BE9FD0EBB88C70 /* AppleScriptFocuser.swift in Sources */,
 				8866F67D597B25FE5F26485A /* AppleScriptHelpers.swift in Sources */,
@@ -2609,6 +2608,7 @@
 			files = (
 				BB6858F502827249DFC7E71E /* AccountProvider.swift in Sources */,
 				52E482C16D6388E61B64DFBC /* ActivateAppHelpers.swift in Sources */,
+				CFE96ECE743C62FA99B92F23 /* AppRuntimePaths.swift in Sources */,
 				A2F7960601060A4F2D8BE790 /* CanonicalToolName.swift in Sources */,
 				452CF0878A952AAF60319431 /* ClaudeStatisticsKit.swift in Sources */,
 				21492C1C67351582F64D20A1 /* DaySlice.swift in Sources */,

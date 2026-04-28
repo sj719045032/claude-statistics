@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 extension StatusLineInstaller {
     static func generatedScript() -> String {

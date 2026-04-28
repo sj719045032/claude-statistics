@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 /// Manages installation of the Claude Statistics-integrated status line script
 struct StatusLineInstaller {
