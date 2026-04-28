@@ -233,11 +233,11 @@ P0 主要项已完成。第三方 ProviderPlugin 装上 `.csplugin` 后，Settin
 
 ### P3 — Cosmetic / Schema 收尾
 
-| 工作项 |
-|---|
-| 三个 `iconAssetName` 字面量改成 manifest 字段 |
-| `TerminalPreferences.<x>OptionID` 8 个常量改成 capability 提供 |
-| 老 UserDefaults key 兼容迁移（旧版本用户的 `notch.enabled.<provider>` 等需保留读路径） |
+| 工作项 | 状态 |
+|---|---|
+| 三个 `iconAssetName` 字面量改成 manifest 字段 | ✅ 已部分接入：`PluginManifest.iconAsset: String?` 已加，3 个 builtin manifest 已 dogfood 同名值；host UI 仍读 `descriptor.iconAssetName`（双轨 by design — descriptor 给 host，manifest 给 plugin loader） |
+| `TerminalPreferences.<x>OptionID` 8 个常量改成 capability 提供 | ✅ **已完成** (2026-04-28)：删 7 个 terminal-specific 常量（`ghostty/iTerm/terminal/warp/kitty/wezTerm/alacritty`OptionID），各 capability 直接用字面量；保留 `autoOptionID` 因为它是 sentinel value（不属于任何 capability，被 25+ 处消费）。 |
+| 老 UserDefaults key 兼容迁移（旧版本用户的 `notch.enabled.<provider>` 等需保留读路径） | ✅ 已完成：`NotchPreferences.migrateLegacyIfNeeded()` 在启动时把旧单 key `notch.enabled` fanout 到 per-provider key（`NotchPreferences.swift:78-94`），调用点 `ClaudeStatisticsApp.swift:618`。`TerminalPreferences.preferredOptionID(forProvider:)` 也走 per-provider → legacy 单 key 两步 fallback（`TerminalPreferences.swift:46-61`）。 |
 
 ---
 
@@ -453,6 +453,18 @@ Chat-app launchers
 - ✅ 测试：823 全过（+2）。Debug app 重启验证 OK。
 
 **剩余 P2** 经审计已全部清零（`HookInstalling` / `HookProvider` 已通过 `HookProvider.notchHookInstaller` + `statusLineInstaller` 协议接入，host 端零硬编码 fan-out — 见 §5.1 表回填）。下一步聚焦 Terminal 维度 P1（M2 .csplugin 化 + focus pipeline bundleId 退场），这两项都是单独 session 工作量。
+
+**P3 cosmetic 收尾**（同 session 后段）：
+
+- ✅ `TerminalPreferences.<x>OptionID` 7 个 terminal-specific 常量删除，capability struct `optionID` 字段改为字面量直接写入。`autoOptionID` 保留（它是 sentinel，不属于任何 capability，被 25+ 处消费判定「自动选 frontmost」语义）。
+- ✅ `iconAssetName` manifest 字段（双轨 by design）+ 老 UserDefaults key 迁移已落地，回填到 P3 表。
+
+**P1 真正剩余**（下次 session 起点）：
+
+- `AppleScriptFocuser` 的 `switch bundleId` 退场（line 20 + line 182 各一道）：每个 case 内部含完整的 osascript 模板字符串（Apple Terminal / iTerm2 / Ghostty 三段独立逻辑）。下沉路径：SDK 加 `TerminalAppleScriptFocusing` 协议（`containsScript(...)` / `focusScript(...)`），3 个 capability struct 实现，`AppleScriptFocuser` 改为查 capability。需保证 osascript byte-equivalent。
+- `TerminalFocusCoordinator.isSessionFocused` 同样的 `switch bundleId`（line 500），逻辑更简单（直接 dispatch 到 3 个 host 函数）；可与上面合并到同一协议或单独 capability hook。
+- `HookCLI` `TerminalContextDetector` builtin terminal 检测下沉：env 检测（`KITTY_*` / `WEZTERM_*` / `ITERM_*`）+ Ghostty osascript fan-out。注意 HookCLI 在主 app 二进制以 CLI 模式运行（`main.swift:4`），**不能用 `PluginRegistry`**（plugin registry 只在 SwiftUI app 进程构建）；下沉得做成「编译期可达的 builtin capability 列表」（host 端 builtin capability struct 直接 import 即可）。
+- M2: 8 个 builtin terminal 抽 `.csplugin`（每个需 self-contain capability + launch + readiness 实现）。当前 builtin terminal capability 已经足够 plugin-aware，但仍编译进主二进制；抽出后 host 完全不区分 builtin / 第三方。
 
 ---
 
