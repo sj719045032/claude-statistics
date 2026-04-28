@@ -93,3 +93,52 @@ extension ITermTerminalCapability: TerminalFrontmostSessionProbing {
         """
     }
 }
+
+extension ITermTerminalCapability: TerminalAppleScriptContainsProbing {
+    func containsSessionScript(
+        tty: String?,
+        projectPath: String?,
+        terminalWindowID: String?,
+        terminalTabID: String?,
+        stableTerminalID: String?
+    ) -> String? {
+        let trimmedTTY = (tty?.isEmpty == false) ? tty : nil
+        let trimmedStable = (stableTerminalID?.isEmpty == false) ? stableTerminalID : nil
+        guard trimmedTTY != nil || trimmedStable != nil else { return nil }
+
+        let stableIDClause: String
+        if let stableTerminalID = trimmedStable {
+            stableIDClause = """
+            if (id of s as text) is "\(AppleScriptHelpers.escape(stableTerminalID))" then return "ok"
+            """
+        } else {
+            stableIDClause = ""
+        }
+
+        let ttyClause: String
+        if trimmedTTY != nil {
+            ttyClause = """
+            if targetTtys contains (tty of s as text) then return "ok"
+            """
+        } else {
+            ttyClause = ""
+        }
+
+        return """
+        set targetTtys to \(trimmedTTY.map(AppleScriptHelpers.ttyListLiteral) ?? "{}")
+        tell application "iTerm2"
+            repeat with w in windows
+                repeat with t in tabs of w
+                    repeat with s in sessions of t
+                        try
+                            \(stableIDClause)
+                            \(ttyClause)
+                        end try
+                    end repeat
+                end repeat
+            end repeat
+        end tell
+        return "miss"
+        """
+    }
+}

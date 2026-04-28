@@ -82,3 +82,28 @@ extension AppleTerminalCapability: TerminalFrontmostSessionProbing {
         """
     }
 }
+
+extension AppleTerminalCapability: TerminalAppleScriptContainsProbing {
+    func containsSessionScript(
+        tty: String?,
+        projectPath: String?,
+        terminalWindowID: String?,
+        terminalTabID: String?,
+        stableTerminalID: String?
+    ) -> String? {
+        guard let tty, !tty.isEmpty else { return nil }
+        return """
+        set targetTtys to \(AppleScriptHelpers.ttyListLiteral(tty))
+        tell application "Terminal"
+            repeat with w in windows
+                repeat with t in tabs of w
+                    try
+                        if targetTtys contains (tty of t as text) then return "ok"
+                    end try
+                end repeat
+            end repeat
+        end tell
+        return "miss"
+        """
+    }
+}

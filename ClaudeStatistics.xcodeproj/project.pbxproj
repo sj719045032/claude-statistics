@@ -206,6 +206,7 @@
 		861A6FDE8151A6DF1D571793 /* TimeFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15FB669CCF4C2F10D4550624 /* TimeFormatter.swift */; };
 		871E27060B953A2929FB1580 /* TerminalFocusRouteHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10FC057E644E62D0BE8CD70 /* TerminalFocusRouteHandler.swift */; };
 		87A0D9F3C385691894E98482 /* SnippetText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44406011A5BC03F7F5261429 /* SnippetText.swift */; };
+		8866F67D597B25FE5F26485A /* AppleScriptHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8921BE3208B862105FFAF93 /* AppleScriptHelpers.swift */; };
 		887B628E7C964D59454E184C /* ProcessTreeWalker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A32D01DDF055A652F2C104D /* ProcessTreeWalker.swift */; };
 		88F2EFD1B9C27DA8F671021C /* ClaudeHookNormalizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10F402C2998B35DE30CF5E5 /* ClaudeHookNormalizerTests.swift */; };
 		8A47113825B15370391C1135 /* TerminalFocusRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ADE3FEF920338C79B20E30F /* TerminalFocusRoute.swift */; };
@@ -768,6 +769,7 @@
 		A776ADBF033757E89353F9E2 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		A7C96479A32A5A1C4D1A624B /* ShareRoleEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRoleEngine.swift; sourceTree = "<group>"; };
 		A872F99484F4F48F8F878E49 /* ShareRoleEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRoleEngineTests.swift; sourceTree = "<group>"; };
+		A8921BE3208B862105FFAF93 /* AppleScriptHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleScriptHelpers.swift; sourceTree = "<group>"; };
 		A8C9D74CE3280126E243E85C /* ProjectGroupHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectGroupHeader.swift; sourceTree = "<group>"; };
 		A9F4A8499C7CCC383E405EB7 /* SearchIndexMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchIndexMessage.swift; sourceTree = "<group>"; };
 		AC6EE5A2DBB624AC7941EBC0 /* StatusLineScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusLineScript.swift; sourceTree = "<group>"; };
@@ -1525,6 +1527,7 @@
 				0B84A6ED09B77E2974C0629A /* AccessibilityFocuser.swift */,
 				DD33F591AEEB93C40913AC8F /* ActivateFocuser.swift */,
 				645A6AB9436D7D2577DAE9D8 /* AppleScriptFocuser.swift */,
+				A8921BE3208B862105FFAF93 /* AppleScriptHelpers.swift */,
 				193523F08B5073E042F772E1 /* GhosttyInspector.swift */,
 				387E20F7F962C004AD38B92C /* KittyFocuser.swift */,
 				E337F442CEE88957F93C95B2 /* KittyFocusSetup.swift */,
@@ -2048,6 +2051,7 @@
 				BF1EFAB27138847B92339836 /* AppRuntimePaths.swift in Sources */,
 				E37D4BFF022181A1AF159CD9 /* AppTab.swift in Sources */,
 				BC65FB4B58BE9FD0EBB88C70 /* AppleScriptFocuser.swift in Sources */,
+				8866F67D597B25FE5F26485A /* AppleScriptHelpers.swift in Sources */,
 				2412DFF76D3D61785F48C91B /* AppleTerminalCapability.swift in Sources */,
 				FF97501E49AA0A80727611F2 /* AttentionBridge.swift in Sources */,
 				EE3493DDFB2070C49ADD989F /* AttentionBridgeAuth.swift in Sources */,

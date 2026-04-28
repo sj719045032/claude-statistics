@@ -92,6 +92,23 @@ protocol TerminalFrontmostSessionProbing {
     var frontmostFocusedSessionScript: String { get }
 }
 
+/// Capability for terminals that can answer "do you currently host a
+/// session matching the supplied locators?" via AppleScript. The
+/// returned script must yield `"ok"` on a hit and `"miss"` on a miss
+/// (matching `AppleScriptFocuser.contains`'s comparison). Returning
+/// `nil` means the supplied locator combination is insufficient for
+/// this terminal — the focuser then short-circuits to false instead
+/// of running osascript with empty args.
+protocol TerminalAppleScriptContainsProbing {
+    func containsSessionScript(
+        tty: String?,
+        projectPath: String?,
+        terminalWindowID: String?,
+        terminalTabID: String?,
+        stableTerminalID: String?
+    ) -> String?
+}
+
 extension TerminalFocusIdentityProviding {
     func shouldUseCachedIdentity(
         requestedWindowID: String?,

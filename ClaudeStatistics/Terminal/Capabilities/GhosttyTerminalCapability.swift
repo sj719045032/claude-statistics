@@ -156,6 +156,102 @@ extension GhosttyTerminalCapability: TerminalFrontmostSessionProbing {
     }
 }
 
+extension GhosttyTerminalCapability: TerminalAppleScriptContainsProbing {
+    func containsSessionScript(
+        tty: String?,
+        projectPath: String?,
+        terminalWindowID: String?,
+        terminalTabID: String?,
+        stableTerminalID: String?
+    ) -> String? {
+        let trimmedWindow = terminalWindowID?.nilIfEmpty
+        let trimmedTab = terminalTabID?.nilIfEmpty
+        let trimmedStable = stableTerminalID?.nilIfEmpty
+        let trimmedPath = projectPath?.nilIfEmpty
+
+        let hasExplicitLocator = trimmedWindow != nil || trimmedTab != nil || trimmedStable != nil
+        guard hasExplicitLocator || trimmedPath != nil else { return nil }
+
+        let windowClause: String
+        if let trimmedWindow, let trimmedTab {
+            windowClause = """
+            try
+                set targetWindow to first window whose id is "\(AppleScriptHelpers.escape(trimmedWindow))"
+                set targetTab to first tab of targetWindow whose id is "\(AppleScriptHelpers.escape(trimmedTab))"
+                return "ok"
+            end try
+            """
+        } else if let trimmedWindow {
+            windowClause = """
+            try
+                if exists (first window whose id is "\(AppleScriptHelpers.escape(trimmedWindow))") then return "ok"
+            end try
+            """
+        } else {
+            windowClause = ""
+        }
+
+        let stableIDClause: String
+        if let trimmedStable {
+            stableIDClause = """
+            if (id of terminalRef as text) is "\(AppleScriptHelpers.escape(trimmedStable))" then return "ok"
+            """
+        } else {
+            stableIDClause = ""
+        }
+
+        return """
+        set targetPaths to \(AppleScriptHelpers.pathListLiteral(projectPath))
+        tell application id "com.mitchellh.ghostty"
+            \(windowClause)
+            repeat with w in windows
+                repeat with tabRef in tabs of w
+                    repeat with terminalRef in terminals of tabRef
+                        try
+                            \(stableIDClause)
+                            set workingDirText to (working directory of terminalRef as text)
+                            if my normalizePath(workingDirText) is in targetPaths then return "ok"
+                        end try
+                    end repeat
+                end repeat
+            end repeat
+        end tell
+        return "miss"
+
+        on normalizePath(rawValue)
+            set valueText to rawValue as text
+            if valueText starts with "file://" then
+                set valueText to text 8 thru -1 of valueText
+            end if
+            set valueText to my decodeURLText(valueText)
+            if valueText ends with "/" and valueText is not "/" then
+                set valueText to text 1 thru -2 of valueText
+            end if
+            return valueText
+        end normalizePath
+
+        on decodeURLText(valueText)
+            set decodedText to valueText
+            set decodedText to my replaceText("%20", " ", decodedText)
+            set decodedText to my replaceText("%2D", "-", decodedText)
+            set decodedText to my replaceText("%2E", ".", decodedText)
+            set decodedText to my replaceText("%2F", "/", decodedText)
+            set decodedText to my replaceText("%5F", "_", decodedText)
+            return decodedText
+        end decodeURLText
+
+        on replaceText(findText, replaceText, sourceText)
+            set AppleScript's text item delimiters to findText
+            set textItems to every text item of sourceText
+            set AppleScript's text item delimiters to replaceText
+            set rebuiltText to textItems as text
+            set AppleScript's text item delimiters to ""
+            return rebuiltText
+        end replaceText
+        """
+    }
+}
+
 private extension String {
     var nilIfEmpty: String? {
         isEmpty ? nil : self

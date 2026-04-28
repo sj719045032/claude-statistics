@@ -338,6 +338,16 @@ enum TerminalRegistry {
             .first { $0.ownsBundleIdentifier(bundleId) }
     }
 
+    /// Capability that builds the "do you currently host a session
+    /// matching these locators?" AppleScript for `AppleScriptFocuser
+    /// .contains`. Same dispatch shape as `frontmostSessionProber` —
+    /// a third-party AppleScript-able terminal just adds the
+    /// conformance.
+    static func appleScriptContainsProber(for bundleId: String?) -> (any TerminalCapability & TerminalAppleScriptContainsProbing)? {
+        capabilities.compactMap { $0 as? any TerminalCapability & TerminalAppleScriptContainsProbing }
+            .first { $0.ownsBundleIdentifier(bundleId) }
+    }
+
     private static func launchCapability(
         for preferredOptionID: String
     ) -> (any TerminalCapability & TerminalLauncher)? {
