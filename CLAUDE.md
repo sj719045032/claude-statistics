@@ -64,6 +64,29 @@ When you catch yourself writing `switch providerName { case "apply_patch": … }
 inside shared code, stop — route it through a provider-owned alias table and
 have the shared code switch on the canonical value instead.
 
+## Plugin Architecture — North Star
+
+See `docs/PLUGIN_ARCHITECTURE.md` for the full nailing-down. Three
+sentences:
+
+1. **Plugins are self-contained.** Business logic, state, provider-
+   specific data models, provider-specific SwiftUI views — all live
+   inside the `.csplugin`. Plugins never depend on host-module types.
+2. **Host is the chassis.** It ships SDK protocols + general-purpose
+   helpers + the unified UI containers (Settings tabs, Marketplace,
+   notch shell, statistics scaffolding). No plugin should require
+   "the host adds a new file specifically for me" to work.
+3. **Cut slots, not relationships.** The chassis defines SDK
+   protocols that hand plugins a SwiftUI slot to fill (via `AnyView`)
+   plus a context object carrying whatever data / callbacks the
+   plugin needs. Adding a third-party provider plugin must require
+   zero host code changes.
+
+**Anti-pattern to refuse**: writing a host file like
+`<X>ProviderAccountCardSupplement.swift` to glue a new plugin into
+host UI. If you reach for this, stop — the SDK is missing a slot.
+Add the slot protocol instead, then have the plugin fill it.
+
 ## Implementation Discipline
 
 **Build tools, not patches.** When the same shape of work shows up in
