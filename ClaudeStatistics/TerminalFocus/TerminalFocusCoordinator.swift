@@ -497,66 +497,29 @@ actor TerminalFocusCoordinator {
         stableTerminalID: String?
     ) -> Bool {
         let bundleId = inferBundleId(pid: pid, terminalName: terminalName)
-        switch bundleId {
-        case "com.googlecode.iterm2":
-            return focusedITermSessionMatches(tty: tty, stableTerminalID: stableTerminalID)
-        case "com.mitchellh.ghostty":
-            return focusedGhosttySessionMatches(tty: tty, stableTerminalID: stableTerminalID)
-        case "com.apple.Terminal":
-            return focusedTerminalSessionMatches(tty: tty)
-        default:
-            guard let pid else { return false }
-            var frontmostPid: pid_t?
-            if Thread.isMainThread {
-                frontmostPid = NSWorkspace.shared.frontmostApplication?.processIdentifier
-            } else {
-                DispatchQueue.main.sync {
-                    frontmostPid = NSWorkspace.shared.frontmostApplication?.processIdentifier
-                }
-            }
-            return frontmostPid == pid
+        // AppleScript-able terminals each contribute their own frontmost
+        // probe script via `TerminalFrontmostSessionProbing`. The shared
+        // parser below interprets the `"<stableID>|<tty>"` shape.
+        if let prober = TerminalRegistry.frontmostSessionProber(for: bundleId) {
+            return focusedSessionOutputMatches(
+                runOsascript(prober.frontmostFocusedSessionScript),
+                tty: tty,
+                stableTerminalID: stableTerminalID
+            )
         }
-    }
-
-    private nonisolated static func focusedITermSessionMatches(tty: String?, stableTerminalID: String?) -> Bool {
-        let script = """
-        tell application "iTerm2"
-            if not frontmost then return ""
-            try
-                set s to current session of current tab of current window
-                return (id of s as text) & "|" & (tty of s as text)
-            end try
-        end tell
-        return ""
-        """
-        return focusedSessionOutputMatches(runOsascript(script), tty: tty, stableTerminalID: stableTerminalID)
-    }
-
-    private nonisolated static func focusedGhosttySessionMatches(tty: String?, stableTerminalID: String?) -> Bool {
-        let script = """
-        tell application id "com.mitchellh.ghostty"
-            if not frontmost then return ""
-            try
-                set terminalRef to focused terminal of selected tab of front window
-                return (id of terminalRef as text) & "|"
-            end try
-        end tell
-        return ""
-        """
-        return focusedSessionOutputMatches(runOsascript(script), tty: tty, stableTerminalID: stableTerminalID)
-    }
-
-    private nonisolated static func focusedTerminalSessionMatches(tty: String?) -> Bool {
-        let script = """
-        tell application "Terminal"
-            if not frontmost then return ""
-            try
-                return "|" & (tty of selected tab of front window as text)
-            end try
-        end tell
-        return ""
-        """
-        return focusedSessionOutputMatches(runOsascript(script), tty: tty, stableTerminalID: nil)
+        // Fallback for non-AppleScript terminals (Kitty / WezTerm /
+        // Alacritty / Warp / unknown): just check if our pid is the
+        // frontmost app's pid.
+        guard let pid else { return false }
+        var frontmostPid: pid_t?
+        if Thread.isMainThread {
+            frontmostPid = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        } else {
+            DispatchQueue.main.sync {
+                frontmostPid = NSWorkspace.shared.frontmostApplication?.processIdentifier
+            }
+        }
+        return frontmostPid == pid
     }
 
     private nonisolated static func focusedSessionOutputMatches(

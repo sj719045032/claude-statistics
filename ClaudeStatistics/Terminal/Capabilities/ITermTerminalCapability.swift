@@ -78,3 +78,18 @@ struct ITermTerminalCapability: TerminalCapability, TerminalLauncher, TerminalFo
         [openPrimaryAppAction(id: "iterm.open", title: "Open iTerm2")].compactMap { $0 }
     }
 }
+
+extension ITermTerminalCapability: TerminalFrontmostSessionProbing {
+    var frontmostFocusedSessionScript: String {
+        """
+        tell application "iTerm2"
+            if not frontmost then return ""
+            try
+                set s to current session of current tab of current window
+                return (id of s as text) & "|" & (tty of s as text)
+            end try
+        end tell
+        return ""
+        """
+    }
+}

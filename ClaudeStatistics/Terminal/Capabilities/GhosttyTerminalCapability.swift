@@ -141,6 +141,21 @@ struct GhosttyTerminalCapability: TerminalCapability, TerminalLauncher, Terminal
     }
 }
 
+extension GhosttyTerminalCapability: TerminalFrontmostSessionProbing {
+    var frontmostFocusedSessionScript: String {
+        """
+        tell application id "com.mitchellh.ghostty"
+            if not frontmost then return ""
+            try
+                set terminalRef to focused terminal of selected tab of front window
+                return (id of terminalRef as text) & "|"
+            end try
+        end tell
+        return ""
+        """
+    }
+}
+
 private extension String {
     var nilIfEmpty: String? {
         isEmpty ? nil : self

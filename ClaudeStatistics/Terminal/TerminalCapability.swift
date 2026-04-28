@@ -79,6 +79,19 @@ protocol TerminalFocusIdentityProviding {
 // `ClaudeStatisticsKit` so plugins can declare readiness/setup
 // behaviour without depending on the host bundle.
 
+/// Capability for terminals whose "is the user currently focused on
+/// my frontmost session?" check is implementable via AppleScript
+/// (currently Apple Terminal, iTerm2, Ghostty). The probe must
+/// return `"<stableID>|<tty>"` (either part may be empty) when this
+/// terminal is the frontmost app, and `""` otherwise; the host's
+/// shared parser (`focusedSessionOutputMatches`) compares those
+/// fields to the requested target. Kept host-only because it's a
+/// macOS / osascript implementation detail that the SDK doesn't
+/// need to expose to plugins yet.
+protocol TerminalFrontmostSessionProbing {
+    var frontmostFocusedSessionScript: String { get }
+}
+
 extension TerminalFocusIdentityProviding {
     func shouldUseCachedIdentity(
         requestedWindowID: String?,

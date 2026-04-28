@@ -328,6 +328,16 @@ enum TerminalRegistry {
         focusIdentityProviders.first { $0.ownsBundleIdentifier(bundleId) }
     }
 
+    /// Capability that knows how to ask the OS "is your frontmost
+    /// session the one we're targeting?" via AppleScript. Used by
+    /// `TerminalFocusCoordinator.isSessionFocused` instead of a
+    /// switch-on-bundleId so adding a third-party AppleScript-able
+    /// terminal is just a capability conformance away.
+    static func frontmostSessionProber(for bundleId: String?) -> (any TerminalCapability & TerminalFrontmostSessionProbing)? {
+        capabilities.compactMap { $0 as? any TerminalCapability & TerminalFrontmostSessionProbing }
+            .first { $0.ownsBundleIdentifier(bundleId) }
+    }
+
     private static func launchCapability(
         for preferredOptionID: String
     ) -> (any TerminalCapability & TerminalLauncher)? {

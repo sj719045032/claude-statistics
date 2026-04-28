@@ -68,3 +68,17 @@ struct AppleTerminalCapability: TerminalCapability, TerminalLauncher, TerminalFo
         [openPrimaryAppAction(id: "terminal.open", title: "Open Terminal")].compactMap { $0 }
     }
 }
+
+extension AppleTerminalCapability: TerminalFrontmostSessionProbing {
+    var frontmostFocusedSessionScript: String {
+        """
+        tell application "Terminal"
+            if not frontmost then return ""
+            try
+                return "|" & (tty of selected tab of front window as text)
+            end try
+        end tell
+        return ""
+        """
+    }
+}
