@@ -2,6 +2,7 @@ import AppKit
 import ApplicationServices
 import Carbon
 import SwiftUI
+import ClaudeStatisticsKit
 
 @MainActor
 final class NotchHoverState: ObservableObject {

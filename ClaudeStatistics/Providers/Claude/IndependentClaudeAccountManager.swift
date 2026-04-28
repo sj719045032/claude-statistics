@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import ClaudeStatisticsKit
 
 /// Multi-account manager for Independent mode. Mirrors `ClaudeAccountManager`'s
 /// observable shape so the existing `AccountSwitcherAccessory` UI can be reused,

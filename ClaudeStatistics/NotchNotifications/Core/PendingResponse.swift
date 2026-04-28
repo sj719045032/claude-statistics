@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import ClaudeStatisticsKit
 
 final class PendingResponse: Equatable {
     let timeoutAt: Date

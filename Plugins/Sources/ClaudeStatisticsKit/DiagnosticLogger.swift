@@ -1,8 +1,20 @@
 import Foundation
 import os.log
 
-final class DiagnosticLogger {
-    static let shared = DiagnosticLogger()
+/// Process-wide diagnostic logger. Lives in the SDK so plugins
+/// dlopened from `.csplugin` bundles can write to the same log file
+/// the host process uses, without taking a host module dependency.
+/// All entries land in `~/.claude/claude-statistics-diagnostic.log`
+/// and the matching os_log subsystem (`com.tinystone.claude-statistics`,
+/// category `diagnostics`).
+public final class DiagnosticLogger {
+    public static let shared = DiagnosticLogger()
+
+    /// UserDefaults key the verbose-logging toggle is stored under.
+    /// Hardcoded here (rather than referenced from a host enum) so
+    /// the SDK has no host module dependency. Host's
+    /// `AppPreferences.verboseLogging` mirrors this same string.
+    private static let verboseLoggingDefaultsKey = "diagnostic.verbose.enabled"
 
     private let osLog = Logger(subsystem: "com.tinystone.claude-statistics", category: "diagnostics")
     private let logFileURL: URL
@@ -20,19 +32,19 @@ final class DiagnosticLogger {
         )
     }
 
-    var logFilePath: String { logFileURL.path }
+    public var logFilePath: String { logFileURL.path }
 
     // MARK: - Public API
 
-    func info(_ message: String) {
+    public func info(_ message: String) {
         log(level: "INFO", message: message)
     }
 
-    func warning(_ message: String) {
+    public func warning(_ message: String) {
         log(level: "WARN", message: message)
     }
 
-    func error(_ message: String) {
+    public func error(_ message: String) {
         log(level: "ERROR", message: message)
     }
 
@@ -40,17 +52,17 @@ final class DiagnosticLogger {
     /// key recomputations, every `reportInteractiveSize` tick, etc.).
     /// Gated behind `diagnostic.verbose.enabled` so the default runtime
     /// doesn't build the string on every SwiftUI render pass.
-    func verbose(_ message: @autoclosure () -> String) {
-        guard UserDefaults.standard.bool(forKey: AppPreferences.verboseLogging) else { return }
+    public func verbose(_ message: @autoclosure () -> String) {
+        guard UserDefaults.standard.bool(forKey: Self.verboseLoggingDefaultsKey) else { return }
         log(level: "VERBOSE", message: message())
     }
 
-    func parsingError(file: String, line lineNum: Int, error: Error) {
+    public func parsingError(file: String, line lineNum: Int, error: Error) {
         let fileName = (file as NSString).lastPathComponent
         log(level: "PARSE", message: "[\(fileName):\(lineNum)] \(error.localizedDescription)")
     }
 
-    func parsingSummary(file: String, totalLines: Int, skippedLines: Int, messages: Int, tokens: Int) {
+    public func parsingSummary(file: String, totalLines: Int, skippedLines: Int, messages: Int, tokens: Int) {
         let fileName = (file as NSString).lastPathComponent
         if skippedLines > 0 {
             let pct = totalLines > 0 ? Int(Double(skippedLines) / Double(totalLines) * 100) : 0
@@ -60,34 +72,34 @@ final class DiagnosticLogger {
         }
     }
 
-    func appProcessStarted(pid: Int32, bundleID: String, executablePath: String) {
+    public func appProcessStarted(pid: Int32, bundleID: String, executablePath: String) {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
         log(level: "INFO", message: "App process started — v\(version) pid=\(pid) bundle=\(bundleID) exec=\(executablePath)")
     }
 
-    func appProcessWillTerminate(pid: Int32, bundleID: String) {
+    public func appProcessWillTerminate(pid: Int32, bundleID: String) {
         log(level: "WARN", message: "App process will terminate — pid=\(pid) bundle=\(bundleID)")
     }
 
-    func initialScanStarted(provider: String, sessionCount: Int) {
+    public func initialScanStarted(provider: String, sessionCount: Int) {
         log(level: "INFO", message: "Initial scan complete — provider=\(provider) sessions=\(sessionCount)")
     }
 
-    func parsePhaseComplete(totalSessions: Int, totalMessages: Int, totalTokens: Int) {
+    public func parsePhaseComplete(totalSessions: Int, totalMessages: Int, totalTokens: Int) {
         log(level: "INFO", message: "Full parse complete — \(totalSessions) sessions, \(totalMessages) messages, \(totalTokens) tokens")
     }
 
-    func parsePerf(sessions: Int, subagentSessions: Int, parseTime: Double, dbTime: Double, indexTime: Double) {
+    public func parsePerf(sessions: Int, subagentSessions: Int, parseTime: Double, dbTime: Double, indexTime: Double) {
         log(level: "PERF", message: "Full parse \(sessions) sessions (\(subagentSessions) with subagents) — parse=\(String(format: "%.1f", parseTime))s db=\(String(format: "%.1f", dbTime))s index=\(String(format: "%.1f", indexTime))s total=\(String(format: "%.1f", parseTime + dbTime + indexTime))s")
     }
 
     /// Read the full log content
-    func readLog() -> String {
+    public func readLog() -> String {
         (try? String(contentsOf: logFileURL, encoding: .utf8)) ?? "(No diagnostic log yet)"
     }
 
     /// Clear the log file
-    func clearLog() {
+    public func clearLog() {
         queue.async { [logFileURL] in
             try? "".write(to: logFileURL, atomically: true, encoding: .utf8)
         }

@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 // MARK: - Hook Socket Client
 func sendToSocket(

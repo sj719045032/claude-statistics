@@ -1,6 +1,7 @@
 import AppKit
 import Carbon
 import Foundation
+import ClaudeStatisticsKit
 
 enum GlobalHotKeyAction: Int, CaseIterable, Identifiable {
     case panel = 1

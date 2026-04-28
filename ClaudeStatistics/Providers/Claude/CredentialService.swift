@@ -1,6 +1,7 @@
 import Foundation
 import LocalAuthentication
 import Security
+import ClaudeStatisticsKit
 
 enum ClaudeCredentialSource: String {
     case file

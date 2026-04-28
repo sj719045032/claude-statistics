@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 final class AttentionBridge {
     weak var notchCenter: NotchNotificationCenter?

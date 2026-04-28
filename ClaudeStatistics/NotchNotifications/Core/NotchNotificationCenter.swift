@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import ClaudeStatisticsKit
 
 @MainActor
 final class NotchNotificationCenter: ObservableObject {

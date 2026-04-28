@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 enum AppRuntimePaths {
     /// Debug builds run out of `~/.claude-statistics-debug/` so they never

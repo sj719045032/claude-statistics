@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import SwiftUI
+import ClaudeStatisticsKit
 
 @MainActor
 final class IndependentClaudeAccountViewModel: ObservableObject {

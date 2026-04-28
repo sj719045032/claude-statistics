@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import ClaudeStatisticsKit
 
 enum HookCLI {
     private static let providerFlag = "--claude-stats-hook-provider"

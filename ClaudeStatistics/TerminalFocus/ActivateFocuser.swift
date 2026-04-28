@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ClaudeStatisticsKit
 
 enum ActivateFocuser {
     @MainActor

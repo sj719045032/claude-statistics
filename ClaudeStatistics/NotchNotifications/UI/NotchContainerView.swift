@@ -1,4 +1,5 @@
 import SwiftUI
+import ClaudeStatisticsKit
 
 
 // MARK: - IdlePeekLayout / TopRevealMaskShape moved to dedicated files

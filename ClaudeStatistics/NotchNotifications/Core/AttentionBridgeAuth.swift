@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 /// Filesystem paths and shared-secret token used by the Unix-socket bridge
 /// between the hook CLI and the in-app `AttentionBridge`. Kept separate from

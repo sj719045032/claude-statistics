@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 /// Pure rules around mapping `RuntimeSession` records to terminal tabs.
 /// Three families of logic that all hinge on Ghostty's quirks (a single

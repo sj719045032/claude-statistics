@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 extension HookRunner {
     func buildCodexAction(payload: [String: Any]) -> HookAction? {

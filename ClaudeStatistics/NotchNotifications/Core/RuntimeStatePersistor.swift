@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 /// Owns the on-disk JSON snapshot of `runtimeByKey`. Two responsibilities:
 /// 1. Debounced background writes — hook events fire 5–10× per Claude turn

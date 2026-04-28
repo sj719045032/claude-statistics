@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 enum AppleScriptFocusResult: Equatable {
     case success(resolvedStableID: String?)

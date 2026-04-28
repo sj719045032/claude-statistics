@@ -1,5 +1,6 @@
 import SwiftUI
 import MarkdownView
+import ClaudeStatisticsKit
 
 /// Intrinsic height of the markdown content inside a card's scroll area.
 /// Consumed by the card itself to size its ScrollView to fit short content.
