@@ -226,10 +226,10 @@ P0 主要项已完成。第三方 ProviderPlugin 装上 `.csplugin` 后，Settin
 | 工作项 | 状态 |
 |---|---|
 | `ShareRoleEngine` 改造：从 `ShareRoleID` 枚举驱动改成 `pluginRegistry.shareRoles` 收集 + 评分协议化 | ✅ **已完成** (2026-04-27)：`ShareRoleID` enum → open struct；SDK `ShareRolePlugin.evaluate(context:)`；host `SharePluginScoring` + `mergePluginScores`；plugin 端到端可参与 ranking / primary 选择。 |
-| `ShareCardThemePlugin` 接入 `SharePreviewView` / `ShareCardView` 的主题选择 | ⏳ 待办：descriptor visual 字段补全 + host 端 theme lookup（plugin role 当前用 fallback steadyBuilder 调色板）|
-| `HookProvider.statusLineInstaller` host 端遍历 `pluginRegistry.providers.values` 收集，替代三份 `*StatusLineInstaller` 写死调用 | ⏳ 待办 |
+| `ShareCardThemePlugin` 接入 `SharePreviewView` / `ShareCardView` 的主题选择 | ✅ **已完成** (2026-04-28)：SDK `ShareCardThemeDescriptor` 扩 13 个视觉字段（hex 颜色 + symbol 名 + 标志，保持 Foundation-only），`ShareRoleDescriptor` 加 optional `themeID`；host 加 `SharePluginThemes.collect()` 收集 plugin role id → ShareVisualTheme 字典，`ShareRoleEngine.buildRoleResult` 接受 `pluginThemes:` 参数并在 plugin role 胜出时使用 plugin theme（builtin role 仍走原 switch）。3 个调用站点（`SessionDataStore.buildShareRoleResult` / `buildAllTimeShareRoleResult`、`AppState.buildAllProvidersShareRoleResult`）透传。 |
+| `HookProvider.statusLineInstaller` host 端遍历 `pluginRegistry.providers.values` 收集，替代三份 `*StatusLineInstaller` 写死调用 | ✅ 已完成（事实上已落地，回填状态）：host 端零 `*StatusLineInstaller.*` 直引用；`SettingsView:108` 走 `provider.statusLineInstaller` 协议、`StatusLineSync.refreshManagedIntegrations` 走 `ProviderRegistry.availableProviders(plugins:)` 遍历。三份 utility struct 由各自 provider 内的 `*StatusLineAdapter: StatusLineInstalling` wrapper 桥接。第三方 `ProviderPlugin` 只要 `statusLineInstaller` 返回非 nil，Settings 与启动 refresh 自动包含。 |
 | `ModelPricingRates` 接入 `Session.builtinModels` 的拼装；`*PricingCatalog` 三份 enum 改成 `BundledSessionProvider.modelPricing` 协议返回 | ✅ 已部分接入：plugin pricing 通过 `extraPluginPricing` 旁路合并；builtin 三家保留循环（by design）|
-| `TranscriptParser` 三份单例改成 `descriptor.makeParser()` 工厂 | ⏳ 待办 |
+| `TranscriptParser` 三份单例改成 `descriptor.makeParser()` 工厂 | ⛔ **by-design**（重新审视后取消）：`SessionDataProvider` 协议已经包含全部 5 个 `parseX` 方法（SessionDataProvider.swift:33-37），三份 `*TranscriptParser.shared` 只在各自 provider 类内部使用，host 端非 Provider 路径零引用。第三方 plugin provider 自由决定 parse 实现形式（singleton / 工厂 / 直接函数），把 parser 提升到 SDK 表面只会平白多一层间接、暴露 parser 状态到协议。 |
 
 ### P3 — Cosmetic / Schema 收尾
 
@@ -262,11 +262,9 @@ P0 主要项已完成。第三方 ProviderPlugin 装上 `.csplugin` 后，Settin
 **原计 ≈ 75-80 处硬编码点。截至 2026-04-27 单 session 完成 16 commit 后**：维度 A / B 真正阻碍 plugin 扩展性的项基本清零（剩 by-design 或等更大 surgery 的局部）；维度 C 的 ShareRolePlugin 是首个被真正 wire 进 host engine 的"非 Provider/Terminal" 协议。
 
 **剩余未动（按工作量从小到大）**：
-1. `ShareCardThemePlugin` 视觉字段补全 + host theme lookup（小）
-2. `HookProvider.statusLineInstaller` host 端 plugin 收集（小）
-3. `HookInstalling` 通用桶（中：需要 SDK 桶设计 + host 收集）
-4. M2 builtin terminal 抽 `.csplugin`（大：每个 plugin 需 self-contain capability + launch + readiness 实现）
-5. Terminal focus pipeline `switch bundleId` 退场（大：AppleScript 模板 / focus route handler 协议化）
+1. `HookInstalling` 通用桶（中：需要 SDK 桶设计 + host 收集）
+2. M2 builtin terminal 抽 `.csplugin`（大：每个 plugin 需 self-contain capability + launch + readiness 实现）
+3. Terminal focus pipeline `switch bundleId` 退场（大：AppleScript 模板 / focus route handler 协议化）
 
 ---
 
@@ -433,6 +431,27 @@ Chat-app launchers
 - ⏳ `HookProvider` / `StatusLineInstalling` host 接入（§5.1 表里仍未 wired）。
 - ⏳ M2 builtin terminal 抽 `.csplugin`（每个 plugin 需 self-contain capability + launch + readiness 实现，单独 session 工作量）。
 - ⏳ `SharePluginScoring` / `mergePluginScores` 单元测试（功能可用，但还没专门 case）。
+
+### 2026-04-28 (P2 收尾：ShareCardThemePlugin 接入 + audit 现状回填)
+
+回填两条事实上已落地的项 + 推进一条真正未做的项。
+
+**audit 现状回填**：
+
+- ✅ `HookProvider.statusLineInstaller` 已实质接入：host 端零 `*StatusLineInstaller.*` 直引用，三份 utility struct 由各自 `*StatusLineAdapter: StatusLineInstalling` 桥接，`SettingsView:108` 和 `StatusLineSync.refreshManagedIntegrations` 都走 `provider.statusLineInstaller` 协议 + `ProviderRegistry.availableProviders(plugins:)` 遍历。
+- ⛔ `TranscriptParser` 三份单例 → `descriptor.makeParser()` 工厂 取消（by design）：`SessionDataProvider` 协议已经包含全部 5 个 `parseX` 方法（`SessionDataProvider.swift:33-37`），三份 `*TranscriptParser.shared` 只在各自 provider 类内部使用、host 端非 Provider 路径零引用。把 parser 提到 SDK 表面只会平白多一层间接、暴露 parser 状态到协议。
+
+**ShareCardThemePlugin 接入**（本轮主体）：
+
+- ✅ SDK `ShareCardThemeDescriptor` 扩 13 个视觉字段：`backgroundTopHex` / `backgroundBottomHex` / `accentHex` / `titleGradientHex: [String]` / `titleForegroundHex` / `titleOutlineHex`（含 alpha）/ `titleShadowOpacity` / `prefersLightQRCode` / `symbolName` / `decorationSymbols` / `mascotPrimarySymbol` / `mascotSecondarySymbols`。颜色用 `#RRGGBB` / `#RRGGBBAA` hex 字符串保持 SDK Foundation-only。
+- ✅ SDK `ShareRoleDescriptor` 加 optional `themeID: String?`（默认 nil） — 关联到 `ShareCardThemeDescriptor.id`，未声明或解析失败时落回 host 的 steadyBuilder fallback。ABI-additive。
+- ✅ host 加 `ClaudeStatistics/Services/SharePluginThemes.swift`：`SharePluginThemes.collect(plugins:)` 走 `ShareRolePlugin.roles → themeID → ShareCardThemePlugin.themes` 把 plugin role id 解析为 `ShareVisualTheme` 字典；`ShareCardThemeDescriptor.toVisualTheme()` 把 SDK descriptor 转 SwiftUI `ShareVisualTheme`；`Color(shareThemeHex:)` 解析 hex（malformed 返回 nil → 调用点替换为安全 default）。
+- ✅ `ShareRoleEngine.makeRoleResult` / `makeAllTimeRoleResult` / `buildRoleResult` 加 `pluginThemes: [String: ShareVisualTheme] = [:]` 参数；当 primary role 是 plugin id 且字典命中时使用 plugin theme，否则走 builtin `primary.theme` switch。
+- ✅ 3 个调用点透传：`SessionDataStore.buildShareRoleResult` / `buildAllTimeShareRoleResult`、`AppState.buildAllProvidersShareRoleResult`。
+- ✅ 测试：`ShareRoleEngineTests` 加 `test_pluginThemes_unusedWhenBuiltinPrimaryWins` + `test_pluginThemes_overridesFallbackWhenPluginPrimaryWins` 锁定 builtin / plugin 分支；`ShareDescriptorTests.testThemeDescriptorEquality` 改用 fixture helper 适配新 init 签名。`ClaudeStatisticsKitTests` 全部通过。
+- ✅ 测试：823 全过（+2）。Debug app 重启验证 OK。
+
+**剩余 P2** 仅 `HookInstalling` 通用桶，需要 SDK 桶设计（ShareRolePlugin 同形）+ host 收集器。这一项没有 user-visible blocker，可以后续单独推。
 
 ---
 
