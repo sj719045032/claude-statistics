@@ -1471,7 +1471,6 @@ final class PluginReflectionTests: XCTestCase {
         (GeminiPluginDogfood.manifest.principalClass, GeminiPluginDogfood.self),
         (ITermPlugin.manifest.principalClass, ITermPlugin.self),
         (GhosttyPlugin.manifest.principalClass, GhosttyPlugin.self),
-        (KittyPlugin.manifest.principalClass, KittyPlugin.self),
         (WezTermPlugin.manifest.principalClass, WezTermPlugin.self)
         // Editor plugins (VSCode / Cursor / Windsurf / Trae / Zed),
         // WarpPlugin, and AlacrittyPlugin all ship as `.csplugin`
@@ -1503,18 +1502,18 @@ final class PluginReflectionTests: XCTestCase {
         // End-to-end of what PluginLoader will do: take principalClass
         // string from the manifest, look up via NSClassFromString,
         // cast to (NSObject & Plugin).Type, then init(). Use a
-        // host-resident plugin (KittyPlugin) so this works without
+        // host-resident plugin (WezTermPlugin) so this works without
         // dlopen — the .csplugin path is exercised by integration
         // tests once the bundles ship.
-        guard let cls = NSClassFromString("KittyPlugin") else {
-            return XCTFail("KittyPlugin not found in ObjC runtime")
+        guard let cls = NSClassFromString("WezTermPlugin") else {
+            return XCTFail("WezTermPlugin not found in ObjC runtime")
         }
         guard let pluginType = cls as? (NSObject & Plugin).Type else {
-            return XCTFail("KittyPlugin must conform to NSObject & Plugin")
+            return XCTFail("WezTermPlugin must conform to NSObject & Plugin")
         }
         let instance = pluginType.init()
-        XCTAssertEqual(type(of: instance).manifest.id, "net.kovidgoyal.kitty")
-        XCTAssertEqual(type(of: instance).manifest.principalClass, "KittyPlugin")
+        XCTAssertEqual(type(of: instance).manifest.id, "com.github.wez.wezterm")
+        XCTAssertEqual(type(of: instance).manifest.principalClass, "WezTermPlugin")
         XCTAssertTrue(instance is any TerminalPlugin)
     }
 }

@@ -65,11 +65,10 @@ final class AppState: ObservableObject {
         GeminiPluginDogfood.manifest.id:    { GeminiPluginDogfood() },
         ITermPlugin.manifest.id:            { ITermPlugin() },
         GhosttyPlugin.manifest.id:          { GhosttyPlugin() },
-        KittyPlugin.manifest.id:            { KittyPlugin() },
         WezTermPlugin.manifest.id:          { WezTermPlugin() }
-        // WarpPlugin / AlacrittyPlugin / AppleTerminalPlugin extracted
-        // to .csplugin (M2). Loaded via PluginLoader from
-        // Contents/PlugIns at runtime, not here.
+        // WarpPlugin / AlacrittyPlugin / AppleTerminalPlugin /
+        // KittyPlugin extracted to .csplugin (M2). Loaded via
+        // PluginLoader from Contents/PlugIns at runtime, not here.
     ]
 
     let pluginRegistry: PluginRegistry = {

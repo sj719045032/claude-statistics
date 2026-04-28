@@ -166,10 +166,11 @@
 		6CB15E196B0E4A38B471E499 /* ProviderDescriptor+Builtins.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A3763EF17B80F22CAE77EB0 /* ProviderDescriptor+Builtins.swift */; };
 		6CB9AC028D3C2D548F717E01 /* NotchContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAB0C3E8C901FF061718EB35 /* NotchContainerView.swift */; };
 		6D53771D8F61F6149FD50D46 /* ShareRolePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CF4AF3083144F9E8BD8D7B0 /* ShareRolePlugin.swift */; };
-		6D56C0EAAF4175166391D7EA /* KittyFocuser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 387E20F7F962C004AD38B92C /* KittyFocuser.swift */; };
+		6DDFD43E80949B0357042049 /* KittyPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD82F72F3EFB08D1CBFC4D5A /* KittyPlugin.swift */; };
 		6E50954F02E729F9586DC3E4 /* HookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 711926C1469F96FC6CF23888 /* HookInstaller.swift */; };
 		6F7855449E33E79371EF1AB9 /* PanelContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6618F7DEA731482B556A431E /* PanelContentView.swift */; };
 		6FE3F8B395E9A7F6DFAF5556 /* MenuBarBanners.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED35908F8D6A2C41A2A6E59 /* MenuBarBanners.swift */; };
+		702FE0AB9ABB3CABECE4FA53 /* ClaudeStatisticsKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; };
 		70DE2014995D643A72C0A9D0 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15809DA1BE38EFE9D002FB73 /* main.swift */; };
 		72BEFCA0F5104A962D6079F2 /* Toast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78CE622332A7407002158A27 /* Toast.swift */; };
 		735FD3D1F37B307E1FCAAC53 /* NotchEventKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE5B40BC767A244E2DA372A /* NotchEventKind.swift */; };
@@ -252,15 +253,14 @@
 		AC5082113B4136915E426299 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 2710C957B5C3CF8708B02CC6 /* Localizable.strings */; };
 		AFE5B13BCD7D98DD27DF6EA0 /* GeminiProviderAccountCardAccessory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BD468B7884551FA250E5E0C /* GeminiProviderAccountCardAccessory.swift */; };
 		B04844AD3BA910295978D241 /* StatusBarPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5486873DBEC29739725E366 /* StatusBarPanel.swift */; };
-		B0B1B4026A01E4A28C24922D /* KittyFocusSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E337F442CEE88957F93C95B2 /* KittyFocusSetup.swift */; };
 		B254C34493D9423B2010A88F /* ProviderUsagePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BCFE5BD947C85335BFC3783 /* ProviderUsagePresentation.swift */; };
 		B308C8501282F4C35D073282 /* GeminiHookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 623F6F9C65341AB301CF1B20 /* GeminiHookInstaller.swift */; };
+		B313D975C4C4D0AD58C0DA0D /* KittyPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = D922135FFC7EA58D322F5BC4 /* KittyPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		B35C61F703B5F19516D17FF9 /* PluginRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 880DBC8623214822DA25BA07 /* PluginRegistry.swift */; };
 		B452E47CCD714F45226D388B /* ClaudeStatisticsKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; };
 		B5403E5E4A9523A1070B1A57 /* PeriodDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FC5E98FAD83CAA61787C4EC /* PeriodDetailView.swift */; };
 		B5422B6FC3CA8791CF2E7D38 /* TerminalFocusStrategy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 479C9C530CFDAC7834C1A7F6 /* TerminalFocusStrategy.swift */; };
 		B63B261872D1F6B4FA5D0E3E /* MarkdownFonts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FE62A428252AC30E71689F7 /* MarkdownFonts.swift */; };
-		B671E1405611DE6D70BE23EB /* KittyTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86B78596315756EA65E43D80 /* KittyTerminalCapability.swift */; };
 		B67485324065CEED99A923C2 /* LivenessCheckerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E077808ABF96135D9B76672B /* LivenessCheckerTests.swift */; };
 		B6E40DABE032CAD3C2B16A85 /* AlacrittyPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = F65F257EBB643FDD2327BF34 /* AlacrittyPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		B6E7557397A05A5477857084 /* ClaudeStatisticsKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; };
@@ -399,6 +399,13 @@
 			remoteGlobalIDString = 0CF09A1D36F30D5CA3AD359E;
 			remoteInfo = WarpPlugin;
 		};
+		516D11F7BAF28451AA0DCFF6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 18B1CC7C2F803601C447E6E4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0D168196A00A3289ED06FEE5;
+			remoteInfo = KittyPlugin;
+		};
 		66A659FCA5DA687E8DD8C483 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 18B1CC7C2F803601C447E6E4 /* Project object */;
@@ -463,6 +470,13 @@
 			remoteInfo = ClaudeStatistics;
 		};
 		A491ADE3B4650286FD10F973 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 18B1CC7C2F803601C447E6E4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DEB25A2406721FCABB7A5B97;
+			remoteInfo = ClaudeStatisticsKit;
+		};
+		A515752A878B5DCF571BB5B7 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 18B1CC7C2F803601C447E6E4 /* Project object */;
 			proxyType = 1;
@@ -562,6 +576,7 @@
 				F32FC3771216AB14B758D85C /* WarpPlugin.bundle in Embed Dependencies */,
 				B6E40DABE032CAD3C2B16A85 /* AlacrittyPlugin.bundle in Embed Dependencies */,
 				13F0708507CB618404FD5515 /* AppleTerminalPlugin.bundle in Embed Dependencies */,
+				B313D975C4C4D0AD58C0DA0D /* KittyPlugin.bundle in Embed Dependencies */,
 			);
 			name = "Embed Dependencies";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -583,6 +598,7 @@
 		00B22ECE4D683B12838FAF26 /* ToolActivityFormatter+Permissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ToolActivityFormatter+Permissions.swift"; sourceTree = "<group>"; };
 		011E707E6F2F284A99ECF925 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		027CDBE36D6D9439DB32C0AE /* HookCLI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookCLI.swift; sourceTree = "<group>"; };
+		028CD108781DD2A269101E52 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		0398E20299823326D6ED583C /* ShareCardThemePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardThemePlugin.swift; sourceTree = "<group>"; };
 		03DF8D6D8A1022EF2721BE82 /* NotchNotificationCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchNotificationCenter.swift; sourceTree = "<group>"; };
 		044319D72CE45477BDDCBE97 /* AttentionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionBridge.swift; sourceTree = "<group>"; };
@@ -657,7 +673,6 @@
 		35EC230BC5F1EF207A984D87 /* FSEventsWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FSEventsWatcher.swift; sourceTree = "<group>"; };
 		36F9BBB23CB057720EA99A7B /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
 		370D33AC086199C95EC1E2CD /* UsageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageData.swift; sourceTree = "<group>"; };
-		387E20F7F962C004AD38B92C /* KittyFocuser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KittyFocuser.swift; sourceTree = "<group>"; };
 		397B635FE9ED8F8B01A5AD1A /* SharePluginThemes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharePluginThemes.swift; sourceTree = "<group>"; };
 		398009672C963C1E8B72A03E /* GeminiPricingFetchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiPricingFetchService.swift; sourceTree = "<group>"; };
 		3BCFE5BD947C85335BFC3783 /* ProviderUsagePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderUsagePresentation.swift; sourceTree = "<group>"; };
@@ -772,7 +787,6 @@
 		84C6E039B436786047A1D605 /* TranscriptParserCommons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptParserCommons.swift; sourceTree = "<group>"; };
 		852FDD0C73454C36E0024C94 /* PermissionRequestRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionRequestRegistry.swift; sourceTree = "<group>"; };
 		85BCB7D594E3ACE15472DF55 /* PluginManifestPlist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginManifestPlist.swift; sourceTree = "<group>"; };
-		86B78596315756EA65E43D80 /* KittyTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KittyTerminalCapability.swift; sourceTree = "<group>"; };
 		86DF62498CA52D57F92CB797 /* ClaudeOAuthCallbackServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeOAuthCallbackServer.swift; sourceTree = "<group>"; };
 		86F1F7334EBE1509C248AE11 /* PermissionRequestRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionRequestRegistryTests.swift; sourceTree = "<group>"; };
 		872985FBB1CB099BD6D4B01E /* CodexSessionScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexSessionScanner.swift; sourceTree = "<group>"; };
@@ -844,6 +858,7 @@
 		BAEEBABA82636376B36824D8 /* IndependentClaudeAccountViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndependentClaudeAccountViewModel.swift; sourceTree = "<group>"; };
 		BB46FA3EF4C974D6BB965592 /* PluginDiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginDiscoverView.swift; sourceTree = "<group>"; };
 		BD2C72B18AE30277C693576A /* ClaudeAccountModeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeAccountModeController.swift; sourceTree = "<group>"; };
+		BD82F72F3EFB08D1CBFC4D5A /* KittyPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KittyPlugin.swift; sourceTree = "<group>"; };
 		BD92CF4E1DC514CEDE539FDD /* HookProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookProvider.swift; sourceTree = "<group>"; };
 		BDA63237DD4854F868A0DCE4 /* ModifierRecorderRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierRecorderRow.swift; sourceTree = "<group>"; };
 		BF23C58F1F4E3E5605623ECE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -878,6 +893,7 @@
 		D758CE8D0B6780C973E35221 /* SessionQuickStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionQuickStats.swift; sourceTree = "<group>"; };
 		D7A55E899B9748E80EF1CA53 /* ProviderDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderDescriptor.swift; sourceTree = "<group>"; };
 		D908D872738DD762E0632F3E /* TranscriptParser+SearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TranscriptParser+SearchIndex.swift"; sourceTree = "<group>"; };
+		D922135FFC7EA58D322F5BC4 /* KittyPlugin.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KittyPlugin.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
 		D9D13F949F9557AC75AAC3B1 /* ShareCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardView.swift; sourceTree = "<group>"; };
 		DA072464D4CA170B290FA84E /* AppRuntimePaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRuntimePaths.swift; sourceTree = "<group>"; };
 		DA847F7AAA8B25206BA33E25 /* ClaudeManagedAccountStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeManagedAccountStore.swift; sourceTree = "<group>"; };
@@ -891,7 +907,6 @@
 		E0A4394699B6C98FA39ACFF0 /* ShareRoleEvaluation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRoleEvaluation.swift; sourceTree = "<group>"; };
 		E10F402C2998B35DE30CF5E5 /* ClaudeHookNormalizerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHookNormalizerTests.swift; sourceTree = "<group>"; };
 		E2ECFFB813325710CC7E258B /* TranscriptParser+Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TranscriptParser+Session.swift"; sourceTree = "<group>"; };
-		E337F442CEE88957F93C95B2 /* KittyFocusSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KittyFocusSetup.swift; sourceTree = "<group>"; };
 		E3E1273546BE9434362C72E0 /* ClaudeStatistics.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ClaudeStatistics.entitlements; sourceTree = "<group>"; };
 		E476D9F870BCC0644BC74FD3 /* UsageHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageHistoryStore.swift; sourceTree = "<group>"; };
 		E59B402C6902996368A65A6F /* TranscriptParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptParser.swift; sourceTree = "<group>"; };
@@ -989,6 +1004,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				E5818AC985038DCC7CB7123A /* ClaudeStatisticsKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9633006C6DEC1243686248F3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				702FE0AB9ABB3CABECE4FA53 /* ClaudeStatisticsKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1093,6 +1116,16 @@
 			path = Plugins/Sources/VSCodePlugin;
 			sourceTree = "<group>";
 		};
+		0EDDF0208197FE9ACAA1101A /* KittyPlugin */ = {
+			isa = PBXGroup;
+			children = (
+				028CD108781DD2A269101E52 /* Info.plist */,
+				BD82F72F3EFB08D1CBFC4D5A /* KittyPlugin.swift */,
+			);
+			name = KittyPlugin;
+			path = Plugins/Sources/KittyPlugin;
+			sourceTree = "<group>";
+		};
 		1341AC1398085D0EADE92592 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -1154,6 +1187,7 @@
 				907576DD936254F8D2574A2E /* ClaudeStatisticsTests.xctest */,
 				B26EF311570AA2816D7357F2 /* CodexAppPlugin.bundle */,
 				2C2B9D441D4C392C0F00863A /* CursorPlugin.bundle */,
+				D922135FFC7EA58D322F5BC4 /* KittyPlugin.bundle */,
 				23C67298966CCB82BB03EF9C /* TraePlugin.bundle */,
 				5AD2F29DA1EEA44E8B785C0A /* VSCodePlugin.bundle */,
 				80332DBB29AEBEF37DADF439 /* WarpPlugin.bundle */,
@@ -1454,7 +1488,6 @@
 				A7538BF07592B7D765AF1C22 /* ExternalTerminalCapability.swift */,
 				89661CA17E93D43C4B68FC23 /* GhosttyTerminalCapability.swift */,
 				F4387E440942DCAE1B61C97F /* ITermTerminalCapability.swift */,
-				86B78596315756EA65E43D80 /* KittyTerminalCapability.swift */,
 				C9B269891E67AA3FB9D53E64 /* WezTermTerminalCapability.swift */,
 			);
 			path = Capabilities;
@@ -1508,6 +1541,7 @@
 				0399A9F94EA2A5BC73BE9801 /* ClaudeStatisticsTests */,
 				FB1959342B4F9580F732A237 /* CodexAppPlugin */,
 				185584B6C5BFE6702E9C2E9E /* CursorPlugin */,
+				0EDDF0208197FE9ACAA1101A /* KittyPlugin */,
 				90D91EB78F80AC03A52E6A6D /* TraePlugin */,
 				0DD94F1E5E9CB86DB74B681D /* VSCodePlugin */,
 				31DB8414E2C9C86C06B6F515 /* WarpPlugin */,
@@ -1620,8 +1654,6 @@
 				645A6AB9436D7D2577DAE9D8 /* AppleScriptFocuser.swift */,
 				A8921BE3208B862105FFAF93 /* AppleScriptHelpers.swift */,
 				193523F08B5073E042F772E1 /* GhosttyInspector.swift */,
-				387E20F7F962C004AD38B92C /* KittyFocuser.swift */,
-				E337F442CEE88957F93C95B2 /* KittyFocusSetup.swift */,
 				6A32D01DDF055A652F2C104D /* ProcessTreeWalker.swift */,
 				5F483343402849CE44F4F47C /* TerminalCLICommand.swift */,
 				A51BA7586FEEB898B1FE9ED8 /* TerminalFocusCoordinator.swift */,
@@ -1780,6 +1812,25 @@
 			);
 			productName = WarpPlugin;
 			productReference = 80332DBB29AEBEF37DADF439 /* WarpPlugin.bundle */;
+			productType = "com.apple.product-type.bundle";
+		};
+		0D168196A00A3289ED06FEE5 /* KittyPlugin */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 914A463DDC5A8945EBCE14EE /* Build configuration list for PBXNativeTarget "KittyPlugin" */;
+			buildPhases = (
+				DE47689930A1696CBCDB669A /* Sources */,
+				9633006C6DEC1243686248F3 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B0817CC1B679EF5AB0880E75 /* PBXTargetDependency */,
+			);
+			name = KittyPlugin;
+			packageProductDependencies = (
+			);
+			productName = KittyPlugin;
+			productReference = D922135FFC7EA58D322F5BC4 /* KittyPlugin.bundle */;
 			productType = "com.apple.product-type.bundle";
 		};
 		3600D65FD517F507E84B13F4 /* WindsurfPlugin */ = {
@@ -1958,6 +2009,7 @@
 				03A0C8E605F4EB357471FD9B /* PBXTargetDependency */,
 				A72CB6BA9E1821AC478CF2A4 /* PBXTargetDependency */,
 				E863D65E45E391F83C1C2EB1 /* PBXTargetDependency */,
+				70C512FC4DC0B6BE6E5B6B94 /* PBXTargetDependency */,
 			);
 			name = ClaudeStatistics;
 			packageProductDependencies = (
@@ -2038,6 +2090,9 @@
 					0CF09A1D36F30D5CA3AD359E = {
 						ProvisioningStyle = Automatic;
 					};
+					0D168196A00A3289ED06FEE5 = {
+						ProvisioningStyle = Automatic;
+					};
 					3600D65FD517F507E84B13F4 = {
 						ProvisioningStyle = Automatic;
 					};
@@ -2101,6 +2156,7 @@
 				DEDA0D8134638C41359F5866 /* ClaudeStatisticsTests */,
 				3CFEE3D64354C892A2AECAF5 /* CodexAppPlugin */,
 				44D7019F27E3E862125F144D /* CursorPlugin */,
+				0D168196A00A3289ED06FEE5 /* KittyPlugin */,
 				3BF07BD1A9E6D172E5E10B75 /* TraePlugin */,
 				A5EA0ADFE2151E072E433A5E /* VSCodePlugin */,
 				0CF09A1D36F30D5CA3AD359E /* WarpPlugin */,
@@ -2231,6 +2287,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DE47689930A1696CBCDB669A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6DDFD43E80949B0357042049 /* KittyPlugin.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E0092E88A7358C68E86DDDFE /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -2323,9 +2387,6 @@
 				8446541DF0CE23D10CA93E2D /* IndependentClaudeCredentialStore.swift in Sources */,
 				D05B30BF6C0E4B0AB8AE3EB8 /* InformationalEventGate.swift in Sources */,
 				65F93A7427460951A2B11EB8 /* InlineImageView.swift in Sources */,
-				B0B1B4026A01E4A28C24922D /* KittyFocusSetup.swift in Sources */,
-				6D56C0EAAF4175166391D7EA /* KittyFocuser.swift in Sources */,
-				B671E1405611DE6D70BE23EB /* KittyTerminalCapability.swift in Sources */,
 				E04B621B671D090DB9155348 /* LanguageManager.swift in Sources */,
 				8E4A0F1CC4494773DA52E9CF /* LivenessChecker.swift in Sources */,
 				B63B261872D1F6B4FA5D0E3E /* MarkdownFonts.swift in Sources */,
@@ -2578,6 +2639,11 @@
 			target = 7219A5031D3C80D1C5682BA5 /* ClaudeAppPlugin */;
 			targetProxy = 2C56A1938EC05E56710C8F4C /* PBXContainerItemProxy */;
 		};
+		70C512FC4DC0B6BE6E5B6B94 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0D168196A00A3289ED06FEE5 /* KittyPlugin */;
+			targetProxy = 516D11F7BAF28451AA0DCFF6 /* PBXContainerItemProxy */;
+		};
 		7AC4ACA5BFE24FEF31F53FFB /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = DEB25A2406721FCABB7A5B97 /* ClaudeStatisticsKit */;
@@ -2622,6 +2688,11 @@
 			isa = PBXTargetDependency;
 			target = DEB25A2406721FCABB7A5B97 /* ClaudeStatisticsKit */;
 			targetProxy = CCDE35C64F27D9F8265A5273 /* PBXContainerItemProxy */;
+		};
+		B0817CC1B679EF5AB0880E75 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DEB25A2406721FCABB7A5B97 /* ClaudeStatisticsKit */;
+			targetProxy = A515752A878B5DCF571BB5B7 /* PBXContainerItemProxy */;
 		};
 		B3334DC057F1EDA825EF25A8 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -2859,6 +2930,29 @@
 			};
 			name = Release;
 		};
+		4F3B9E84A380CF05341D9E03 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Plugins/Sources/KittyPlugin/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACH_O_TYPE = mh_bundle;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.KittyPlugin;
+				PRODUCT_NAME = KittyPlugin;
+				SDKROOT = macosx;
+				SKIP_INSTALL = NO;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				WRAPPER_EXTENSION = csplugin;
+			};
+			name = Release;
+		};
 		51DF565F1AD654006D6F4D4A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -3043,6 +3137,29 @@
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.CodexAppPlugin;
 				PRODUCT_NAME = CodexAppPlugin;
+				SDKROOT = macosx;
+				SKIP_INSTALL = NO;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				WRAPPER_EXTENSION = csplugin;
+			};
+			name = Debug;
+		};
+		9CC5C35F8302B26282A9923E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Plugins/Sources/KittyPlugin/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACH_O_TYPE = mh_bundle;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.KittyPlugin;
+				PRODUCT_NAME = KittyPlugin;
 				SDKROOT = macosx;
 				SKIP_INSTALL = NO;
 				SWIFT_STRICT_CONCURRENCY = minimal;
@@ -3448,6 +3565,15 @@
 			buildConfigurations = (
 				BCDD492684B362E6E8B6CB41 /* Debug */,
 				C3047A109399B37660AB7C56 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		914A463DDC5A8945EBCE14EE /* Build configuration list for PBXNativeTarget "KittyPlugin" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9CC5C35F8302B26282A9923E /* Debug */,
+				4F3B9E84A380CF05341D9E03 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

@@ -5,13 +5,12 @@ enum TerminalRegistry {
     private static let appCapabilities: [any TerminalCapability] = [
         GhosttyTerminalCapability(),
         WezTermTerminalCapability(),
-        ITermTerminalCapability(),
-        // Warp / Alacritty / AppleTerminal extracted to .csplugin
-        // bundles (M2). Host now sees them through
+        ITermTerminalCapability()
+        // Warp / Alacritty / AppleTerminal / Kitty extracted to
+        // .csplugin bundles (M2). Host sees them through
         // `pluginCapabilitiesStore`'s `PluginBackedTerminalCapability`
         // adapter; their focus path goes through the plugin's own
         // `makeFocusStrategy()` instance via `pluginStrategyResolver`.
-        KittyTerminalCapability()
     ]
 
     /// Identifiers contributed by external `TerminalPlugin`s at runtime

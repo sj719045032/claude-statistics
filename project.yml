@@ -409,6 +409,43 @@ targets:
         CODE_SIGN_STYLE: Automatic
         SWIFT_STRICT_CONCURRENCY: minimal
 
+  KittyPlugin:
+    type: bundle
+    platform: macOS
+    sources:
+      - path: Plugins/Sources/KittyPlugin
+    dependencies:
+      - target: ClaudeStatisticsKit
+    info:
+      path: Plugins/Sources/KittyPlugin/Info.plist
+      properties:
+        CFBundleIdentifier: com.tinystone.KittyPlugin
+        CFBundleName: KittyPlugin
+        CFBundleExecutable: KittyPlugin
+        CFBundlePackageType: BNDL
+        NSPrincipalClass: KittyPlugin
+        CSPluginManifest:
+          id: net.kovidgoyal.kitty
+          kind: terminal
+          displayName: Kitty
+          version: 1.0.0
+          minHostAPIVersion: 0.1.0
+          permissions:
+            - filesystemHome
+          principalClass: KittyPlugin
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tinystone.KittyPlugin
+        PRODUCT_NAME: KittyPlugin
+        WRAPPER_EXTENSION: csplugin
+        MACH_O_TYPE: mh_bundle
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SKIP_INSTALL: NO
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_STRICT_CONCURRENCY: minimal
+
   ClaudeStatistics:
     type: application
     platform: macOS
@@ -454,6 +491,10 @@ targets:
           destination: plugins
           subpath: ""
       - target: AppleTerminalPlugin
+        copy:
+          destination: plugins
+          subpath: ""
+      - target: KittyPlugin
         copy:
           destination: plugins
           subpath: ""
