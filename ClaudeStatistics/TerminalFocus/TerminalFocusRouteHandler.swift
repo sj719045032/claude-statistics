@@ -15,8 +15,6 @@ protocol TerminalFocusRouteHandler: TerminalFocusStrategy {
 enum TerminalFocusRouteRegistry {
     private static let handlers: [any TerminalFocusRouteHandler] = [
         AppleScriptTerminalFocusRouteHandler(),
-        CLITerminalFocusRouteHandler(kind: .kitty),
-        CLITerminalFocusRouteHandler(kind: .wezterm),
         AccessibilityTerminalFocusRouteHandler(),
         ActivateTerminalFocusRouteHandler()
     ]
@@ -48,43 +46,6 @@ struct AppleScriptTerminalFocusRouteHandler: TerminalFocusRouteHandler {
             ActivateFocuser.focus(pid: target.terminalPid, bundleId: target.bundleId, projectPath: nil)
         }
 
-        if let direct = await directFocus(target: target) {
-            return direct
-        }
-
-        if let terminalPid = target.terminalPid,
-           AccessibilityFocuser.focus(pid: terminalPid, projectPath: target.projectPath) {
-            return TerminalFocusExecutionResult(capability: .ready, resolvedStableID: target.terminalStableID)
-        }
-
-        if await MainActor.run(body: {
-            ActivateFocuser.focus(pid: target.terminalPid, bundleId: target.bundleId, projectPath: target.projectPath)
-        }) {
-            return TerminalFocusExecutionResult(capability: .appOnly, resolvedStableID: target.terminalStableID)
-        }
-
-        return nil
-    }
-}
-
-struct CLITerminalFocusRouteHandler: TerminalFocusRouteHandler {
-    let kind: TerminalCLIKind
-
-    var route: TerminalFocusRoute {
-        .cli(kind)
-    }
-
-    func capability(for target: TerminalFocusTarget) -> TerminalFocusCapability {
-        TerminalRegistry.focusCapabilityProvider(for: target.bundleId)?
-            .focusCapability(for: target) ?? defaultCapability(for: target)
-    }
-
-    func directFocus(target: TerminalFocusTarget) async -> TerminalFocusExecutionResult? {
-        await TerminalRegistry.directFocusProvider(for: target.bundleId)?
-            .directFocus(target)
-    }
-
-    func resolvedFocus(target: TerminalFocusTarget) async -> TerminalFocusExecutionResult? {
         if let direct = await directFocus(target: target) {
             return direct
         }

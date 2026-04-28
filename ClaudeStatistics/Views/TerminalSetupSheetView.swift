@@ -149,7 +149,7 @@ struct TerminalSetupSheetView: View {
 
     private var fallbackDetail: String {
         switch capability?.route {
-        case .cli, .appleScript, .accessibility:
+        case .appleScript, .accessibility:
             return "When precise focus misses, the app activates the terminal instead of failing silently."
         case .activate:
             return "This selection activates the app or editor window, but cannot jump to a specific tab."

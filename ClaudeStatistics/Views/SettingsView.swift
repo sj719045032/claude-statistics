@@ -1432,11 +1432,13 @@ private struct TerminalFocusSettingsView: View {
     }
 
     private var preciseFocusDetail: String {
+        // Kitty / WezTerm used to live here as `.cli(.kitty)` / `.cli(.wezterm)`
+        // cases, but they were extracted to `.csplugin` bundles in M2 and now
+        // surface as `PluginBackedTerminalCapability.route == .accessibility`
+        // — the plugin's own strategy still drives precise focus via the
+        // terminal's CLI (kitty @ / wezterm cli), it just doesn't show up as
+        // a host-side route enum any more.
         switch effectiveCapability?.route {
-        case .cli(.kitty):
-            return "Uses Kitty remote control and terminal-native IDs when available."
-        case .cli(.wezterm):
-            return "Uses WezTerm CLI pane activation when terminal identifiers are available."
         case .appleScript:
             return "Uses AppleScript with terminal-native IDs and session locators when available."
         case .accessibility:
@@ -1448,7 +1450,7 @@ private struct TerminalFocusSettingsView: View {
 
     private var fallbackDetail: String {
         switch effectiveCapability?.route {
-        case .cli, .appleScript, .accessibility:
+        case .appleScript, .accessibility:
             return "When precise focus misses, the app activates the terminal instead of failing silently."
         case .activate:
             return "This selection activates the app or editor window, but cannot jump to a specific tab."
