@@ -104,3 +104,51 @@ public final class CodexPlugin: ProviderPlugin, ProviderAccountUIProviding {
 **未来**：
 - 任何 provider / terminal / share role / share theme plugin 抽离都遵循本文。
 - 第三方 `.csplugin` 通过 marketplace 安装后零 host 改动即工作。
+
+## 7. Codex / Gemini Provider 抽 .csplugin 路线图
+
+下次 session 起点。所有 prep 已 ready，剩下是「拆 host 编译时引用 + 搬代码」的机械工作，但要在**一个或两个原子 commit** 内完成（half-state 不 build）。
+
+### 7.1 Codex 抽出 checklist
+
+**Plugin 侧**（创建）：
+
+- `Plugins/Sources/CodexPlugin/CodexPlugin.swift` — 主 plugin 类 + 内嵌：
+  - `CodexProvider`（lift from host `Providers/Codex/CodexProvider.swift`，196 行）
+  - `CodexTranscriptParser`（697 行）
+  - `CodexSessionScanner`（202 行）
+  - `CodexUsageService`（347 行；UserDefaults key `codexUsageRetryAfter` 改 hardcoded literal）
+  - `CodexAccountManager`（555 行；`@MainActor` 保留 — plugin 内类同样可以 @MainActor）
+  - `CodexHookNormalizer`（193 行；用 SDK `DiagnosticLogger` / `AppRuntimePaths`）
+  - `CodexStatusLineInstaller`（135 行）
+  - `ProviderAccountUIProviding` conformance（包含 `CodexProviderAccountCardAccessory` view，view 内直接引用 plugin 自持 `accountManager`，**不再** cast `ProviderSettingsContext`）
+- `Plugins/Sources/CodexPlugin/Info.plist`（manifest id `com.openai.codex`，category `chat-app`，permissions 看 `BuiltinProviderPlugins.CodexPluginDogfood.manifest`）
+
+**Host 侧**（删除/改造）：
+
+- 删 `ClaudeStatistics/Providers/Codex/`（8 文件 2385 行，含 `CodexProviderAccountCardSupplement.swift` 整段 cast hack）
+- 删 `BuiltinProviderPlugins.CodexPluginDogfood` 类
+- 删 `hostPluginFactories` 内 `CodexPluginDogfood.manifest.id` 条目
+- `AccountManagers.codex` 字段移除（同时 reloaders 字典里的 `ProviderDescriptor.codex.id` 条目也删；plugin 自己持有 `accountManager`）
+- `ProviderRegistry.provider(for:)` switch 删 `case .codex`（动态查路径已先于 switch，plugin 加载后命中那条）
+- `HookCLI.swift` switch case `.codex` 改：从 `pluginRegistry.providers["com.openai.codex"]` 拿 plugin、调 plugin 的 hook normalizer。但 HookCLI 在 main app 二进制 CLI 模式跑，**不能用 PluginRegistry** —— 这是 audit doc 已经标的约束。需要一个 host-resident 的「Codex hook normalizer」精简版只做 env / payload 解析，留主二进制（非 plugin），与 plugin 内的 normalizer 一份共存（少量重复，hook 性能要求决定的）。
+- `DatabaseService.resetProviderCache(.codex)` — 通过 ProviderKind.codex（仍存在 static let）调用，无需改
+- `ProviderKind.codex` static let 保留，`allBuiltins` 数组保留 — 这些只是 string id wrappers，不再持 host class 引用
+- 6 处 test files 引用 `CodexProvider` / `CodexAccountManager` / `CodexTranscriptParser` —— 这些 test 在 host module 不能 import plugin。要么 (a) 删 test（plugin 自己测自己），(b) 把 test 搬到 plugin tests target，或 (c) 用 `NSClassFromString("CodexPlugin")` 做 runtime test
+
+### 7.2 Gemini 抽出 checklist
+
+结构同 Codex，复制 7.1 模板替换名字。Gemini 文件夹 10 文件 2993 行（多 OAuth 服务）。
+
+### 7.3 关键约束
+
+- **HookCLI 模式**：main app 二进制以 CLI 模式运行（`main.swift:4`，SwiftUI / `AppState` / `PluginRegistry` 全部不构建）。所以**hook context 检测代码必须留主二进制**，不能依赖 PluginRegistry。这是少量「重复」是设计上不可避免的。
+- **test 隔离**：plugin 类不在 host module，host test target 不能直接 import。每个 plugin 自己的 test target 是正解，但当前 project.yml 没配 plugin test target —— 加 target 又是新工作。临时 workaround 是用 `NSClassFromString` runtime check（已经在 `testInstantiatePluginViaObjcRuntime` 用过这个模式）。
+- **manifest id 冲突**：plugin 内 `@objc(CodexPlugin)` 类名不能与已存在的 host 类同名。host `BuiltinProviderPlugins.CodexPluginDogfood` 在该 commit 一并删除即可，无冲突。
+- **build 原子性**：切换路径不能在中间状态停（host 引用半删 + plugin 半建）。建议在独立 git worktree 完成所有改动，build + test 通过后再合并。
+
+### 7.4 工作量
+
+- Codex：1 大 commit ≈ 1500-2000 行净增（plugin 创建 +2400，host 删 -2400，但额外的 hook normalizer 主二进制副本 +200，project.yml +30，测试调整 +50）。预估 1-1.5 dedicated session（含 build break troubleshooting）。
+- Gemini：同形结构，~1.5 session。
+- 推荐顺序：Gemini 先（更纯净，没有 sync/independent 双模式），Codex 后（双模式带来更多 SwiftUI view 状态搬迁）。
