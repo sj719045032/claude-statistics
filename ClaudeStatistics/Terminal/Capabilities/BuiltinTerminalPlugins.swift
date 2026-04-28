@@ -70,32 +70,3 @@ final class GhosttyPlugin: NSObject, TerminalPlugin {
     override init() { super.init() }
 }
 
-@objc(WezTermPlugin)
-final class WezTermPlugin: NSObject, TerminalPlugin {
-    static let manifest = PluginManifest(
-        id: "com.github.wez.wezterm",
-        kind: .terminal,
-        displayName: "WezTerm",
-        version: SemVer(major: 1, minor: 0, patch: 0),
-        minHostAPIVersion: SDKInfo.apiVersion,
-        permissions: [],
-        principalClass: "WezTermPlugin"
-    )
-    private let capability = WezTermTerminalCapability()
-    var descriptor: TerminalDescriptor { capability.descriptor }
-    func detectInstalled() -> Bool { capability.isInstalled }
-    func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
-        CLITerminalFocusRouteHandler(kind: .wezterm)
-    }
-    func makeLauncher() -> (any TerminalLauncher)? {
-        capability as? any TerminalLauncher
-    }
-    func makeReadinessProvider() -> (any TerminalReadinessProviding)? {
-        capability as? any TerminalReadinessProviding
-    }
-    func makeSetupWizard() -> (any TerminalSetupProviding)? {
-        capability as? any TerminalSetupProviding
-    }
-    override init() { super.init() }
-}
-

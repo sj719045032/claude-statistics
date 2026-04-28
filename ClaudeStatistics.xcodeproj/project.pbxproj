@@ -124,7 +124,6 @@
 		4B427B261423763F796DE5DD /* TranscriptParserCommons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84C6E039B436786047A1D605 /* TranscriptParserCommons.swift */; };
 		4B62970E69C56DC0B4EDA500 /* WindsurfPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDC23EFEE70C8277A9152008 /* WindsurfPlugin.swift */; };
 		4C27C5DD7022DEE994CAA840 /* WireEventTranslatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17CEC3E9B44025FEE0E05C89 /* WireEventTranslatorTests.swift */; };
-		4CE3642E43CC24EF1EECFF65 /* WezTermTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9B269891E67AA3FB9D53E64 /* WezTermTerminalCapability.swift */; };
 		4E4BEF51FB660CE04D41338F /* IndependentClaudeAccountViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEEBABA82636376B36824D8 /* IndependentClaudeAccountViewModel.swift */; };
 		4F1FBB58C850CD3E947CA886 /* NotchStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3B518873560CAC7DE5DE5B /* NotchStateMachine.swift */; };
 		514804C5AD6F7662F4A01752 /* TraePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3BA52F0BB4EF6A31E3B0200 /* TraePlugin.swift */; };
@@ -149,6 +148,7 @@
 		5CDD29E21151F5CC8F466F4B /* IdlePeekCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E1B7BED272EFA6F7FB5C0B3 /* IdlePeekCard.swift */; };
 		5D6E800F52E0D14E3DD5EC05 /* AlacrittyPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F1F1261B7DA6F39B8786B00 /* AlacrittyPlugin.swift */; };
 		5D785899FA06E4A00E4CC7A8 /* ClaudeStatisticsKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; };
+		5FA0B8E153CB6FF8DD185D9E /* ClaudeStatisticsKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; };
 		6358C2762C6D6D85AC919DF8 /* WarpPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F49B383915AEEBCCDC916171 /* WarpPlugin.swift */; };
 		6381FDCEA8C711F7353696CE /* MessageRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DFE81229B8A87810C7DF58A /* MessageRow.swift */; };
 		64954F8535C5DA9FD1AE6D8B /* CostModelsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCA5C01E14873CBF3E6419F7 /* CostModelsCard.swift */; };
@@ -283,6 +283,7 @@
 		C19FAC3501132B64FECBDB3F /* VSCodePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91C96A74998EE00B79497160 /* VSCodePlugin.swift */; };
 		C44D93FD163D5ACB677A0C2F /* TitleSanitizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF9DAF9AE28E22F14DFD7EA4 /* TitleSanitizer.swift */; };
 		C48BDE19A5E58235BAB61F51 /* UsageViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5306E49F4AF08425229312F0 /* UsageViewModel.swift */; };
+		C4CB7D03BBF5B8FB6E0753CB /* WezTermPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = CFED6A9AD6F9C6154A5FDC5C /* WezTermPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C4EEDE0F0236FE4680A1B5CC /* NotchAutoAllowRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAB51505E677DA60C3533985 /* NotchAutoAllowRules.swift */; };
 		C54FBCE125797BA8792B1B85 /* TabOrderEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3371B97F78B775313FF5398A /* TabOrderEditor.swift */; };
 		C7AEC597AAFC4A6623C72C6A /* TrustStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0CF435E7D0B041E89EE8E31 /* TrustStore.swift */; };
@@ -323,6 +324,7 @@
 		E3520EEEBFD2FB2FACC19D45 /* ProviderContextRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AD3D99C9F42189EFF639E71 /* ProviderContextRegistry.swift */; };
 		E37D4BFF022181A1AF159CD9 /* AppTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBD75397BB200D96BF189CEB /* AppTab.swift */; };
 		E45AD6199CAB1661300675D6 /* SessionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0415091A24EBCDA6840A49 /* SessionDetailView.swift */; };
+		E48EA8E6F75544C5D1E4AEF1 /* WezTermPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66782415186CF1B98A9B9A83 /* WezTermPlugin.swift */; };
 		E497442123AF33C4184AB992 /* ShareMetrics+Evaluation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1B172A49401EA28223A83C0 /* ShareMetrics+Evaluation.swift */; };
 		E5818AC985038DCC7CB7123A /* ClaudeStatisticsKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; };
 		E58B6A3A03084C0705C450F5 /* ProviderRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AE7C2A2D6731BCD2D826C90 /* ProviderRegistry.swift */; };
@@ -371,6 +373,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		0FB67D0865BC77F5AB980E5E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 18B1CC7C2F803601C447E6E4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8397661F4AE263CD90838620;
+			remoteInfo = WezTermPlugin;
+		};
 		0FBBF536E6230EAA99CDC205 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 18B1CC7C2F803601C447E6E4 /* Project object */;
@@ -532,6 +541,13 @@
 			remoteGlobalIDString = 3600D65FD517F507E84B13F4;
 			remoteInfo = WindsurfPlugin;
 		};
+		E1B30A6DE019DCB6F57ED8EF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 18B1CC7C2F803601C447E6E4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DEB25A2406721FCABB7A5B97;
+			remoteInfo = ClaudeStatisticsKit;
+		};
 		E2CAEE646F2A7BD08CE70C66 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 18B1CC7C2F803601C447E6E4 /* Project object */;
@@ -577,6 +593,7 @@
 				B6E40DABE032CAD3C2B16A85 /* AlacrittyPlugin.bundle in Embed Dependencies */,
 				13F0708507CB618404FD5515 /* AppleTerminalPlugin.bundle in Embed Dependencies */,
 				B313D975C4C4D0AD58C0DA0D /* KittyPlugin.bundle in Embed Dependencies */,
+				C4CB7D03BBF5B8FB6E0753CB /* WezTermPlugin.bundle in Embed Dependencies */,
 			);
 			name = "Embed Dependencies";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -706,6 +723,7 @@
 		4D7AC12A966340D54D712D4B /* NotchAutoAllowRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchAutoAllowRulesTests.swift; sourceTree = "<group>"; };
 		4DFE81229B8A87810C7DF58A /* MessageRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageRow.swift; sourceTree = "<group>"; };
 		4E1858F23256C6FEBB750A08 /* ShareRole.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRole.swift; sourceTree = "<group>"; };
+		4E3EEC4F4F9BCE678E2B2E7D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		52E462E75817E26A0FBF0558 /* ModelTokenStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelTokenStats.swift; sourceTree = "<group>"; };
 		52FF7E2030D328036A1F8F6D /* SharePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharePreviewView.swift; sourceTree = "<group>"; };
 		5306E49F4AF08425229312F0 /* UsageViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageViewModel.swift; sourceTree = "<group>"; };
@@ -738,6 +756,7 @@
 		6470B331BB31EF4AE6E5CF51 /* GeminiProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiProvider.swift; sourceTree = "<group>"; };
 		652CCA3656340142820CB27A /* UsageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageData.swift; sourceTree = "<group>"; };
 		6618F7DEA731482B556A431E /* PanelContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelContentView.swift; sourceTree = "<group>"; };
+		66782415186CF1B98A9B9A83 /* WezTermPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WezTermPlugin.swift; sourceTree = "<group>"; };
 		66851A558CEC1E024AAC87E6 /* TerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalCapability.swift; sourceTree = "<group>"; };
 		669DD3F7CA0ACD5A8FFF69A3 /* ClaudeProviderAccountCardAccessory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeProviderAccountCardAccessory.swift; sourceTree = "<group>"; };
 		674190CA06E6AD12570EA1BF /* AccountManagers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountManagers.swift; sourceTree = "<group>"; };
@@ -872,7 +891,6 @@
 		C4A98D291523FF680B04B41C /* ClaudeAppPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeAppPlugin.swift; sourceTree = "<group>"; };
 		C8D22D6E017B129B416B5A0E /* RuntimeSessionEventApplier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSessionEventApplier.swift; sourceTree = "<group>"; };
 		C931907E9B4996736E4A7373 /* ClaudeAccountManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeAccountManager.swift; sourceTree = "<group>"; };
-		C9B269891E67AA3FB9D53E64 /* WezTermTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WezTermTerminalCapability.swift; sourceTree = "<group>"; };
 		CA7D5709A13CDC7751084AAF /* TerminalPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPreferences.swift; sourceTree = "<group>"; };
 		CAF9A88BAC1F779F77E517EB /* SessionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListView.swift; sourceTree = "<group>"; };
 		CB74582FD45D2092358A8D01 /* GeminiUsageModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiUsageModels.swift; sourceTree = "<group>"; };
@@ -883,6 +901,7 @@
 		CD05FEC4C1832D8F37A115B6 /* SessionTrendAggregator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTrendAggregator.swift; sourceTree = "<group>"; };
 		CDB231372E9B14E6FBB2A6E9 /* TranscriptParser+QuickStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TranscriptParser+QuickStats.swift"; sourceTree = "<group>"; };
 		CE1124931992403EA0EBD95E /* AppPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferences.swift; sourceTree = "<group>"; };
+		CFED6A9AD6F9C6154A5FDC5C /* WezTermPlugin.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WezTermPlugin.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
 		D0A898F5BCC7044CA037D185 /* GeminiStatusLineInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiStatusLineInstaller.swift; sourceTree = "<group>"; };
 		D0C3351516C414AC7F51400E /* ClaudeOAuthLoginSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeOAuthLoginSheet.swift; sourceTree = "<group>"; };
 		D0CA06E1C8046BE97A74F7C3 /* IndependentClaudeAccountManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndependentClaudeAccountManager.swift; sourceTree = "<group>"; };
@@ -1051,6 +1070,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CFCDE2E9B5792E70771009CF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5FA0B8E153CB6FF8DD185D9E /* ClaudeStatisticsKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D2EC536C74E1CC6ADFE87B17 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -1191,6 +1218,7 @@
 				23C67298966CCB82BB03EF9C /* TraePlugin.bundle */,
 				5AD2F29DA1EEA44E8B785C0A /* VSCodePlugin.bundle */,
 				80332DBB29AEBEF37DADF439 /* WarpPlugin.bundle */,
+				CFED6A9AD6F9C6154A5FDC5C /* WezTermPlugin.bundle */,
 				40D1EFBD1FA452CAB2FC7DEC /* WindsurfPlugin.bundle */,
 				7F2DF9762DDE871C2C51B049 /* ZedPlugin.bundle */,
 			);
@@ -1488,7 +1516,6 @@
 				A7538BF07592B7D765AF1C22 /* ExternalTerminalCapability.swift */,
 				89661CA17E93D43C4B68FC23 /* GhosttyTerminalCapability.swift */,
 				F4387E440942DCAE1B61C97F /* ITermTerminalCapability.swift */,
-				C9B269891E67AA3FB9D53E64 /* WezTermTerminalCapability.swift */,
 			);
 			path = Capabilities;
 			sourceTree = "<group>";
@@ -1545,6 +1572,7 @@
 				90D91EB78F80AC03A52E6A6D /* TraePlugin */,
 				0DD94F1E5E9CB86DB74B681D /* VSCodePlugin */,
 				31DB8414E2C9C86C06B6F515 /* WarpPlugin */,
+				D93AE6841F7E096995329E2A /* WezTermPlugin */,
 				7C9D6D06931362BACB41FFC5 /* WindsurfPlugin */,
 				89013ED5A3F9D1F70BA0B016 /* ZedPlugin */,
 				1341AC1398085D0EADE92592 /* Frameworks */,
@@ -1688,6 +1716,16 @@
 			children = (
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		D93AE6841F7E096995329E2A /* WezTermPlugin */ = {
+			isa = PBXGroup;
+			children = (
+				4E3EEC4F4F9BCE678E2B2E7D /* Info.plist */,
+				66782415186CF1B98A9B9A83 /* WezTermPlugin.swift */,
+			);
+			name = WezTermPlugin;
+			path = Plugins/Sources/WezTermPlugin;
 			sourceTree = "<group>";
 		};
 		E35EDCF6E9274048C5840F07 /* Models */ = {
@@ -1928,6 +1966,25 @@
 			productReference = 9E5D8A2D6C14F2665A818236 /* ClaudeAppPlugin.bundle */;
 			productType = "com.apple.product-type.bundle";
 		};
+		8397661F4AE263CD90838620 /* WezTermPlugin */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C093EF944BF8D439F9F3556D /* Build configuration list for PBXNativeTarget "WezTermPlugin" */;
+			buildPhases = (
+				035CC3F94191CAC146B676D9 /* Sources */,
+				CFCDE2E9B5792E70771009CF /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B830924E0753A9C122F7FD59 /* PBXTargetDependency */,
+			);
+			name = WezTermPlugin;
+			packageProductDependencies = (
+			);
+			productName = WezTermPlugin;
+			productReference = CFED6A9AD6F9C6154A5FDC5C /* WezTermPlugin.bundle */;
+			productType = "com.apple.product-type.bundle";
+		};
 		87DCF594EBA4E2D293793B07 /* ZedPlugin */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 35019EF695D5474CEDFCF507 /* Build configuration list for PBXNativeTarget "ZedPlugin" */;
@@ -2010,6 +2067,7 @@
 				A72CB6BA9E1821AC478CF2A4 /* PBXTargetDependency */,
 				E863D65E45E391F83C1C2EB1 /* PBXTargetDependency */,
 				70C512FC4DC0B6BE6E5B6B94 /* PBXTargetDependency */,
+				B4F6440BBC836A7481C980C4 /* PBXTargetDependency */,
 			);
 			name = ClaudeStatistics;
 			packageProductDependencies = (
@@ -2108,6 +2166,9 @@
 					7219A5031D3C80D1C5682BA5 = {
 						ProvisioningStyle = Automatic;
 					};
+					8397661F4AE263CD90838620 = {
+						ProvisioningStyle = Automatic;
+					};
 					87DCF594EBA4E2D293793B07 = {
 						ProvisioningStyle = Automatic;
 					};
@@ -2160,6 +2221,7 @@
 				3BF07BD1A9E6D172E5E10B75 /* TraePlugin */,
 				A5EA0ADFE2151E072E433A5E /* VSCodePlugin */,
 				0CF09A1D36F30D5CA3AD359E /* WarpPlugin */,
+				8397661F4AE263CD90838620 /* WezTermPlugin */,
 				3600D65FD517F507E84B13F4 /* WindsurfPlugin */,
 				87DCF594EBA4E2D293793B07 /* ZedPlugin */,
 			);
@@ -2184,6 +2246,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				4B62970E69C56DC0B4EDA500 /* WindsurfPlugin.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		035CC3F94191CAC146B676D9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E48EA8E6F75544C5D1E4AEF1 /* WezTermPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2533,7 +2603,6 @@
 				C48BDE19A5E58235BAB61F51 /* UsageViewModel.swift in Sources */,
 				F6601FAA89B6B7CE9A56779B /* UsageWindowRow.swift in Sources */,
 				663E5EC2269BC72FDE27ADB5 /* WaitingInputCard.swift in Sources */,
-				4CE3642E43CC24EF1EECFF65 /* WezTermTerminalCapability.swift in Sources */,
 				95C9B1EF669A91B5F178BA20 /* WireEventTranslator.swift in Sources */,
 				123A7C30556D89B77A29D544 /* WireMessage.swift in Sources */,
 				70DE2014995D643A72C0A9D0 /* main.swift in Sources */,
@@ -2703,6 +2772,16 @@
 			isa = PBXTargetDependency;
 			target = DEB25A2406721FCABB7A5B97 /* ClaudeStatisticsKit */;
 			targetProxy = 69FAD06793A2E60392EA5C09 /* PBXContainerItemProxy */;
+		};
+		B4F6440BBC836A7481C980C4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8397661F4AE263CD90838620 /* WezTermPlugin */;
+			targetProxy = 0FB67D0865BC77F5AB980E5E /* PBXContainerItemProxy */;
+		};
+		B830924E0753A9C122F7FD59 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DEB25A2406721FCABB7A5B97 /* ClaudeStatisticsKit */;
+			targetProxy = E1B30A6DE019DCB6F57ED8EF /* PBXContainerItemProxy */;
 		};
 		BAF099C706BD58782FFBFD82 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -2884,6 +2963,29 @@
 			};
 			name = Release;
 		};
+		40E7B492876AA4675BA23755 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Plugins/Sources/WezTermPlugin/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACH_O_TYPE = mh_bundle;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.WezTermPlugin;
+				PRODUCT_NAME = WezTermPlugin;
+				SDKROOT = macosx;
+				SKIP_INSTALL = NO;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				WRAPPER_EXTENSION = csplugin;
+			};
+			name = Release;
+		};
 		4302B53CE16599109073A352 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -3051,6 +3153,29 @@
 				WRAPPER_EXTENSION = csplugin;
 			};
 			name = Release;
+		};
+		69468A7B06548C0C5DE79F91 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Plugins/Sources/WezTermPlugin/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACH_O_TYPE = mh_bundle;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.WezTermPlugin;
+				PRODUCT_NAME = WezTermPlugin;
+				SDKROOT = macosx;
+				SKIP_INSTALL = NO;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				WRAPPER_EXTENSION = csplugin;
+			};
+			name = Debug;
 		};
 		7FD4B3782431D3116278BC9D /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -3592,6 +3717,15 @@
 			buildConfigurations = (
 				A340EFC456887099F456E975 /* Debug */,
 				5DF07C0E7AD6E0627D9DB9ED /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C093EF944BF8D439F9F3556D /* Build configuration list for PBXNativeTarget "WezTermPlugin" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				69468A7B06548C0C5DE79F91 /* Debug */,
+				40E7B492876AA4675BA23755 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

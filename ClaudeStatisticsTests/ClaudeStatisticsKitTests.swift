@@ -1470,8 +1470,7 @@ final class PluginReflectionTests: XCTestCase {
         (CodexPluginDogfood.manifest.principalClass, CodexPluginDogfood.self),
         (GeminiPluginDogfood.manifest.principalClass, GeminiPluginDogfood.self),
         (ITermPlugin.manifest.principalClass, ITermPlugin.self),
-        (GhosttyPlugin.manifest.principalClass, GhosttyPlugin.self),
-        (WezTermPlugin.manifest.principalClass, WezTermPlugin.self)
+        (GhosttyPlugin.manifest.principalClass, GhosttyPlugin.self)
         // Editor plugins (VSCode / Cursor / Windsurf / Trae / Zed),
         // WarpPlugin, and AlacrittyPlugin all ship as `.csplugin`
         // bundles, same as ClaudeAppPlugin / CodexAppPlugin — the
@@ -1502,18 +1501,18 @@ final class PluginReflectionTests: XCTestCase {
         // End-to-end of what PluginLoader will do: take principalClass
         // string from the manifest, look up via NSClassFromString,
         // cast to (NSObject & Plugin).Type, then init(). Use a
-        // host-resident plugin (WezTermPlugin) so this works without
+        // host-resident plugin (GhosttyPlugin) so this works without
         // dlopen — the .csplugin path is exercised by integration
         // tests once the bundles ship.
-        guard let cls = NSClassFromString("WezTermPlugin") else {
-            return XCTFail("WezTermPlugin not found in ObjC runtime")
+        guard let cls = NSClassFromString("GhosttyPlugin") else {
+            return XCTFail("GhosttyPlugin not found in ObjC runtime")
         }
         guard let pluginType = cls as? (NSObject & Plugin).Type else {
-            return XCTFail("WezTermPlugin must conform to NSObject & Plugin")
+            return XCTFail("GhosttyPlugin must conform to NSObject & Plugin")
         }
         let instance = pluginType.init()
-        XCTAssertEqual(type(of: instance).manifest.id, "com.github.wez.wezterm")
-        XCTAssertEqual(type(of: instance).manifest.principalClass, "WezTermPlugin")
+        XCTAssertEqual(type(of: instance).manifest.id, "com.mitchellh.ghostty")
+        XCTAssertEqual(type(of: instance).manifest.principalClass, "GhosttyPlugin")
         XCTAssertTrue(instance is any TerminalPlugin)
     }
 }

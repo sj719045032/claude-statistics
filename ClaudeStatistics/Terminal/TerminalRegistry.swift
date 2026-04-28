@@ -4,13 +4,14 @@ import ClaudeStatisticsKit
 enum TerminalRegistry {
     private static let appCapabilities: [any TerminalCapability] = [
         GhosttyTerminalCapability(),
-        WezTermTerminalCapability(),
         ITermTerminalCapability()
-        // Warp / Alacritty / AppleTerminal / Kitty extracted to
-        // .csplugin bundles (M2). Host sees them through
-        // `pluginCapabilitiesStore`'s `PluginBackedTerminalCapability`
-        // adapter; their focus path goes through the plugin's own
-        // `makeFocusStrategy()` instance via `pluginStrategyResolver`.
+        // 5 terminals (Warp / Alacritty / AppleTerminal / Kitty /
+        // WezTerm) extracted to .csplugin bundles (M2). Host sees
+        // them through `pluginCapabilitiesStore`'s
+        // `PluginBackedTerminalCapability` adapter; their focus path
+        // goes through the plugin's own `makeFocusStrategy()` via
+        // `pluginStrategyResolver`. Only iTerm2 + Ghostty remain
+        // builtin (most-used; smallest disruption surface).
     ]
 
     /// Identifiers contributed by external `TerminalPlugin`s at runtime

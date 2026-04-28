@@ -64,11 +64,12 @@ final class AppState: ObservableObject {
         CodexPluginDogfood.manifest.id:     { CodexPluginDogfood() },
         GeminiPluginDogfood.manifest.id:    { GeminiPluginDogfood() },
         ITermPlugin.manifest.id:            { ITermPlugin() },
-        GhosttyPlugin.manifest.id:          { GhosttyPlugin() },
-        WezTermPlugin.manifest.id:          { WezTermPlugin() }
-        // WarpPlugin / AlacrittyPlugin / AppleTerminalPlugin /
-        // KittyPlugin extracted to .csplugin (M2). Loaded via
+        GhosttyPlugin.manifest.id:          { GhosttyPlugin() }
+        // 5 terminals (Warp / Alacritty / AppleTerminal / Kitty /
+        // WezTerm) extracted to .csplugin (M2). Loaded via
         // PluginLoader from Contents/PlugIns at runtime, not here.
+        // Only iTerm2 + Ghostty stay builtin (most-used; smallest
+        // user-visible disruption if extraction goes wrong).
     ]
 
     let pluginRegistry: PluginRegistry = {
