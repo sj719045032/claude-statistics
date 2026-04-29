@@ -103,13 +103,15 @@ public final class CodexPlugin: ProviderPlugin, ProviderAccountUIProviding {
 - **Plugin 列表 UI 按 category chip 筛选**：`PluginCategoryFilterBar` 是个 capsule-style chip bar，Installed + Discover 两个 tab 都有，按 `provider / terminal / chat-app / editor-integration / share-card / utility` 顺序显示有内容的分类（带计数），点击切换。chip 用 `Text(LocalizedStringKey)` 通过 `.environment(\.locale)` 对运行时语言切换响应（不像 `NSLocalizedString` 提前 stringify）。
 - **`vendor` → `provider` 命名统一**：Catalog category 字符串、enum case、plist `category` 字段、本地化 key（`settings.plugins.category.provider`）全部对齐到代码体系内的 `ProviderPlugin` / `ProviderDescriptor` / `ProviderRegistry` 命名。
 - **`PluginInstaller` 加 fallback 路径**：`Bundle(url:)` 在 `NSTemporaryDirectory()` 内的 staging dir 偶发返回 nil（macOS 行为），fallback 改为直接读 `Contents/Info.plist` 通过 `PropertyListSerialization`。`InstallError` 拆 `manifestMissing` 为 `bundleLoadFailed(path:)` + `manifestKeyMissing(path:)` + 加 `DiagnosticLogger` 详细日志。
+- **CodexPlugin pilot 真正不进 `.app`**：`project.yml` 给 CodexPlugin dependency 加 `embed: false` + `link: false`。XcodeGen 默认对 cfbundle dependency 即使没 `copy:` 段也会落到 main app 的 Resources build phase（之前 commit 漏了这一点 —— `.csplugin` 仍被偷偷 copy 到 `Contents/Resources/`）。修后 `.app` 内确认零 CodexPlugin 痕迹。
+- **Release pipeline 自动产出 marketplace artifacts**：`scripts/pack-csplugin.sh` 加可选第二参数 `<build-products-dir>`；`scripts/build-dmg.sh` 在 Release build 完成后扫所有 `Build/Products/Release/*.csplugin` 调 pack-csplugin → `build/marketplace/<Name>.csplugin.zip` + `<Name>.sha256`，并先 wipe 上轮残留；`scripts/release.sh` 把那批 zip 加进 `gh release create` ASSET_LIST。一次 release 现在产出 14 个 plugin bundle 跟 dmg/zip/deltas 一起 upload 到同一 `v<version>` GitHub release，catalog `index.json.downloadURL` 直接指过去就行。
 
 **未来**：
 - Claude provider 抽 `.csplugin`（最后一个 host-bundled adapter）：会触发 SDK 容纳 sync/independent 双模式 SwiftUI view 状态的额外工作。
 - 任何 provider / terminal / share role / share theme plugin 抽离都遵循本文。
 - 第三方 `.csplugin` 通过 marketplace 安装后零 host 改动即工作。
-- 把其它 `.csplugin`（Gemini / Kitty / WezTerm / Warp / Alacritty / AppleTerminal / ClaudeAppPlugin / CodexAppPlugin / VSCode / Cursor / Windsurf / Trae / Zed）逐个从 `.app` build-time copy 移除，统一走 marketplace 安装路径。Codex pilot 是模板。
-- catalog repo（`github.com/sj719045032/claude-statistics-plugins`）真正建立 + `index.json` 填充 + 每次 `release.sh` 自动产出 `.csplugin.zip` artifact 上传到 GitHub release。
+- 把其它 `.csplugin`（Gemini / Kitty / WezTerm / Warp / Alacritty / AppleTerminal / ClaudeAppPlugin / CodexAppPlugin / VSCode / Cursor / Windsurf / Trae / Zed）逐个从 `.app` build-time copy 移除（同 Codex pilot：`embed: false` + `link: false` + 移除 `copy:` 块），统一走 marketplace 安装路径。前置已就位 —— release pipeline 自动 upload + Codex pilot 模板齐活。
+- catalog repo（`github.com/sj719045032/claude-statistics-plugins`）真正建立 + `index.json` 填充。release pipeline 已经在产出 artifacts 并 upload 到主 repo 的 GitHub release，catalog repo 只需要 host 一份 `index.json` 指过去即可。
 - 切语言时 install error toast / loaded.count 等 `NSLocalizedString` 路径残留的 reactive 缺口（已识别，chip + 主入口已修）。
 
 ## 7. Provider Plugin 抽 .csplugin 路线图（参考模板）
