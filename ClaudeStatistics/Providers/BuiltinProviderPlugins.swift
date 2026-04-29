@@ -1,18 +1,15 @@
 import ClaudeStatisticsKit
 import Foundation
 
-/// Stage-3 dogfood plugins for the three builtin Provider adapters.
-/// Each one exposes a `ProviderDescriptor` so the host's
-/// `PluginRegistry` exercises a real registration path while the
-/// legacy `ProviderRegistry` keeps driving session scanning, parsing,
-/// and account flows.
+/// Dogfood wrapper for the host-bundled Claude provider adapter.
+/// Exposes a `ProviderDescriptor` so the `PluginRegistry`
+/// registration path stays uniform — Claude code (`ClaudeProvider`,
+/// account manager, transcript parser, etc.) still ships from the
+/// host module rather than a `.csplugin` bundle.
 ///
-/// Stage 4 splits each into a standalone `Plugins/Sources/<Name>Plugin/`
-/// target packaged as `<id>.csplugin`, with the actual provider
-/// behaviour (session scanner, transcript parser, usage source,
-/// account manager, hook installer, status-line installer, view
-/// contributor) folded into the plugin's own factory methods. Until
-/// then these wrappers only carry the descriptor.
+/// Codex and Gemini moved into their own `Plugins/Sources/<Name>Plugin/`
+/// packages and load from `Contents/PlugIns/` at runtime. The host
+/// stays out of their guts entirely.
 
 @objc(ClaudePluginDogfood)
 final class ClaudePluginDogfood: NSObject, ProviderPlugin {
@@ -32,21 +29,4 @@ final class ClaudePluginDogfood: NSObject, ProviderPlugin {
     override init() { super.init() }
 }
 
-@objc(CodexPluginDogfood)
-final class CodexPluginDogfood: NSObject, ProviderPlugin {
-    static let manifest = PluginManifest(
-        id: "com.openai.codex",
-        kind: .provider,
-        displayName: "Codex",
-        version: SemVer(major: 1, minor: 0, patch: 0),
-        minHostAPIVersion: SDKInfo.apiVersion,
-        permissions: [.filesystemHome, .network],
-        principalClass: "CodexPluginDogfood",
-        iconAsset: "CodexProviderIcon",
-        category: PluginCatalogCategory.vendor
-    )
-    var descriptor: ProviderDescriptor { .codex }
-    func makeProvider() -> (any BundledSessionProvider)? { CodexProvider.shared }
-    override init() { super.init() }
-}
 

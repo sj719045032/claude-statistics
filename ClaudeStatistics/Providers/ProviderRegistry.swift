@@ -196,8 +196,6 @@ enum ProviderRegistry {
         switch kind {
         case .claude:
             return ClaudeProvider.shared
-        case .codex:
-            return CodexProvider.shared
         default:
             // Unknown ProviderKind id reaching this fallback means a
             // plugin-registered provider missed the dynamic lookup

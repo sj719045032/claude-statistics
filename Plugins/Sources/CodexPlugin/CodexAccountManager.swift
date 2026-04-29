@@ -281,7 +281,7 @@ final class CodexAccountManager: ObservableObject {
             noticeMessage = NSLocalizedString("settings.codexAccounts.addHint", comment: "")
             isAddingAccount = true
 
-            TerminalRegistry.launch(
+            TerminalDispatch.launch(
                 TerminalLaunchRequest(
                     executable: "codex",
                     arguments: ["login"],

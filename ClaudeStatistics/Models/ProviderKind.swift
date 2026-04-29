@@ -30,16 +30,47 @@ struct ProviderKind: RawRepresentable, Hashable, Codable, Identifiable, Sendable
     var descriptor: ProviderDescriptor {
         switch rawValue {
         case "claude": return .claude
-        case "codex":  return .codex
         default:
-            // Any extracted plugin (Gemini today, third-party
-            // tomorrow) registers its descriptor into
-            // `PluginDescriptorStore` from `init()`. Fall back to the
-            // Claude descriptor when the store hasn't been populated
-            // yet — same legacy contract `ProviderKind(rawValue:) ?? .claude`
-            // call sites historically relied on.
-            return PluginDescriptorStore.descriptor(for: rawValue) ?? .claude
+            // Any extracted plugin (Codex, Gemini, third-party) registers
+            // its descriptor into `PluginDescriptorStore` from `init()`.
+            // Fall back to a minimal placeholder using `rawValue` as id
+            // when the store hasn't been populated — `allKnownDescriptors`
+            // dedups by id, so handing back `.claude` would alias every
+            // unloaded plugin onto the Claude slot. The placeholder
+            // copies Claude's UI styling (we only need a usable
+            // `iconAssetName` / `accentColor` if any UI surface still
+            // looks at it before plugin load).
+            return PluginDescriptorStore.descriptor(for: rawValue)
+                ?? ProviderDescriptor.placeholder(id: rawValue)
         }
+    }
+}
+
+extension ProviderDescriptor {
+    /// Best-effort placeholder used by `ProviderKind.descriptor` when
+    /// the plugin owning `id` hasn't pushed its descriptor into
+    /// `PluginDescriptorStore` yet (typical only for the brief window
+    /// between AppState init and PluginRegistry load, or in unit tests
+    /// that exercise host code without loading the bundle).
+    static func placeholder(id: String) -> ProviderDescriptor {
+        ProviderDescriptor(
+            id: id,
+            displayName: id.capitalized,
+            iconAssetName: "ClaudeProviderIcon",
+            accentColor: Color(red: 0.5, green: 0.5, blue: 0.5),
+            badgeColor: Color(red: 0.5, green: 0.5, blue: 0.5),
+            notchEnabledDefaultsKey: "notch.enabled.\(id)",
+            capabilities: ProviderCapabilities(
+                supportsCost: true,
+                supportsUsage: true,
+                supportsProfile: true,
+                supportsStatusLine: true,
+                supportsExactPricing: false,
+                supportsResume: true,
+                supportsNewSession: true
+            ),
+            resolveToolAlias: { PluginToolAliasStore.canonical($0, for: id) }
+        )
     }
 }
 
@@ -112,10 +143,9 @@ enum MenuBarPreferences {
     }
 }
 
-/// Builtin provider capability constants. Only Claude and Codex
-/// remain here while their adapters still ship from the host module.
-/// Gemini's capabilities are inlined inside `GeminiPlugin.descriptor`
-/// (the plugin's `ProviderPlugin` factory).
+/// Builtin provider capability constants. Only Claude remains here
+/// while its adapter still ships from the host module. Codex and
+/// Gemini inline their capabilities inside the plugin descriptor.
 extension ProviderCapabilities {
     static let claude = ProviderCapabilities(
         supportsCost: true,
@@ -123,16 +153,6 @@ extension ProviderCapabilities {
         supportsProfile: true,
         supportsStatusLine: true,
         supportsExactPricing: true,
-        supportsResume: true,
-        supportsNewSession: true
-    )
-
-    static let codex = ProviderCapabilities(
-        supportsCost: true,
-        supportsUsage: true,
-        supportsProfile: true,
-        supportsStatusLine: true,
-        supportsExactPricing: false,
         supportsResume: true,
         supportsNewSession: true
     )

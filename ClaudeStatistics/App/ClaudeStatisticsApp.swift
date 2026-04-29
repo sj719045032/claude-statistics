@@ -61,15 +61,15 @@ final class AppState: ObservableObject {
     /// back live without restart.
     static let hostPluginFactories: [String: () -> any Plugin] = [
         ClaudePluginDogfood.manifest.id:    { ClaudePluginDogfood() },
-        CodexPluginDogfood.manifest.id:     { CodexPluginDogfood() },
         ITermPlugin.manifest.id:            { ITermPlugin() },
         GhosttyPlugin.manifest.id:          { GhosttyPlugin() }
         // 5 terminals (Warp / Alacritty / AppleTerminal / Kitty /
-        // WezTerm) plus Gemini provider extracted to .csplugin
-        // (M2 / Stage 4). Loaded via PluginLoader from Contents/PlugIns
-        // at runtime, not here. Only iTerm2 + Ghostty stay builtin
-        // (most-used; smallest user-visible disruption if extraction
-        // goes wrong).
+        // WezTerm) plus Gemini + Codex providers extracted to
+        // .csplugin (M2 / Stage 4). Loaded via PluginLoader from
+        // Contents/PlugIns at runtime, not here. Only iTerm2 +
+        // Ghostty stay builtin (most-used; smallest user-visible
+        // disruption if extraction goes wrong). Claude provider
+        // is the last remaining host-bundled adapter.
     ]
 
     let pluginRegistry: PluginRegistry = {
@@ -334,9 +334,16 @@ final class AppState: ObservableObject {
         let selectedKind = ProviderRegistry.selectedProviderKind()
         providerKind = selectedKind
         let availableKinds = Set(ProviderRegistry.availableProviders(plugins: pluginRegistry))
-        let startupKinds = ProviderRegistry.allKnownDescriptors(plugins: pluginRegistry)
+        var startupKinds = ProviderRegistry.allKnownDescriptors(plugins: pluginRegistry)
             .compactMap { ProviderKind(rawValue: $0.id) }
-            .filter { availableKinds.contains($0) || $0 == selectedKind }
+            .filter { availableKinds.contains($0) }
+        // The selected kind always needs a context — even if its
+        // plugin happens to be disabled or hasn't been loaded yet
+        // (test target without bundles, etc.) — because line ~354
+        // force-unwraps `contexts.store(for: selectedKind)`.
+        if !startupKinds.contains(selectedKind) {
+            startupKinds.append(selectedKind)
+        }
 
         let tracker = ActiveSessionsTracker()
         self.activeSessionsTracker = tracker

@@ -60,9 +60,11 @@ struct HookRunner: HookHelperContext {
         switch provider {
         case .claude:
             action = buildClaudeAction(payload: payload)
-        case .codex:
-            action = buildCodexAction(payload: payload)
         default:
+            // Codex / Gemini / third-party providers all flow through
+            // the plugin router. Each plugin implements
+            // `ProviderHookNormalizing` and HookPluginRouter looks it
+            // up in PluginRegistry by `hookProviderId`.
             action = HookPluginRouter.action(for: provider.rawValue, payload: payload, helper: self)
         }
 

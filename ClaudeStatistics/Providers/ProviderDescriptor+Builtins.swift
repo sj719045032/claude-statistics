@@ -3,17 +3,16 @@ import SwiftUI
 import ClaudeStatisticsKit
 
 /// Builtin provider descriptors. The `ProviderDescriptor` type itself
-/// lives in `ClaudeStatisticsKit`; the host-bundled instances stay
-/// here only for adapters whose code still ships from the host module
-/// — Claude / Codex today, because their alias enums and session-id
-/// canonicalisation closures close over host-internal symbols.
+/// lives in `ClaudeStatisticsKit`; only Claude's static stays here
+/// because the Claude adapter still ships from the host module — its
+/// alias enum and session-id canonicalisation closure close over
+/// host-internal symbols.
 ///
-/// Gemini's static was deleted when the plugin extracted: the plugin
-/// publishes its own `ProviderDescriptor` into `PluginDescriptorStore`
-/// from `GeminiPlugin.init()`, and `ProviderKind.descriptor` resolves
-/// any non-Claude / non-Codex id through that store. No Gemini
-/// metadata (display name, icon, capabilities, notch defaults key,
-/// alias table) lives in this file.
+/// Codex and Gemini both extracted: each plugin publishes its
+/// descriptor into `PluginDescriptorStore` from `init()`, and
+/// `ProviderKind.descriptor` resolves any non-Claude id through that
+/// store. No Codex / Gemini metadata (display name, icon,
+/// capabilities, notch defaults key, alias table) lives in this file.
 extension ProviderDescriptor {
     static let claude = ProviderDescriptor(
         id: "claude",
@@ -36,19 +35,5 @@ extension ProviderDescriptor {
             return rawID
         },
         notchProcessingHintKey: "notch.operation.thinking"
-    )
-
-    static let codex = ProviderDescriptor(
-        id: "codex",
-        displayName: "Codex",
-        iconAssetName: "CodexProviderIcon",
-        accentColor: Color(red: 0.10, green: 0.66, blue: 0.50),
-        badgeColor: Color(red: 0.18, green: 0.80, blue: 0.44),
-        notchEnabledDefaultsKey: "notch.enabled.codex",
-        capabilities: .codex,
-        resolveToolAlias: { CodexToolNames.canonical($0) },
-        postStopExitGrace: 0.25,
-        syncsTranscriptToActiveSessions: true,
-        commandFilteredNotchPreview: true
     )
 }

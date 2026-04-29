@@ -1467,7 +1467,6 @@ final class PluginReflectionTests: XCTestCase {
     // NSClassFromString once the bundle is dlopen'd.
     private static let registeredPluginClasses: [(declared: String, cls: AnyClass)] = [
         (ClaudePluginDogfood.manifest.principalClass, ClaudePluginDogfood.self),
-        (CodexPluginDogfood.manifest.principalClass, CodexPluginDogfood.self),
         (ITermPlugin.manifest.principalClass, ITermPlugin.self),
         (GhosttyPlugin.manifest.principalClass, GhosttyPlugin.self)
         // Editor plugins (VSCode / Cursor / Windsurf / Trae / Zed),

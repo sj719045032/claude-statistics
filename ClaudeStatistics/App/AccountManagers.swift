@@ -5,19 +5,15 @@ import ClaudeStatisticsKit
 /// `AppState` so the top-level state object isn't responsible for the
 /// manager instances and their per-kind reload routing.
 ///
-/// The hard-typed properties (`claude` / `independentClaude` / `codex`)
-/// stay for now because Settings accessories reach into them directly.
-/// The `reload(for:)` path is plugin-aware: reload functions are stored
-/// in a `descriptor.id`-keyed dictionary so when Codex moves to a
-/// `.csplugin` bundle (and the GeminiPlugin already does) the plugin
-/// owns its own manager and skips this file entirely. A `nil` reloader
-/// for a descriptor id is treated as no-op — that's how Gemini's reload
-/// flows past here without crashing.
+/// Only Claude (sync + independent) remains here while its provider
+/// still ships from the host module. Gemini and Codex own their own
+/// account managers inside the plugin and skip this file entirely.
+/// A `nil` reloader for a descriptor id is treated as no-op — that's
+/// how Gemini / Codex reloads flow past without crashing.
 @MainActor
 final class AccountManagers {
     let claude = ClaudeAccountManager()
     let independentClaude = IndependentClaudeAccountManager()
-    let codex = CodexAccountManager()
 
     /// Per-descriptor.id reload function. Builtins seed three entries
     /// here at init time; third-party `ProviderPlugin`s register/
@@ -34,9 +30,6 @@ final class AccountManagers {
         reloaders[ProviderDescriptor.claude.id] = { [weak self] in
             self?.claude.load()
             self?.independentClaude.load()
-        }
-        reloaders[ProviderDescriptor.codex.id] = { [weak self] in
-            self?.codex.load()
         }
     }
 

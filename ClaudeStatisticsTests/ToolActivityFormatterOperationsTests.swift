@@ -4,6 +4,18 @@ import XCTest
 
 final class ToolActivityFormatterOperationsTests: XCTestCase {
 
+    override func setUp() {
+        super.setUp()
+        CodexTestPlaceholder.register()
+        GeminiTestPlaceholder.register()
+    }
+
+    override func tearDown() {
+        CodexTestPlaceholder.unregister()
+        GeminiTestPlaceholder.unregister()
+        super.tearDown()
+    }
+
     // MARK: - shellCommandSummary: xcodebuild
 
     func test_shellSummary_xcodebuildBuildWithScheme() {

@@ -227,8 +227,8 @@ enum PluginTrustGate {
 
         // Re-enable runs every applicable register path because a
         // single `manifest.id` can carry two plugin instances at once
-        // — e.g. host `CodexPluginDogfood` (kind=.provider) and
-        // bundled `CodexAppPlugin` (kind=.terminal) both claim
+        // — e.g. extracted `CodexPlugin` (kind=.provider, .csplugin)
+        // and bundled `CodexAppPlugin` (kind=.terminal) both claim
         // "com.openai.codex". `disable` unregisters both via a single
         // `unregister(id:)` call, so `enable` has to re-register
         // both. We try the host factory first (it has no URL), then

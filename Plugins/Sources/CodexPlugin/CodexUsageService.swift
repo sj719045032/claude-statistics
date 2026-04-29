@@ -10,19 +10,26 @@ final class CodexUsageService: ProviderUsageSource {
     private let tokenRefreshURL = URL(string: "https://auth.openai.com/oauth/token")!
     private let clientID = "app_EMoamEEZ73f0CkXaXp7hrann"
 
+    /// `UserDefaults` key for the Codex usage API retry-after deadline.
+    /// Mirror of host's `AppPreferences.codexUsageRetryAfter` — host
+    /// `AppPreferences` isn't visible from a plugin target, but the
+    /// underlying key string is the user-facing preference identifier
+    /// and must stay in sync (renaming would silently lose user state).
+    private static let retryAfterKey = "codexUsageAPIRetryAfter"
+
     /// Tracks when we can next call the API (set on 429), persisted across restarts
     private(set) var retryAfter: Date? {
         get {
-            if let stored = UserDefaults.standard.object(forKey: AppPreferences.codexUsageRetryAfter) as? Date {
+            if let stored = UserDefaults.standard.object(forKey: Self.retryAfterKey) as? Date {
                 return stored > Date() ? stored : nil
             }
             return nil
         }
         set {
             if let date = newValue {
-                UserDefaults.standard.set(date, forKey: AppPreferences.codexUsageRetryAfter)
+                UserDefaults.standard.set(date, forKey: Self.retryAfterKey)
             } else {
-                UserDefaults.standard.removeObject(forKey: AppPreferences.codexUsageRetryAfter)
+                UserDefaults.standard.removeObject(forKey: Self.retryAfterKey)
             }
         }
     }

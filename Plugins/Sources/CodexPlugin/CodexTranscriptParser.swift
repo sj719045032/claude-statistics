@@ -85,7 +85,7 @@ final class CodexTranscriptParser {
         quick.messageCount = userCount + assistantCount
         quick.totalTokens = latestUsage?.totalTokens ?? quick.totalTokens
         if let latestUsage, let model = quick.model {
-            quick.estimatedCost = ModelPricing.estimateCost(
+            quick.estimatedCost = CodexCostEstimator.estimate(
                 model: model,
                 inputTokens: latestUsage.inputTokens,
                 outputTokens: latestUsage.outputTokens,
@@ -370,7 +370,7 @@ final class CodexTranscriptParser {
                 let bucket = granularity.bucketStart(for: timestamp)
                 var existing = buckets[bucket, default: (tokens: 0, cost: 0)]
                 existing.tokens += delta.totalTokens
-                existing.cost += ModelPricing.estimateCost(
+                existing.cost += CodexCostEstimator.estimate(
                     model: activeModel,
                     inputTokens: delta.inputTokens,
                     outputTokens: delta.outputTokens,
@@ -542,7 +542,12 @@ final class CodexTranscriptParser {
     }
 
     private func normalizedToolName(_ rawName: String) -> String {
-        let canonical = ProviderKind.codex.descriptor.canonicalToolName(rawName)
+        let normalized = rawName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "-", with: "_")
+            .replacingOccurrences(of: " ", with: "_")
+        let canonical = CodexToolNames.canonical(normalized) ?? normalized
         let pretty = CanonicalToolName.displayName(for: canonical)
         // `displayName(for:)` title-cases unknown canonicals, which would turn
         // a pass-through name like `view_image` into `View_image`. Keep the

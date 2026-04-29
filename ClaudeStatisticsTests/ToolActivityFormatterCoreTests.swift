@@ -13,10 +13,12 @@ final class ToolActivityFormatterCoreTests: XCTestCase {
     override func setUp() {
         super.setUp()
         GeminiTestPlaceholder.register()
+        CodexTestPlaceholder.register()
     }
 
     override func tearDown() {
         GeminiTestPlaceholder.unregister()
+        CodexTestPlaceholder.unregister()
         super.tearDown()
     }
 

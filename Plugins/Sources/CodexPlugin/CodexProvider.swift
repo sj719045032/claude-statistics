@@ -1,13 +1,20 @@
 import Foundation
 import ClaudeStatisticsKit
 
-final class CodexProvider: SessionProvider, @unchecked Sendable {
+final class CodexProvider: SessionDataProvider, UsageProvider, AccountProvider, HookProvider, SessionLauncher, @unchecked Sendable {
     static let shared = CodexProvider()
 
-    let kind: ProviderKind = .codex
-    var providerId: String { kind.rawValue }
-    let displayName = ProviderKind.codex.descriptor.displayName
-    let capabilities = ProviderCapabilities.codex
+    var providerId: String { "codex" }
+    let displayName = "Codex"
+    let capabilities = ProviderCapabilities(
+        supportsCost: true,
+        supportsUsage: true,
+        supportsProfile: true,
+        supportsStatusLine: true,
+        supportsExactPricing: false,
+        supportsResume: true,
+        supportsNewSession: true
+    )
     let usageSource: (any ProviderUsageSource)? = CodexUsageService.shared
     let configDirectory = (NSHomeDirectory() as NSString).appendingPathComponent(".codex")
     let builtinPricingModels = CodexPricingCatalog.builtinModels
@@ -95,7 +102,7 @@ final class CodexProvider: SessionProvider, @unchecked Sendable {
     }
 
     func openNewSession(_ session: Session) {
-        TerminalRegistry.launch(
+        TerminalDispatch.launch(
             TerminalLaunchRequest(
                 executable: "codex",
                 arguments: [],
@@ -105,7 +112,7 @@ final class CodexProvider: SessionProvider, @unchecked Sendable {
     }
 
     func resumeSession(_ session: Session) {
-        TerminalRegistry.launch(
+        TerminalDispatch.launch(
             TerminalLaunchRequest(
                 executable: "codex",
                 arguments: ["resume", session.externalID],
@@ -123,7 +130,7 @@ final class CodexProvider: SessionProvider, @unchecked Sendable {
     }
 
     func openNewSession(inDirectory path: String) {
-        TerminalRegistry.launch(
+        TerminalDispatch.launch(
             TerminalLaunchRequest(
                 executable: "codex",
                 arguments: [],
@@ -135,23 +142,26 @@ final class CodexProvider: SessionProvider, @unchecked Sendable {
 
 // MARK: - Tool name canonicalization
 
-/// Maps Codex's raw tool names (`apply_patch`, `exec_command`, …) onto the
-/// shared canonical vocabulary (`edit`, `bash`, …). Input is expected to be
-/// the lower-cased/underscore-normalized form that `ProviderKind
-/// .canonicalToolName(_:)` produces; returns `nil` when no alias applies so
-/// the caller can keep the original name.
+/// Maps Codex's raw tool names (`apply_patch`, `exec_command`, …) onto
+/// the shared canonical vocabulary (`edit`, `bash`, …). Input is
+/// expected to be the lower-cased/underscore-normalized form that
+/// `ProviderDescriptor.canonicalToolName(_:)` produces; returns `nil`
+/// when no alias applies so the caller can keep the original name.
+///
+/// `table` is the source of truth; `CodexPlugin.init()` registers it
+/// into `PluginToolAliasStore` so the host descriptor's alias closure
+/// resolves through this same data without holding a duplicate copy.
 enum CodexToolNames {
+    static let table: [String: String] = [
+        "exec_command":      "bash",
+        "write_stdin":       "bash",
+        "local_shell":       "bash",
+        "apply_patch":       "edit",
+        "read_mcp_resource": "read",
+    ]
+
     static func canonical(_ normalized: String) -> String? {
-        switch normalized {
-        case "exec_command", "write_stdin", "local_shell":
-            return "bash"
-        case "apply_patch":
-            return "edit"
-        case "read_mcp_resource":
-            return "read"
-        default:
-            return nil
-        }
+        table[normalized]
     }
 }
 
@@ -179,18 +189,50 @@ struct CodexStatusLineAdapter: StatusLineInstalling {
     func restore() throws { try CodexStatusLineInstaller.restore() }
 }
 
+/// Plugin-local cost estimator. Mirrors what `ModelPricing.estimateCost`
+/// would do against the shared catalog, but uses the plugin's own
+/// `CodexPricingCatalog.builtinModels` so the parser doesn't need to
+/// reach into the host. Host-side `SessionStats+Pricing` recomputes
+/// against the live `ModelPricing` catalog (which merges per-plugin
+/// `builtinPricingModels` + user overrides) — this is just the seed
+/// value the parser carries until host fix-up.
+enum CodexCostEstimator {
+    static func estimate(
+        model: String,
+        inputTokens: Int,
+        outputTokens: Int,
+        cacheCreation5mTokens: Int,
+        cacheCreation1hTokens: Int,
+        cacheCreationTotalTokens: Int,
+        cacheReadTokens: Int
+    ) -> Double {
+        guard let p = CodexPricingCatalog.builtinModels[model] else { return 0 }
+        let perM = 1_000_000.0
+        var cost = Double(inputTokens) / perM * p.input
+            + Double(outputTokens) / perM * p.output
+            + Double(cacheReadTokens) / perM * p.cacheRead
+        if cacheCreation5mTokens > 0 || cacheCreation1hTokens > 0 {
+            cost += Double(cacheCreation5mTokens) / perM * p.cacheWrite5m
+            cost += Double(cacheCreation1hTokens) / perM * p.cacheWrite1h
+        } else if cacheCreationTotalTokens > 0 {
+            cost += Double(cacheCreationTotalTokens) / perM * p.cacheWrite1h
+        }
+        return cost
+    }
+}
+
 enum CodexPricingCatalog {
     // Source: OpenAI pricing pages verified on 2026-04-14
-    static let builtinModels: [String: ModelPricing.Pricing] = [
-        "gpt-5":              ModelPricing.Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25, cacheWrite1h: 1.25, cacheRead: 0.125),
-        "gpt-5.1":            ModelPricing.Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25, cacheWrite1h: 1.25, cacheRead: 0.125),
-        "gpt-5.4":            ModelPricing.Pricing(input: 2.50, output: 15.0, cacheWrite5m: 2.50, cacheWrite1h: 2.50, cacheRead: 0.25),
-        "gpt-5.4-mini":       ModelPricing.Pricing(input: 0.75, output: 4.50, cacheWrite5m: 0.75, cacheWrite1h: 0.75, cacheRead: 0.075),
-        "gpt-5-codex":        ModelPricing.Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25, cacheWrite1h: 1.25, cacheRead: 0.125),
-        "gpt-5.1-codex":      ModelPricing.Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25, cacheWrite1h: 1.25, cacheRead: 0.125),
-        "gpt-5.1-codex-max":  ModelPricing.Pricing(input: 1.25, output: 10.0, cacheWrite5m: 1.25, cacheWrite1h: 1.25, cacheRead: 0.125),
-        "gpt-5.1-codex-mini": ModelPricing.Pricing(input: 0.25, output: 2.0, cacheWrite5m: 0.25, cacheWrite1h: 0.25, cacheRead: 0.025),
-        "gpt-5.2-codex":      ModelPricing.Pricing(input: 1.75, output: 14.0, cacheWrite5m: 1.75, cacheWrite1h: 1.75, cacheRead: 0.175),
-        "gpt-5.3-codex":      ModelPricing.Pricing(input: 1.75, output: 14.0, cacheWrite5m: 1.75, cacheWrite1h: 1.75, cacheRead: 0.175),
+    static let builtinModels: [String: ModelPricingRates] = [
+        "gpt-5":              ModelPricingRates(input: 1.25, output: 10.0, cacheWrite5m: 1.25, cacheWrite1h: 1.25, cacheRead: 0.125),
+        "gpt-5.1":            ModelPricingRates(input: 1.25, output: 10.0, cacheWrite5m: 1.25, cacheWrite1h: 1.25, cacheRead: 0.125),
+        "gpt-5.4":            ModelPricingRates(input: 2.50, output: 15.0, cacheWrite5m: 2.50, cacheWrite1h: 2.50, cacheRead: 0.25),
+        "gpt-5.4-mini":       ModelPricingRates(input: 0.75, output: 4.50, cacheWrite5m: 0.75, cacheWrite1h: 0.75, cacheRead: 0.075),
+        "gpt-5-codex":        ModelPricingRates(input: 1.25, output: 10.0, cacheWrite5m: 1.25, cacheWrite1h: 1.25, cacheRead: 0.125),
+        "gpt-5.1-codex":      ModelPricingRates(input: 1.25, output: 10.0, cacheWrite5m: 1.25, cacheWrite1h: 1.25, cacheRead: 0.125),
+        "gpt-5.1-codex-max":  ModelPricingRates(input: 1.25, output: 10.0, cacheWrite5m: 1.25, cacheWrite1h: 1.25, cacheRead: 0.125),
+        "gpt-5.1-codex-mini": ModelPricingRates(input: 0.25, output: 2.0, cacheWrite5m: 0.25, cacheWrite1h: 0.25, cacheRead: 0.025),
+        "gpt-5.2-codex":      ModelPricingRates(input: 1.75, output: 14.0, cacheWrite5m: 1.75, cacheWrite1h: 1.75, cacheRead: 0.175),
+        "gpt-5.3-codex":      ModelPricingRates(input: 1.75, output: 14.0, cacheWrite5m: 1.75, cacheWrite1h: 1.75, cacheRead: 0.175),
     ]
 }

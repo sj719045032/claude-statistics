@@ -74,7 +74,7 @@ final class CodexSessionScanner {
             sessions.append(Session(
                 id: id,
                 externalID: id,
-                provider: ProviderKind.codex.rawValue,
+                provider: "codex",
                 projectPath: projectPath,
                 filePath: filePath,
                 startTime: startTime,

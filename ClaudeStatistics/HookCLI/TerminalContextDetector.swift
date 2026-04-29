@@ -16,15 +16,9 @@ func canonicalTerminalName(_ terminalName: String?) -> String? {
     return terminalName
 }
 
-func terminalContextForCodex(event: String, terminalName: String?, cwd: String?) -> TerminalContext {
-    terminalContext(
-        event: event,
-        terminalName: terminalName,
-        cwd: cwd,
-        ghosttyFrontmostEvents: ["SessionStart", "UserPromptSubmit"],
-        ghosttyFallbackMode: .uniqueDirectoryMatch
-    )
-}
+// `terminalContextForCodex` removed — Codex's normalizer lives in
+// `Plugins/Sources/CodexPlugin/` and reaches the same logic through
+// `HookHelperContext.detectTerminalContext`.
 
 func terminalContextForClaude(event: String, terminalName: String?, cwd: String?) -> TerminalContext {
     terminalContext(
