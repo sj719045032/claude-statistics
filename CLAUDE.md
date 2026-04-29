@@ -209,6 +209,48 @@ without any extra hosting.
   reflects only the current release's bundles. The directory is
   gitignored.
 
+### Sync the marketplace catalog after release
+
+The catalog repo is **`github.com/sj719045032/claude-statistics-plugins`**
+(public). The host's `PluginCatalog.defaultRemoteURL` points at its
+`main` branch's `index.json`. Each release ships new
+`.csplugin.zip` artifacts with new SHAs — the catalog must be
+updated or users see stale `sha256Mismatch` install errors.
+
+```bash
+# After scripts/release.sh succeeds, sync the catalog (offline-safe;
+# no GitHub writes until the final push):
+bash scripts/sync-catalog.sh <version>
+# Review the diff:
+cd build/catalog-repo && git diff index.json
+# Push from sj719045032's account:
+gh auth switch --hostname github.com --user sj719045032
+git commit -am "sync catalog for v<version>"
+git push
+gh auth switch --hostname github.com --user tinystone007
+```
+
+What sync-catalog.sh does:
+1. Clones (or `git pull --rebase`s) the catalog repo into
+   `build/catalog-repo/` (gitignored).
+2. For each `build/marketplace/<Name>.sha256`, finds the matching
+   entry in `index.json` (by the plugin name embedded in
+   `downloadURL`) and rewrites `sha256`, `version`, and
+   `downloadURL`. The new download URL points at
+   `https://github.com/sj719045032/claude-statistics/releases/download/v<version>/<Name>-<version>.csplugin.zip`
+   — i.e. the host repo's release tag, where release.sh has just
+   uploaded the bundles.
+3. Bumps `updatedAt` to ISO-8601 UTC now.
+4. Prints the exact `git commit` + `git push` commands and leaves
+   the actual push to the operator (publishing to a public repo on
+   another GitHub account stays a deliberate manual step, not
+   automated).
+
+`raw.githubusercontent.com` takes ≤ 5 min to propagate after push.
+Apple Terminal is intentionally absent from the catalog (chassis
+built-in per `docs/PLUGIN_ARCHITECTURE.md` §1.1) — the script
+correctly warns "no matching entry" for its sidecar and skips.
+
 ## Deploy Website to Vercel
 
 The marketing site is deployed from the **repo root**, not from `website/`.
