@@ -15,7 +15,7 @@ Chassis 自带一组**永久内置**的 default 体验，与 SDK 协议同等地
 它们不抽 `.csplugin`，不走 marketplace —— 因为 fresh install 用户
 必须立刻可用，体验不能被"先去 marketplace 装一下"打断。
 
-**永久内置的 chassis built-ins**（不抽，不动）：
+**永久内置的 chassis built-ins**（不抽 + 不走 marketplace）：
 
 - **Claude provider** —— 应用名是 *Claude* Statistics，Claude 是
   应用核心体验，从 sync/independent 双模式状态到 ClaudeProvider
@@ -25,6 +25,13 @@ Chassis 自带一组**永久内置**的 default 体验，与 SDK 协议同等地
   自带的角色集是 share 卡片的 default 内容。
 - **内置 share themes** —— 默认主题（`SharePluginThemes`）—— 自带
   色板 / 排版 / 视觉风格是 share 卡片的 default 外观。
+- **iTerm2 / Ghostty / Apple Terminal 三个内置终端** —— macOS 用户
+  几乎都装了至少其中一个，是 chassis 默认终端体验。
+  - iTerm2 / Ghostty 直接在 host module 内（从未抽 `.csplugin`）。
+  - Apple Terminal 是 `.csplugin` 形态（commit `2000110` M2 抽离）
+    但永久 build-time bundled 进 `.app/Contents/PlugIns/`，不走
+    marketplace —— `project.yml` 里继续保留 `copy: { destination:
+    plugins }` dependency。形态不同，但 fresh-install 用户都开机就有。
 
 **但 SDK 协议永久 open for extension**：`ProviderPlugin` /
 `TerminalPlugin` / `ShareRolePlugin` / `ShareCardThemePlugin` 等
@@ -33,11 +40,11 @@ Chassis 自带一组**永久内置**的 default 体验，与 SDK 协议同等地
 内置 ≠ 闭门 —— chassis built-ins 占住 default 卡位，但 SDK 仍是
 "挖坑位，不挖关系"。
 
-**这条原则的判定**：要不要把某个 X 抽成 `.csplugin`？追问"X 是不是
-fresh install 用户立刻看到、没了它应用就空"。是 → 留 chassis
-built-in；否 → 走 marketplace plugin。Gemini / Codex / VSCode /
-Warp 这些——用户没装也能用 Claude，所以走 marketplace；新增的第三方
-share theme/role 也走 plugin。
+**这条原则的判定**：要不要把某个 X 抽成 marketplace plugin（不在
+`.app` 内 ship）？追问"X 是不是 fresh install 用户立刻看到、没了它
+应用就空"。是 → 留 chassis built-in；否 → 走 marketplace plugin。
+Gemini / Codex / VSCode / Warp 这些——用户没装也能用 Claude，所以
+走 marketplace；新增的第三方 share theme/role 也走 plugin。
 
 ## 2. 边界划分
 
