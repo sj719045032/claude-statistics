@@ -191,18 +191,17 @@ echo ""
 echo "==> appcast.xml updated with v${VERSION}"
 echo ""
 
-# Build the gh release upload file list. Marketplace .csplugin.zip
-# files are added so a single GitHub release v<version> carries both
-# the app delta updates and every plugin's installable bundle.
+# Build the gh release upload file list for the host app release on
+# the main repo (claude-statistics). Plugin .csplugin.zip files are
+# NOT included — they ship through their own release on the catalog
+# repo (claude-statistics-plugins) so the catalog can host both the
+# metadata and the bytes. release.sh creates that second release;
+# build-dmg's job is just to produce the artifacts.
 UPLOAD_ARGS="${DMG_OUTPUT} ${ZIP_OUTPUT}"
 while IFS= read -r d; do
   [ -z "$d" ] && continue
   UPLOAD_ARGS="${UPLOAD_ARGS} \"${d}\""
 done <<<"${NEW_DELTAS}"
-for plugin_zip in "${MARKETPLACE_DIR}"/*.csplugin.zip; do
-  [ -f "${plugin_zip}" ] || continue
-  UPLOAD_ARGS="${UPLOAD_ARGS} \"${plugin_zip}\""
-done
 
 echo "Next steps:"
 echo "  1. git add appcast.xml && git commit && git push"

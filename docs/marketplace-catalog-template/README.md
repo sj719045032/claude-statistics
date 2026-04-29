@@ -21,13 +21,16 @@ SHA-256 in the same entry. We use that flexibility as follows:
   marketplace — Gemini / Codex providers, Claude.app / Codex.app
   chat-app, Alacritty / Kitty / Warp / WezTerm terminals, VSCode /
   Cursor / Windsurf / Trae / Zed editors): every `.csplugin.zip` is
-  uploaded as a release asset on the **host repo's** GitHub Releases
-  by `scripts/release.sh` (no separate hosting). The `downloadURL`
-  for each entry points at
-  `https://github.com/sj719045032/claude-statistics/releases/download/v<version>/<Plugin>-<version>.csplugin.zip`.
-  Apple Terminal is intentionally absent — it stays bundled inside
-  the host `.app` per `PLUGIN_ARCHITECTURE.md` §1.1, never via this
-  catalog.
+  uploaded as a release asset on **this catalog repo's** GitHub
+  Releases under a tag matching the host app version (e.g. `v3.2.0`).
+  The host's `scripts/release.sh` step 3b creates that release on
+  this repo while step 3a creates the host app's own release on
+  `claude-statistics`. The `downloadURL` for each entry in
+  `index.json` points at
+  `https://github.com/sj719045032/claude-statistics-plugins/releases/download/v<version>/<Plugin>-<version>.csplugin.zip`
+  — same repo as the catalog, no separate hosting. Apple Terminal is
+  intentionally absent — it stays bundled inside the host `.app` per
+  `PLUGIN_ARCHITECTURE.md` §1.1, never via this catalog.
 - **Third-party plugins**: authors upload their `.csplugin.zip` to a
   release on **their own** GitHub repo, then open a PR adding an
   entry to `index.json` whose `downloadURL` points at their release.

@@ -15,9 +15,10 @@ set -euo pipefail
 #      matching entry in `index.json` (by the plugin name embedded in
 #      `downloadURL`) and rewrites its `sha256`, `version`, and
 #      `downloadURL`. The download URL is repinned to
-#      `https://github.com/sj719045032/claude-statistics/releases/download/v<version>/<Name>-<version>.csplugin.zip`
-#      — i.e. the host repo's release tag, where `release.sh` already
-#      uploads the bundles.
+#      `https://github.com/sj719045032/claude-statistics-plugins/releases/download/v<version>/<Name>-<version>.csplugin.zip`
+#      — i.e. the **catalog repo's** v<version> release tag, which
+#      release.sh's step 3b creates and populates with the plugin
+#      bundles.
 #   3. Bumps `updatedAt` to the current ISO-8601 UTC timestamp.
 #   4. Prints `git diff` and the exact `git commit` + `git push` the
 #      operator needs to run from `sj719045032`'s account. The push
@@ -80,8 +81,11 @@ fi
 
 # Step 2: replace each entry whose downloadURL contains the plugin
 # name. We match `<Name>-` so e.g. "CodexPlugin-" doesn't accidentally
-# match "CodexAppPlugin-" (the latter has "App" between).
-DOWNLOAD_URL_PREFIX="https://github.com/sj719045032/claude-statistics/releases/download/v${VERSION}"
+# match "CodexAppPlugin-" (the latter has "App" between). The new
+# downloadURL points at the **catalog repo's** v<version> release
+# (release.sh creates it in step 3b) — the catalog owns both the
+# metadata and the bytes.
+DOWNLOAD_URL_PREFIX="https://github.com/sj719045032/claude-statistics-plugins/releases/download/v${VERSION}"
 TOUCHED_COUNT=0
 TMPFILE="$(mktemp)"
 cp "${INDEX_JSON}" "${TMPFILE}"

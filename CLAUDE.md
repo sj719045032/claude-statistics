@@ -189,16 +189,18 @@ match exists.
 
 ### Marketplace plugin artifacts
 
-`build-dmg.sh` also packs every `.csplugin` produced by the Release
-build into `build/marketplace/<Name>.csplugin.zip` (plus a sidecar
+`build-dmg.sh` packs every `.csplugin` produced by the Release build
+into `build/marketplace/<Name>.csplugin.zip` (plus a sidecar
 `.sha256`) by calling `scripts/pack-csplugin.sh <Name> <products-dir>`
-in a loop. `release.sh` adds those zips to the `gh release create`
-upload list, so a single `v<version>` GitHub release carries the
-`.dmg` / `.zip` / Sparkle deltas **and** every plugin's installable
-bundle in one place. The catalog `index.json` then points
-`downloadURL` at
-`https://github.com/sj719045032/claude-statistics/releases/download/v<version>/<Plugin>.csplugin.zip`
-without any extra hosting.
+in a loop. The host app release on the main repo
+(`claude-statistics`) only contains the host artifacts (DMG / ZIP /
+Sparkle deltas). The plugin bundles ship through their **own**
+`v<version>` GitHub release on the catalog repo
+(`claude-statistics-plugins`) — the catalog repo owns both the
+`index.json` metadata and the `.csplugin.zip` bytes, so
+`PluginCatalogEntry.downloadURL` points right back at the same repo
+that served the catalog. `release.sh` creates both releases in the
+same run (step 3a host, step 3b catalog).
 
 - Manual pack (Debug build): `bash scripts/pack-csplugin.sh CodexPlugin`
   finds the bundle under `/tmp/claude-stats-build/Build/Products/{Debug,Release}/`.
@@ -237,9 +239,9 @@ What sync-catalog.sh does:
    entry in `index.json` (by the plugin name embedded in
    `downloadURL`) and rewrites `sha256`, `version`, and
    `downloadURL`. The new download URL points at
-   `https://github.com/sj719045032/claude-statistics/releases/download/v<version>/<Name>-<version>.csplugin.zip`
-   — i.e. the host repo's release tag, where release.sh has just
-   uploaded the bundles.
+   `https://github.com/sj719045032/claude-statistics-plugins/releases/download/v<version>/<Name>-<version>.csplugin.zip`
+   — i.e. the catalog repo's own v<version> release tag, which
+   release.sh's step 3b just populated.
 3. Bumps `updatedAt` to ISO-8601 UTC now.
 4. Prints the exact `git commit` + `git push` commands and leaves
    the actual push to the operator (publishing to a public repo on
