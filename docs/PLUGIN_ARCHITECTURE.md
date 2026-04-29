@@ -94,8 +94,8 @@ public final class CodexPlugin: ProviderPlugin, ProviderAccountUIProviding {
 
 **已落实**：
 - 5 个 terminal plugin 抽 `.csplugin`（Warp / Alacritty / AppleTerminal / Kitty / WezTerm），iTerm2 + Ghostty 留 builtin。
-- **Gemini provider 抽 `.csplugin`** 真正自包含（包括 hook normalizer）：plugin 通过 SDK `ProviderAccountUIProviding` 填账户卡片坑位；通过 SDK `ProviderHookNormalizing` 实现 hook 路径 normalize（HookCLI 在 main-binary CLI 模式直接加载 `Contents/PlugIns/` 内的 plugin，不再需要 host-side glue）；通过 `TerminalDispatch` 发起 terminal launch。Host **不再持有任何 Gemini-specific class / file**。唯一残留的小重复是 `ProviderDescriptor.gemini.resolveToolAlias` 内联的 alias 字典（host-UI 路径 transcript-replay / debug-rebuild 在 PluginRegistry-aware 之前需要），文档明示 plugin 的 `GeminiToolNames` 是 canonical。
-- 通用能力上 SDK：`DiagnosticLogger` / `FSEventsWatcher` / `AppRuntimePaths` / `TerminalDispatch` / `TerminalProcessRunner` / `HookInstaller` 工具集 / `UsageError` / `UsageCacheFile` / `PricingFetchError` / `ToolOutputCleaning` / **hook chassis**（`HookActionEnvelope` / `HookTerminalContext` / `HookHelperContext` / `ProviderHookNormalizing` 协议 + `HookPayloadNormalizer` payload helpers）。
+- **Gemini provider 抽 `.csplugin`** 真正自包含（包括 hook normalizer + descriptor + alias 表）：plugin 通过 SDK `ProviderAccountUIProviding` 填账户卡片坑位；通过 SDK `ProviderHookNormalizing` 实现 hook 路径 normalize（HookCLI 在 main-binary CLI 模式直接加载 `Contents/PlugIns/` 内的 plugin）；通过 `TerminalDispatch` 发起 terminal launch；通过 `PluginDescriptorStore` + `PluginToolAliasStore` 把 descriptor metadata + tool alias 表 push 给 host fallback。**Host 端零 Gemini-specific class / static / file / glue function。** 仅剩两处 surface：（1）`ProviderRegistry.supportedProviders` 列表里的 `.gemini` builtin id —— 是 host 知道 builtin plugin id 的注册信息，非 glue；（2）`Localizable.strings` 中的 Gemini 显示文案 —— host UI 容器层，等 SDK plugin localization 体系落地再迁移。
+- 通用能力上 SDK：`DiagnosticLogger` / `FSEventsWatcher` / `AppRuntimePaths` / `TerminalDispatch` / `TerminalProcessRunner` / `HookInstaller` 工具集 / `UsageError` / `UsageCacheFile` / `PricingFetchError` / `ToolOutputCleaning` / **hook chassis**（`HookActionEnvelope` / `HookTerminalContext` / `HookHelperContext` / `ProviderHookNormalizing` 协议 + `HookPayloadNormalizer` payload helpers）/ **plugin metadata stores**（`PluginDescriptorStore` / `PluginToolAliasStore`，让 plugin 在 init 时把 descriptor + alias 表 push 给 host fallback）。
 - Marketplace 代码完整（`PluginCatalog` / `PluginInstaller` / `PluginUninstaller` / `PluginDiscoverView`）+ Phase 3 文档（`docs/marketplace-catalog-template/` + `docs/PLUGIN_PACKAGING.md`）。
 - 多个 capability 协议化（`TerminalFocusStrategy` / `TerminalAppleScriptFocusing` / `TerminalFrontmostSessionProbing` / `ShareRolePlugin` 等）。
 
@@ -119,22 +119,21 @@ public final class CodexPlugin: ProviderPlugin, ProviderAccountUIProviding {
 - `UsageError` / `UsageCacheFile` / `PricingFetchError` 上 SDK（每个 provider 的 usage / pricing service 都用同一组错误码 + 缓存文件 schema）。
 - `ToolOutputCleaning` 上 SDK，public 化（transcript parser 普遍依赖）。
 - **Hook chassis**：`ProviderHookNormalizing` 协议（plugin 实现 `normalize(payload:helper:) -> HookActionEnvelope?`）+ `HookHelperContext` 协议（host 暴露 `baseMessage` / `resolvedHookCWD` / `canonicalTerminalName` / `detectTerminalContext`）+ `HookPayloadNormalizer` payload helpers（`stringValue` / `firstText` / `toolNameValue` / `toolResponseText` / `normalizedToolUseId` / `set` / `nonEmpty`）。HookCLI 在 main-binary CLI 模式通过 `Bundle.main.builtInPlugInsURL` 加载 plugin → 在 PluginRegistry 找 `ProviderHookNormalizing` 实现 → call。Plugin 自包含，host 不再为单个 provider 写 hook glue。
+- **Plugin metadata stores**：`PluginDescriptorStore` 让 plugin 在 `init()` 把自己的完整 `ProviderDescriptor` 注入，host 的 `ProviderKind.descriptor` switch fallback 通过它解析非 Claude / Codex 的 id；`PluginToolAliasStore` 让 plugin push 自己的 raw → canonical alias 表，host 的 descriptor closure 通过它做 alias resolution。两个 store 都是 thread-safe + idempotent，让 plugin 与 host 数据**唯一存在 plugin 一侧**，host 无重复。
 
 **Gemini 抽离时刻意选的简化**（评估一致性后决定不上 SDK）：
 - plugin 内 `GeminiAccountSwitcherAccessory` inline 简化版 popover view，没用 host 的
   `AccountSwitcherAccessory<Account>` 通用组件。后者依赖 `DestructiveIconButton` →
   `SkipConfirmKeyMonitor` 链路（6+ host 调用点），整链上 SDK 是大改；账号切换是低频
   操作，缺 skip-confirm modifier 不影响主流程。
-- `ProviderDescriptor.gemini.resolveToolAlias` 内联一份小 alias 字典（与 plugin
-  `GeminiToolNames` 同步）。原因：host UI 路径
-  （`ToolActivityFormatter.canonicalToolName(_:)` 等 transcript-replay /
-  debug-rebuild 入口）目前不是 PluginRegistry-aware，没法走 plugin 端的
-  alias 表。CLI hook 路径已经完全走 plugin，这份 host 副本不再用于 hook
-  normalize。下一步是把 host UI 路径改造为通过 `PluginRegistry` 查 plugin
-  alias，然后这一份 closure 内联可以删掉。
 - `ModelPricing.estimateCost` 没上 SDK。plugin 内 `GeminiTranscriptParser.estimatedCost`
   直接对 `GeminiPricingCatalog.builtinModels` 字典做内联计算，host 端
   `SessionStats+Pricing` 后续会基于 live `ModelPricing` 重算覆盖。
+- Localization strings（`settings.geminiAccounts.*` / `statusLine.gemini.*` /
+  `pricing.source.gemini` / `notch.settings.provider.gemini` 等）暂留 host
+  `Localizable.strings`。plugin 内 status-line installer 等仍引用这些 keys；
+  彻底搬走需要 SDK 加 plugin-bundled localization 体系（plugin 自带 .lproj
+  + 通过 plugin bundle 查找），这是单独工程。
 
 下面是抽离 Codex 时仍然适用的 checklist。所有 prep 已 ready，剩下是「拆 host 编译时引用 + 搬代码」的机械工作，但要在**一个或两个原子 commit** 内完成（half-state 不 build）。
 
