@@ -67,7 +67,6 @@
 		28B30EDA1771A39B023BCAC7 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = B63838C3755C7D084DD73D95 /* Session.swift */; };
 		28BC2444287AB7D7A32B68A3 /* TerminalReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD9EAD578F58BF668BBBFC13 /* TerminalReadiness.swift */; };
 		2D03585C91016BBA7C5E390C /* SessionStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 563283ED216FE68D0E3B11EA /* SessionStats.swift */; };
-		2DA0A639E1B1C0A1F83FF6D2 /* CodexPlugin.bundle in Resources */ = {isa = PBXBuildFile; fileRef = EED1B00CE0B6B4CAFDC621E3 /* CodexPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		2EB570758BE9F11F6E15AE78 /* TerminalSetupCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 808F166AA1B5F781858856E1 /* TerminalSetupCoordinator.swift */; };
 		2F83F61733323C3D00215158 /* SkipConfirmKeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D09F01402459E00EA228AF6 /* SkipConfirmKeyMonitor.swift */; };
 		3054AF8F8A6177EDB151996F /* PluginBackedTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4705840BAD2350953636CF55 /* PluginBackedTerminalCapability.swift */; };
@@ -2378,7 +2377,6 @@
 			files = (
 				D06D7B513EFFD60742C93431 /* Assets.xcassets in Resources */,
 				AC5082113B4136915E426299 /* Localizable.strings in Resources */,
-				2DA0A639E1B1C0A1F83FF6D2 /* CodexPlugin.bundle in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

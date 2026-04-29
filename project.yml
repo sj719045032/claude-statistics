@@ -623,9 +623,16 @@ targets:
           destination: plugins
           subpath: ""
       # CodexPlugin: pilot for marketplace-only delivery. Built as a
-      # standalone target but NOT copied into the .app — users install
-      # it through Settings → Plugins → Discover.
+      # standalone target so dev / packaging scripts can find the
+      # `.csplugin` under Build/Products/, but NOT embedded into the
+      # `.app` — users install it through Settings → Plugins →
+      # Discover. `embed: false` keeps the bundle out of every embed /
+      # resources build phase; without it XcodeGen falls back to
+      # adding cfbundle dependencies to Resources, which would
+      # smuggle the .csplugin into Contents/Resources/.
       - target: CodexPlugin
+        embed: false
+        link: false
       - package: Sparkle
       - package: MarkdownView
         product: MarkdownView
