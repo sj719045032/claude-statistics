@@ -187,6 +187,28 @@ match exists.
 - Measured: 12 MB → few KB for no-code-change diff; real point releases
   typically land at single-digit MB deltas.
 
+### Marketplace plugin artifacts
+
+`build-dmg.sh` also packs every `.csplugin` produced by the Release
+build into `build/marketplace/<Name>.csplugin.zip` (plus a sidecar
+`.sha256`) by calling `scripts/pack-csplugin.sh <Name> <products-dir>`
+in a loop. `release.sh` adds those zips to the `gh release create`
+upload list, so a single `v<version>` GitHub release carries the
+`.dmg` / `.zip` / Sparkle deltas **and** every plugin's installable
+bundle in one place. The catalog `index.json` then points
+`downloadURL` at
+`https://github.com/sj719045032/claude-statistics/releases/download/v<version>/<Plugin>.csplugin.zip`
+without any extra hosting.
+
+- Manual pack (Debug build): `bash scripts/pack-csplugin.sh CodexPlugin`
+  finds the bundle under `/tmp/claude-stats-build/Build/Products/{Debug,Release}/`.
+- Pack from a custom build dir (release pipeline does this): pass the
+  Products directory as the second argument:
+  `bash scripts/pack-csplugin.sh CodexPlugin build/release/Build/Products/Release`.
+- `build/marketplace/` is wiped before each pack run so the upload set
+  reflects only the current release's bundles. The directory is
+  gitignored.
+
 ## Deploy Website to Vercel
 
 The marketing site is deployed from the **repo root**, not from `website/`.

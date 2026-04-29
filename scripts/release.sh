@@ -117,7 +117,18 @@ find "$ARCHIVE_DIR" -maxdepth 1 -name "*.delta" 2>/dev/null | sort > "$AFTER_DEL
 mapfile -t NEW_DELTAS < <(comm -13 "$BEFORE_DELTAS" "$AFTER_DELTAS")
 rm -f "$BEFORE_DELTAS" "$AFTER_DELTAS"
 
-ASSET_LIST=("$DMG" "$ZIP" "${NEW_DELTAS[@]+"${NEW_DELTAS[@]}"}")
+# Marketplace plugin bundles produced by build-dmg.sh's pack step.
+# Uploading them to the same GitHub release means the catalog's
+# `downloadURL` can point at https://…/v${VERSION}/<Plugin>.csplugin.zip
+# without any extra hosting.
+mapfile -t PLUGIN_ARTIFACTS < <(find build/marketplace -maxdepth 1 -name "*.csplugin.zip" 2>/dev/null | sort)
+
+ASSET_LIST=(
+    "$DMG"
+    "$ZIP"
+    "${NEW_DELTAS[@]+"${NEW_DELTAS[@]}"}"
+    "${PLUGIN_ARTIFACTS[@]+"${PLUGIN_ARTIFACTS[@]}"}"
+)
 
 echo ""
 echo "    Assets to upload:"

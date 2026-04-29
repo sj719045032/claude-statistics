@@ -6,19 +6,26 @@ set -euo pipefail
 # sidecar `<name>.sha256` to `build/marketplace/`.
 #
 # Usage:
-#   bash scripts/pack-csplugin.sh CodexPlugin
+#   bash scripts/pack-csplugin.sh <PluginName>
+#   bash scripts/pack-csplugin.sh <PluginName> <build-products-dir>
 #
-# Prereq: a Debug or Release build has produced
-#   /tmp/claude-stats-build/Build/Products/<config>/<name>.csplugin/
-# (run `bash scripts/run-debug.sh` once before invoking this script).
+# With one argument, looks under
+#   /tmp/claude-stats-build/Build/Products/{Debug,Release}/
+# (the path `scripts/run-debug.sh` writes to). The release-pipeline
+# variant passes the second argument so `scripts/build-dmg.sh` can
+# point at its own `build/release/Build/Products/Release/` instead of
+# requiring a debug build to exist on disk.
+#
+# Prereq: the chosen build dir contains `<PluginName>.csplugin/` —
+# every standalone plugin target lands its bundle there.
 
 if [ "$#" -lt 1 ]; then
-    echo "Usage: $0 <PluginName>" >&2
+    echo "Usage: $0 <PluginName> [build-products-dir]" >&2
     exit 2
 fi
 
 PLUGIN_NAME="$1"
-BUILD_DIR="/tmp/claude-stats-build"
+SOURCE_OVERRIDE="${2:-}"
 
 # Resolve repo-relative output dir to an absolute path so the
 # subshell `cd` below doesn't confuse it.
@@ -27,21 +34,32 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 OUTPUT_DIR="${REPO_ROOT}/build/marketplace"
 mkdir -p "${OUTPUT_DIR}"
 
-# Look for the .csplugin in Debug first, then Release. xcodegen builds
-# each standalone target into its configuration's Products directory.
 SOURCE_BUNDLE=""
-for config in Debug Release; do
-    candidate="${BUILD_DIR}/Build/Products/${config}/${PLUGIN_NAME}.csplugin"
+if [ -n "${SOURCE_OVERRIDE}" ]; then
+    candidate="${SOURCE_OVERRIDE}/${PLUGIN_NAME}.csplugin"
     if [ -d "${candidate}" ]; then
         SOURCE_BUNDLE="${candidate}"
-        break
+    else
+        echo "==> ${PLUGIN_NAME}.csplugin not found at ${candidate}" >&2
+        exit 3
     fi
-done
+else
+    BUILD_DIR="/tmp/claude-stats-build"
+    # Look for the .csplugin in Debug first, then Release. xcodegen builds
+    # each standalone target into its configuration's Products directory.
+    for config in Debug Release; do
+        candidate="${BUILD_DIR}/Build/Products/${config}/${PLUGIN_NAME}.csplugin"
+        if [ -d "${candidate}" ]; then
+            SOURCE_BUNDLE="${candidate}"
+            break
+        fi
+    done
 
-if [ -z "${SOURCE_BUNDLE}" ]; then
-    echo "==> ${PLUGIN_NAME}.csplugin not found under ${BUILD_DIR}/Build/Products/{Debug,Release}/" >&2
-    echo "    Run \`bash scripts/run-debug.sh\` first to produce the bundle." >&2
-    exit 3
+    if [ -z "${SOURCE_BUNDLE}" ]; then
+        echo "==> ${PLUGIN_NAME}.csplugin not found under ${BUILD_DIR}/Build/Products/{Debug,Release}/" >&2
+        echo "    Run \`bash scripts/run-debug.sh\` first to produce the bundle." >&2
+        exit 3
+    fi
 fi
 
 ZIP_PATH="${OUTPUT_DIR}/${PLUGIN_NAME}.csplugin.zip"

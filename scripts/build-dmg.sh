@@ -76,6 +76,26 @@ cd "${BUILD_DIR}/Build/Products/Release"
 ditto -c -k --keepParent "${APP_NAME}.app" "${OLDPWD}/${ZIP_OUTPUT}"
 cd "${OLDPWD}"
 
+# Pack every standalone .csplugin produced by this Release build into
+# `build/marketplace/<Name>.csplugin.zip` + sidecar `<Name>.sha256`.
+# These are the artifacts the marketplace catalog points at — they
+# need to be uploaded to the same GitHub release so users can install
+# plugins from Settings → Plugins → Discover. Wiping the dir first
+# keeps stale zips from previous releases out of the upload list.
+echo "==> Packing .csplugin marketplace artifacts..."
+MARKETPLACE_DIR="build/marketplace"
+mkdir -p "${MARKETPLACE_DIR}"
+rm -f "${MARKETPLACE_DIR}"/*.csplugin.zip "${MARKETPLACE_DIR}"/*.sha256
+RELEASE_PRODUCTS="${BUILD_DIR}/Build/Products/Release"
+PACKED_COUNT=0
+for csplugin in "${RELEASE_PRODUCTS}"/*.csplugin; do
+    [ -d "${csplugin}" ] || continue
+    name="$(basename "${csplugin}" .csplugin)"
+    bash scripts/pack-csplugin.sh "${name}" "${RELEASE_PRODUCTS}" >/dev/null
+    PACKED_COUNT=$((PACKED_COUNT + 1))
+done
+echo "    Packed ${PACKED_COUNT} .csplugin bundles → ${MARKETPLACE_DIR}/"
+
 # Clean up intermediate build to avoid duplicate app registrations
 rm -rf "${BUILD_DIR}"
 
@@ -163,17 +183,26 @@ if [ "${DELTA_COUNT}" -gt 0 ]; then
 else
   echo "    Deltas: none (archive had no prior versions to diff against)"
 fi
+if [ "${PACKED_COUNT}" -gt 0 ]; then
+  echo "    Plugins: ${PACKED_COUNT} .csplugin.zip in ${MARKETPLACE_DIR}/ — marketplace artifacts"
+fi
 
 echo ""
 echo "==> appcast.xml updated with v${VERSION}"
 echo ""
 
-# Build the gh release upload file list.
+# Build the gh release upload file list. Marketplace .csplugin.zip
+# files are added so a single GitHub release v<version> carries both
+# the app delta updates and every plugin's installable bundle.
 UPLOAD_ARGS="${DMG_OUTPUT} ${ZIP_OUTPUT}"
 while IFS= read -r d; do
   [ -z "$d" ] && continue
   UPLOAD_ARGS="${UPLOAD_ARGS} \"${d}\""
 done <<<"${NEW_DELTAS}"
+for plugin_zip in "${MARKETPLACE_DIR}"/*.csplugin.zip; do
+  [ -f "${plugin_zip}" ] || continue
+  UPLOAD_ARGS="${UPLOAD_ARGS} \"${plugin_zip}\""
+done
 
 echo "Next steps:"
 echo "  1. git add appcast.xml && git commit && git push"
