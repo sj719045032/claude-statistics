@@ -50,20 +50,3 @@ final class CodexPluginDogfood: NSObject, ProviderPlugin {
     override init() { super.init() }
 }
 
-@objc(GeminiPluginDogfood)
-final class GeminiPluginDogfood: NSObject, ProviderPlugin {
-    static let manifest = PluginManifest(
-        id: "com.google.gemini",
-        kind: .provider,
-        displayName: "Gemini",
-        version: SemVer(major: 1, minor: 0, patch: 0),
-        minHostAPIVersion: SDKInfo.apiVersion,
-        permissions: [.filesystemHome, .network],
-        principalClass: "GeminiPluginDogfood",
-        iconAsset: "GeminiProviderIcon",
-        category: PluginCatalogCategory.vendor
-    )
-    var descriptor: ProviderDescriptor { .gemini }
-    func makeProvider() -> (any BundledSessionProvider)? { GeminiProvider.shared }
-    override init() { super.init() }
-}

@@ -94,12 +94,13 @@ public final class CodexPlugin: ProviderPlugin, ProviderAccountUIProviding {
 
 **已落实**：
 - 5 个 terminal plugin 抽 `.csplugin`（Warp / Alacritty / AppleTerminal / Kitty / WezTerm），iTerm2 + Ghostty 留 builtin。
-- 通用能力上 SDK：`DiagnosticLogger` / `FSEventsWatcher` / `AppRuntimePaths`。
+- **Gemini provider 抽 `.csplugin`**（本节 §7 路线图执行完毕）：plugin 自包含 + 自持 `GeminiAccountManager`，通过 SDK `ProviderAccountUIProviding` 填账户卡片坑位；hook normalizer 留主二进制（`HookCLI/HookCLIGeminiBuilder.swift`），SDK 加 `TerminalDispatch` 让 plugin 发起 launch。
+- 通用能力上 SDK：`DiagnosticLogger` / `FSEventsWatcher` / `AppRuntimePaths` / `TerminalDispatch` / `TerminalProcessRunner` / `HookInstaller` 工具集 / `UsageError` / `UsageCacheFile` / `PricingFetchError` / `ToolOutputCleaning`。
 - Marketplace 代码完整（`PluginCatalog` / `PluginInstaller` / `PluginUninstaller` / `PluginDiscoverView`）+ Phase 3 文档（`docs/marketplace-catalog-template/` + `docs/PLUGIN_PACKAGING.md`）。
 - 多个 capability 协议化（`TerminalFocusStrategy` / `TerminalAppleScriptFocusing` / `TerminalFrontmostSessionProbing` / `ShareRolePlugin` 等）。
 
 **进行中**（按本架构原则）：
-- Codex / Gemini provider 抽 `.csplugin`：先 SDK 加 `ProviderAccountUIProviding` 坑位，删除 host 端 `<X>ProviderAccountCardSupplement.swift`，再抽 plugin。
+- Codex provider 抽 `.csplugin`：模板已经被 Gemini 抽离过程跑通，参考 §7.1 + 已上 SDK 的工具集，按 §7.2 落地。
 
 **未来**：
 - 任何 provider / terminal / share role / share theme plugin 抽离都遵循本文。
@@ -107,7 +108,30 @@ public final class CodexPlugin: ProviderPlugin, ProviderAccountUIProviding {
 
 ## 7. Codex / Gemini Provider 抽 .csplugin 路线图
 
-下次 session 起点。所有 prep 已 ready，剩下是「拆 host 编译时引用 + 搬代码」的机械工作，但要在**一个或两个原子 commit** 内完成（half-state 不 build）。
+> 本节最初是「下次 session 起点」。Gemini 已按 §7.1 模板落地（commit 见 git log
+> 2026-04-29 `refactor: extract GeminiPlugin into standalone .csplugin`），
+> 这里保留作为 Codex 抽离时的对照模板 + 抽离过程中**实际踩到的额外坑**记录。
+
+**Gemini 抽离时实际触发的 SDK 扩展**（Codex 抽离时同样会需要）：
+- `TerminalDispatch`：plugin 内 `SessionLauncher` 想 launch terminal，但不能 import 主程序的 `TerminalRegistry`。host startup 注入 dispatcher，plugin 调 SDK 全局 dispatch。
+- `HookInstaller.swift`（`FileSnapshot` / `HookInstallerUtils` / `HookError`）整文件搬 SDK，public 化。原本只在 host 内 internal，但每个 provider plugin 的 `HookInstalling` 实现都需要。
+- `TerminalProcessRunner` + `TerminalProcessRunResult` 上 SDK（被 `HookInstallerUtils.runCommand` 链上需要）。
+- `UsageError` / `UsageCacheFile` / `PricingFetchError` 上 SDK（每个 provider 的 usage / pricing service 都用同一组错误码 + 缓存文件 schema）。
+- `ToolOutputCleaning` 上 SDK，public 化（transcript parser 普遍依赖）。
+
+**Gemini 抽离时刻意选的简化**（评估一致性后决定不上 SDK）：
+- plugin 内 `GeminiAccountSwitcherAccessory` inline 简化版 popover view，没用 host 的
+  `AccountSwitcherAccessory<Account>` 通用组件。后者依赖 `DestructiveIconButton` →
+  `SkipConfirmKeyMonitor` 链路（6+ host 调用点），整链上 SDK 是大改；账号切换是低频
+  操作，缺 skip-confirm modifier 不影响主流程。
+- `ProviderDescriptor.gemini` 静态 + `HostGeminiToolAliases`（host 内）保留，与 plugin 内
+  `GeminiToolNames` 重复一份。原因：HookCLI 在主二进制 CLI 模式下跑，PluginRegistry
+  不可用，alias 解析必须 host 自带一份。这是 §7.3 「少量重复不可避免」的实例化。
+- `ModelPricing.estimateCost` 没上 SDK。plugin 内 `GeminiTranscriptParser.estimatedCost`
+  直接对 `GeminiPricingCatalog.builtinModels` 字典做内联计算，host 端
+  `SessionStats+Pricing` 后续会基于 live `ModelPricing` 重算覆盖。
+
+下面是抽离 Codex 时仍然适用的 checklist。所有 prep 已 ready，剩下是「拆 host 编译时引用 + 搬代码」的机械工作，但要在**一个或两个原子 commit** 内完成（half-state 不 build）。
 
 ### 7.1 Codex 抽出 checklist
 

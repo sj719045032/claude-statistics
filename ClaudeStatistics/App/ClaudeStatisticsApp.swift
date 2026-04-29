@@ -62,14 +62,14 @@ final class AppState: ObservableObject {
     static let hostPluginFactories: [String: () -> any Plugin] = [
         ClaudePluginDogfood.manifest.id:    { ClaudePluginDogfood() },
         CodexPluginDogfood.manifest.id:     { CodexPluginDogfood() },
-        GeminiPluginDogfood.manifest.id:    { GeminiPluginDogfood() },
         ITermPlugin.manifest.id:            { ITermPlugin() },
         GhosttyPlugin.manifest.id:          { GhosttyPlugin() }
         // 5 terminals (Warp / Alacritty / AppleTerminal / Kitty /
-        // WezTerm) extracted to .csplugin (M2). Loaded via
-        // PluginLoader from Contents/PlugIns at runtime, not here.
-        // Only iTerm2 + Ghostty stay builtin (most-used; smallest
-        // user-visible disruption if extraction goes wrong).
+        // WezTerm) plus Gemini provider extracted to .csplugin
+        // (M2 / Stage 4). Loaded via PluginLoader from Contents/PlugIns
+        // at runtime, not here. Only iTerm2 + Ghostty stay builtin
+        // (most-used; smallest user-visible disruption if extraction
+        // goes wrong).
     ]
 
     let pluginRegistry: PluginRegistry = {
@@ -319,6 +319,13 @@ final class AppState: ObservableObject {
 
     init() {
         DefaultSettings.register()
+        // Wire the SDK terminal dispatcher before anything plugin-side
+        // gets a chance to call it. Plugins (e.g. GeminiPlugin's
+        // `openNewSession`) route launches through `TerminalDispatch`
+        // because they can't import the host's `TerminalRegistry`.
+        TerminalDispatch.setDispatcher { request in
+            TerminalRegistry.launch(request)
+        }
         // pluginRegistry is initialised before init body runs (stored
         // property closure), so plugin-disabled state is honoured by
         // every downstream filter on this path.

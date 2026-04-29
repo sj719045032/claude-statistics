@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 enum GhosttyInspector {
     static func focusedTerminalStableID() -> String? {

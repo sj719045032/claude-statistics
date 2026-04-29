@@ -1,23 +1,23 @@
 import Foundation
 import ClaudeStatisticsKit
 
-/// Owns the per-provider account managers. Pulled out of `AppState` so
-/// the top-level state object isn't responsible for the four manager
-/// instances and their per-kind reload routing.
+/// Owns the host-side per-provider account managers. Pulled out of
+/// `AppState` so the top-level state object isn't responsible for the
+/// manager instances and their per-kind reload routing.
 ///
-/// The hard-typed properties (`claude` / `independentClaude` / `codex`
-/// / `gemini`) stay for now because Settings accessories reach into
-/// them directly. The `reload(for:)` path, however, is plugin-aware:
-/// reload functions are stored in a `descriptor.id`-keyed dictionary
-/// so when Codex / Gemini move to `.csplugin` bundles they can register
-/// their own load hook via `registerReloader(for:_:)` without any
-/// switch in this file.
+/// The hard-typed properties (`claude` / `independentClaude` / `codex`)
+/// stay for now because Settings accessories reach into them directly.
+/// The `reload(for:)` path is plugin-aware: reload functions are stored
+/// in a `descriptor.id`-keyed dictionary so when Codex moves to a
+/// `.csplugin` bundle (and the GeminiPlugin already does) the plugin
+/// owns its own manager and skips this file entirely. A `nil` reloader
+/// for a descriptor id is treated as no-op — that's how Gemini's reload
+/// flows past here without crashing.
 @MainActor
 final class AccountManagers {
     let claude = ClaudeAccountManager()
     let independentClaude = IndependentClaudeAccountManager()
     let codex = CodexAccountManager()
-    let gemini = GeminiAccountManager()
 
     /// Per-descriptor.id reload function. Builtins seed three entries
     /// here at init time; third-party `ProviderPlugin`s register/
@@ -37,9 +37,6 @@ final class AccountManagers {
         }
         reloaders[ProviderDescriptor.codex.id] = { [weak self] in
             self?.codex.load()
-        }
-        reloaders[ProviderDescriptor.gemini.id] = { [weak self] in
-            self?.gemini.load()
         }
     }
 

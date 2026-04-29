@@ -295,7 +295,7 @@ final class GeminiAccountManager: ObservableObject {
             noticeMessage = NSLocalizedString("settings.geminiAccounts.addHint", comment: "")
             isAddingAccount = true
 
-            TerminalRegistry.launch(
+            TerminalDispatch.launch(
                 TerminalLaunchRequest(
                     executable: "gemini",
                     arguments: [],

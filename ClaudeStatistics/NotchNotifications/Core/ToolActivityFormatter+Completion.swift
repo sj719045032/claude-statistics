@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 // "Completion" family: produce a `ToolOutputSummary` from a finished tool
 // invocation (PostToolUse / PostToolUseFailure / SubagentStop). Prefers

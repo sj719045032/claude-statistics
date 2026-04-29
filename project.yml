@@ -482,6 +482,46 @@ targets:
         CODE_SIGN_STYLE: Automatic
         SWIFT_STRICT_CONCURRENCY: minimal
 
+  GeminiPlugin:
+    type: bundle
+    platform: macOS
+    sources:
+      - path: Plugins/Sources/GeminiPlugin
+    dependencies:
+      - target: ClaudeStatisticsKit
+    info:
+      path: Plugins/Sources/GeminiPlugin/Info.plist
+      properties:
+        CFBundleIdentifier: com.tinystone.GeminiPlugin
+        CFBundleName: GeminiPlugin
+        CFBundleExecutable: GeminiPlugin
+        CFBundlePackageType: BNDL
+        NSPrincipalClass: GeminiPlugin
+        CSPluginManifest:
+          id: com.google.gemini
+          kind: provider
+          displayName: Gemini
+          version: 1.0.0
+          minHostAPIVersion: 0.1.0
+          permissions:
+            - filesystemHome
+            - network
+          principalClass: GeminiPlugin
+          iconAsset: GeminiProviderIcon
+          category: vendor
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tinystone.GeminiPlugin
+        PRODUCT_NAME: GeminiPlugin
+        WRAPPER_EXTENSION: csplugin
+        MACH_O_TYPE: mh_bundle
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SKIP_INSTALL: NO
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_STRICT_CONCURRENCY: minimal
+
   ClaudeStatistics:
     type: application
     platform: macOS
@@ -535,6 +575,10 @@ targets:
           destination: plugins
           subpath: ""
       - target: WezTermPlugin
+        copy:
+          destination: plugins
+          subpath: ""
+      - target: GeminiPlugin
         copy:
           destination: plugins
           subpath: ""

@@ -241,16 +241,5 @@ final class CodexPricingFetchService: ProviderPricingFetching {
     }
 }
 
-enum PricingFetchError: LocalizedError {
-    case invalidURL
-    case httpError
-    case parseError(String)
-
-    var errorDescription: String? {
-        switch self {
-        case .invalidURL: return "Invalid pricing URL"
-        case .httpError: return "Failed to fetch pricing page"
-        case .parseError(let msg): return "Parse error: \(msg)"
-        }
-    }
-}
+// `PricingFetchError` moved to `ClaudeStatisticsKit` so plugins share
+// the same error vocabulary.

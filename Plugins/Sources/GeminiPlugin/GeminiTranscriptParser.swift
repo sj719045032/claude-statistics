@@ -454,19 +454,26 @@ final class GeminiTranscriptParser {
     }
 
     private func estimatedCost(for tokens: GeminiTokenUsage, model: String) -> Double {
-        ModelPricing.estimateCost(
-            model: model,
-            inputTokens: tokens.inputTokens,
-            outputTokens: tokens.billedOutputTokens,
-            cacheCreation5mTokens: 0,
-            cacheCreation1hTokens: 0,
-            cacheCreationTotalTokens: 0,
-            cacheReadTokens: tokens.cachedTokens
-        )
+        // Plugin-local cost estimate against `GeminiPricingCatalog.builtinModels`.
+        // Host's `SessionStats+Pricing` recomputes against the live `ModelPricing`
+        // catalog (which merges per-plugin `builtinPricingModels` plus user
+        // overrides), so this is only the seed value the parser carries until
+        // host fix-up. Returning zero would make pre-host-fixup cost columns
+        // empty in any caller that surfaces them before recompute.
+        guard let p = GeminiPricingCatalog.builtinModels[model] else { return 0 }
+        let perM = 1_000_000.0
+        return Double(tokens.inputTokens) / perM * p.input
+            + Double(tokens.billedOutputTokens) / perM * p.output
+            + Double(tokens.cachedTokens) / perM * p.cacheRead
     }
 
     private func normalizedToolName(_ toolCall: GeminiToolCall) -> String {
-        let canonical = ProviderKind.gemini.descriptor.canonicalToolName(toolCall.name)
+        let normalized = toolCall.name
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "-", with: "_")
+            .replacingOccurrences(of: " ", with: "_")
+        let canonical = GeminiToolNames.canonical(normalized) ?? normalized
         // Keep Gemini's own displayName when the alias table didn't match —
         // `displayName(for:)` would otherwise title-case an unknown key.
         if canonical.isEmpty || canonical == toolCall.name.lowercased() {

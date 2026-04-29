@@ -1,13 +1,20 @@
 import Foundation
 import ClaudeStatisticsKit
 
-final class GeminiProvider: SessionProvider, @unchecked Sendable {
+final class GeminiProvider: SessionDataProvider, UsageProvider, AccountProvider, HookProvider, SessionLauncher, @unchecked Sendable {
     static let shared = GeminiProvider()
 
-    let kind: ProviderKind = .gemini
-    var providerId: String { kind.rawValue }
-    let displayName = ProviderKind.gemini.descriptor.displayName
-    let capabilities = ProviderCapabilities.gemini
+    var providerId: String { "gemini" }
+    let displayName = "Gemini"
+    let capabilities = ProviderCapabilities(
+        supportsCost: true,
+        supportsUsage: true,
+        supportsProfile: true,
+        supportsStatusLine: true,
+        supportsExactPricing: false,
+        supportsResume: true,
+        supportsNewSession: true
+    )
     let usageSource: (any ProviderUsageSource)? = GeminiUsageService.shared
     let configDirectory = (NSHomeDirectory() as NSString).appendingPathComponent(".gemini")
     let builtinPricingModels = GeminiPricingCatalog.builtinModels
@@ -84,7 +91,7 @@ final class GeminiProvider: SessionProvider, @unchecked Sendable {
     }
 
     func openNewSession(_ session: Session) {
-        TerminalRegistry.launch(
+        TerminalDispatch.launch(
             TerminalLaunchRequest(
                 executable: "gemini",
                 arguments: [],
@@ -94,7 +101,7 @@ final class GeminiProvider: SessionProvider, @unchecked Sendable {
     }
 
     func resumeSession(_ session: Session) {
-        TerminalRegistry.launch(
+        TerminalDispatch.launch(
             TerminalLaunchRequest(
                 executable: "gemini",
                 arguments: ["resume", session.externalID],
@@ -112,7 +119,7 @@ final class GeminiProvider: SessionProvider, @unchecked Sendable {
     }
 
     func openNewSession(inDirectory path: String) {
-        TerminalRegistry.launch(
+        TerminalDispatch.launch(
             TerminalLaunchRequest(
                 executable: "gemini",
                 arguments: [],
@@ -182,19 +189,19 @@ struct GeminiStatusLineAdapter: StatusLineInstalling {
 
 enum GeminiPricingCatalog {
     // Source: Google Gemini API pricing page verified on 2026-04-14.
-    static let builtinModels: [String: ModelPricing.Pricing] = [
+    static let builtinModels: [String: ModelPricingRates] = [
         // 2.5
-        "gemini-2.5-pro":                    ModelPricing.Pricing(input: 1.25, output: 10.0, cacheWrite5m: 0.125, cacheWrite1h: 0.25, cacheRead: 0.125),
-        "gemini-2.5-flash":                  ModelPricing.Pricing(input: 0.30, output: 2.50, cacheWrite5m: 0.03, cacheWrite1h: 0.03, cacheRead: 0.03),
-        "gemini-2.5-flash-preview-09-2025":  ModelPricing.Pricing(input: 0.30, output: 2.50, cacheWrite5m: 0.03, cacheWrite1h: 0.03, cacheRead: 0.03),
-        "gemini-2.5-flash-lite":             ModelPricing.Pricing(input: 0.10, output: 0.40, cacheWrite5m: 0.01, cacheWrite1h: 0.01, cacheRead: 0.01),
-        "gemini-2.5-flash-lite-preview-09-2025": ModelPricing.Pricing(input: 0.10, output: 0.40, cacheWrite5m: 0.01, cacheWrite1h: 0.01, cacheRead: 0.01),
+        "gemini-2.5-pro":                    ModelPricingRates(input: 1.25, output: 10.0, cacheWrite5m: 0.125, cacheWrite1h: 0.25, cacheRead: 0.125),
+        "gemini-2.5-flash":                  ModelPricingRates(input: 0.30, output: 2.50, cacheWrite5m: 0.03, cacheWrite1h: 0.03, cacheRead: 0.03),
+        "gemini-2.5-flash-preview-09-2025":  ModelPricingRates(input: 0.30, output: 2.50, cacheWrite5m: 0.03, cacheWrite1h: 0.03, cacheRead: 0.03),
+        "gemini-2.5-flash-lite":             ModelPricingRates(input: 0.10, output: 0.40, cacheWrite5m: 0.01, cacheWrite1h: 0.01, cacheRead: 0.01),
+        "gemini-2.5-flash-lite-preview-09-2025": ModelPricingRates(input: 0.10, output: 0.40, cacheWrite5m: 0.01, cacheWrite1h: 0.01, cacheRead: 0.01),
         // 3.x
-        "gemini-3.1-pro-preview":            ModelPricing.Pricing(input: 2.0, output: 12.0, cacheWrite5m: 0.20, cacheWrite1h: 0.40, cacheRead: 0.20),
-        "gemini-3.1-pro-preview-customtools": ModelPricing.Pricing(input: 2.0, output: 12.0, cacheWrite5m: 0.20, cacheWrite1h: 0.40, cacheRead: 0.20),
-        "gemini-3.1-flash-lite-preview":     ModelPricing.Pricing(input: 0.25, output: 1.50, cacheWrite5m: 0.025, cacheWrite1h: 0.025, cacheRead: 0.025),
-        "gemini-3-flash-preview":            ModelPricing.Pricing(input: 0.50, output: 3.00, cacheWrite5m: 0.05, cacheWrite1h: 0.05, cacheRead: 0.05),
+        "gemini-3.1-pro-preview":            ModelPricingRates(input: 2.0, output: 12.0, cacheWrite5m: 0.20, cacheWrite1h: 0.40, cacheRead: 0.20),
+        "gemini-3.1-pro-preview-customtools": ModelPricingRates(input: 2.0, output: 12.0, cacheWrite5m: 0.20, cacheWrite1h: 0.40, cacheRead: 0.20),
+        "gemini-3.1-flash-lite-preview":     ModelPricingRates(input: 0.25, output: 1.50, cacheWrite5m: 0.025, cacheWrite1h: 0.025, cacheRead: 0.025),
+        "gemini-3-flash-preview":            ModelPricingRates(input: 0.50, output: 3.00, cacheWrite5m: 0.05, cacheWrite1h: 0.05, cacheRead: 0.05),
         // Historical alias seen in local CLI sessions. Current docs expose 3.1 Pro Preview.
-        "gemini-3-pro-preview":              ModelPricing.Pricing(input: 2.0, output: 12.0, cacheWrite5m: 0.20, cacheWrite1h: 0.40, cacheRead: 0.20),
+        "gemini-3-pro-preview":              ModelPricingRates(input: 2.0, output: 12.0, cacheWrite5m: 0.20, cacheWrite1h: 0.40, cacheRead: 0.20),
     ]
 }

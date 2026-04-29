@@ -344,24 +344,5 @@ extension UsageAPIService {
     }
 }
 
-enum UsageError: LocalizedError {
-    case noCredentials
-    case invalidURL
-    case invalidResponse
-    case httpError(statusCode: Int)
-    case rateLimited(retryInSeconds: Int)
-    case unauthorized
-    case decodingFailed(detail: String, raw: String)
-
-    var errorDescription: String? {
-        switch self {
-        case .noCredentials: return "No Claude credentials found"
-        case .invalidURL: return "Invalid API URL"
-        case .invalidResponse: return "Invalid response"
-        case .httpError(let code): return "HTTP error: \(code)"
-        case .rateLimited(let seconds): return "Rate limited, retry in \(seconds)s"
-        case .unauthorized: return "Token expired — open the CLI to refresh"
-        case .decodingFailed(let detail, _): return "Decoding error: \(detail)"
-        }
-    }
-}
+// `UsageError` moved to `ClaudeStatisticsKit` so plugins share the
+// same error vocabulary.

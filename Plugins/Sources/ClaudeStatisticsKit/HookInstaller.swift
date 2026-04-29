@@ -1,18 +1,26 @@
 import Foundation
-import ClaudeStatisticsKit
 
-// `HookInstallResult` and the `HookInstalling` protocol live in
-// `ClaudeStatisticsKit`. Only the host-internal helpers — file snapshot,
-// command rendering, install-orchestration — remain here.
+// `HookInstallResult` and the `HookInstalling` protocol live next to
+// the other SDK protocols. This file holds the cross-plugin helpers
+// — file snapshot, command rendering, install-orchestration — used by
+// every Provider plugin's `HookInstalling` implementation (Gemini /
+// Codex / Claude / third-party).
 
-// Snapshot of a file before mutation (for rollback)
-struct FileSnapshot {
-    let path: String
-    let existed: Bool
-    let content: Data?
-    let permissions: Int16?
+/// Snapshot of a file before mutation (for rollback).
+public struct FileSnapshot {
+    public let path: String
+    public let existed: Bool
+    public let content: Data?
+    public let permissions: Int16?
 
-    static func capture(at path: String) -> FileSnapshot {
+    public init(path: String, existed: Bool, content: Data?, permissions: Int16?) {
+        self.path = path
+        self.existed = existed
+        self.content = content
+        self.permissions = permissions
+    }
+
+    public static func capture(at path: String) -> FileSnapshot {
         let fm = FileManager.default
         guard fm.fileExists(atPath: path),
               let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
@@ -30,7 +38,7 @@ struct FileSnapshot {
         return FileSnapshot(path: path, existed: true, content: data, permissions: perms)
     }
 
-    func restore() throws {
+    public func restore() throws {
         let fm = FileManager.default
         if existed, let data = content {
             try data.write(to: URL(fileURLWithPath: path))
@@ -43,13 +51,14 @@ struct FileSnapshot {
     }
 }
 
-// Shared utilities for all HookInstaller implementations
-enum HookInstallerUtils {
-    static func shellQuoted(_ value: String) -> String {
+/// Shared utilities for all `HookInstalling` implementations across
+/// host and plugin.
+public enum HookInstallerUtils {
+    public static func shellQuoted(_ value: String) -> String {
         "'\(value.replacingOccurrences(of: "'", with: "'\\''"))'"
     }
 
-    static func managedHookExecutablePath() -> String {
+    public static func managedHookExecutablePath() -> String {
         // Debug vs release isolation is handled at the root-directory layer
         // (`.claude-statistics` vs `.claude-statistics-debug`), and now also
         // includes an optional -debug suffix for the binary itself to assist
@@ -66,7 +75,7 @@ enum HookInstallerUtils {
     /// kept pointing the symlink at the pre-`mv` (no-Debug-suffix) path; we
     /// keep it only as the last-resort fallback baked into the wrapper.
     @discardableResult
-    static func ensureManagedHookExecutableLink() -> String? {
+    public static func ensureManagedHookExecutableLink() -> String? {
         let wrapperPath = managedHookExecutablePath()
         guard AppRuntimePaths.ensureBinDirectory() != nil else { return nil }
 
@@ -141,7 +150,7 @@ enum HookInstallerUtils {
         """
     }
 
-    static func currentHookCommand(providerId: String) -> String {
+    public static func currentHookCommand(providerId: String) -> String {
         // The wrapper path lives under ~/.claude-statistics{,-debug}/bin/ so it
         // never contains spaces — no quoting needed in the hook command string.
         let wrapperPath = ensureManagedHookExecutableLink()
@@ -152,12 +161,12 @@ enum HookInstallerUtils {
         return "\(formattedPath) --claude-stats-hook-provider \(providerId)"
     }
 
-    static func removeScript(at path: String) {
+    public static func removeScript(at path: String) {
         try? FileManager.default.removeItem(atPath: path)
     }
 
     @discardableResult
-    static func runCommand(_ executable: String, args: [String], timeout: TimeInterval = 2.0) -> String? {
+    public static func runCommand(_ executable: String, args: [String], timeout: TimeInterval = 2.0) -> String? {
         guard let result = TerminalProcessRunner.run(
             executable: executable,
             arguments: args,
@@ -174,18 +183,18 @@ enum HookInstallerUtils {
     // live in ~/.local/bin, /opt/homebrew/bin, nvm, etc. — paths absent from the
     // app bundle's default process PATH.
     @discardableResult
-    static func runLoginShell(_ command: String, timeout: TimeInterval = 3.0) -> String? {
+    public static func runLoginShell(_ command: String, timeout: TimeInterval = 3.0) -> String? {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         return runCommand(shell, args: ["-lc", command], timeout: timeout)
     }
 }
 
-enum HookError: LocalizedError {
+public enum HookError: LocalizedError {
     case settingsNotFound
     case jsonParseError
     case writeError(Error)
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .settingsNotFound: return "Settings file not found"
         case .jsonParseError: return "Failed to parse settings JSON"

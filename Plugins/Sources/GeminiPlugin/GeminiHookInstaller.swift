@@ -2,7 +2,7 @@ import Foundation
 import ClaudeStatisticsKit
 
 struct GeminiHookInstaller: HookInstalling {
-    let providerId: String = ProviderKind.gemini.rawValue
+    let providerId: String = "gemini"
 
     private static let scriptName = "claude-stats-gemini-hook"
     private static let managedMarkers = [

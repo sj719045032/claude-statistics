@@ -8,7 +8,7 @@ final class GeminiPricingFetchService: ProviderPricingFetching {
 
     private init() {}
 
-    func fetchPricing() async throws -> [String: ModelPricing.Pricing] {
+    func fetchPricing() async throws -> [String: ModelPricingRates] {
         guard let url = URL(string: pricingURL) else {
             throw PricingFetchError.invalidURL
         }
@@ -27,7 +27,7 @@ final class GeminiPricingFetchService: ProviderPricingFetching {
         return try parsePricingFromHTML(html)
     }
 
-    private func parsePricingFromHTML(_ html: String) throws -> [String: ModelPricing.Pricing] {
+    private func parsePricingFromHTML(_ html: String) throws -> [String: ModelPricingRates] {
         let text = html
             .replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
             .replacingOccurrences(of: "&nbsp;", with: " ")
@@ -43,7 +43,7 @@ final class GeminiPricingFetchService: ProviderPricingFetching {
             ("Gemini 2.5 Flash-Lite Preview", ["gemini-2.5-flash-lite-preview-09-2025"]),
         ]
 
-        var results: [String: ModelPricing.Pricing] = [:]
+        var results: [String: ModelPricingRates] = [:]
         for spec in specs {
             guard let section = section(named: spec.heading, in: text) else { continue }
             guard let standard = standardSection(in: section) else { continue }
@@ -53,7 +53,7 @@ final class GeminiPricingFetchService: ProviderPricingFetching {
             }
 
             let cache = firstDollar(after: "Context caching price", in: standard) ?? (input * 0.1)
-            let pricing = ModelPricing.Pricing(
+            let pricing = ModelPricingRates(
                 input: input,
                 output: output,
                 cacheWrite5m: cache,

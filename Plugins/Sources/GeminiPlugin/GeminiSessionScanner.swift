@@ -57,7 +57,7 @@ final class GeminiSessionScanner {
                 let session = Session(
                     id: stored.sessionId,
                     externalID: stored.sessionId,
-                    provider: ProviderKind.gemini.rawValue,
+                    provider: "gemini",
                     projectPath: projectPath,
                     filePath: chatFile.path,
                     startTime: stored.startTime,

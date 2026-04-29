@@ -2,20 +2,10 @@ import Foundation
 import ClaudeStatisticsKit
 
 // `UsageData`, `UsageWindow`, `ProviderUsageBucket`, `ExtraUsage`,
-// `UserProfile`, `ProfileAccount`, and `ProfileOrganization` live in
-// `ClaudeStatisticsKit`. The host-bundle types below are
-// Claude-specific cache and API-response wrappers that don't belong
-// in the cross-plugin SDK.
-
-struct UsageCacheFile: Codable {
-    let fetchedAt: String
-    let data: UsageData
-
-    enum CodingKeys: String, CodingKey {
-        case fetchedAt = "fetched_at"
-        case data
-    }
-}
+// `UserProfile`, `ProfileAccount`, `ProfileOrganization` and
+// `UsageCacheFile` live in `ClaudeStatisticsKit`. The host-bundle
+// types below are Claude-specific cache and API-response wrappers
+// that don't belong in the cross-plugin SDK.
 
 struct ClaudeUsageCacheFile: Codable {
     let fetchedAt: String

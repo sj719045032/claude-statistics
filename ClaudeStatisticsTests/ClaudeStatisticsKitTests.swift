@@ -1468,11 +1468,11 @@ final class PluginReflectionTests: XCTestCase {
     private static let registeredPluginClasses: [(declared: String, cls: AnyClass)] = [
         (ClaudePluginDogfood.manifest.principalClass, ClaudePluginDogfood.self),
         (CodexPluginDogfood.manifest.principalClass, CodexPluginDogfood.self),
-        (GeminiPluginDogfood.manifest.principalClass, GeminiPluginDogfood.self),
         (ITermPlugin.manifest.principalClass, ITermPlugin.self),
         (GhosttyPlugin.manifest.principalClass, GhosttyPlugin.self)
         // Editor plugins (VSCode / Cursor / Windsurf / Trae / Zed),
-        // WarpPlugin, and AlacrittyPlugin all ship as `.csplugin`
+        // WarpPlugin, AlacrittyPlugin, AppleTerminalPlugin, KittyPlugin,
+        // WezTermPlugin, and GeminiPlugin all ship as `.csplugin`
         // bundles, same as ClaudeAppPlugin / CodexAppPlugin — the
         // loader exercises them at runtime via NSClassFromString once
         // the bundle is dlopen'd, so they're not in this list.

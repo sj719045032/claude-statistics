@@ -3,12 +3,14 @@ import SwiftUI
 import ClaudeStatisticsKit
 
 /// Builtin provider descriptors. The `ProviderDescriptor` type itself
-/// lives in `ClaudeStatisticsKit`; only these three host-bundled
-/// instances stay here because they close over the host-internal
-/// `ClaudeToolNames` / `CodexToolNames` / `GeminiToolNames` enums.
-/// Stage 4 moves each instance into its corresponding `*Plugin`
-/// package and they will be registered through `PluginRegistry` rather
-/// than referenced by the legacy `ProviderKind.descriptor` switch.
+/// lives in `ClaudeStatisticsKit`; the host-bundled instances stay here
+/// because they close over the host-internal `ClaudeToolNames` /
+/// `CodexToolNames` enums (and an inline copy of Gemini's alias table —
+/// the plugin owns the canonical version, but the HookCLI path runs in
+/// main-binary CLI mode where `PluginRegistry` is unavailable, so
+/// alias resolution must be reachable from the host too).
+/// Stage 4 moves each remaining instance into its corresponding
+/// `*Plugin` package and registers them through `PluginRegistry`.
 extension ProviderDescriptor {
     static let claude = ProviderDescriptor(
         id: "claude",
@@ -55,7 +57,7 @@ extension ProviderDescriptor {
         badgeColor: Color(red: 0.27, green: 0.51, blue: 0.96),
         notchEnabledDefaultsKey: "notch.enabled.gemini",
         capabilities: .gemini,
-        resolveToolAlias: { GeminiToolNames.canonical($0) },
+        resolveToolAlias: { HostGeminiToolAliases.canonical($0) },
         commandFilteredNotchPreview: true,
         notchNoisePrefixes: ["process group pgid:", "background pids:"]
     )
