@@ -20,6 +20,26 @@ import ClaudeStatisticsKit
 enum TerminalIdentityResolver {
     private static let ghosttyBundleID = "com.mitchellh.ghostty"
 
+    /// Lowercased terminal-name aliases that resolve to Ghostty even
+    /// when the GhosttyPlugin hasn't registered with `PluginRegistry`
+    /// yet (or in unit tests where no plugin loader runs). This
+    /// keeps the resolver's hardcoded `ghosttyBundleID` rule
+    /// well-defined without requiring the catalog plugin to be
+    /// installed first. The aliases mirror GhosttyPlugin's own
+    /// `descriptor.terminalNameAliases` — keep them in sync.
+    private static let ghosttyTerminalNameAliases: Set<String> = ["ghostty", "xterm-ghostty"]
+
+    /// Whether `terminalName` (or its registry-resolved bundle id)
+    /// identifies a Ghostty session — checks the plugin registry's
+    /// alias table first, falls back to the hardcoded alias list.
+    private static func isGhosttyTerminal(name terminalName: String?) -> Bool {
+        if TerminalRegistry.bundleId(forTerminalName: terminalName) == ghosttyBundleID {
+            return true
+        }
+        guard let lower = terminalName?.lowercased() else { return false }
+        return ghosttyTerminalNameAliases.contains(lower)
+    }
+
     // MARK: - Per-record
 
     static func sanitized(_ runtime: RuntimeSession) -> RuntimeSession {
@@ -48,7 +68,7 @@ enum TerminalIdentityResolver {
     ) -> [String: RuntimeSession] {
         var result = runtimes
         let ghosttyEntries = runtimes.compactMap { key, runtime -> (key: String, runtime: RuntimeSession)? in
-            guard TerminalRegistry.bundleId(forTerminalName: runtime.terminalName) == ghosttyBundleID,
+            guard isGhosttyTerminal(name: runtime.terminalName),
                   runtime.terminalStableID?.nilIfEmpty != nil,
                   runtime.tty?.nilIfEmpty != nil else {
                 return nil
@@ -97,7 +117,7 @@ enum TerminalIdentityResolver {
         let tty = event.tty?.nilIfEmpty
         let tabID = event.terminalTabID?.nilIfEmpty
         let stableID = event.terminalStableID?.nilIfEmpty
-        let isGhostty = TerminalRegistry.bundleId(forTerminalName: event.terminalName) == ghosttyBundleID
+        let isGhostty = isGhosttyTerminal(name: event.terminalName)
         // Need at least one terminal identity to match on, otherwise we'd
         // evict unrelated sessions across different tabs.
         guard tty != nil || tabID != nil || stableID != nil else { return [] }
@@ -134,7 +154,7 @@ enum TerminalIdentityResolver {
         incomingStableID: String?,
         in runtimes: [String: RuntimeSession]
     ) -> Bool {
-        guard TerminalRegistry.bundleId(forTerminalName: terminalName) == ghosttyBundleID else {
+        guard isGhosttyTerminal(name: terminalName) else {
             return true
         }
         guard incomingStableID != nil || incomingTabID != nil else { return true }

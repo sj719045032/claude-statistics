@@ -1470,14 +1470,16 @@ final class PluginReflectionTests: XCTestCase {
     // NSClassFromString once the bundle is dlopen'd.
     private static let registeredPluginClasses: [(declared: String, cls: AnyClass)] = [
         (ClaudePluginDogfood.manifest.principalClass, ClaudePluginDogfood.self),
-        (ITermPlugin.manifest.principalClass, ITermPlugin.self),
-        (GhosttyPlugin.manifest.principalClass, GhosttyPlugin.self)
-        // Editor plugins (VSCode / Cursor / Windsurf / Trae / Zed),
-        // WarpPlugin, AlacrittyPlugin, AppleTerminalPlugin, KittyPlugin,
-        // WezTermPlugin, and GeminiPlugin all ship as `.csplugin`
-        // bundles, same as ClaudeAppPlugin / CodexAppPlugin — the
-        // loader exercises them at runtime via NSClassFromString once
-        // the bundle is dlopen'd, so they're not in this list.
+        (AppleTerminalPlugin.manifest.principalClass, AppleTerminalPlugin.self)
+        // Only chassis built-ins per `docs/PLUGIN_ARCHITECTURE.md`
+        // §1.1 stay host-resident: Claude provider + Apple Terminal
+        // (system-bundled). Every other plugin (Gemini / Codex
+        // providers, iTerm2 / Ghostty / Warp / Alacritty / Kitty /
+        // WezTerm terminals, Claude.app / Codex.app chat-apps,
+        // VSCode / Cursor / Windsurf / Trae / Zed editors) ships as
+        // `.csplugin` from the catalog repo and is exercised at
+        // runtime via NSClassFromString once dlopen'd, so they're
+        // not in this compile-time list.
     ]
 
     func testManifestPrincipalClassMatchesObjcRuntimeName() {
@@ -1503,18 +1505,19 @@ final class PluginReflectionTests: XCTestCase {
         // End-to-end of what PluginLoader will do: take principalClass
         // string from the manifest, look up via NSClassFromString,
         // cast to (NSObject & Plugin).Type, then init(). Use a
-        // host-resident plugin (GhosttyPlugin) so this works without
+        // host-resident plugin (AppleTerminalPlugin — chassis built-in
+        // for the system-bundled terminal) so this works without
         // dlopen — the .csplugin path is exercised by integration
         // tests once the bundles ship.
-        guard let cls = NSClassFromString("GhosttyPlugin") else {
-            return XCTFail("GhosttyPlugin not found in ObjC runtime")
+        guard let cls = NSClassFromString("AppleTerminalPlugin") else {
+            return XCTFail("AppleTerminalPlugin not found in ObjC runtime")
         }
         guard let pluginType = cls as? (NSObject & Plugin).Type else {
-            return XCTFail("GhosttyPlugin must conform to NSObject & Plugin")
+            return XCTFail("AppleTerminalPlugin must conform to NSObject & Plugin")
         }
         let instance = pluginType.init()
-        XCTAssertEqual(type(of: instance).manifest.id, "com.mitchellh.ghostty")
-        XCTAssertEqual(type(of: instance).manifest.principalClass, "GhosttyPlugin")
+        XCTAssertEqual(type(of: instance).manifest.id, "com.apple.Terminal")
+        XCTAssertEqual(type(of: instance).manifest.principalClass, "AppleTerminalPlugin")
         XCTAssertTrue(instance is any TerminalPlugin)
     }
 }

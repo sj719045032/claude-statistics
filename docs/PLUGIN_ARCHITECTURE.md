@@ -25,13 +25,16 @@ Chassis 自带一组**永久内置**的 default 体验，与 SDK 协议同等地
   自带的角色集是 share 卡片的 default 内容。
 - **内置 share themes** —— 默认主题（`SharePluginThemes`）—— 自带
   色板 / 排版 / 视觉风格是 share 卡片的 default 外观。
-- **iTerm2 / Ghostty / Apple Terminal 三个内置终端** —— macOS 用户
-  几乎都装了至少其中一个，是 chassis 默认终端体验。三个都直接在
-  host module 内（Apple Terminal 一度被 commit `2000110` 抽成
+- **Apple Terminal 内置终端** —— macOS **系统自带**，每台 Mac 都
+  有，跟用户安装与否无关。这是真正的"开箱即用"终端，所以是
+  chassis built-in；iTerm2 / Ghostty 等用户**可能没装**的终端走
+  marketplace。Apple Terminal 一度被 commit `2000110` 抽成
   `.csplugin`，在 plugin-source-to-catalog-repo 重构里反向搬回
   `ClaudeStatistics/Terminal/Capabilities/AppleTerminalBuiltin.swift`，
-  通过 `hostPluginFactories` 注册到 `PluginRegistry`，跟 iTerm2 /
-  Ghostty 形态彻底对齐）。
+  通过 `hostPluginFactories` 注册到 `PluginRegistry`。iTerm2 +
+  Ghostty 在 plugin-source-to-catalog-repo 重构里搬到 catalog
+  repo `Sources/{ITerm,Ghostty}Plugin/` 走 marketplace —— 没装
+  iTerm2 / Ghostty 的用户根本不需要这些 plugin。
 
 **但 SDK 协议永久 open for extension**：`ProviderPlugin` /
 `TerminalPlugin` / `ShareRolePlugin` / `ShareCardThemePlugin` 等
@@ -41,10 +44,12 @@ Chassis 自带一组**永久内置**的 default 体验，与 SDK 协议同等地
 "挖坑位，不挖关系"。
 
 **这条原则的判定**：要不要把某个 X 抽成 marketplace plugin（不在
-`.app` 内 ship）？追问"X 是不是 fresh install 用户立刻看到、没了它
-应用就空"。是 → 留 chassis built-in；否 → 走 marketplace plugin。
-Gemini / Codex / VSCode / Warp 这些——用户没装也能用 Claude，所以
-走 marketplace；新增的第三方 share theme/role 也走 plugin。
+`.app` 内 ship）？追问 **"fresh install 用户立刻就有 X 吗"**——
+要么 X 是 chassis 自身代码（Claude provider / share roles / share
+themes 这种 host module 自带的），要么 X 是 macOS 系统组件
+（Apple Terminal 这种）。是 → 留 chassis built-in；否（用户可能
+根本没装那个 app，比如 iTerm2 / Ghostty / VSCode / Cursor）→ 走
+marketplace plugin。新增的第三方 share theme / role 也走 plugin。
 
 ## 2. 边界划分
 

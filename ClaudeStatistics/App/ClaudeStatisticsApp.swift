@@ -61,18 +61,18 @@ final class AppState: ObservableObject {
     /// back live without restart.
     static let hostPluginFactories: [String: () -> any Plugin] = [
         ClaudePluginDogfood.manifest.id:    { ClaudePluginDogfood() },
-        ITermPlugin.manifest.id:            { ITermPlugin() },
-        GhosttyPlugin.manifest.id:          { GhosttyPlugin() },
         AppleTerminalPlugin.manifest.id:    { AppleTerminalPlugin() }
         // Chassis built-ins per `docs/PLUGIN_ARCHITECTURE.md` §1.1:
-        // Claude provider, iTerm2 / Ghostty / Apple Terminal — the
+        // Claude provider (the app's namesake) + Apple Terminal (the
+        // OS-bundled terminal every Mac ships with). These are the
         // out-of-box experience that must work the moment a fresh
-        // install opens the app. Every other plugin (Gemini / Codex
-        // providers, Claude.app / Codex.app chat-app, Warp /
-        // Alacritty / Kitty / WezTerm terminals, VSCode / Cursor /
-        // Windsurf / Trae / Zed editors) ships through the catalog
-        // repo's marketplace; users install from Settings →
-        // Plugins → Discover.
+        // install opens the app — fresh installs literally cannot
+        // depend on the marketplace yet. Every other plugin (Gemini
+        // / Codex providers, iTerm2 / Ghostty / Warp / Alacritty /
+        // Kitty / WezTerm terminals, Claude.app / Codex.app
+        // chat-apps, VSCode / Cursor / Windsurf / Trae / Zed
+        // editors) ships through the catalog repo's marketplace;
+        // users install from Settings → Plugins → Discover.
     ]
 
     let pluginRegistry: PluginRegistry = {
