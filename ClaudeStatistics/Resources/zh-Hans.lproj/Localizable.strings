@@ -254,6 +254,7 @@
 "settings.developerTools" = "开发人员工具";
 "settings.plugins" = "插件";
 "settings.plugins.empty" = "未加载任何插件。";
+"settings.plugins.empty.filter" = "该分类下暂无插件。";
 "settings.plugins.loaded.count" = "已加载插件（%d）";
 "settings.plugins.trust" = "信任";
 "settings.plugins.resetTrust" = "重置所有插件信任决定";
@@ -294,7 +295,18 @@
 "settings.plugins.discover.error.decoding" = "解码错误";
 "settings.plugins.discover.error.schemaTooNew" = "目录架构 v%d > 支持 v%d，请更新 Claude Statistics。";
 "settings.plugins.discover.error.offlineNoCache" = "离线且无本地缓存。";
-"settings.plugins.category.vendor" = "厂商适配";
+"settings.plugins.install.error.download" = "下载失败";
+"settings.plugins.install.error.sha256Mismatch %@ %@" = "SHA-256 校验失败（期望 %@，实际 %@）。目录条目可能与发布包不一致。";
+"settings.plugins.install.error.unzip" = "解压插件包失败";
+"settings.plugins.install.error.missingBundle" = "压缩包内未找到 .csplugin 目录。";
+"settings.plugins.install.error.bundleLoad %@" = "macOS 无法加载位于 %@ 的插件 bundle。";
+"settings.plugins.install.error.manifestKey %@" = "%@ 的 Info.plist 中缺少 CSPluginManifest 条目。";
+"settings.plugins.install.error.idMismatch %@ %@" = "插件 id 不一致（目录：%@，manifest：%@）。";
+"settings.plugins.install.error.apiVersion %@ %@" = "插件要求 SDK %@，主程序仅提供 %@。";
+"settings.plugins.install.error.move" = "将插件移入用户目录失败";
+"settings.plugins.install.error.load" = "插件已加载但注册失败";
+"settings.plugins.category.all" = "全部";
+"settings.plugins.category.provider" = "Provider";
 "settings.plugins.category.terminal" = "终端";
 "settings.plugins.category.chat-app" = "聊天应用";
 "settings.plugins.category.share-card" = "分享卡片";

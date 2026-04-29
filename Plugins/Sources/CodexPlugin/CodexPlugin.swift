@@ -25,7 +25,7 @@ public final class CodexPlugin: NSObject, ProviderPlugin, ProviderAccountUIProvi
         permissions: [.filesystemHome, .network],
         principalClass: "CodexPlugin",
         iconAsset: "CodexProviderIcon",
-        category: PluginCatalogCategory.vendor
+        category: PluginCatalogCategory.provider
     )
 
     /// Plugin-owned account manager so the host's account-card popover

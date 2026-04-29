@@ -21,7 +21,7 @@
 	<key>CSPluginManifest</key>
 	<dict>
 		<key>category</key>
-		<string>vendor</string>
+		<string>provider</string>
 		<key>displayName</key>
 		<string>Codex</string>
 		<key>iconAsset</key>

@@ -24,6 +24,8 @@ struct PluginDiscoverView: View {
     /// `objectWillChange`).
     @State private var refreshTick: Int = 0
     @State private var installingIDs: Set<String> = []
+    /// Active chip in the category filter bar. `nil` ⇒ "All".
+    @State private var selectedCategory: String?
 
     private enum LoadingState: Equatable {
         case idle
@@ -36,6 +38,13 @@ struct PluginDiscoverView: View {
         VStack(spacing: 0) {
             statusBar
             Divider()
+            if !categoryCounts.isEmpty {
+                PluginCategoryFilterBar(
+                    categories: categoryCounts,
+                    selection: $selectedCategory
+                )
+                Divider()
+            }
             content
         }
         .task {
@@ -43,6 +52,38 @@ struct PluginDiscoverView: View {
             // button kicks the same path.
             await refresh()
         }
+    }
+
+    /// Categories present in the fetched catalog, in canonical order,
+    /// with row counts. Empty when nothing has been fetched yet.
+    private var categoryCounts: [(id: String, count: Int)] {
+        _ = refreshTick
+        var byCategory: [String: Int] = [:]
+        for entry in entries {
+            let key = PluginCatalogCategory.known.contains(entry.category)
+                ? entry.category
+                : PluginCatalogCategory.utility
+            byCategory[key, default: 0] += 1
+        }
+        return PluginCatalogCategory.known.compactMap { cat in
+            guard let count = byCategory[cat], count > 0 else { return nil }
+            return (id: cat, count: count)
+        }
+    }
+
+    private var filteredEntries: [PluginCatalogEntry] {
+        _ = refreshTick
+        guard let selectedCategory else {
+            return entries.sorted { $0.name < $1.name }
+        }
+        return entries
+            .filter { entry in
+                let key = PluginCatalogCategory.known.contains(entry.category)
+                    ? entry.category
+                    : PluginCatalogCategory.utility
+                return key == selectedCategory
+            }
+            .sorted { $0.name < $1.name }
     }
 
     @ViewBuilder
@@ -99,43 +140,25 @@ struct PluginDiscoverView: View {
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if filteredEntries.isEmpty {
+            VStack(spacing: 8) {
+                Image(systemName: "tray")
+                    .font(.system(size: 32))
+                    .foregroundStyle(.tertiary)
+                Text("settings.plugins.empty.filter")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             Form {
-                ForEach(grouped, id: \.category) { group in
-                    Section(header: Text(displayName(for: group.category))) {
-                        ForEach(group.entries) { entry in
-                            entryRow(entry)
-                        }
+                Section {
+                    ForEach(filteredEntries) { entry in
+                        entryRow(entry)
                     }
                 }
             }
             .formStyle(.grouped)
-        }
-    }
-
-    private struct CategoryGroup: Identifiable {
-        let category: String
-        let entries: [PluginCatalogEntry]
-        var id: String { category }
-    }
-
-    private var grouped: [CategoryGroup] {
-        _ = refreshTick
-        // Order known categories first (matches doc §3); unknowns
-        // fall under utility.
-        var byCategory: [String: [PluginCatalogEntry]] = [:]
-        for entry in entries {
-            let key = PluginCatalogCategory.known.contains(entry.category)
-                ? entry.category
-                : PluginCatalogCategory.utility
-            byCategory[key, default: []].append(entry)
-        }
-        return PluginCatalogCategory.known.compactMap { cat in
-            guard let rows = byCategory[cat], !rows.isEmpty else { return nil }
-            return CategoryGroup(
-                category: cat,
-                entries: rows.sorted { $0.name < $1.name }
-            )
         }
     }
 
@@ -280,6 +303,9 @@ struct PluginDiscoverView: View {
                 // refresh, provider lookup, etc.) by reusing the
                 // same hook the trust prompt fires.
                 PluginTrustGate.onPluginHotLoaded?(entry.toManifestStub(), URL(fileURLWithPath: ""))
+            } catch let installError as PluginInstaller.InstallError {
+                errorMessage = describe(installError)
+                loadingState = .failed
             } catch {
                 errorMessage = String(describing: error)
                 loadingState = .failed
@@ -305,9 +331,49 @@ struct PluginDiscoverView: View {
         }
     }
 
+    private func describe(_ error: PluginInstaller.InstallError) -> String {
+        switch error {
+        case .downloadFailed(let m):
+            return NSLocalizedString("settings.plugins.install.error.download", comment: "") + ": \(m)"
+        case .sha256Mismatch(let expected, let actual):
+            return String(
+                format: NSLocalizedString("settings.plugins.install.error.sha256Mismatch %@ %@", comment: ""),
+                expected, actual
+            )
+        case .unzipFailed(let m):
+            return NSLocalizedString("settings.plugins.install.error.unzip", comment: "") + ": \(m)"
+        case .missingPluginBundle:
+            return NSLocalizedString("settings.plugins.install.error.missingBundle", comment: "")
+        case .bundleLoadFailed(let path):
+            return String(
+                format: NSLocalizedString("settings.plugins.install.error.bundleLoad %@", comment: ""),
+                path
+            )
+        case .manifestKeyMissing(let path):
+            return String(
+                format: NSLocalizedString("settings.plugins.install.error.manifestKey %@", comment: ""),
+                path
+            )
+        case .manifestIDMismatch(let expected, let actual):
+            return String(
+                format: NSLocalizedString("settings.plugins.install.error.idMismatch %@ %@", comment: ""),
+                expected, actual
+            )
+        case .incompatibleAPIVersion(let req, let host):
+            return String(
+                format: NSLocalizedString("settings.plugins.install.error.apiVersion %@ %@", comment: ""),
+                "\(req)", "\(host)"
+            )
+        case .moveFailed(let m):
+            return NSLocalizedString("settings.plugins.install.error.move", comment: "") + ": \(m)"
+        case .loadFailed(let reason):
+            return NSLocalizedString("settings.plugins.install.error.load", comment: "") + ": \(String(describing: reason))"
+        }
+    }
+
     private func displayName(for category: String) -> LocalizedStringKey {
         switch category {
-        case PluginCatalogCategory.vendor: return "settings.plugins.category.vendor"
+        case PluginCatalogCategory.provider: return "settings.plugins.category.provider"
         case PluginCatalogCategory.terminal: return "settings.plugins.category.terminal"
         case PluginCatalogCategory.chatApp: return "settings.plugins.category.chat-app"
         case PluginCatalogCategory.shareCard: return "settings.plugins.category.share-card"
@@ -319,7 +385,7 @@ struct PluginDiscoverView: View {
 
     private func glyph(for category: String) -> String {
         switch category {
-        case PluginCatalogCategory.vendor: return "shippingbox"
+        case PluginCatalogCategory.provider: return "shippingbox"
         case PluginCatalogCategory.terminal: return "terminal"
         case PluginCatalogCategory.chatApp: return "bubble.left.and.bubble.right"
         case PluginCatalogCategory.shareCard: return "person.crop.square"

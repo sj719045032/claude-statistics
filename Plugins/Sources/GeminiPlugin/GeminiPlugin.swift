@@ -24,7 +24,7 @@ public final class GeminiPlugin: NSObject, ProviderPlugin, ProviderAccountUIProv
         permissions: [.filesystemHome, .network],
         principalClass: "GeminiPlugin",
         iconAsset: "GeminiProviderIcon",
-        category: PluginCatalogCategory.vendor
+        category: PluginCatalogCategory.provider
     )
 
     /// Plugin-owned account manager so the host's account-card popover

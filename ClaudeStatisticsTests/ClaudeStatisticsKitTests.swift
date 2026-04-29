@@ -57,10 +57,13 @@ final class PluginManifestTests: XCTestCase {
         XCTAssertEqual(decoded, sample)
     }
 
-    func testPermissionRawValuesUseDottedForm() {
-        XCTAssertEqual(PluginPermission.filesystemHome.rawValue, "filesystem.home")
-        XCTAssertEqual(PluginPermission.filesystemAny.rawValue, "filesystem.any")
-        XCTAssertEqual(PluginPermission.appleScript.rawValue, "apple.script")
+    func testPermissionRawValuesMatchPlistFormat() {
+        // Raw values are camelCase (default) so they match how
+        // `.csplugin` Info.plist files write the permissions array
+        // (xcodegen project.yml entries use the case names directly).
+        XCTAssertEqual(PluginPermission.filesystemHome.rawValue, "filesystemHome")
+        XCTAssertEqual(PluginPermission.filesystemAny.rawValue, "filesystemAny")
+        XCTAssertEqual(PluginPermission.appleScript.rawValue, "appleScript")
     }
 
     func testKindCodableUsesEnumRawValue() throws {
@@ -149,7 +152,7 @@ final class PluginManifestTests: XCTestCase {
     func testKnownCategoriesContainAllSixDocumentedValues() {
         XCTAssertEqual(
             Set(PluginCatalogCategory.known),
-            ["vendor", "terminal", "chat-app", "share-card", "editor-integration", "utility"]
+            ["provider", "terminal", "chat-app", "share-card", "editor-integration", "utility"]
         )
     }
 }

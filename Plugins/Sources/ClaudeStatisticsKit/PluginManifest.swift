@@ -23,15 +23,15 @@ public enum PluginKind: String, Codable, Sendable {
 /// sandboxing is a non-goal (REWRITE_PLAN §7.2).
 public enum PluginPermission: String, Codable, Sendable, Hashable {
     /// Read/write under `~` (home directory subtree).
-    case filesystemHome   = "filesystem.home"
+    case filesystemHome
     /// Read/write any path. High-risk; default deny.
-    case filesystemAny    = "filesystem.any"
+    case filesystemAny
     /// Open outbound network connections.
     case network
     /// Use macOS Accessibility (AX) APIs.
     case accessibility
     /// Run AppleScript / OSA.
-    case appleScript      = "apple.script"
+    case appleScript
     /// Access the macOS Keychain via Security framework.
     case keychain
 }
@@ -48,9 +48,10 @@ public enum PluginPermission: String, Codable, Sendable, Hashable {
 /// display name and SF Symbol; unknown strings fall back to
 /// `utility`.
 public enum PluginCatalogCategory {
-    /// Vendor adapter for an AI coding CLI (Claude / Codex / Gemini /
-    /// Aider / …).
-    public static let vendor = "vendor"
+    /// Provider adapter for an AI coding CLI (Claude / Codex / Gemini /
+    /// Aider / …). Matches the SDK protocol naming
+    /// (`ProviderPlugin` / `ProviderDescriptor` / `ProviderRegistry`).
+    public static let provider = "provider"
     /// Terminal-emulator adapter (focus return + launching).
     public static let terminal = "terminal"
     /// Desktop chat-app integration with deep-link focus
@@ -67,7 +68,7 @@ public enum PluginCatalogCategory {
     /// catalogs may publish additional values; the UI handles unknown
     /// strings by falling back to `utility`.
     public static let known: [String] = [
-        vendor, terminal, chatApp, shareCard, editorIntegration, utility
+        provider, terminal, chatApp, shareCard, editorIntegration, utility
     ]
 }
 

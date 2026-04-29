@@ -23,7 +23,8 @@ public enum PluginInstaller {
         case sha256Mismatch(expected: String, actual: String)
         case unzipFailed(String)
         case missingPluginBundle
-        case manifestMissing
+        case bundleLoadFailed(path: String)
+        case manifestKeyMissing(path: String)
         case manifestIDMismatch(expected: String, actual: String)
         case incompatibleAPIVersion(required: SemVer, host: SemVer)
         case moveFailed(String)
@@ -134,14 +135,32 @@ public enum PluginInstaller {
         try zipData.write(to: zipURL)
         try unzip(zipURL: zipURL, into: stagingRoot)
 
+        let stagingListing = (try? FileManager.default.contentsOfDirectory(atPath: stagingRoot.path))?
+            .sorted().joined(separator: ", ") ?? "<unreadable>"
+        DiagnosticLogger.shared.info(
+            "PluginInstaller: unzip done; stagingRoot=\(stagingRoot.path); zipBytes=\(zipData.count); contents=[\(stagingListing)]"
+        )
+
         // 4. Locate the .csplugin bundle in the unzipped contents.
         let bundleURL = try findCspluginBundle(in: stagingRoot)
+        let bundleContents = (try? FileManager.default.contentsOfDirectory(atPath: bundleURL.path))?
+            .sorted().joined(separator: ", ") ?? "<unreadable>"
+        let contentsDir = bundleURL.appendingPathComponent("Contents")
+        let contentsListing = (try? FileManager.default.contentsOfDirectory(atPath: contentsDir.path))?
+            .sorted().joined(separator: ", ") ?? "<unreadable>"
+        DiagnosticLogger.shared.info(
+            "PluginInstaller: bundleURL=\(bundleURL.path); bundle entries=[\(bundleContents)]; Contents=[\(contentsListing)]"
+        )
 
         // 5. Validate manifest matches entry id + host API.
-        guard let bundle = Bundle(url: bundleURL),
-              let manifest = PluginManifest(bundle: bundle) else {
-            throw InstallError.manifestMissing
-        }
+        // Try Bundle(url:) first; fall back to direct Info.plist read
+        // when Bundle returns nil. Observed on macOS: a freshly-unzipped
+        // `.csplugin` in `NSTemporaryDirectory()` sometimes refuses to
+        // load via Bundle API even though the bundle layout is valid
+        // (suspected: bundle cache keyed by CFBundleIdentifier, or
+        // dyld-style sanity checks on the embedded mach-O — neither
+        // matters at the manifest-validation stage).
+        let manifest = try readManifest(bundleURL: bundleURL)
         guard manifest.id == entry.id else {
             throw InstallError.manifestIDMismatch(expected: entry.id, actual: manifest.id)
         }
@@ -218,6 +237,90 @@ public enum PluginInstaller {
             ) ?? "unzip exit \(process.terminationStatus)"
             throw InstallError.unzipFailed(errMessage)
         }
+    }
+
+    /// Decode the plugin manifest from the unzipped bundle. Tries
+    /// `Bundle(url:)` → `bundle.object(forInfoDictionaryKey:)` first;
+    /// on any failure falls back to reading `Contents/Info.plist`
+    /// directly through `PropertyListSerialization`. The fallback is
+    /// what saves us on staging dirs where `Bundle(url:)` returns
+    /// nil for non-app/non-framework wrappers.
+    nonisolated static func readManifest(bundleURL: URL) throws -> PluginManifest {
+        if let bundle = Bundle(url: bundleURL),
+           let manifest = PluginManifest(bundle: bundle) {
+            return manifest
+        }
+
+        let infoURL = bundleURL.appendingPathComponent("Contents/Info.plist")
+        guard FileManager.default.fileExists(atPath: infoURL.path),
+              let data = try? Data(contentsOf: infoURL) else {
+            DiagnosticLogger.shared.error(
+                "PluginInstaller.readManifest: Info.plist not found at \(infoURL.path)"
+            )
+            throw InstallError.bundleLoadFailed(path: bundleURL.path)
+        }
+
+        let plist: Any
+        do {
+            plist = try PropertyListSerialization.propertyList(from: data, options: [], format: nil)
+        } catch {
+            DiagnosticLogger.shared.error(
+                "PluginInstaller.readManifest: Info.plist parse failed at \(infoURL.path): \(error.localizedDescription)"
+            )
+            throw InstallError.bundleLoadFailed(path: bundleURL.path)
+        }
+
+        guard let dict = plist as? [String: Any] else {
+            DiagnosticLogger.shared.error(
+                "PluginInstaller.readManifest: plist top-level is \(type(of: plist)) not [String: Any] at \(infoURL.path)"
+            )
+            throw InstallError.bundleLoadFailed(path: bundleURL.path)
+        }
+        guard let manifestRaw = dict[PluginManifest.infoDictionaryKey] else {
+            let keys = dict.keys.sorted().joined(separator: ", ")
+            let dataSize = data.count
+            // Sneak the diagnostic into the error path so it surfaces
+            // in the UI toast, not just in DiagnosticLogger — every
+            // path the toast can reach helps narrow `Bundle(url:)`
+            // refusal cases.
+            DiagnosticLogger.shared.error(
+                "PluginInstaller.readManifest: \(PluginManifest.infoDictionaryKey) missing at \(infoURL.path); plist size=\(dataSize) bytes; top-level keys=[\(keys)]"
+            )
+            throw InstallError.manifestKeyMissing(path: "\(bundleURL.path) — keys=[\(keys)] size=\(dataSize)")
+        }
+
+        let manifestData: Data
+        do {
+            manifestData = try PropertyListSerialization.data(
+                fromPropertyList: manifestRaw, format: .binary, options: 0
+            )
+        } catch {
+            DiagnosticLogger.shared.error(
+                "PluginInstaller.readManifest: serialize manifestRaw failed at \(infoURL.path): \(error)"
+            )
+            throw InstallError.manifestKeyMissing(path: "\(bundleURL.path) — serialize: \(error.localizedDescription)")
+        }
+
+        let manifest: PluginManifest
+        do {
+            manifest = try PluginManifest(plistData: manifestData)
+        } catch {
+            let keys: String
+            if let dict = manifestRaw as? [String: Any] {
+                keys = dict.keys.sorted().joined(separator: ", ")
+            } else {
+                keys = "<not a dict: \(type(of: manifestRaw))>"
+            }
+            DiagnosticLogger.shared.error(
+                "PluginInstaller.readManifest: PluginManifest decode error at \(infoURL.path); keys=[\(keys)]; error=\(error)"
+            )
+            throw InstallError.manifestKeyMissing(path: "\(bundleURL.path) — decode: \(error.localizedDescription)")
+        }
+
+        DiagnosticLogger.shared.warning(
+            "PluginInstaller.readManifest: Bundle(url:) returned nil at \(bundleURL.path); fell back to direct Info.plist read"
+        )
+        return manifest
     }
 
     nonisolated static func findCspluginBundle(in directory: URL) throws -> URL {

@@ -508,7 +508,7 @@ targets:
             - network
           principalClass: GeminiPlugin
           iconAsset: GeminiProviderIcon
-          category: vendor
+          category: provider
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tinystone.GeminiPlugin
@@ -548,7 +548,7 @@ targets:
             - network
           principalClass: CodexPlugin
           iconAsset: CodexProviderIcon
-          category: vendor
+          category: provider
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tinystone.CodexPlugin
@@ -622,10 +622,10 @@ targets:
         copy:
           destination: plugins
           subpath: ""
+      # CodexPlugin: pilot for marketplace-only delivery. Built as a
+      # standalone target but NOT copied into the .app — users install
+      # it through Settings → Plugins → Discover.
       - target: CodexPlugin
-        copy:
-          destination: plugins
-          subpath: ""
       - package: Sparkle
       - package: MarkdownView
         product: MarkdownView

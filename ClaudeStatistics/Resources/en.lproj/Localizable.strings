@@ -241,6 +241,7 @@
 "settings.developerTools" = "Developer Tools";
 "settings.plugins" = "Plugins";
 "settings.plugins.empty" = "No plugins loaded.";
+"settings.plugins.empty.filter" = "No plugins match the selected category.";
 "settings.plugins.loaded.count" = "Loaded plugins (%d)";
 "settings.plugins.trust" = "Trust";
 "settings.plugins.resetTrust" = "Reset all plugin trust decisions";
@@ -281,7 +282,18 @@
 "settings.plugins.discover.error.decoding" = "Decode error";
 "settings.plugins.discover.error.schemaTooNew" = "Catalog schema v%d > supported v%d. Update Claude Statistics.";
 "settings.plugins.discover.error.offlineNoCache" = "Offline and no cached catalog available.";
-"settings.plugins.category.vendor" = "Vendor";
+"settings.plugins.install.error.download" = "Download failed";
+"settings.plugins.install.error.sha256Mismatch %@ %@" = "SHA-256 mismatch (expected %@, got %@). The catalog entry may be out of sync with the artifact.";
+"settings.plugins.install.error.unzip" = "Failed to unzip plugin archive";
+"settings.plugins.install.error.missingBundle" = "No .csplugin bundle found inside the archive.";
+"settings.plugins.install.error.bundleLoad %@" = "macOS failed to load the plugin bundle at %@.";
+"settings.plugins.install.error.manifestKey %@" = "Plugin manifest (CSPluginManifest) missing in Info.plist at %@.";
+"settings.plugins.install.error.idMismatch %@ %@" = "Plugin id mismatch (catalog: %@, manifest: %@).";
+"settings.plugins.install.error.apiVersion %@ %@" = "Plugin requires SDK %@ but host provides %@.";
+"settings.plugins.install.error.move" = "Failed to install plugin into user directory";
+"settings.plugins.install.error.load" = "Plugin loaded but registration failed";
+"settings.plugins.category.all" = "All";
+"settings.plugins.category.provider" = "Provider";
 "settings.plugins.category.terminal" = "Terminal";
 "settings.plugins.category.chat-app" = "Chat App";
 "settings.plugins.category.share-card" = "Share Card";

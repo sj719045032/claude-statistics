@@ -67,6 +67,7 @@
 		28B30EDA1771A39B023BCAC7 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = B63838C3755C7D084DD73D95 /* Session.swift */; };
 		28BC2444287AB7D7A32B68A3 /* TerminalReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD9EAD578F58BF668BBBFC13 /* TerminalReadiness.swift */; };
 		2D03585C91016BBA7C5E390C /* SessionStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 563283ED216FE68D0E3B11EA /* SessionStats.swift */; };
+		2DA0A639E1B1C0A1F83FF6D2 /* CodexPlugin.bundle in Resources */ = {isa = PBXBuildFile; fileRef = EED1B00CE0B6B4CAFDC621E3 /* CodexPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		2EB570758BE9F11F6E15AE78 /* TerminalSetupCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 808F166AA1B5F781858856E1 /* TerminalSetupCoordinator.swift */; };
 		2F83F61733323C3D00215158 /* SkipConfirmKeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D09F01402459E00EA228AF6 /* SkipConfirmKeyMonitor.swift */; };
 		3054AF8F8A6177EDB151996F /* PluginBackedTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4705840BAD2350953636CF55 /* PluginBackedTerminalCapability.swift */; };
@@ -177,6 +178,7 @@
 		7638F0F90283446588598B55 /* ShareRoleEngine+Scoring.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B5E7A34504AEC6D0A847DAC /* ShareRoleEngine+Scoring.swift */; };
 		7674AC8643AF2C6126880D3C /* TranscriptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73D3015C65881224ECFCC5BB /* TranscriptView.swift */; };
 		76A8026C31CD0B76319D9C1F /* SharePluginThemes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 397B635FE9ED8F8B01A5AD1A /* SharePluginThemes.swift */; };
+		76DE471855D0D0D5F9874A3A /* PluginCategoryFilterBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D77C4C7A67A83742722D438C /* PluginCategoryFilterBar.swift */; };
 		77E8F54113FA69FB43B2CB39 /* ModelPricingRates.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD30D570EAFE66E26FBFB51C /* ModelPricingRates.swift */; };
 		7843151598D9561667E57EF3 /* TerminalRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A337A8A5F00CF27D753FA581 /* TerminalRegistry.swift */; };
 		78C85F2EAC22E9FFD94B3093 /* ProviderHookNormalizing.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9514A40AA4DF7561C0D5C8B /* ProviderHookNormalizing.swift */; };
@@ -184,7 +186,6 @@
 		7937C41E33477CCD599429C8 /* ClaudeAppPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 9E5D8A2D6C14F2665A818236 /* ClaudeAppPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		793CA993AA390F6C7D5534CD /* PluginDescriptorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5374ACC8FB5125744712FDC6 /* PluginDescriptorStore.swift */; };
 		79A1CDAE5E3199165B64474F /* ToolBarRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEDA0BBF5662205A54927288 /* ToolBarRow.swift */; };
-		7A3E0B35A5EDCF3459CC553A /* CodexPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = EED1B00CE0B6B4CAFDC621E3 /* CodexPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		7A6DC1B86241A8A90AB91897 /* TerminalPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F81931C824888B412AEA051E /* TerminalPlugin.swift */; };
 		7AC6A56F2665F81ED453AF4A /* HookInstalling.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFDDC93577A73B4D01F88B6A /* HookInstalling.swift */; };
 		7B647CA03E39E1B7CDB94D42 /* TranscriptDisplayMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EBA6E09EEB67ED884B4504F /* TranscriptDisplayMessage.swift */; };
@@ -638,7 +639,6 @@
 				B313D975C4C4D0AD58C0DA0D /* KittyPlugin.bundle in Embed Dependencies */,
 				C4CB7D03BBF5B8FB6E0753CB /* WezTermPlugin.bundle in Embed Dependencies */,
 				1ECABB048A5F9B030C7CB8C0 /* GeminiPlugin.bundle in Embed Dependencies */,
-				7A3E0B35A5EDCF3459CC553A /* CodexPlugin.bundle in Embed Dependencies */,
 			);
 			name = "Embed Dependencies";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -964,6 +964,7 @@
 		D1B172A49401EA28223A83C0 /* ShareMetrics+Evaluation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShareMetrics+Evaluation.swift"; sourceTree = "<group>"; };
 		D74BEFC175DFC5CD3999DBE1 /* ToolActivityFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolActivityFormatter.swift; sourceTree = "<group>"; };
 		D758CE8D0B6780C973E35221 /* SessionQuickStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionQuickStats.swift; sourceTree = "<group>"; };
+		D77C4C7A67A83742722D438C /* PluginCategoryFilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginCategoryFilterBar.swift; sourceTree = "<group>"; };
 		D7A55E899B9748E80EF1CA53 /* ProviderDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderDescriptor.swift; sourceTree = "<group>"; };
 		D908D872738DD762E0632F3E /* TranscriptParser+SearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TranscriptParser+SearchIndex.swift"; sourceTree = "<group>"; };
 		D922135FFC7EA58D322F5BC4 /* KittyPlugin.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KittyPlugin.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1833,6 +1834,7 @@
 				41054FA7DE043B7E25B4A88E /* MenuBarView.swift */,
 				BDA63237DD4854F868A0DCE4 /* ModifierRecorderRow.swift */,
 				6618F7DEA731482B556A431E /* PanelContentView.swift */,
+				D77C4C7A67A83742722D438C /* PluginCategoryFilterBar.swift */,
 				BB46FA3EF4C974D6BB965592 /* PluginDiscoverView.swift */,
 				92102BACD66FCBC76D328044 /* PluginsSettingsView.swift */,
 				E61FA41EAFBAE59342A3A526 /* ProjectAnalyticsView.swift */,
@@ -2376,6 +2378,7 @@
 			files = (
 				D06D7B513EFFD60742C93431 /* Assets.xcassets in Resources */,
 				AC5082113B4136915E426299 /* Localizable.strings in Resources */,
+				2DA0A639E1B1C0A1F83FF6D2 /* CodexPlugin.bundle in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2635,6 +2638,7 @@
 				3BED6D466169435AA6DCE604 /* PermissionRequestCard.swift in Sources */,
 				78D29B62500CB98D0FA18D5B /* PermissionRequestRegistry.swift in Sources */,
 				3054AF8F8A6177EDB151996F /* PluginBackedTerminalCapability.swift in Sources */,
+				76DE471855D0D0D5F9874A3A /* PluginCategoryFilterBar.swift in Sources */,
 				49CB17C9F9F3741C3B0BB281 /* PluginDiscoverView.swift in Sources */,
 				DF30CD5504F391E42C582602 /* PluginTrustGate.swift in Sources */,
 				EC8566C210AB59F29E27E735 /* PluginUninstaller.swift in Sources */,

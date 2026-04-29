@@ -16,6 +16,8 @@ struct PluginsSettingsView: View {
     }
 
     @State private var tab: Tab = .installed
+    /// Active chip in the Installed-tab filter bar; `nil` means "All".
+    @State private var selectedInstalledCategory: String?
     @State private var showResetConfirmation = false
     @State private var resetMessage: String?
     @State private var pendingDisable: Row?
@@ -45,6 +47,45 @@ struct PluginsSettingsView: View {
         return pluginRegistry.loadedManifests()
             .sorted { $0.id < $1.id }
             .map { Row(manifest: $0, source: pluginRegistry.source(for: $0.id)) }
+    }
+
+    /// Categories present in the loaded list, in canonical order, with
+    /// row counts. Feeds the chip-style filter bar.
+    private var installedCategoryCounts: [(id: String, count: Int)] {
+        var byCategory: [String: Int] = [:]
+        for row in rows {
+            let raw = row.manifest.category ?? PluginCatalogCategory.utility
+            let key = PluginCatalogCategory.known.contains(raw) ? raw : PluginCatalogCategory.utility
+            byCategory[key, default: 0] += 1
+        }
+        return PluginCatalogCategory.known.compactMap { cat in
+            guard let count = byCategory[cat], count > 0 else { return nil }
+            return (id: cat, count: count)
+        }
+    }
+
+    /// Rows matching the active chip selection. `nil` ⇒ no filter,
+    /// return everything.
+    private var filteredRows: [Row] {
+        guard let selectedInstalledCategory else { return rows }
+        return rows.filter { row in
+            let raw = row.manifest.category ?? PluginCatalogCategory.utility
+            let key = PluginCatalogCategory.known.contains(raw) ? raw : PluginCatalogCategory.utility
+            return key == selectedInstalledCategory
+        }
+    }
+
+    /// Optional `UserDefaults` override pointing at a local
+    /// `index.json` (file://… for dev/QA, or a self-hosted https URL
+    /// for staged catalogs). Empty / unset → fall back to
+    /// `PluginCatalog.defaultRemoteURL`. Set with:
+    ///   defaults write com.tinystone.ClaudeStatistics.debug \
+    ///     dev.pluginCatalog.remoteURL "file:///path/to/index.json"
+    private var developerCatalogOverrideURL: URL? {
+        guard let raw = UserDefaults.standard.string(forKey: "dev.pluginCatalog.remoteURL")?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else { return nil }
+        return URL(string: raw)
     }
 
     private var disabledRows: [Row] {
@@ -108,7 +149,10 @@ struct PluginsSettingsView: View {
             case .installed:
                 installedTab
             case .discover:
-                PluginDiscoverView(pluginRegistry: pluginRegistry)
+                PluginDiscoverView(
+                    pluginRegistry: pluginRegistry,
+                    catalogURL: developerCatalogOverrideURL
+                )
             }
         }
         .alert("settings.plugins.resetTrust.confirmTitle", isPresented: $showResetConfirmation) {
@@ -198,19 +242,39 @@ struct PluginsSettingsView: View {
 
     @ViewBuilder
     private var installedTab: some View {
+        VStack(spacing: 0) {
+            PluginCategoryFilterBar(
+                categories: installedCategoryCounts,
+                selection: $selectedInstalledCategory
+            )
+            Divider().opacity(installedCategoryCounts.isEmpty ? 0 : 1)
+            installedForm
+        }
+    }
+
+    @ViewBuilder
+    private var installedForm: some View {
         Form {
-                Section {
-                    if rows.isEmpty {
-                        Text("settings.plugins.empty")
+                if filteredRows.isEmpty {
+                    Section {
+                        Text(rows.isEmpty
+                             ? "settings.plugins.empty"
+                             : "settings.plugins.empty.filter")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(rows) { row in
+                    } header: {
+                        Text(String(format: NSLocalizedString("settings.plugins.loaded.count", comment: ""),
+                                    filteredRows.count))
+                    }
+                } else {
+                    Section {
+                        ForEach(filteredRows) { row in
                             pluginRow(row.manifest, source: row.source, isDisabled: false)
                         }
+                    } header: {
+                        Text(String(format: NSLocalizedString("settings.plugins.loaded.count", comment: ""),
+                                    filteredRows.count))
                     }
-                } header: {
-                    Text(String(format: NSLocalizedString("settings.plugins.loaded.count", comment: ""), rows.count))
                 }
 
                 if !disabledRows.isEmpty {

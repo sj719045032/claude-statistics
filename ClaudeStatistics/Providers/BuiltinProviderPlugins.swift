@@ -22,7 +22,7 @@ final class ClaudePluginDogfood: NSObject, ProviderPlugin {
         permissions: [.filesystemHome, .network, .keychain],
         principalClass: "ClaudePluginDogfood",
         iconAsset: "ClaudeProviderIcon",
-        category: PluginCatalogCategory.vendor
+        category: PluginCatalogCategory.provider
     )
     var descriptor: ProviderDescriptor { .claude }
     func makeProvider() -> (any BundledSessionProvider)? { ClaudeProvider.shared }

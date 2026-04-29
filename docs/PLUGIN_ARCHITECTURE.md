@@ -98,11 +98,19 @@ public final class CodexPlugin: ProviderPlugin, ProviderAccountUIProviding {
 - 通用能力上 SDK：`DiagnosticLogger` / `FSEventsWatcher` / `AppRuntimePaths` / `TerminalDispatch` / `TerminalProcessRunner` / `HookInstaller` 工具集 / `UsageError` / `UsageCacheFile` / `PricingFetchError` / `ToolOutputCleaning` / **hook chassis**（`HookActionEnvelope` / `HookTerminalContext` / `HookHelperContext` / `ProviderHookNormalizing` 协议 + `HookPayloadNormalizer` payload helpers）/ **plugin metadata stores**（`PluginDescriptorStore` / `PluginToolAliasStore`，让 plugin 在 init 时把 descriptor + alias 表 push 给 host fallback）。
 - Marketplace 代码完整（`PluginCatalog` / `PluginInstaller` / `PluginUninstaller` / `PluginDiscoverView`）+ Phase 3 文档（`docs/marketplace-catalog-template/` + `docs/PLUGIN_PACKAGING.md`）。
 - 多个 capability 协议化（`TerminalFocusStrategy` / `TerminalAppleScriptFocusing` / `TerminalFrontmostSessionProbing` / `ShareRolePlugin` 等）。
+- **`PluginPermission` rawValue chassis bug 已修**：之前 enum rawValue 用 dotted form (`"filesystem.home"`) 而所有 `.csplugin` Info.plist 写 camelCase (`"filesystemHome"`)，导致 `PluginManifest(bundle:)` 对每一个磁盘上的 `.csplugin` 都默默 decode 失败 —— host 一直走 fallback 路径让用户感知不到。修后所有 `.csplugin`（13 个）真正通过 `PluginLoader.loadOne` 注册到 `PluginRegistry`。
+- **Codex 作为 marketplace pilot 已落地**：`project.yml` 不再把 `CodexPlugin.csplugin` build-time copy 进 `.app/Contents/PlugIns/`，用户必须从 Settings → 插件 → Discover 安装。`PluginsSettingsView` 支持 `dev.pluginCatalog.remoteURL` `UserDefaults` 覆盖（dev/QA 用 file:// 指向本地 `index.json`），生产环境走 `PluginCatalog.defaultRemoteURL`。
+- **Plugin 列表 UI 按 category chip 筛选**：`PluginCategoryFilterBar` 是个 capsule-style chip bar，Installed + Discover 两个 tab 都有，按 `provider / terminal / chat-app / editor-integration / share-card / utility` 顺序显示有内容的分类（带计数），点击切换。chip 用 `Text(LocalizedStringKey)` 通过 `.environment(\.locale)` 对运行时语言切换响应（不像 `NSLocalizedString` 提前 stringify）。
+- **`vendor` → `provider` 命名统一**：Catalog category 字符串、enum case、plist `category` 字段、本地化 key（`settings.plugins.category.provider`）全部对齐到代码体系内的 `ProviderPlugin` / `ProviderDescriptor` / `ProviderRegistry` 命名。
+- **`PluginInstaller` 加 fallback 路径**：`Bundle(url:)` 在 `NSTemporaryDirectory()` 内的 staging dir 偶发返回 nil（macOS 行为），fallback 改为直接读 `Contents/Info.plist` 通过 `PropertyListSerialization`。`InstallError` 拆 `manifestMissing` 为 `bundleLoadFailed(path:)` + `manifestKeyMissing(path:)` + 加 `DiagnosticLogger` 详细日志。
 
 **未来**：
 - Claude provider 抽 `.csplugin`（最后一个 host-bundled adapter）：会触发 SDK 容纳 sync/independent 双模式 SwiftUI view 状态的额外工作。
 - 任何 provider / terminal / share role / share theme plugin 抽离都遵循本文。
 - 第三方 `.csplugin` 通过 marketplace 安装后零 host 改动即工作。
+- 把其它 `.csplugin`（Gemini / Kitty / WezTerm / Warp / Alacritty / AppleTerminal / ClaudeAppPlugin / CodexAppPlugin / VSCode / Cursor / Windsurf / Trae / Zed）逐个从 `.app` build-time copy 移除，统一走 marketplace 安装路径。Codex pilot 是模板。
+- catalog repo（`github.com/sj719045032/claude-statistics-plugins`）真正建立 + `index.json` 填充 + 每次 `release.sh` 自动产出 `.csplugin.zip` artifact 上传到 GitHub release。
+- 切语言时 install error toast / loaded.count 等 `NSLocalizedString` 路径残留的 reactive 缺口（已识别，chip + 主入口已修）。
 
 ## 7. Provider Plugin 抽 .csplugin 路线图（参考模板）
 
