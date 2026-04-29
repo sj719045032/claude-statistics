@@ -18,7 +18,13 @@ struct PluginDiscoverView: View {
     @State private var entries: [PluginCatalogEntry] = []
     @State private var lastFetchKind: PluginCatalog.Outcome.Kind?
     @State private var loadingState: LoadingState = .idle
-    @State private var errorMessage: String?
+    /// Discriminated error so the view can render `Text(LocalizedStringKey)`
+    /// with arguments at draw time. SwiftUI then re-resolves the
+    /// strings through `.environment(\.locale)` whenever the user
+    /// changes the in-app language — a stringified
+    /// `String(format: NSLocalizedString(...))` would freeze the
+    /// translation at the moment of the error.
+    @State private var errorMessage: DiscoverErrorMessage?
     /// Per-entry install state ticks so a successful install
     /// re-renders the row (`pluginRegistry` snapshot doesn't ship
     /// `objectWillChange`).
@@ -32,6 +38,33 @@ struct PluginDiscoverView: View {
         case fetching
         case ready
         case failed
+    }
+
+    /// Renderable representation of every error path the Discover tab
+    /// surfaces. Each case carries the raw arguments so `errorText`
+    /// can hand them to a `Text(LocalizedStringKey)` interpolation —
+    /// keys live in `Localizable.strings`, lookup happens at render
+    /// time, language switches re-render automatically.
+    private enum DiscoverErrorMessage: Equatable {
+        case network(String)
+        case decoding(String)
+        case schemaTooNew(catalog: Int, host: Int)
+        case offlineNoCache
+
+        case downloadFailed(String)
+        case sha256Mismatch(expected: String, actual: String)
+        case unzipFailed(String)
+        case missingBundle
+        case bundleLoadFailed(path: String)
+        case manifestKeyMissing(path: String)
+        case manifestIDMismatch(expected: String, actual: String)
+        case apiVersionIncompatible(required: String, host: String)
+        case moveFailed(String)
+        case loadFailed(String)
+
+        /// Fallback for `catch` arms that hit a non-typed error —
+        /// the description is dumped verbatim, no localization.
+        case unknown(String)
     }
 
     var body: some View {
@@ -110,11 +143,13 @@ struct PluginDiscoverView: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 11))
                     .foregroundStyle(.red)
-                Text(errorMessage ?? "")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                if let errorMessage {
+                    errorText(errorMessage)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
             }
             Spacer()
             Button(action: { Task { await refresh() } }) {
@@ -279,10 +314,10 @@ struct PluginDiscoverView: View {
             loadingState = .ready
         } catch let error as PluginCatalog.FetchError {
             loadingState = .failed
-            errorMessage = describe(error)
+            errorMessage = mapDiscoverError(error)
         } catch {
             loadingState = .failed
-            errorMessage = String(describing: error)
+            errorMessage = .unknown(String(describing: error))
         }
     }
 
@@ -304,10 +339,10 @@ struct PluginDiscoverView: View {
                 // same hook the trust prompt fires.
                 PluginTrustGate.onPluginHotLoaded?(entry.toManifestStub(), URL(fileURLWithPath: ""))
             } catch let installError as PluginInstaller.InstallError {
-                errorMessage = describe(installError)
+                errorMessage = mapInstallError(installError)
                 loadingState = .failed
             } catch {
-                errorMessage = String(describing: error)
+                errorMessage = .unknown(String(describing: error))
                 loadingState = .failed
             }
             installingIDs.remove(entry.id)
@@ -317,57 +352,68 @@ struct PluginDiscoverView: View {
 
     // MARK: - Helpers
 
-    private func describe(_ error: PluginCatalog.FetchError) -> String {
+    private func mapDiscoverError(_ error: PluginCatalog.FetchError) -> DiscoverErrorMessage {
         switch error {
-        case .network(let m): return NSLocalizedString("settings.plugins.discover.error.network", comment: "") + ": \(m)"
-        case .decoding(let m): return NSLocalizedString("settings.plugins.discover.error.decoding", comment: "") + ": \(m)"
-        case .schemaVersionTooNew(let r, let s):
-            return String(
-                format: NSLocalizedString("settings.plugins.discover.error.schemaTooNew", comment: ""),
-                r, s
-            )
-        case .offlineNoCache:
-            return NSLocalizedString("settings.plugins.discover.error.offlineNoCache", comment: "")
+        case .network(let m): return .network(m)
+        case .decoding(let m): return .decoding(m)
+        case .schemaVersionTooNew(let catalog, let host): return .schemaTooNew(catalog: catalog, host: host)
+        case .offlineNoCache: return .offlineNoCache
         }
     }
 
-    private func describe(_ error: PluginInstaller.InstallError) -> String {
+    private func mapInstallError(_ error: PluginInstaller.InstallError) -> DiscoverErrorMessage {
         switch error {
+        case .downloadFailed(let m): return .downloadFailed(m)
+        case .sha256Mismatch(let expected, let actual): return .sha256Mismatch(expected: expected, actual: actual)
+        case .unzipFailed(let m): return .unzipFailed(m)
+        case .missingPluginBundle: return .missingBundle
+        case .bundleLoadFailed(let path): return .bundleLoadFailed(path: path)
+        case .manifestKeyMissing(let path): return .manifestKeyMissing(path: path)
+        case .manifestIDMismatch(let expected, let actual): return .manifestIDMismatch(expected: expected, actual: actual)
+        case .incompatibleAPIVersion(let req, let host): return .apiVersionIncompatible(required: "\(req)", host: "\(host)")
+        case .moveFailed(let m): return .moveFailed(m)
+        case .loadFailed(let reason): return .loadFailed(String(describing: reason))
+        }
+    }
+
+    /// Render `errorMessage` as a `Text(LocalizedStringKey)` so SwiftUI
+    /// re-resolves through the active locale. Each case maps to a
+    /// strings table key that takes its arguments via `%@` / `%lld`
+    /// substitution — no `String(format: NSLocalizedString…)` path
+    /// because that stringifies eagerly and freezes the language.
+    @ViewBuilder
+    private func errorText(_ msg: DiscoverErrorMessage) -> some View {
+        switch msg {
+        case .network(let m):
+            Text("settings.plugins.discover.error.network \(m)")
+        case .decoding(let m):
+            Text("settings.plugins.discover.error.decoding \(m)")
+        case .schemaTooNew(let catalog, let host):
+            Text("settings.plugins.discover.error.schemaTooNew \(catalog) \(host)")
+        case .offlineNoCache:
+            Text("settings.plugins.discover.error.offlineNoCache")
         case .downloadFailed(let m):
-            return NSLocalizedString("settings.plugins.install.error.download", comment: "") + ": \(m)"
+            Text("settings.plugins.install.error.download \(m)")
         case .sha256Mismatch(let expected, let actual):
-            return String(
-                format: NSLocalizedString("settings.plugins.install.error.sha256Mismatch %@ %@", comment: ""),
-                expected, actual
-            )
+            Text("settings.plugins.install.error.sha256Mismatch \(expected) \(actual)")
         case .unzipFailed(let m):
-            return NSLocalizedString("settings.plugins.install.error.unzip", comment: "") + ": \(m)"
-        case .missingPluginBundle:
-            return NSLocalizedString("settings.plugins.install.error.missingBundle", comment: "")
+            Text("settings.plugins.install.error.unzip \(m)")
+        case .missingBundle:
+            Text("settings.plugins.install.error.missingBundle")
         case .bundleLoadFailed(let path):
-            return String(
-                format: NSLocalizedString("settings.plugins.install.error.bundleLoad %@", comment: ""),
-                path
-            )
+            Text("settings.plugins.install.error.bundleLoad \(path)")
         case .manifestKeyMissing(let path):
-            return String(
-                format: NSLocalizedString("settings.plugins.install.error.manifestKey %@", comment: ""),
-                path
-            )
+            Text("settings.plugins.install.error.manifestKey \(path)")
         case .manifestIDMismatch(let expected, let actual):
-            return String(
-                format: NSLocalizedString("settings.plugins.install.error.idMismatch %@ %@", comment: ""),
-                expected, actual
-            )
-        case .incompatibleAPIVersion(let req, let host):
-            return String(
-                format: NSLocalizedString("settings.plugins.install.error.apiVersion %@ %@", comment: ""),
-                "\(req)", "\(host)"
-            )
+            Text("settings.plugins.install.error.idMismatch \(expected) \(actual)")
+        case .apiVersionIncompatible(let req, let host):
+            Text("settings.plugins.install.error.apiVersion \(req) \(host)")
         case .moveFailed(let m):
-            return NSLocalizedString("settings.plugins.install.error.move", comment: "") + ": \(m)"
-        case .loadFailed(let reason):
-            return NSLocalizedString("settings.plugins.install.error.load", comment: "") + ": \(String(describing: reason))"
+            Text("settings.plugins.install.error.move \(m)")
+        case .loadFailed(let m):
+            Text("settings.plugins.install.error.load \(m)")
+        case .unknown(let s):
+            Text(verbatim: s)
         }
     }
 

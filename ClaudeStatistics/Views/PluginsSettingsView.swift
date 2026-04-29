@@ -263,8 +263,7 @@ struct PluginsSettingsView: View {
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     } header: {
-                        Text(String(format: NSLocalizedString("settings.plugins.loaded.count", comment: ""),
-                                    filteredRows.count))
+                        Text("settings.plugins.loaded.count \(filteredRows.count)")
                     }
                 } else {
                     Section {
@@ -272,8 +271,7 @@ struct PluginsSettingsView: View {
                             pluginRow(row.manifest, source: row.source, isDisabled: false)
                         }
                     } header: {
-                        Text(String(format: NSLocalizedString("settings.plugins.loaded.count", comment: ""),
-                                    filteredRows.count))
+                        Text("settings.plugins.loaded.count \(filteredRows.count)")
                     }
                 }
 
@@ -283,10 +281,7 @@ struct PluginsSettingsView: View {
                             pluginRow(row.manifest, source: row.source, isDisabled: true)
                         }
                     } header: {
-                        Text(String(
-                            format: NSLocalizedString("settings.plugins.disabled.count", comment: ""),
-                            disabledRows.count
-                        ))
+                        Text("settings.plugins.disabled.count \(disabledRows.count)")
                     }
                 }
 
