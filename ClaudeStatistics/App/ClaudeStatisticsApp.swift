@@ -62,14 +62,17 @@ final class AppState: ObservableObject {
     static let hostPluginFactories: [String: () -> any Plugin] = [
         ClaudePluginDogfood.manifest.id:    { ClaudePluginDogfood() },
         ITermPlugin.manifest.id:            { ITermPlugin() },
-        GhosttyPlugin.manifest.id:          { GhosttyPlugin() }
-        // 5 terminals (Warp / Alacritty / AppleTerminal / Kitty /
-        // WezTerm) plus Gemini + Codex providers extracted to
-        // .csplugin (M2 / Stage 4). Loaded via PluginLoader from
-        // Contents/PlugIns at runtime, not here. Only iTerm2 +
-        // Ghostty stay builtin (most-used; smallest user-visible
-        // disruption if extraction goes wrong). Claude provider
-        // is the last remaining host-bundled adapter.
+        GhosttyPlugin.manifest.id:          { GhosttyPlugin() },
+        AppleTerminalPlugin.manifest.id:    { AppleTerminalPlugin() }
+        // Chassis built-ins per `docs/PLUGIN_ARCHITECTURE.md` §1.1:
+        // Claude provider, iTerm2 / Ghostty / Apple Terminal — the
+        // out-of-box experience that must work the moment a fresh
+        // install opens the app. Every other plugin (Gemini / Codex
+        // providers, Claude.app / Codex.app chat-app, Warp /
+        // Alacritty / Kitty / WezTerm terminals, VSCode / Cursor /
+        // Windsurf / Trae / Zed editors) ships through the catalog
+        // repo's marketplace; users install from Settings →
+        // Plugins → Discover.
     ]
 
     let pluginRegistry: PluginRegistry = {

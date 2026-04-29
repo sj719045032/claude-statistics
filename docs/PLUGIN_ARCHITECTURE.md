@@ -26,12 +26,12 @@ Chassis 自带一组**永久内置**的 default 体验，与 SDK 协议同等地
 - **内置 share themes** —— 默认主题（`SharePluginThemes`）—— 自带
   色板 / 排版 / 视觉风格是 share 卡片的 default 外观。
 - **iTerm2 / Ghostty / Apple Terminal 三个内置终端** —— macOS 用户
-  几乎都装了至少其中一个，是 chassis 默认终端体验。
-  - iTerm2 / Ghostty 直接在 host module 内（从未抽 `.csplugin`）。
-  - Apple Terminal 是 `.csplugin` 形态（commit `2000110` M2 抽离）
-    但永久 build-time bundled 进 `.app/Contents/PlugIns/`，不走
-    marketplace —— `project.yml` 里继续保留 `copy: { destination:
-    plugins }` dependency。形态不同，但 fresh-install 用户都开机就有。
+  几乎都装了至少其中一个，是 chassis 默认终端体验。三个都直接在
+  host module 内（Apple Terminal 一度被 commit `2000110` 抽成
+  `.csplugin`，在 plugin-source-to-catalog-repo 重构里反向搬回
+  `ClaudeStatistics/Terminal/Capabilities/AppleTerminalBuiltin.swift`，
+  通过 `hostPluginFactories` 注册到 `PluginRegistry`，跟 iTerm2 /
+  Ghostty 形态彻底对齐）。
 
 **但 SDK 协议永久 open for extension**：`ProviderPlugin` /
 `TerminalPlugin` / `ShareRolePlugin` / `ShareCardThemePlugin` 等

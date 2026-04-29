@@ -2,15 +2,19 @@ import AppKit
 import ClaudeStatisticsKit
 import Foundation
 
-/// Apple Terminal plugin (extracted from main binary in M2).
-///
-/// Apple's Terminal.app exposes an AppleScript surface for both
-/// launching new tabs (`do script "…" in window N`) and focusing
-/// existing ones (matching by `tty`). The plugin self-contains the
-/// scripts and a small osascript runner — no host fallback needed.
+/// Apple Terminal built into the host module (chassis built-in per
+/// `docs/PLUGIN_ARCHITECTURE.md` §1.1). Originally extracted to a
+/// `.csplugin` in commit `2000110`; reverted in this refactor so all
+/// chassis built-ins (Claude provider, share roles/themes, iTerm2 /
+/// Ghostty / Apple Terminal) actually live in the host module rather
+/// than mixing forms. Behaviour is identical to the previous
+/// `.csplugin` — same `@objc(AppleTerminalPlugin)` name + same
+/// `id "com.apple.Terminal"` so the manifest layer doesn't see a
+/// rename. The class is `internal` (no `public`) because it stays
+/// in this module.
 @objc(AppleTerminalPlugin)
-public final class AppleTerminalPlugin: NSObject, TerminalPlugin {
-    public static let manifest = PluginManifest(
+final class AppleTerminalPlugin: NSObject, TerminalPlugin {
+    static let manifest = PluginManifest(
         id: "com.apple.Terminal",
         kind: .terminal,
         displayName: "Terminal",
@@ -20,7 +24,7 @@ public final class AppleTerminalPlugin: NSObject, TerminalPlugin {
         principalClass: "AppleTerminalPlugin"
     )
 
-    public let descriptor = TerminalDescriptor(
+    let descriptor = TerminalDescriptor(
         id: "Terminal",
         displayName: "Terminal",
         category: .terminal,
@@ -31,19 +35,19 @@ public final class AppleTerminalPlugin: NSObject, TerminalPlugin {
         autoLaunchPriority: 70
     )
 
-    public override init() { super.init() }
+    override init() { super.init() }
 
-    public func detectInstalled() -> Bool { true } // Terminal.app ships with macOS.
+    func detectInstalled() -> Bool { true } // Terminal.app ships with macOS.
 
-    public func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
+    func makeFocusStrategy() -> (any TerminalFocusStrategy)? {
         AppleTerminalFocusStrategy()
     }
 
-    public func makeLauncher() -> (any TerminalLauncher)? {
+    func makeLauncher() -> (any TerminalLauncher)? {
         AppleTerminalLauncher()
     }
 
-    public func makeReadinessProvider() -> (any TerminalReadinessProviding)? {
+    func makeReadinessProvider() -> (any TerminalReadinessProviding)? {
         AppleTerminalReadinessProvider()
     }
 }
