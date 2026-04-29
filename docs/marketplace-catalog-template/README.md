@@ -17,10 +17,17 @@ Release assets.
 treats it as opaque and trusts whatever bytes come back, gated by the
 SHA-256 in the same entry. We use that flexibility as follows:
 
-- **First-party plugins** (the 12 bundles that currently ship inside
-  the host app): every `.csplugin.zip` is uploaded to **this catalog
-  repo's** GitHub Releases under a tag matching the plugin version
-  (e.g. `v1.0.0`). The `downloadURL` for each entry points there.
+- **First-party plugins** (the 13 bundles delivered through the
+  marketplace — Gemini / Codex providers, Claude.app / Codex.app
+  chat-app, Alacritty / Kitty / Warp / WezTerm terminals, VSCode /
+  Cursor / Windsurf / Trae / Zed editors): every `.csplugin.zip` is
+  uploaded as a release asset on the **host repo's** GitHub Releases
+  by `scripts/release.sh` (no separate hosting). The `downloadURL`
+  for each entry points at
+  `https://github.com/sj719045032/claude-statistics/releases/download/v<version>/<Plugin>-<version>.csplugin.zip`.
+  Apple Terminal is intentionally absent — it stays bundled inside
+  the host `.app` per `PLUGIN_ARCHITECTURE.md` §1.1, never via this
+  catalog.
 - **Third-party plugins**: authors upload their `.csplugin.zip` to a
   release on **their own** GitHub repo, then open a PR adding an
   entry to `index.json` whose `downloadURL` points at their release.
@@ -48,13 +55,13 @@ the host repo). The exact field set:
       "description": "<one-line summary>",
       "author": "<author name or org>",
       "homepage": "<https URL to project / docs, or null>",
-      "category": "<one of: vendor | terminal | chat-app | share-card | editor-integration | utility>",
+      "category": "<one of: provider | terminal | chat-app | share-card | editor-integration | utility>",
       "version": "<MAJOR.MINOR.PATCH>",
       "minHostAPIVersion": "<MAJOR.MINOR.PATCH>",
       "downloadURL": "<https URL of the .csplugin.zip>",
       "sha256": "<lowercase hex SHA-256 of the bytes at downloadURL>",
       "iconURL": "<https URL of a 24x24 PNG/PDF, or null>",
-      "permissions": ["<zero or more of: filesystem.home, filesystem.any, network, accessibility, apple.script, keychain>"]
+      "permissions": ["<zero or more of: filesystemHome, filesystemAny, network, accessibility, appleScript, keychain>"]
     }
   ]
 }
@@ -67,7 +74,7 @@ Field rules the host enforces:
 | `schemaVersion` | Must equal `1`. The host rejects feeds with a higher value as `schemaVersionTooNew` and refuses to fall back. |
 | `updatedAt` | ISO-8601 with timezone. Shown in the Discover footer. |
 | `id` | Must match the `id` inside the downloaded `.csplugin`'s `Info.plist → CSPluginManifest`. Mismatch → install aborts with `manifestIDMismatch`. |
-| `category` | Strings outside the known six (`vendor`, `terminal`, `chat-app`, `share-card`, `editor-integration`, `utility`) are accepted but rendered under "Utility" in the UI. |
+| `category` | Strings outside the known six (`provider`, `terminal`, `chat-app`, `share-card`, `editor-integration`, `utility`) are accepted but rendered under "Utility" in the UI. |
 | `version`, `minHostAPIVersion` | Strict dotted-numeric SemVer (`MAJOR.MINOR.PATCH`). Pre-release suffixes are rejected by `SemVer`'s decoder. |
 | `downloadURL` | HTTPS, public, no auth, must serve the raw `.csplugin.zip` bytes. GitHub Release assets are the recommended host. |
 | `sha256` | Lowercase hex of the bytes returned by `downloadURL`. Comparison is case-insensitive. Mismatch → install aborts with `sha256Mismatch`. |

@@ -98,7 +98,7 @@ the existing entries as a template. Required fields:
   "description": "<one line>",
   "author": "<your name or org>",
   "homepage": "<https URL to your repo / docs, or null>",
-  "category": "<vendor | terminal | chat-app | share-card | editor-integration | utility>",
+  "category": "<provider | terminal | chat-app | share-card | editor-integration | utility>",
   "version": "<MAJOR.MINOR.PATCH>",
   "minHostAPIVersion": "<MAJOR.MINOR.PATCH>",
   "downloadURL": "<https URL of the .csplugin.zip you uploaded>",
@@ -118,7 +118,7 @@ user**, not the protocol it implements:
 
 | `category` | Pick this if… |
 |---|---|
-| `vendor` | You ship a vendor adapter for an AI coding CLI (Claude / Codex / Gemini / Aider / …). |
+| `provider` | You ship a provider adapter for an AI coding CLI (Codex / Gemini / Aider / …). Note: Claude is the chassis's built-in default provider — see `PLUGIN_ARCHITECTURE.md` §1.1. |
 | `terminal` | You adapt a terminal emulator for focus return + new-session launching (iTerm2, Kitty, Alacritty, …). |
 | `chat-app` | You integrate a desktop chat app via deep-link (Claude.app, Codex.app, …). |
 | `share-card` | You contribute share-card roles, scoring, or visual themes. |
