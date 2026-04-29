@@ -9,6 +9,36 @@
 2. **主程序是底座**。提供通用 SDK 协议 + UI primitives + 统一布局容器。任何 plugin 都不该「需要主程序为我专门加文件」才能 work。
 3. **挖坑位，不挖关系**。SDK 协议定义 plugin 可填充的 view slot 与数据回调；plugin 通过坑位上交 SwiftUI view + 状态。底座不知道 plugin 的具体类型，只知道协议。
 
+## 1.1 Chassis built-ins vs marketplace plugins（2026-04-30 决策）
+
+Chassis 自带一组**永久内置**的 default 体验，与 SDK 协议同等地位。
+它们不抽 `.csplugin`，不走 marketplace —— 因为 fresh install 用户
+必须立刻可用，体验不能被"先去 marketplace 装一下"打断。
+
+**永久内置的 chassis built-ins**（不抽，不动）：
+
+- **Claude provider** —— 应用名是 *Claude* Statistics，Claude 是
+  应用核心体验，从 sync/independent 双模式状态到 ClaudeProvider
+  整链都留 host module。
+- **内置 share roles** —— 默认 ShareRole 体系（`ShareRoleEngine`
+  + `ShareMetrics+Evaluation` + `SharePluginScoring`）—— chassis
+  自带的角色集是 share 卡片的 default 内容。
+- **内置 share themes** —— 默认主题（`SharePluginThemes`）—— 自带
+  色板 / 排版 / 视觉风格是 share 卡片的 default 外观。
+
+**但 SDK 协议永久 open for extension**：`ProviderPlugin` /
+`TerminalPlugin` / `ShareRolePlugin` / `ShareCardThemePlugin` 等
+协议保持公开，第三方插件可以加**新** provider / 终端适配 / share
+卡片角色 / share 卡片主题，host 通过 `PluginRegistry` 平等加载。
+内置 ≠ 闭门 —— chassis built-ins 占住 default 卡位，但 SDK 仍是
+"挖坑位，不挖关系"。
+
+**这条原则的判定**：要不要把某个 X 抽成 `.csplugin`？追问"X 是不是
+fresh install 用户立刻看到、没了它应用就空"。是 → 留 chassis
+built-in；否 → 走 marketplace plugin。Gemini / Codex / VSCode /
+Warp 这些——用户没装也能用 Claude，所以走 marketplace；新增的第三方
+share theme/role 也走 plugin。
+
 ## 2. 边界划分
 
 ### 主程序（host + SDK）拥有
@@ -94,7 +124,7 @@ public final class CodexPlugin: ProviderPlugin, ProviderAccountUIProviding {
 
 **已落实**：
 - 5 个 terminal plugin 抽 `.csplugin`（Warp / Alacritty / AppleTerminal / Kitty / WezTerm），iTerm2 + Ghostty 留 builtin。
-- **Gemini + Codex provider 都抽 `.csplugin`** 真正自包含（包括 hook normalizer + descriptor + alias 表）：每个 plugin 通过 SDK `ProviderAccountUIProviding` 填账户卡片坑位；通过 SDK `ProviderHookNormalizing` 实现 hook 路径 normalize（HookCLI 在 main-binary CLI 模式直接加载 `Contents/PlugIns/` 内的 plugin）；通过 `TerminalDispatch` 发起 terminal launch；通过 `PluginDescriptorStore` + `PluginToolAliasStore` 把 descriptor metadata + tool alias 表 push 给 host fallback。**Host 端零 Gemini / Codex-specific class / static / file / glue function。** 仅剩三处 surface：（1）`ProviderRegistry.supportedProviders` / `ProviderKind.allBuiltins` 列表里的 `.codex` / `.gemini` builtin id —— 是 host 已知的 builtin plugin id 注册信息，非 glue；（2）`Localizable.strings` 中的显示文案 —— host UI 容器层，等 SDK plugin localization 体系落地再迁移；（3）`AppPreferences.codexUsageRetryAfter` legacy 用户偏好 key 字符串（plugin 内 inline literal 镜像）。Claude provider 是唯一仍 host-bundled 的 adapter（含 sync/independent 双模式状态）。
+- **Gemini + Codex provider 都抽 `.csplugin`** 真正自包含（包括 hook normalizer + descriptor + alias 表）：每个 plugin 通过 SDK `ProviderAccountUIProviding` 填账户卡片坑位；通过 SDK `ProviderHookNormalizing` 实现 hook 路径 normalize（HookCLI 在 main-binary CLI 模式直接加载 `Contents/PlugIns/` 内的 plugin）；通过 `TerminalDispatch` 发起 terminal launch；通过 `PluginDescriptorStore` + `PluginToolAliasStore` 把 descriptor metadata + tool alias 表 push 给 host fallback。**Host 端零 Gemini / Codex-specific class / static / file / glue function。** 仅剩三处 surface：（1）`ProviderRegistry.supportedProviders` / `ProviderKind.allBuiltins` 列表里的 `.codex` / `.gemini` builtin id —— 是 host 已知的 builtin plugin id 注册信息，非 glue；（2）`Localizable.strings` 中的显示文案 —— host UI 容器层，等 SDK plugin localization 体系落地再迁移；（3）`AppPreferences.codexUsageRetryAfter` legacy 用户偏好 key 字符串（plugin 内 inline literal 镜像）。Claude provider 永久 host-bundled（§1.1 决策），是 chassis 的 default provider。
 - 通用能力上 SDK：`DiagnosticLogger` / `FSEventsWatcher` / `AppRuntimePaths` / `TerminalDispatch` / `TerminalProcessRunner` / `HookInstaller` 工具集 / `UsageError` / `UsageCacheFile` / `PricingFetchError` / `ToolOutputCleaning` / **hook chassis**（`HookActionEnvelope` / `HookTerminalContext` / `HookHelperContext` / `ProviderHookNormalizing` 协议 + `HookPayloadNormalizer` payload helpers）/ **plugin metadata stores**（`PluginDescriptorStore` / `PluginToolAliasStore`，让 plugin 在 init 时把 descriptor + alias 表 push 给 host fallback）。
 - Marketplace 代码完整（`PluginCatalog` / `PluginInstaller` / `PluginUninstaller` / `PluginDiscoverView`）+ Phase 3 文档（`docs/marketplace-catalog-template/` + `docs/PLUGIN_PACKAGING.md`）。
 - 多个 capability 协议化（`TerminalFocusStrategy` / `TerminalAppleScriptFocusing` / `TerminalFrontmostSessionProbing` / `ShareRolePlugin` 等）。
@@ -107,8 +137,7 @@ public final class CodexPlugin: ProviderPlugin, ProviderAccountUIProviding {
 - **Release pipeline 自动产出 marketplace artifacts**：`scripts/pack-csplugin.sh` 加可选第二参数 `<build-products-dir>`；`scripts/build-dmg.sh` 在 Release build 完成后扫所有 `Build/Products/Release/*.csplugin` 调 pack-csplugin → `build/marketplace/<Name>.csplugin.zip` + `<Name>.sha256`，并先 wipe 上轮残留；`scripts/release.sh` 把那批 zip 加进 `gh release create` ASSET_LIST。一次 release 现在产出 14 个 plugin bundle 跟 dmg/zip/deltas 一起 upload 到同一 `v<version>` GitHub release，catalog `index.json.downloadURL` 直接指过去就行。
 
 **未来**：
-- Claude provider 抽 `.csplugin`（最后一个 host-bundled adapter）：会触发 SDK 容纳 sync/independent 双模式 SwiftUI view 状态的额外工作。
-- 任何 provider / terminal / share role / share theme plugin 抽离都遵循本文。
+- 新增（第三方或自定义）的 provider / terminal / share role / share theme plugin 走本文模板。Chassis built-ins（Claude provider / 内置 share roles / 内置 share themes）永久 host-bundled，详见 §1.1 —— 它们不抽 `.csplugin`，但 SDK 协议保持 open，新卡片新主题等扩展走 plugin。
 - 第三方 `.csplugin` 通过 marketplace 安装后零 host 改动即工作。
 - 把其它 `.csplugin`（Gemini / Kitty / WezTerm / Warp / Alacritty / AppleTerminal / ClaudeAppPlugin / CodexAppPlugin / VSCode / Cursor / Windsurf / Trae / Zed）逐个从 `.app` build-time copy 移除（同 Codex pilot：`embed: false` + `link: false` + 移除 `copy:` 块），统一走 marketplace 安装路径。前置已就位 —— release pipeline 自动 upload + Codex pilot 模板齐活。
 - catalog repo（`github.com/sj719045032/claude-statistics-plugins`）真正建立 + `index.json` 填充。release pipeline 已经在产出 artifacts 并 upload 到主 repo 的 GitHub release，catalog repo 只需要 host 一份 `index.json` 指过去即可。
