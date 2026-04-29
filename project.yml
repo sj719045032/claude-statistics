@@ -570,66 +570,63 @@ targets:
     dependencies:
       - target: ClaudeStatisticsKit
         embed: true
-      - target: ClaudeAppPlugin
-        copy:
-          destination: plugins
-          subpath: ""
-      - target: CodexAppPlugin
-        copy:
-          destination: plugins
-          subpath: ""
-      - target: VSCodePlugin
-        copy:
-          destination: plugins
-          subpath: ""
-      - target: CursorPlugin
-        copy:
-          destination: plugins
-          subpath: ""
-      - target: WindsurfPlugin
-        copy:
-          destination: plugins
-          subpath: ""
-      - target: TraePlugin
-        copy:
-          destination: plugins
-          subpath: ""
-      - target: ZedPlugin
-        copy:
-          destination: plugins
-          subpath: ""
-      - target: WarpPlugin
-        copy:
-          destination: plugins
-          subpath: ""
-      - target: AlacrittyPlugin
-        copy:
-          destination: plugins
-          subpath: ""
+      # ── Chassis built-in plugin ──────────────────────────────────
+      # Apple Terminal joins iTerm2 / Ghostty in the default
+      # out-of-box terminal experience (PLUGIN_ARCHITECTURE.md §1.1).
+      # iTerm2 + Ghostty live in the host module; Apple Terminal is
+      # historically a `.csplugin` (commit 2000110), kept build-time
+      # bundled into `.app/Contents/PlugIns/` so fresh-install users
+      # see it immediately — never marketplace-only.
       - target: AppleTerminalPlugin
         copy:
           destination: plugins
           subpath: ""
+      # ── Marketplace-only plugins ─────────────────────────────────
+      # Built as standalone targets so dev / packaging scripts can
+      # find each `.csplugin` under Build/Products/, but NOT embedded
+      # into the `.app`. `embed: false` + `link: false` keeps the
+      # bundle out of every embed / resources phase; without them
+      # XcodeGen falls back to adding cfbundle dependencies to
+      # Resources, which silently smuggles them into
+      # `.app/Contents/Resources/`. Users install via Settings →
+      # Plugins → Discover. See PLUGIN_ARCHITECTURE.md §1.1 for the
+      # chassis-built-in vs marketplace decision rule.
+      - target: ClaudeAppPlugin
+        embed: false
+        link: false
+      - target: CodexAppPlugin
+        embed: false
+        link: false
+      - target: VSCodePlugin
+        embed: false
+        link: false
+      - target: CursorPlugin
+        embed: false
+        link: false
+      - target: WindsurfPlugin
+        embed: false
+        link: false
+      - target: TraePlugin
+        embed: false
+        link: false
+      - target: ZedPlugin
+        embed: false
+        link: false
+      - target: WarpPlugin
+        embed: false
+        link: false
+      - target: AlacrittyPlugin
+        embed: false
+        link: false
       - target: KittyPlugin
-        copy:
-          destination: plugins
-          subpath: ""
+        embed: false
+        link: false
       - target: WezTermPlugin
-        copy:
-          destination: plugins
-          subpath: ""
+        embed: false
+        link: false
       - target: GeminiPlugin
-        copy:
-          destination: plugins
-          subpath: ""
-      # CodexPlugin: pilot for marketplace-only delivery. Built as a
-      # standalone target so dev / packaging scripts can find the
-      # `.csplugin` under Build/Products/, but NOT embedded into the
-      # `.app` — users install it through Settings → Plugins →
-      # Discover. `embed: false` keeps the bundle out of every embed /
-      # resources build phase; without it XcodeGen falls back to
-      # adding cfbundle dependencies to Resources, which would
-      # smuggle the .csplugin into Contents/Resources/.
+        embed: false
+        link: false
       - target: CodexPlugin
         embed: false
         link: false

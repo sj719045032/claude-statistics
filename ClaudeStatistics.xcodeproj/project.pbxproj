@@ -13,7 +13,6 @@
 		0508E2412893BA974CD32DAD /* GhosttyTerminalCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89661CA17E93D43C4B68FC23 /* GhosttyTerminalCapability.swift */; };
 		05647884ADD0916338A59B8C /* PluginInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B2F3C5ACC349B41B04463E5 /* PluginInstaller.swift */; };
 		06784AC10F46DD7CBA02214C /* ToolActivityFormatterOperationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B4B94E4739481488C153E /* ToolActivityFormatterOperationsTests.swift */; };
-		08C1BFE99FA63FFE28B5ED0B /* CodexAppPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = B26EF311570AA2816D7357F2 /* CodexAppPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		08EAA341478D88DCA10B74EE /* ClaudeManagedAccountStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA847F7AAA8B25206BA33E25 /* ClaudeManagedAccountStore.swift */; };
 		09979C26D757D52202ED250D /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AF9820A8A06DCCE5C35C294 /* Theme.swift */; };
 		0A9AE4C18CF4EF95C9D5E793 /* DiagnosticLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF69875F08146D684A061030 /* DiagnosticLogger.swift */; };
@@ -48,7 +47,6 @@
 		1D84A21259B5673F6ABDFCC1 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36F9BBB23CB057720EA99A7B /* Session.swift */; };
 		1DD56466FA2EB5FEF570FF9B /* ProjectAnalyticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E61FA41EAFBAE59342A3A526 /* ProjectAnalyticsView.swift */; };
 		1E2CC52AB7A8D46F89D80409 /* ModelUsage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70F462C9C11FCDC4B51D2D3 /* ModelUsage.swift */; };
-		1ECABB048A5F9B030C7CB8C0 /* GeminiPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 000483164FC9DFF7C18BA394 /* GeminiPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		1FACDAAE648B11670A403202 /* ProviderUsageSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6038163267F751B4F45C74FA /* ProviderUsageSource.swift */; };
 		1FFDAA9375AEB76CB9862CF3 /* SemVer.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBBEE45A24DCB72DA07ECD79 /* SemVer.swift */; };
 		205CC763247D474FFE1ED691 /* ProviderPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62572A1901D430E3E24CB02D /* ProviderPlugin.swift */; };
@@ -155,7 +153,6 @@
 		65F93A7427460951A2B11EB8 /* InlineImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DBC9B9DC669793D4D9184F8 /* InlineImageView.swift */; };
 		663E5EC2269BC72FDE27ADB5 /* WaitingInputCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8E853418A761D4E7EE20D9A /* WaitingInputCard.swift */; };
 		6775E4CF9E784004217A1A12 /* ClaudeStatisticsKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; };
-		67D886006A577EF42FBCDECC /* ZedPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 7F2DF9762DDE871C2C51B049 /* ZedPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		686EC93B311494291E5BCE75 /* StatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E1B839DD5F15A6A55AE3727 /* StatisticsView.swift */; };
 		6BA90267FC02621878E80D2A /* TrendChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEDC6DF1C15355DC5AE2FCF9 /* TrendChartView.swift */; };
 		6C2AEAB804F88DAB72D753DB /* ClaudeStatisticsKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; };
@@ -182,13 +179,11 @@
 		7843151598D9561667E57EF3 /* TerminalRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A337A8A5F00CF27D753FA581 /* TerminalRegistry.swift */; };
 		78C85F2EAC22E9FFD94B3093 /* ProviderHookNormalizing.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9514A40AA4DF7561C0D5C8B /* ProviderHookNormalizing.swift */; };
 		78D29B62500CB98D0FA18D5B /* PermissionRequestRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 852FDD0C73454C36E0024C94 /* PermissionRequestRegistry.swift */; };
-		7937C41E33477CCD599429C8 /* ClaudeAppPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 9E5D8A2D6C14F2665A818236 /* ClaudeAppPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		793CA993AA390F6C7D5534CD /* PluginDescriptorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5374ACC8FB5125744712FDC6 /* PluginDescriptorStore.swift */; };
 		79A1CDAE5E3199165B64474F /* ToolBarRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEDA0BBF5662205A54927288 /* ToolBarRow.swift */; };
 		7A6DC1B86241A8A90AB91897 /* TerminalPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F81931C824888B412AEA051E /* TerminalPlugin.swift */; };
 		7AC6A56F2665F81ED453AF4A /* HookInstalling.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFDDC93577A73B4D01F88B6A /* HookInstalling.swift */; };
 		7B647CA03E39E1B7CDB94D42 /* TranscriptDisplayMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EBA6E09EEB67ED884B4504F /* TranscriptDisplayMessage.swift */; };
-		7B83C799735777CD72DB9A87 /* VSCodePlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 5AD2F29DA1EEA44E8B785C0A /* VSCodePlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		7C6F2559DC6E88F725FDE0A4 /* SessionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 695C93B3138170CBBA58E7FB /* SessionRow.swift */; };
 		7C84A261758C915B999EE6E3 /* ClaudeStatisticsKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; };
 		7CD9C8820D5C77BDC5DE0E35 /* PendingResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A3701AFF5252558AFDD027 /* PendingResponse.swift */; };
@@ -245,7 +240,6 @@
 		A2F1B0B01CE980A41F32D377 /* ActiveSessionsTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1E190E276266D2300756D4 /* ActiveSessionsTracker.swift */; };
 		A2F7960601060A4F2D8BE790 /* CanonicalToolName.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F23EB1047050D22FF96E2B2 /* CanonicalToolName.swift */; };
 		A39A7DB156DF3CB13E531733 /* GeminiPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 671550A78B06089EB14F8741 /* GeminiPlugin.swift */; };
-		A400D230F0DC4BE076682BCA /* TraePlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 23C67298966CCB82BB03EF9C /* TraePlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A5B9E8F4EA41FC8313BF3228 /* ClaudeHookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9503F292FA4FB52DDDF97355 /* ClaudeHookInstaller.swift */; };
 		A63890A01AF570ADBA7E4E11 /* AttentionEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F675DD2E08BB0AC4ADBB101 /* AttentionEvent.swift */; };
 		A76D5FAB925364D1B09EAFB8 /* SessionDetailHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAA4142E960434BF58DDCA67 /* SessionDetailHelpers.swift */; };
@@ -259,7 +253,6 @@
 		B0396884F0CF56BF174800CE /* FSEventsWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 751F9496F7CFE46913C4CEDF /* FSEventsWatcher.swift */; };
 		B04844AD3BA910295978D241 /* StatusBarPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5486873DBEC29739725E366 /* StatusBarPanel.swift */; };
 		B254C34493D9423B2010A88F /* ProviderUsagePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BCFE5BD947C85335BFC3783 /* ProviderUsagePresentation.swift */; };
-		B313D975C4C4D0AD58C0DA0D /* KittyPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = D922135FFC7EA58D322F5BC4 /* KittyPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		B35C61F703B5F19516D17FF9 /* PluginRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 880DBC8623214822DA25BA07 /* PluginRegistry.swift */; };
 		B39F16F8F27A7FAA11296362 /* GeminiHookNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85CD1CA699D600761D6EC9F3 /* GeminiHookNormalizer.swift */; };
 		B452E47CCD714F45226D388B /* ClaudeStatisticsKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; };
@@ -269,7 +262,6 @@
 		B6291B82B772FADDC2880B2D /* CodexHookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80164FAEE7FB8400EFBB438B /* CodexHookInstaller.swift */; };
 		B63B261872D1F6B4FA5D0E3E /* MarkdownFonts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FE62A428252AC30E71689F7 /* MarkdownFonts.swift */; };
 		B67485324065CEED99A923C2 /* LivenessCheckerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E077808ABF96135D9B76672B /* LivenessCheckerTests.swift */; };
-		B6E40DABE032CAD3C2B16A85 /* AlacrittyPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = F65F257EBB643FDD2327BF34 /* AlacrittyPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		B6E7557397A05A5477857084 /* ClaudeStatisticsKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B70EED40792F05E3F6EC026 /* ClaudeStatisticsKit.framework */; };
 		B872C0AE8B54239EEA84509E /* ClaudeAccountModeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD2C72B18AE30277C693576A /* ClaudeAccountModeController.swift */; };
 		B92884452F314C150DD390DF /* GeminiHookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26A2B93BC6B7C2A0CCE337F /* GeminiHookInstaller.swift */; };
@@ -293,7 +285,6 @@
 		C438293230E30B328E3B5B6A /* ProviderAccountUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE636182FF6DD94E82DAB93B /* ProviderAccountUI.swift */; };
 		C44D93FD163D5ACB677A0C2F /* TitleSanitizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF9DAF9AE28E22F14DFD7EA4 /* TitleSanitizer.swift */; };
 		C48BDE19A5E58235BAB61F51 /* UsageViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5306E49F4AF08425229312F0 /* UsageViewModel.swift */; };
-		C4CB7D03BBF5B8FB6E0753CB /* WezTermPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = CFED6A9AD6F9C6154A5FDC5C /* WezTermPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C4EEDE0F0236FE4680A1B5CC /* NotchAutoAllowRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAB51505E677DA60C3533985 /* NotchAutoAllowRules.swift */; };
 		C54FBCE125797BA8792B1B85 /* TabOrderEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3371B97F78B775313FF5398A /* TabOrderEditor.swift */; };
 		C7AEC597AAFC4A6623C72C6A /* TrustStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0CF435E7D0B041E89EE8E31 /* TrustStore.swift */; };
@@ -320,12 +311,10 @@
 		D5B93F546B65DC6CF48DFACF /* PluginManifestPlist.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85BCB7D594E3ACE15472DF55 /* PluginManifestPlist.swift */; };
 		D5DF655B8CBAB8C62F71FB7A /* CodexAppPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A171635FD16038811E09EC6 /* CodexAppPlugin.swift */; };
 		D64171EFA61052FC0A315681 /* SessionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B71B5593D63536AB462D70 /* SessionViewModel.swift */; };
-		D6A0F3AD4B61734F06592708 /* CursorPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 2C2B9D441D4C392C0F00863A /* CursorPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		D7035463E2541293F55B654D /* ClaudePKCE.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDE6D238094644B3E5ECD8C9 /* ClaudePKCE.swift */; };
 		D73C2A7290E0250F8B50A372 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3374C538E77CED126DE3016 /* StatusBarController.swift */; };
 		D99027587C25DA018DE94928 /* ActiveSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E023CB9F472AC7C93777B50 /* ActiveSession.swift */; };
 		DE4144CC6421F5ECD432A66C /* TranscriptParser+Trend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3184FFA7D8598D923510D8EE /* TranscriptParser+Trend.swift */; };
-		DED70E0C72C753C4492E8A84 /* WindsurfPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 40D1EFBD1FA452CAB2FC7DEC /* WindsurfPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		DF30CD5504F391E42C582602 /* PluginTrustGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBF2E6F7720B297179A63812 /* PluginTrustGate.swift */; };
 		DFB7E8400551BE83B025A6A4 /* ShareMetricsBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F0F61EEF95C517CC0B363C3 /* ShareMetricsBuilder.swift */; };
 		DFFDBC5BCDB154C0EE69409F /* CodexStatusLineInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = F832E7795678736B97EA9BB0 /* CodexStatusLineInstaller.swift */; };
@@ -362,7 +351,6 @@
 		F319BEBA588C70528472E710 /* DisplayTextClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1585E37EA4FB0491BA86CA2B /* DisplayTextClassifier.swift */; };
 		F324566F7B85AFF3C7E1EEAC /* CalendarHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1390435247ECA654A169EB3C /* CalendarHeatmap.swift */; };
 		F3272760285AF18F519D8E80 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41054FA7DE043B7E25B4A88E /* MenuBarView.swift */; };
-		F32FC3771216AB14B758D85C /* WarpPlugin.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 80332DBB29AEBEF37DADF439 /* WarpPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		F34E915FE87F63D8BB7181BD /* ClaudeAccountManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C931907E9B4996736E4A7373 /* ClaudeAccountManager.swift */; };
 		F36D40FE127E863FBF99E305 /* NotchWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96A67BCB46008F2465867BD4 /* NotchWindowController.swift */; };
 		F508F785ACD950DAA8453487 /* NotificationTimerStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 563272C01660D2FA4FBCBE13 /* NotificationTimerStoreTests.swift */; };
@@ -625,19 +613,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				7937C41E33477CCD599429C8 /* ClaudeAppPlugin.bundle in Embed Dependencies */,
-				08C1BFE99FA63FFE28B5ED0B /* CodexAppPlugin.bundle in Embed Dependencies */,
-				7B83C799735777CD72DB9A87 /* VSCodePlugin.bundle in Embed Dependencies */,
-				D6A0F3AD4B61734F06592708 /* CursorPlugin.bundle in Embed Dependencies */,
-				DED70E0C72C753C4492E8A84 /* WindsurfPlugin.bundle in Embed Dependencies */,
-				A400D230F0DC4BE076682BCA /* TraePlugin.bundle in Embed Dependencies */,
-				67D886006A577EF42FBCDECC /* ZedPlugin.bundle in Embed Dependencies */,
-				F32FC3771216AB14B758D85C /* WarpPlugin.bundle in Embed Dependencies */,
-				B6E40DABE032CAD3C2B16A85 /* AlacrittyPlugin.bundle in Embed Dependencies */,
 				13F0708507CB618404FD5515 /* AppleTerminalPlugin.bundle in Embed Dependencies */,
-				B313D975C4C4D0AD58C0DA0D /* KittyPlugin.bundle in Embed Dependencies */,
-				C4CB7D03BBF5B8FB6E0753CB /* WezTermPlugin.bundle in Embed Dependencies */,
-				1ECABB048A5F9B030C7CB8C0 /* GeminiPlugin.bundle in Embed Dependencies */,
 			);
 			name = "Embed Dependencies";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2169,6 +2145,7 @@
 			);
 			dependencies = (
 				47FBF442D5FA668102D605C8 /* PBXTargetDependency */,
+				E863D65E45E391F83C1C2EB1 /* PBXTargetDependency */,
 				4AB50C145C7482D27A578EA0 /* PBXTargetDependency */,
 				BAF099C706BD58782FFBFD82 /* PBXTargetDependency */,
 				E267747510DEC59B43D27923 /* PBXTargetDependency */,
@@ -2178,7 +2155,6 @@
 				9E327EB423305EFF95D64128 /* PBXTargetDependency */,
 				03A0C8E605F4EB357471FD9B /* PBXTargetDependency */,
 				A72CB6BA9E1821AC478CF2A4 /* PBXTargetDependency */,
-				E863D65E45E391F83C1C2EB1 /* PBXTargetDependency */,
 				70C512FC4DC0B6BE6E5B6B94 /* PBXTargetDependency */,
 				B4F6440BBC836A7481C980C4 /* PBXTargetDependency */,
 				1270A6E9547816FBD55C1F7E /* PBXTargetDependency */,
