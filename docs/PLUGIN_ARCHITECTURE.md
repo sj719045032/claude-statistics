@@ -94,23 +94,21 @@ public final class CodexPlugin: ProviderPlugin, ProviderAccountUIProviding {
 
 **已落实**：
 - 5 个 terminal plugin 抽 `.csplugin`（Warp / Alacritty / AppleTerminal / Kitty / WezTerm），iTerm2 + Ghostty 留 builtin。
-- **Gemini provider 抽 `.csplugin`** 真正自包含（包括 hook normalizer + descriptor + alias 表）：plugin 通过 SDK `ProviderAccountUIProviding` 填账户卡片坑位；通过 SDK `ProviderHookNormalizing` 实现 hook 路径 normalize（HookCLI 在 main-binary CLI 模式直接加载 `Contents/PlugIns/` 内的 plugin）；通过 `TerminalDispatch` 发起 terminal launch；通过 `PluginDescriptorStore` + `PluginToolAliasStore` 把 descriptor metadata + tool alias 表 push 给 host fallback。**Host 端零 Gemini-specific class / static / file / glue function。** 仅剩两处 surface：（1）`ProviderRegistry.supportedProviders` 列表里的 `.gemini` builtin id —— 是 host 知道 builtin plugin id 的注册信息，非 glue；（2）`Localizable.strings` 中的 Gemini 显示文案 —— host UI 容器层，等 SDK plugin localization 体系落地再迁移。
+- **Gemini + Codex provider 都抽 `.csplugin`** 真正自包含（包括 hook normalizer + descriptor + alias 表）：每个 plugin 通过 SDK `ProviderAccountUIProviding` 填账户卡片坑位；通过 SDK `ProviderHookNormalizing` 实现 hook 路径 normalize（HookCLI 在 main-binary CLI 模式直接加载 `Contents/PlugIns/` 内的 plugin）；通过 `TerminalDispatch` 发起 terminal launch；通过 `PluginDescriptorStore` + `PluginToolAliasStore` 把 descriptor metadata + tool alias 表 push 给 host fallback。**Host 端零 Gemini / Codex-specific class / static / file / glue function。** 仅剩三处 surface：（1）`ProviderRegistry.supportedProviders` / `ProviderKind.allBuiltins` 列表里的 `.codex` / `.gemini` builtin id —— 是 host 已知的 builtin plugin id 注册信息，非 glue；（2）`Localizable.strings` 中的显示文案 —— host UI 容器层，等 SDK plugin localization 体系落地再迁移；（3）`AppPreferences.codexUsageRetryAfter` legacy 用户偏好 key 字符串（plugin 内 inline literal 镜像）。Claude provider 是唯一仍 host-bundled 的 adapter（含 sync/independent 双模式状态）。
 - 通用能力上 SDK：`DiagnosticLogger` / `FSEventsWatcher` / `AppRuntimePaths` / `TerminalDispatch` / `TerminalProcessRunner` / `HookInstaller` 工具集 / `UsageError` / `UsageCacheFile` / `PricingFetchError` / `ToolOutputCleaning` / **hook chassis**（`HookActionEnvelope` / `HookTerminalContext` / `HookHelperContext` / `ProviderHookNormalizing` 协议 + `HookPayloadNormalizer` payload helpers）/ **plugin metadata stores**（`PluginDescriptorStore` / `PluginToolAliasStore`，让 plugin 在 init 时把 descriptor + alias 表 push 给 host fallback）。
 - Marketplace 代码完整（`PluginCatalog` / `PluginInstaller` / `PluginUninstaller` / `PluginDiscoverView`）+ Phase 3 文档（`docs/marketplace-catalog-template/` + `docs/PLUGIN_PACKAGING.md`）。
 - 多个 capability 协议化（`TerminalFocusStrategy` / `TerminalAppleScriptFocusing` / `TerminalFrontmostSessionProbing` / `ShareRolePlugin` 等）。
 
-**进行中**（按本架构原则）：
-- Codex provider 抽 `.csplugin`：模板已经被 Gemini 抽离过程跑通，参考 §7.1 + 已上 SDK 的工具集，按 §7.2 落地。
-
 **未来**：
+- Claude provider 抽 `.csplugin`（最后一个 host-bundled adapter）：会触发 SDK 容纳 sync/independent 双模式 SwiftUI view 状态的额外工作。
 - 任何 provider / terminal / share role / share theme plugin 抽离都遵循本文。
 - 第三方 `.csplugin` 通过 marketplace 安装后零 host 改动即工作。
 
-## 7. Codex / Gemini Provider 抽 .csplugin 路线图
+## 7. Provider Plugin 抽 .csplugin 路线图（参考模板）
 
-> 本节最初是「下次 session 起点」。Gemini 已按 §7.1 模板落地（commit 见 git log
-> 2026-04-29 `refactor: extract GeminiPlugin into standalone .csplugin`），
-> 这里保留作为 Codex 抽离时的对照模板 + 抽离过程中**实际踩到的额外坑**记录。
+> 本节是 Provider 抽离的对照模板。Gemini（commit `7eb5ca6`）+ Codex
+> （commit `3f6c54c`）都已按本节落地。Claude 是唯一未抽的 provider；
+> 抽离时遵循同样的模板，加上 sync/independent 双模式 SwiftUI 状态搬迁。
 
 **Gemini 抽离时实际触发的 SDK 扩展**（Codex 抽离时同样会需要）：
 - `TerminalDispatch`：plugin 内 `SessionLauncher` 想 launch terminal，但不能 import 主程序的 `TerminalRegistry`。host startup 注入 dispatcher，plugin 调 SDK 全局 dispatch。
