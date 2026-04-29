@@ -94,25 +94,30 @@ for sidecar in "${MARKETPLACE_DIR}"/*.sha256; do
     [ -f "${sidecar}" ] || continue
     NAME="$(basename "${sidecar}" .sha256)"
     SHA256="$(awk '{print $1}' "${sidecar}")"
-    DOWNLOAD_URL="${DOWNLOAD_URL_PREFIX}/${NAME}-${VERSION}.csplugin.zip"
+    # Match by `<Name>.csplugin.zip` substring so e.g. CodexPlugin
+    # doesn't match CodexAppPlugin (different basename). The new URL
+    # carries the catalog release tag in the path; filename has no
+    # version (pack-csplugin writes `<Name>.csplugin.zip` and we
+    # upload that name verbatim to the GitHub release).
+    MATCH_FRAGMENT="${NAME}.csplugin.zip"
+    DOWNLOAD_URL="${DOWNLOAD_URL_PREFIX}/${MATCH_FRAGMENT}"
 
-    # Remember whether the file changed for this plugin.
-    BEFORE_SHA="$(jq -r --arg n "${NAME}-" \
-        '[.entries[] | select(.downloadURL | contains($n)) | .sha256] | .[0] // ""' \
+    BEFORE_SHA="$(jq -r --arg n "${MATCH_FRAGMENT}" \
+        '[.entries[] | select(.downloadURL | endswith($n)) | .sha256] | .[0] // ""' \
         "${TMPFILE}")"
 
-    jq --arg name "${NAME}-" \
+    jq --arg frag "${MATCH_FRAGMENT}" \
        --arg sha "${SHA256}" \
        --arg ver "${VERSION}" \
        --arg url "${DOWNLOAD_URL}" \
-       '.entries |= map(if (.downloadURL | contains($name)) then
+       '.entries |= map(if (.downloadURL | endswith($frag)) then
             .sha256 = $sha | .version = $ver | .downloadURL = $url
         else . end)' \
         "${TMPFILE}" > "${TMPFILE}.new"
     mv "${TMPFILE}.new" "${TMPFILE}"
 
-    AFTER_SHA="$(jq -r --arg n "${NAME}-" \
-        '[.entries[] | select(.downloadURL | contains($n)) | .sha256] | .[0] // ""' \
+    AFTER_SHA="$(jq -r --arg n "${MATCH_FRAGMENT}" \
+        '[.entries[] | select(.downloadURL | endswith($n)) | .sha256] | .[0] // ""' \
         "${TMPFILE}")"
 
     if [ -z "${BEFORE_SHA}" ]; then
