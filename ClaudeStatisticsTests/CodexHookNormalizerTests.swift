@@ -10,6 +10,7 @@ import XCTest
 ///     can't extract one.
 ///   - tool_input may arrive as a bare string command instead of a
 ///     dict (the normalizer wraps it).
+@MainActor
 final class CodexHookNormalizerTests: XCTestCase {
     private let runner = HookRunner(provider: .codex)
 

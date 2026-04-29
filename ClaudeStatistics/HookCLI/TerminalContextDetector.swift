@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 // MARK: - Terminal Context Detector
 func canonicalTerminalName(_ terminalName: String?) -> String? {
@@ -35,22 +36,16 @@ func terminalContextForClaude(event: String, terminalName: String?, cwd: String?
     )
 }
 
-func terminalContextForGemini(event: String, terminalName: String?, cwd: String?) -> TerminalContext {
-    terminalContext(
-        event: event,
-        terminalName: terminalName,
-        cwd: cwd,
-        ghosttyFrontmostEvents: ["BeforeAgent", "BeforeModel", "BeforeTool", "SessionStart"],
-        ghosttyFallbackMode: .uniqueDirectoryMatch
-    )
-}
+// `terminalContextForGemini` removed — Gemini's normalizer lives in
+// `Plugins/Sources/GeminiPlugin/` and reaches the same logic through
+// `HookHelperContext.detectTerminalContext`.
 
-private enum GhosttyFallbackMode {
+enum GhosttyFallbackMode {
     case disabled
     case uniqueDirectoryMatch
 }
 
-private func terminalContext(
+func terminalContext(
     event: String,
     terminalName: String?,
     cwd: String?,

@@ -57,7 +57,7 @@ extension HookRunner {
         let normalizedMessage = codexMessage(payload: payload, event: event)
 
         var message: [String: Any] = baseMessage(
-            provider: .codex,
+            providerId: ProviderKind.codex.rawValue,
             event: event,
             status: status,
             notificationType: nil,

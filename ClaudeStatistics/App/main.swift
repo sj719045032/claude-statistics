@@ -1,8 +1,11 @@
 import Darwin
 import Foundation
 
-if let exitCode = HookCLI.runIfNeeded(arguments: CommandLine.arguments) {
-    exit(exitCode)
+let hookExitCode = MainActor.assumeIsolated {
+    HookCLI.runIfNeeded(arguments: CommandLine.arguments)
+}
+if let hookExitCode {
+    exit(hookExitCode)
 }
 
 ClaudeStatisticsApp.main()

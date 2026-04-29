@@ -15,6 +15,7 @@ import XCTest
 /// We avoid touching transcript_path on disk by leaving that key out of
 /// payloads — the `lastAssistantTextFromTranscript` early-returns when
 /// the path is empty/missing and falls through to `claudePreview`.
+@MainActor
 final class ClaudeHookNormalizerTests: XCTestCase {
     private let runner = HookRunner(provider: .claude)
 

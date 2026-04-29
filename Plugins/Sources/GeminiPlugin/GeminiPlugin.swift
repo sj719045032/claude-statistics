@@ -14,7 +14,7 @@ import SwiftUI
 /// is unavailable.
 @MainActor
 @objc(GeminiPlugin)
-public final class GeminiPlugin: NSObject, ProviderPlugin, ProviderAccountUIProviding {
+public final class GeminiPlugin: NSObject, ProviderPlugin, ProviderAccountUIProviding, ProviderHookNormalizing {
     public static let manifest = PluginManifest(
         id: "com.google.gemini",
         kind: .provider,
@@ -74,6 +74,17 @@ public final class GeminiPlugin: NSObject, ProviderPlugin, ProviderAccountUIProv
             currentProfileEmail: context.currentProfileEmail,
             onAfterSwitch: context.refreshAfterAccountChange
         ))
+    }
+
+    // MARK: - ProviderHookNormalizing
+
+    public var hookProviderId: String { "gemini" }
+
+    public func normalize(
+        payload: [String: Any],
+        helper: any HookHelperContext
+    ) -> HookActionEnvelope? {
+        GeminiHookNormalizer.shared.normalize(payload: payload, helper: helper)
     }
 }
 

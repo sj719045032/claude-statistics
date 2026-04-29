@@ -94,8 +94,8 @@ public final class CodexPlugin: ProviderPlugin, ProviderAccountUIProviding {
 
 **已落实**：
 - 5 个 terminal plugin 抽 `.csplugin`（Warp / Alacritty / AppleTerminal / Kitty / WezTerm），iTerm2 + Ghostty 留 builtin。
-- **Gemini provider 抽 `.csplugin`**（本节 §7 路线图执行完毕）：plugin 自包含 + 自持 `GeminiAccountManager`，通过 SDK `ProviderAccountUIProviding` 填账户卡片坑位；hook normalizer 留主二进制（`HookCLI/HookCLIGeminiBuilder.swift`），SDK 加 `TerminalDispatch` 让 plugin 发起 launch。
-- 通用能力上 SDK：`DiagnosticLogger` / `FSEventsWatcher` / `AppRuntimePaths` / `TerminalDispatch` / `TerminalProcessRunner` / `HookInstaller` 工具集 / `UsageError` / `UsageCacheFile` / `PricingFetchError` / `ToolOutputCleaning`。
+- **Gemini provider 抽 `.csplugin`** 真正自包含（包括 hook normalizer）：plugin 通过 SDK `ProviderAccountUIProviding` 填账户卡片坑位；通过 SDK `ProviderHookNormalizing` 实现 hook 路径 normalize（HookCLI 在 main-binary CLI 模式直接加载 `Contents/PlugIns/` 内的 plugin，不再需要 host-side glue）；通过 `TerminalDispatch` 发起 terminal launch。Host **不再持有任何 Gemini-specific class / file**。唯一残留的小重复是 `ProviderDescriptor.gemini.resolveToolAlias` 内联的 alias 字典（host-UI 路径 transcript-replay / debug-rebuild 在 PluginRegistry-aware 之前需要），文档明示 plugin 的 `GeminiToolNames` 是 canonical。
+- 通用能力上 SDK：`DiagnosticLogger` / `FSEventsWatcher` / `AppRuntimePaths` / `TerminalDispatch` / `TerminalProcessRunner` / `HookInstaller` 工具集 / `UsageError` / `UsageCacheFile` / `PricingFetchError` / `ToolOutputCleaning` / **hook chassis**（`HookActionEnvelope` / `HookTerminalContext` / `HookHelperContext` / `ProviderHookNormalizing` 协议 + `HookPayloadNormalizer` payload helpers）。
 - Marketplace 代码完整（`PluginCatalog` / `PluginInstaller` / `PluginUninstaller` / `PluginDiscoverView`）+ Phase 3 文档（`docs/marketplace-catalog-template/` + `docs/PLUGIN_PACKAGING.md`）。
 - 多个 capability 协议化（`TerminalFocusStrategy` / `TerminalAppleScriptFocusing` / `TerminalFrontmostSessionProbing` / `ShareRolePlugin` 等）。
 
@@ -118,15 +118,20 @@ public final class CodexPlugin: ProviderPlugin, ProviderAccountUIProviding {
 - `TerminalProcessRunner` + `TerminalProcessRunResult` 上 SDK（被 `HookInstallerUtils.runCommand` 链上需要）。
 - `UsageError` / `UsageCacheFile` / `PricingFetchError` 上 SDK（每个 provider 的 usage / pricing service 都用同一组错误码 + 缓存文件 schema）。
 - `ToolOutputCleaning` 上 SDK，public 化（transcript parser 普遍依赖）。
+- **Hook chassis**：`ProviderHookNormalizing` 协议（plugin 实现 `normalize(payload:helper:) -> HookActionEnvelope?`）+ `HookHelperContext` 协议（host 暴露 `baseMessage` / `resolvedHookCWD` / `canonicalTerminalName` / `detectTerminalContext`）+ `HookPayloadNormalizer` payload helpers（`stringValue` / `firstText` / `toolNameValue` / `toolResponseText` / `normalizedToolUseId` / `set` / `nonEmpty`）。HookCLI 在 main-binary CLI 模式通过 `Bundle.main.builtInPlugInsURL` 加载 plugin → 在 PluginRegistry 找 `ProviderHookNormalizing` 实现 → call。Plugin 自包含，host 不再为单个 provider 写 hook glue。
 
 **Gemini 抽离时刻意选的简化**（评估一致性后决定不上 SDK）：
 - plugin 内 `GeminiAccountSwitcherAccessory` inline 简化版 popover view，没用 host 的
   `AccountSwitcherAccessory<Account>` 通用组件。后者依赖 `DestructiveIconButton` →
   `SkipConfirmKeyMonitor` 链路（6+ host 调用点），整链上 SDK 是大改；账号切换是低频
   操作，缺 skip-confirm modifier 不影响主流程。
-- `ProviderDescriptor.gemini` 静态 + `HostGeminiToolAliases`（host 内）保留，与 plugin 内
-  `GeminiToolNames` 重复一份。原因：HookCLI 在主二进制 CLI 模式下跑，PluginRegistry
-  不可用，alias 解析必须 host 自带一份。这是 §7.3 「少量重复不可避免」的实例化。
+- `ProviderDescriptor.gemini.resolveToolAlias` 内联一份小 alias 字典（与 plugin
+  `GeminiToolNames` 同步）。原因：host UI 路径
+  （`ToolActivityFormatter.canonicalToolName(_:)` 等 transcript-replay /
+  debug-rebuild 入口）目前不是 PluginRegistry-aware，没法走 plugin 端的
+  alias 表。CLI hook 路径已经完全走 plugin，这份 host 副本不再用于 hook
+  normalize。下一步是把 host UI 路径改造为通过 `PluginRegistry` 查 plugin
+  alias，然后这一份 closure 内联可以删掉。
 - `ModelPricing.estimateCost` 没上 SDK。plugin 内 `GeminiTranscriptParser.estimatedCost`
   直接对 `GeminiPricingCatalog.builtinModels` 字典做内联计算，host 端
   `SessionStats+Pricing` 后续会基于 live `ModelPricing` 重算覆盖。
@@ -155,7 +160,7 @@ public final class CodexPlugin: ProviderPlugin, ProviderAccountUIProviding {
 - 删 `hostPluginFactories` 内 `CodexPluginDogfood.manifest.id` 条目
 - `AccountManagers.codex` 字段移除（同时 reloaders 字典里的 `ProviderDescriptor.codex.id` 条目也删；plugin 自己持有 `accountManager`）
 - `ProviderRegistry.provider(for:)` switch 删 `case .codex`（动态查路径已先于 switch，plugin 加载后命中那条）
-- `HookCLI.swift` switch case `.codex` 改：从 `pluginRegistry.providers["com.openai.codex"]` 拿 plugin、调 plugin 的 hook normalizer。但 HookCLI 在 main app 二进制 CLI 模式跑，**不能用 PluginRegistry** —— 这是 audit doc 已经标的约束。需要一个 host-resident 的「Codex hook normalizer」精简版只做 env / payload 解析，留主二进制（非 plugin），与 plugin 内的 normalizer 一份共存（少量重复，hook 性能要求决定的）。
+- `HookCLI.swift` switch case `.codex` 改为走 `HookPluginRouter`（已在 Gemini 抽离时落地）：plugin 端实现 `ProviderHookNormalizing`，HookCLI 通过 `Bundle.main.builtInPlugInsURL` + `PluginLoader.loadAll` 在 CLI 模式加载 plugin。Codex plugin extracted 后，host 端的 `ClaudeStatistics/Providers/Codex/CodexHookNormalizer.swift` 跟着搬到 `Plugins/Sources/CodexPlugin/`，host 端 switch 删 case `.codex` 直接走 default plugin 路由。Hook 路径**没有**「必须留主二进制」的约束 —— 之前的 audit 文档判断错了，HookCLI 完全可以加载 plugin。
 - `DatabaseService.resetProviderCache(.codex)` — 通过 ProviderKind.codex（仍存在 static let）调用，无需改
 - `ProviderKind.codex` static let 保留，`allBuiltins` 数组保留 — 这些只是 string id wrappers，不再持 host class 引用
 - 6 处 test files 引用 `CodexProvider` / `CodexAccountManager` / `CodexTranscriptParser` —— 这些 test 在 host module 不能 import plugin。要么 (a) 删 test（plugin 自己测自己），(b) 把 test 搬到 plugin tests target，或 (c) 用 `NSClassFromString("CodexPlugin")` 做 runtime test
@@ -166,7 +171,7 @@ public final class CodexPlugin: ProviderPlugin, ProviderAccountUIProviding {
 
 ### 7.3 关键约束
 
-- **HookCLI 模式**：main app 二进制以 CLI 模式运行（`main.swift:4`，SwiftUI / `AppState` / `PluginRegistry` 全部不构建）。所以**hook context 检测代码必须留主二进制**，不能依赖 PluginRegistry。这是少量「重复」是设计上不可避免的。
+- **HookCLI 模式**：main app 二进制以 CLI 模式运行（`main.swift:4`）。SwiftUI / `AppState` 不构建，但 `PluginRegistry` + `PluginLoader.loadAll(from: Bundle.main.builtInPlugInsURL)` 在 CLI 模式仍然可用 —— Gemini 抽离时验证了这条路径。所以 hook normalize 完全可以走 plugin（`ProviderHookNormalizing`），不用 host-resident 副本。
 - **test 隔离**：plugin 类不在 host module，host test target 不能直接 import。每个 plugin 自己的 test target 是正解，但当前 project.yml 没配 plugin test target —— 加 target 又是新工作。临时 workaround 是用 `NSClassFromString` runtime check（已经在 `testInstantiatePluginViaObjcRuntime` 用过这个模式）。
 - **manifest id 冲突**：plugin 内 `@objc(CodexPlugin)` 类名不能与已存在的 host 类同名。host `BuiltinProviderPlugins.CodexPluginDogfood` 在该 commit 一并删除即可，无冲突。
 - **build 原子性**：切换路径不能在中间状态停（host 引用半删 + plugin 半建）。建议在独立 git worktree 完成所有改动，build + test 通过后再合并。

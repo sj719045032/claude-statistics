@@ -5,6 +5,7 @@ import ClaudeStatisticsKit
 enum HookCLI {
     private static let providerFlag = "--claude-stats-hook-provider"
 
+    @MainActor
     static func runIfNeeded(arguments: [String]) -> Int32? {
         guard let flagIndex = arguments.firstIndex(of: providerFlag) else {
             return nil
@@ -46,7 +47,8 @@ struct HookAction {
     }
 }
 
-struct HookRunner {
+@MainActor
+struct HookRunner: HookHelperContext {
     let provider: ProviderKind
 
     func run() -> Int32 {
@@ -60,10 +62,8 @@ struct HookRunner {
             action = buildClaudeAction(payload: payload)
         case .codex:
             action = buildCodexAction(payload: payload)
-        case .gemini:
-            action = buildGeminiAction(payload: payload)
         default:
-            action = nil
+            action = HookPluginRouter.action(for: provider.rawValue, payload: payload, helper: self)
         }
 
         guard let action else { return 0 }
@@ -78,19 +78,19 @@ struct HookRunner {
     }
 
     func baseMessage(
-        provider: ProviderKind,
+        providerId: String,
         event: String,
         status: String,
         notificationType: String?,
         payload: [String: Any],
         cwd: String?,
         terminalName: String?,
-        terminalContext: TerminalContext
+        terminalContext: HookTerminalContext
     ) -> [String: Any] {
         var message: [String: Any] = [
             "v": 1,
             "auth_token": AttentionBridgeAuth.loadToken() ?? "",
-            "provider": provider.rawValue,
+            "provider": providerId,
             "event": event,
             "status": status,
             "pid": Int(getppid()),
@@ -109,6 +109,55 @@ struct HookRunner {
         set(&message, "terminal_surface_id", terminalContext.surfaceID)
 
         return message
+    }
+
+    func detectTerminalContext(
+        event: String,
+        terminalName: String?,
+        cwd: String?,
+        ghosttyFrontmostEvents: Set<String>
+    ) -> HookTerminalContext {
+        terminalContext(
+            event: event,
+            terminalName: terminalName,
+            cwd: cwd,
+            ghosttyFrontmostEvents: ghosttyFrontmostEvents,
+            ghosttyFallbackMode: .uniqueDirectoryMatch
+        )
+    }
+
+    // The free-function `resolvedHookCWD(payload:)` and
+    // `canonicalTerminalName(_:)` already exist at file scope; the
+    // SDK protocol expects same-shaped methods on `HookHelperContext`.
+    // Implementations forward to those free functions so plugins reach
+    // them through the protocol while host normalizers keep the old
+    // bare-name call sites intact.
+    func resolvedHookCWD(payload: [String: Any]) -> String? {
+        if let cwd = stringValue(payload["cwd"])?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !cwd.isEmpty {
+            return cwd
+        }
+        if let pwd = ProcessInfo.processInfo.environment["PWD"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !pwd.isEmpty {
+            return pwd
+        }
+        let cwd = FileManager.default.currentDirectoryPath
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return cwd.isEmpty ? nil : cwd
+    }
+
+    func canonicalTerminalName(_ raw: String?) -> String? {
+        let env = ProcessInfo.processInfo.environment
+        if env["KITTY_WINDOW_ID"] != nil || env["KITTY_LISTEN_ON"] != nil {
+            return "kitty"
+        }
+        if env["WEZTERM_PANE"] != nil || env["WEZTERM_UNIX_SOCKET"] != nil {
+            return "wezterm"
+        }
+        if env["ITERM_SESSION_ID"] != nil {
+            return "iTerm2"
+        }
+        return raw
     }
 
     private func socketDecision(
@@ -181,12 +230,10 @@ struct HookSocketDiagnosticContext {
     let toolUseId: String
 }
 
-struct TerminalContext {
-    var socket: String?
-    var windowID: String?
-    var tabID: String?
-    var surfaceID: String?
-}
+// `TerminalContext` is the SDK's `HookTerminalContext`. Host code
+// uses the SDK type directly so normalizers can run inside or outside
+// the host module without a redundant adapter.
+typealias TerminalContext = HookTerminalContext
 
 func resolvedHookCWD(payload: [String: Any]) -> String? {
     if let cwd = stringValue(payload["cwd"])?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -203,10 +250,8 @@ func resolvedHookCWD(payload: [String: Any]) -> String? {
     return currentDirectory.isEmpty ? nil : currentDirectory
 }
 
-func set(_ object: inout [String: Any], _ key: String, _ value: Any?) {
-    guard let value else { return }
-    object[key] = value
-}
+// `set(_:,_:,_:)` and `nonEmpty(_:)` moved to ClaudeStatisticsKit so
+// plugin-side hook normalizers can reach them.
 
 private func readPayload() -> [String: Any]? {
     let data = FileHandle.standardInput.readDataToEndOfFile()
@@ -344,12 +389,6 @@ func commandOutput(_ executable: String, args: [String], timeout: TimeInterval =
 
     let data = stdout.fileHandleForReading.readDataToEndOfFile()
     return String(data: data, encoding: .utf8)
-}
-
-func nonEmpty(_ value: String?) -> String? {
-    guard let value else { return nil }
-    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-    return trimmed.isEmpty ? nil : trimmed
 }
 
 func hookGhosttyLog(_ message: String) {

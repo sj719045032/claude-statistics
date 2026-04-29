@@ -4,11 +4,18 @@ import ClaudeStatisticsKit
 
 /// Builtin provider descriptors. The `ProviderDescriptor` type itself
 /// lives in `ClaudeStatisticsKit`; the host-bundled instances stay here
-/// because they close over the host-internal `ClaudeToolNames` /
-/// `CodexToolNames` enums (and an inline copy of Gemini's alias table —
-/// the plugin owns the canonical version, but the HookCLI path runs in
-/// main-binary CLI mode where `PluginRegistry` is unavailable, so
-/// alias resolution must be reachable from the host too).
+/// because they close over host-internal alias tables.
+///
+/// Why Gemini's alias closure isn't `{ _ in nil }` (chassis caveat):
+/// host UI surfaces — `ToolActivityFormatter.canonicalToolName(_:)`
+/// and friends — get tool names that did not always travel through a
+/// plugin normalizer (transcript-replay paths, debug rebuilds, the
+/// "rebuild provider index" surface). The CLI hook path is fully
+/// plugin-driven now, but until those host UI surfaces are
+/// PluginRegistry-aware, the descriptor needs a usable alias table
+/// inline. The same vocabulary lives canonical inside
+/// `Plugins/Sources/GeminiPlugin/GeminiProvider.swift`'s `GeminiToolNames`;
+/// keep the two in sync until the host UI side is migrated.
 /// Stage 4 moves each remaining instance into its corresponding
 /// `*Plugin` package and registers them through `PluginRegistry`.
 extension ProviderDescriptor {
@@ -57,7 +64,26 @@ extension ProviderDescriptor {
         badgeColor: Color(red: 0.27, green: 0.51, blue: 0.96),
         notchEnabledDefaultsKey: "notch.enabled.gemini",
         capabilities: .gemini,
-        resolveToolAlias: { HostGeminiToolAliases.canonical($0) },
+        resolveToolAlias: { normalized in
+            // Mirror of `Plugins/Sources/GeminiPlugin/GeminiProvider.swift`'s
+            // `GeminiToolNames`. Plugin owns the canonical table; this
+            // host copy supports the host-UI paths that haven't been
+            // migrated to PluginRegistry-aware alias lookup yet.
+            switch normalized {
+            case "run_shell_command":  return "bash"
+            case "grep_search":        return "grep"
+            case "read_file":          return "read"
+            case "write_file":         return "write"
+            case "replace":            return "edit"
+            case "web_fetch":          return "webfetch"
+            case "web_search", "google_web_search", "google_search":
+                return "websearch"
+            case "list_directory":     return "ls"
+            case "codebase_investigator": return "agent"
+            case "cli_help":           return "help"
+            default:                   return nil
+            }
+        },
         commandFilteredNotchPreview: true,
         notchNoisePrefixes: ["process group pgid:", "background pids:"]
     )

@@ -1,7 +1,11 @@
 import Foundation
 
-// MARK: - Hook Payload Normalizer
-func normalizedToolUseId(payload: [String: Any], toolInput: [String: Any]?) -> String? {
+// Hook payload string-extraction helpers shared by every provider's
+// hook normalizer (Claude / Codex / Gemini / third-party). Hosted in
+// the SDK so plugin-side normalizers can reach them without importing
+// the host module.
+
+public func normalizedToolUseId(payload: [String: Any], toolInput: [String: Any]?) -> String? {
     for key in ["tool_use_id", "toolUseId", "tool_call_id", "toolCallId", "call_id", "callId", "id"] {
         if let value = stringValue(payload[key]) {
             return value
@@ -19,7 +23,7 @@ func normalizedToolUseId(payload: [String: Any], toolInput: [String: Any]?) -> S
     return nil
 }
 
-func toolNameValue(_ payload: [String: Any]) -> String? {
+public func toolNameValue(_ payload: [String: Any]) -> String? {
     for key in ["tool_name", "toolName", "name", "displayName"] {
         if let value = stringValue(payload[key]) {
             return value
@@ -36,7 +40,7 @@ func toolNameValue(_ payload: [String: Any]) -> String? {
     return nil
 }
 
-func toolResponseText(payload: [String: Any]) -> String? {
+public func toolResponseText(payload: [String: Any]) -> String? {
     for key in ["tool_response", "tool_result", "result", "response", "output", "resultDisplay"] {
         if let value = firstText(payload[key]) {
             return value
@@ -45,7 +49,7 @@ func toolResponseText(payload: [String: Any]) -> String? {
     return nil
 }
 
-func stringValue(_ value: Any?) -> String? {
+public func stringValue(_ value: Any?) -> String? {
     switch value {
     case let value as String:
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -57,11 +61,11 @@ func stringValue(_ value: Any?) -> String? {
     }
 }
 
-func dictionaryValue(_ value: Any?) -> [String: Any]? {
+public func dictionaryValue(_ value: Any?) -> [String: Any]? {
     value as? [String: Any]
 }
 
-func nestedDictionaryValue(_ value: Any?, preferredKeys: [String]) -> [String: Any]? {
+public func nestedDictionaryValue(_ value: Any?, preferredKeys: [String]) -> [String: Any]? {
     guard let object = dictionaryValue(value) else { return nil }
     for key in preferredKeys {
         if let nested = dictionaryValue(object[key]) {
@@ -71,7 +75,7 @@ func nestedDictionaryValue(_ value: Any?, preferredKeys: [String]) -> [String: A
     return object
 }
 
-func firstText(_ value: Any?) -> String? {
+public func firstText(_ value: Any?) -> String? {
     guard let value else { return nil }
 
     if let string = value as? String {
@@ -112,4 +116,18 @@ func firstText(_ value: Any?) -> String? {
 
 private func isNoiseText(_ value: String) -> Bool {
     ["text", "json", "stdout", "output", "---", "--", "...", "…"].contains(value.lowercased())
+}
+
+/// Inserts `value` into `object` under `key` only when `value` is non-nil.
+/// Equivalent to the long-form `if let v = value { object[key] = v }`
+/// repeated dozens of times in hook normalizers.
+public func set(_ object: inout [String: Any], _ key: String, _ value: Any?) {
+    guard let value else { return }
+    object[key] = value
+}
+
+public func nonEmpty(_ value: String?) -> String? {
+    guard let value else { return nil }
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
 }

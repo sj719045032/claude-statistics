@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 extension HookRunner {
     func buildClaudeAction(payload: [String: Any]) -> HookAction? {
@@ -62,7 +63,7 @@ extension HookRunner {
         }
 
         var message: [String: Any] = baseMessage(
-            provider: .claude,
+            providerId: ProviderKind.claude.rawValue,
             event: event,
             status: status,
             notificationType: notificationType,

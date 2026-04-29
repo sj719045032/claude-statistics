@@ -1,7 +1,32 @@
 import Foundation
+import ClaudeStatisticsKit
 
-extension HookRunner {
-    func buildGeminiAction(payload: [String: Any]) -> HookAction? {
+/// Plugin-side hook normalizer for Gemini CLI hook payloads. HookCLI
+/// loads `GeminiPlugin` (which forwards to this) through
+/// `ProviderHookNormalizing` and calls `normalize(payload:helper:)`
+/// once per stdin payload.
+///
+/// Mapping rules (Gemini CLI → AttentionBridge wire envelope):
+///   - `hook_event_name` is remapped: `BeforeAgent → UserPromptSubmit`,
+///     `BeforeTool → PreToolUse`, `AfterAgent → Stop`, etc.
+///   - `Notification` with `notification_type=ToolPermission` becomes
+///     wire event `ToolPermission` (passive permission card lane).
+///   - `tool_input` may arrive as a JSON string and is re-parsed.
+///   - Session id arrives as camelCase `sessionId` (snake_case
+///     `session_id` is what the rest of the pipeline expects, so
+///     `baseMessage` is backfilled).
+///   - `tool_response` is a structured object with `returnDisplay` /
+///     `llmContent` / `error`; we prefer the human-readable
+///     `returnDisplay`.
+final class GeminiHookNormalizer {
+    static let shared = GeminiHookNormalizer()
+
+    private init() {}
+
+    func normalize(
+        payload: [String: Any],
+        helper: any HookHelperContext
+    ) -> HookActionEnvelope? {
         guard let event = payload["hook_event_name"] as? String else { return nil }
         let relayedEvents: Set<String> = [
             "BeforeAgent",
@@ -19,16 +44,18 @@ extension HookRunner {
         guard relayedEvents.contains(event) else { return nil }
 
         let notificationType = stringValue(payload["notification_type"])
-        let terminalName = canonicalTerminalName(
-            ProcessInfo.processInfo.environment["TERM_PROGRAM"] ?? ProcessInfo.processInfo.environment["TERM"]
+        let terminalName = helper.canonicalTerminalName(
+            ProcessInfo.processInfo.environment["TERM_PROGRAM"]
+                ?? ProcessInfo.processInfo.environment["TERM"]
         )
-        let cwd = resolvedHookCWD(payload: payload)
-        let terminalContext = terminalContextForGemini(event: event, terminalName: terminalName, cwd: cwd)
+        let cwd = helper.resolvedHookCWD(payload: payload)
+        let terminalContext = helper.detectTerminalContext(
+            event: event,
+            terminalName: terminalName,
+            cwd: cwd,
+            ghosttyFrontmostEvents: ["BeforeAgent", "BeforeModel", "BeforeTool", "SessionStart"]
+        )
 
-        // Map Gemini's hook_event_name to the wire event AttentionBridge
-        // dispatches on. Notification + notification_type="ToolPermission"
-        // gets its own wire event because passive permission cards have
-        // their own lane downstream.
         var wireEvent: String
         var toolName: String?
         var toolInput: [String: Any]?
@@ -53,8 +80,6 @@ extension HookRunner {
         case "Notification":
             wireEvent = notificationType == "ToolPermission" ? "ToolPermission" : "Notification"
         default:
-            // BeforeToolSelection / BeforeModel / AfterModel / SessionStart /
-            // SessionEnd / PreCompress pass through under their own names.
             wireEvent = event
         }
 
@@ -74,8 +99,8 @@ extension HookRunner {
             status = "processing"
         }
 
-        var message: [String: Any] = baseMessage(
-            provider: .gemini,
+        var message = helper.baseMessage(
+            providerId: "gemini",
             event: wireEvent,
             status: status,
             notificationType: notificationType,
@@ -85,8 +110,8 @@ extension HookRunner {
             terminalContext: terminalContext
         )
 
-        // Gemini hook payloads use camelCase `sessionId`; baseMessage only
-        // reads snake_case `session_id`, so backfill here.
+        // Gemini hook payloads use camelCase `sessionId`; baseMessage
+        // only reads snake_case `session_id`, so backfill here.
         if message["session_id"] == nil {
             set(&message, "session_id", stringValue(payload["sessionId"]))
         }
@@ -94,24 +119,24 @@ extension HookRunner {
         set(&message, "tool_input", toolInput)
         set(&message, "tool_use_id", toolUseId)
 
-        // Per-event semantic-lane routing matches Codex/Claude so downstream
-        // (livePrompt / liveProgressNote / livePreview) can pick the right
-        // text without guessing.
+        // Per-event semantic-lane routing matches Codex/Claude so
+        // downstream (livePrompt / liveProgressNote / livePreview) can
+        // pick the right text without guessing.
         switch event {
         case "BeforeAgent":
             // Semantic A: the user's prompt.
             set(&message, "prompt_text", firstText(payload["prompt"]))
 
         case "Notification":
-            // ToolPermission notification → tool/path summary for the card;
-            // other notifications → status string.
+            // ToolPermission notification → tool/path summary for the
+            // card; other notifications → status string.
             let text = firstText(payload["message"])
                 ?? firstText(payload["details"])
                 ?? firstText(payload["reason"])
             set(&message, "message", text)
 
         case "SessionStart":
-            // `source` is "startup" | "resume" | "clear" per the docs.
+            // `source` is "startup" | "resume" | "clear".
             set(&message, "message", firstText(payload["source"]))
 
         case "SessionEnd":
@@ -119,8 +144,8 @@ extension HookRunner {
             set(&message, "message", firstText(payload["reason"]))
 
         case "AfterAgent":
-            // The turn's final response. `prompt_response` is the documented
-            // field per Gemini's hook reference; transcript tail-scan is a
+            // Final response of the turn. `prompt_response` is the
+            // documented payload field; transcript tail-scan is a
             // fallback for older payload shapes.
             if let promptResponse = firstText(payload["prompt_response"]) {
                 set(&message, "commentary_text", promptResponse)
@@ -130,21 +155,22 @@ extension HookRunner {
             }
 
         case "AfterModel":
-            // Streaming chunk-level — fires on every token batch. Writing
-            // commentary_text here would clobber the field N times per turn
-            // and the rendered text would only ever be the latest chunk
-            // (likely a partial sentence). Mid-turn assistant text is read
-            // from the transcript on the surrounding tool events instead.
-            // We still relay the wire event so RuntimeSessionEventApplier
-            // can clear the BeforeModel "thinking" indicator.
+            // Streaming chunk-level — fires on every token batch.
+            // Writing commentary_text here would clobber the field
+            // many times per turn and the rendered text would only
+            // ever be the latest chunk. Mid-turn assistant text is
+            // read from the transcript on the surrounding tool events
+            // instead. We still relay the wire event so
+            // RuntimeSessionEventApplier can clear the BeforeModel
+            // "thinking" indicator.
             break
 
         case "BeforeTool", "AfterTool", "BeforeModel", "BeforeToolSelection", "PreCompress":
-            // No assistant text in these payloads — Gemini's hooks don't
-            // expose per-message replies. Tail-scan the transcript for the
-            // most recent `type: "gemini"` message so the notch bottom row
-            // can show "Gemini said …" between tool calls. Same approach
-            // as Claude's lastAssistantTextFromTranscript.
+            // No assistant text in these payloads — Gemini's hooks
+            // don't expose per-message replies. Tail-scan the
+            // transcript for the most recent `type: "gemini"` message
+            // so the notch bottom row can show "Gemini said …"
+            // between tool calls.
             if let extracted = lastAssistantFromGeminiTranscript(payload: payload) {
                 set(&message, "commentary_text", extracted.text)
                 set(&message, "commentary_timestamp", extracted.timestamp)
@@ -156,15 +182,21 @@ extension HookRunner {
 
         if event == "AfterTool",
            let response = geminiToolResponseText(payload: payload) {
-            set(&message, "tool_response", String(response.prefix(HookDefaults.maxToolResponseLength)))
+            set(&message, "tool_response", String(response.prefix(1200)))
         }
 
-        return HookAction(message: message)
+        return HookActionEnvelope(message: message)
     }
 
     private func canonicalGeminiToolName(_ raw: String?) -> String? {
         guard let raw else { return nil }
-        return ProviderKind.gemini.descriptor.canonicalToolName(raw)
+        let normalized = raw
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "-", with: "_")
+            .replacingOccurrences(of: " ", with: "_")
+        guard !normalized.isEmpty else { return nil }
+        return GeminiToolNames.canonical(normalized) ?? normalized
     }
 
     private func normalizeGeminiToolInput(_ rawInput: Any?) -> [String: Any]? {
@@ -179,8 +211,9 @@ extension HookRunner {
     }
 
     /// Gemini's `tool_response` is an object with `llmContent` /
-    /// `returnDisplay` / `error`, not a string. Prefer the human-readable
-    /// `returnDisplay`, fall back to `llmContent`, then `error`.
+    /// `returnDisplay` / `error`, not a string. Prefer the
+    /// human-readable `returnDisplay`, fall back to `llmContent`,
+    /// then `error`.
     private func geminiToolResponseText(payload: [String: Any]) -> String? {
         guard let response = payload["tool_response"] as? [String: Any] else {
             return toolResponseText(payload: payload)
@@ -190,11 +223,11 @@ extension HookRunner {
             ?? firstText(response["error"])
     }
 
-    /// Walk back from the end of the Gemini transcript JSON and return the
-    /// most recent `type: "gemini"` message's content + timestamp. Gemini
-    /// rewrites the entire transcript file on each save (not jsonl-append),
-    /// so we just parse it in full instead of doing Claude's exponential
-    /// tail-window scan.
+    /// Walk back from the end of the Gemini transcript JSON and
+    /// return the most recent `type: "gemini"` message's content +
+    /// timestamp. Gemini rewrites the entire transcript file on each
+    /// save (not jsonl-append), so we just parse it in full instead
+    /// of doing Claude's exponential tail-window scan.
     private func lastAssistantFromGeminiTranscript(payload: [String: Any]) -> (text: String, timestamp: String?)? {
         guard let rawPath = stringValue(payload["transcript_path"]), !rawPath.isEmpty else { return nil }
         let path = (rawPath as NSString).expandingTildeInPath
@@ -211,9 +244,10 @@ extension HookRunner {
         return nil
     }
 
-    /// Gemini messages store content either as a plain string ("gemini"
-    /// replies) or as `[{"text": "..."}]` (user prompts). Handle both so the
-    /// same helper works regardless of which side wrote the message.
+    /// Gemini messages store content either as a plain string
+    /// ("gemini" replies) or as `[{"text": "..."}]` (user prompts).
+    /// Handle both so the same helper works regardless of which side
+    /// wrote the message.
     private func extractGeminiTranscriptText(_ raw: Any?) -> String? {
         if let text = raw as? String {
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
