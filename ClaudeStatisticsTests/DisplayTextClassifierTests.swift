@@ -3,9 +3,25 @@ import XCTest
 @testable import Claude_Statistics
 
 final class DisplayTextClassifierTests: XCTestCase {
+
+    override func setUp() {
+        super.setUp()
+        GeminiTestPlaceholder.register()
+    }
+
+    override func tearDown() {
+        GeminiTestPlaceholder.unregister()
+        super.tearDown()
+    }
+
     // MARK: - isNoiseValue
 
-    private static let geminiNoisePrefixes = ProviderKind.gemini.descriptor.notchNoisePrefixes
+    // Computed (not `static let`) so it's evaluated after `setUp`
+    // populates the Gemini placeholder. Reading the descriptor at
+    // class-load time would lock in the Claude fallback.
+    private var geminiNoisePrefixes: [String] {
+        ProviderKind.gemini.descriptor.notchNoisePrefixes
+    }
 
     func test_isNoiseValue_genericTokens() {
         for raw in ["true", "false", "null", "nil", "text", "---", "--", "...", "…", "TRUE", "  Null  "] {
@@ -30,12 +46,12 @@ final class DisplayTextClassifierTests: XCTestCase {
     func test_isNoiseValue_jsonBlobAlwaysNoise() {
         let blob = #"{"foo": "bar", "baz": 42}"#
         XCTAssertTrue(DisplayTextClassifier.isNoiseValue(blob))
-        XCTAssertTrue(DisplayTextClassifier.isNoiseValue(blob, noisePrefixes: Self.geminiNoisePrefixes))
+        XCTAssertTrue(DisplayTextClassifier.isNoiseValue(blob, noisePrefixes: self.geminiNoisePrefixes))
     }
 
     func test_isNoiseValue_geminiShellMetadataPrefixes() {
-        XCTAssertTrue(DisplayTextClassifier.isNoiseValue("Process group pgid: 12345", noisePrefixes: Self.geminiNoisePrefixes))
-        XCTAssertTrue(DisplayTextClassifier.isNoiseValue("Background PIDs: 4321, 5678", noisePrefixes: Self.geminiNoisePrefixes))
+        XCTAssertTrue(DisplayTextClassifier.isNoiseValue("Process group pgid: 12345", noisePrefixes: self.geminiNoisePrefixes))
+        XCTAssertTrue(DisplayTextClassifier.isNoiseValue("Background PIDs: 4321, 5678", noisePrefixes: self.geminiNoisePrefixes))
     }
 
     func test_isNoiseValue_geminiPrefixesAreFineForOtherModes() {

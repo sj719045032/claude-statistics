@@ -1,5 +1,6 @@
 import Foundation
 import XCTest
+import ClaudeStatisticsKit
 
 @testable import Claude_Statistics
 
@@ -8,6 +9,16 @@ final class ToolActivityFormatterCoreTests: XCTestCase {
     // MARK: - Helpers
 
     private let fixedDate = Date(timeIntervalSince1970: 1_700_000_000)
+
+    override func setUp() {
+        super.setUp()
+        GeminiTestPlaceholder.register()
+    }
+
+    override func tearDown() {
+        GeminiTestPlaceholder.unregister()
+        super.tearDown()
+    }
 
     // MARK: - canonicalToolName
 

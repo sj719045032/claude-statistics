@@ -134,34 +134,32 @@ final class GeminiProvider: SessionDataProvider, UsageProvider, AccountProvider,
 /// Maps Gemini's raw tool names (`run_shell_command`, `read_file`, …) onto
 /// the shared canonical vocabulary (`bash`, `read`, …). Input is expected to
 /// be the lower-cased/underscore-normalized form that
-/// `ProviderKind.canonicalToolName(_:)` produces; returns `nil` when no
-/// alias applies so the caller can keep the original name.
+/// `ProviderDescriptor.canonicalToolName(_:)` produces; returns `nil` when
+/// no alias applies so the caller can keep the original name.
+///
+/// `table` is the source of truth — `canonical(_:)` is a thin wrapper
+/// for plugin-internal callers, and `GeminiPlugin.init()` registers
+/// the same dictionary into `PluginToolAliasStore` so the host
+/// descriptor's alias closure can resolve through it without holding
+/// a duplicate copy.
 enum GeminiToolNames {
+    static let table: [String: String] = [
+        "run_shell_command":     "bash",
+        "grep_search":           "grep",
+        "read_file":             "read",
+        "write_file":            "write",
+        "replace":               "edit",
+        "web_fetch":             "webfetch",
+        "web_search":            "websearch",
+        "google_web_search":     "websearch",
+        "google_search":         "websearch",
+        "list_directory":        "ls",
+        "codebase_investigator": "agent",
+        "cli_help":              "help",
+    ]
+
     static func canonical(_ normalized: String) -> String? {
-        switch normalized {
-        case "run_shell_command":
-            return "bash"
-        case "grep_search":
-            return "grep"
-        case "read_file":
-            return "read"
-        case "write_file":
-            return "write"
-        case "replace":
-            return "edit"
-        case "web_fetch":
-            return "webfetch"
-        case "web_search", "google_web_search", "google_search":
-            return "websearch"
-        case "list_directory":
-            return "ls"
-        case "codebase_investigator":
-            return "agent"
-        case "cli_help":
-            return "help"
-        default:
-            return nil
-        }
+        table[normalized]
     }
 }
 

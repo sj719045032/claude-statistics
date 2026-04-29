@@ -35,6 +35,11 @@ public final class GeminiPlugin: NSObject, ProviderPlugin, ProviderAccountUIProv
     public override init() {
         self.accountManager = GeminiAccountManager()
         super.init()
+        // Publish plugin metadata so host fallbacks can delegate back
+        // here instead of carrying duplicate Gemini-specific code.
+        // Both calls are idempotent — re-register replaces.
+        PluginToolAliasStore.register(providerId: "gemini", table: GeminiToolNames.table)
+        PluginDescriptorStore.register(self.descriptor)
     }
 
     public var descriptor: ProviderDescriptor {

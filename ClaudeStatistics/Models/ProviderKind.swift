@@ -31,8 +31,14 @@ struct ProviderKind: RawRepresentable, Hashable, Codable, Identifiable, Sendable
         switch rawValue {
         case "claude": return .claude
         case "codex":  return .codex
-        case "gemini": return .gemini
-        default:       return .claude
+        default:
+            // Any extracted plugin (Gemini today, third-party
+            // tomorrow) registers its descriptor into
+            // `PluginDescriptorStore` from `init()`. Fall back to the
+            // Claude descriptor when the store hasn't been populated
+            // yet — same legacy contract `ProviderKind(rawValue:) ?? .claude`
+            // call sites historically relied on.
+            return PluginDescriptorStore.descriptor(for: rawValue) ?? .claude
         }
     }
 }
@@ -106,10 +112,10 @@ enum MenuBarPreferences {
     }
 }
 
-/// Builtin provider capability constants. The `ProviderCapabilities`
-/// type itself lives in `ClaudeStatisticsKit`; only these three
-/// host-bundled instances stay here. Stage 4 moves each into its
-/// corresponding `*Plugin` package.
+/// Builtin provider capability constants. Only Claude and Codex
+/// remain here while their adapters still ship from the host module.
+/// Gemini's capabilities are inlined inside `GeminiPlugin.descriptor`
+/// (the plugin's `ProviderPlugin` factory).
 extension ProviderCapabilities {
     static let claude = ProviderCapabilities(
         supportsCost: true,
@@ -122,16 +128,6 @@ extension ProviderCapabilities {
     )
 
     static let codex = ProviderCapabilities(
-        supportsCost: true,
-        supportsUsage: true,
-        supportsProfile: true,
-        supportsStatusLine: true,
-        supportsExactPricing: false,
-        supportsResume: true,
-        supportsNewSession: true
-    )
-
-    static let gemini = ProviderCapabilities(
         supportsCost: true,
         supportsUsage: true,
         supportsProfile: true,
