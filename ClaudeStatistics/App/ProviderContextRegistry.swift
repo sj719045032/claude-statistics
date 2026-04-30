@@ -89,6 +89,19 @@ final class ProviderContextRegistry {
         }
     }
 
+    /// Tear down a single provider's context entirely. Stops the store
+    /// (closes its DB + watcher), cancels the runtime-bridge
+    /// subscription, and drops the entries from all three maps. Called
+    /// when a provider plugin is disabled so its watcher stops costing
+    /// CPU/FS notifications without an app restart.
+    func remove(for kind: ProviderKind) {
+        if let store = stores.removeValue(forKey: kind) {
+            store.stop()
+        }
+        sessionViewModels.removeValue(forKey: kind)
+        runtimeBridgeCancellables.removeValue(forKey: kind)?.cancel()
+    }
+
     // MARK: Runtime bridge (transcript → ActiveSessionsTracker)
 
     /// Providers that don't deliver in-flight activity through hooks

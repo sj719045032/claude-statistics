@@ -79,6 +79,17 @@ final class UsageVMRegistry {
         }
     }
 
+    /// Tear down a single provider's secondary VM. Stops its auto-
+    /// refresh timer and drops it from the pool — once dereferenced
+    /// the VM's `cacheWatcher` deinit fires and FS sources are torn
+    /// down. Called when a provider plugin is disabled. No-op for the
+    /// current provider (its VM is the primary, which keeps living).
+    func remove(secondaryFor kind: ProviderKind) {
+        if let vm = secondaries.removeValue(forKey: kind) {
+            vm.stopAutoRefresh()
+        }
+    }
+
     // MARK: Factory
 
     private func makeSecondary(for kind: ProviderKind) -> UsageViewModel {

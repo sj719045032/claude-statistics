@@ -1110,6 +1110,119 @@ final class PluginTrustGateTests: XCTestCase {
             .allowed
         )
     }
+
+    private final class FakeDisableProviderPlugin: NSObject, ProviderPlugin {
+        static let manifest = PluginManifest(
+            id: "com.example.disable.alpha",
+            kind: .provider,
+            displayName: "Alpha",
+            version: SemVer(major: 1, minor: 0, patch: 0),
+            minHostAPIVersion: SemVer(major: 0, minor: 1, patch: 0),
+            permissions: [],
+            principalClass: "FakeDisableProviderPlugin"
+        )
+        let descriptor = ProviderDescriptor(
+            id: "alpha-descriptor",
+            displayName: "Alpha",
+            iconAssetName: "test",
+            accentColor: .gray,
+            notchEnabledDefaultsKey: "notch.enabled.alpha",
+            resolveToolAlias: { _ in nil }
+        )
+        override init() { super.init() }
+    }
+
+    private final class FakeDisableProviderKeeper: NSObject, ProviderPlugin {
+        static let manifest = PluginManifest(
+            id: "com.example.disable.beta",
+            kind: .provider,
+            displayName: "Beta",
+            version: SemVer(major: 1, minor: 0, patch: 0),
+            minHostAPIVersion: SemVer(major: 0, minor: 1, patch: 0),
+            permissions: [],
+            principalClass: "FakeDisableProviderKeeper"
+        )
+        let descriptor = ProviderDescriptor(
+            id: "beta-descriptor",
+            displayName: "Beta",
+            iconAssetName: "test",
+            accentColor: .gray,
+            notchEnabledDefaultsKey: "notch.enabled.beta",
+            resolveToolAlias: { _ in nil }
+        )
+        override init() { super.init() }
+    }
+
+    func testDisableProviderPluginPassesDescriptorIDToCallback() throws {
+        // Two providers needed — disable() refuses to remove the last
+        // remaining one. We disable the alpha and assert the keeper
+        // (beta) is what survives.
+        let registry = PluginRegistry()
+        try registry.register(FakeDisableProviderPlugin())
+        try registry.register(FakeDisableProviderKeeper())
+        PluginTrustGate.setPluginRegistry(registry)
+
+        var receivedID: String?
+        var receivedDescriptorID: String?
+        PluginTrustGate.onPluginDisabled = { id, descriptorID in
+            receivedID = id
+            receivedDescriptorID = descriptorID
+        }
+
+        let removed = PluginTrustGate.disable(
+            manifest: FakeDisableProviderPlugin.manifest,
+            source: .host
+        )
+        XCTAssertTrue(removed)
+        XCTAssertEqual(receivedID, "com.example.disable.alpha")
+        XCTAssertEqual(receivedDescriptorID, "alpha-descriptor")
+        PluginTrustGate.onPluginDisabled = nil
+    }
+
+    func testDisableTerminalPluginPassesNilDescriptorIDToCallback() throws {
+        // Terminal-kind plugin has no provider descriptor, so the
+        // descriptor-id arg must be nil — host's teardownProviderState
+        // bails out on nil and leaves provider state untouched.
+        let registry = PluginRegistry()
+        let plugin = FakeDisableTerminalPlugin()
+        try registry.register(plugin)
+        PluginTrustGate.setPluginRegistry(registry)
+
+        var receivedDescriptorID: String? = "sentinel"
+        PluginTrustGate.onPluginDisabled = { _, descriptorID in
+            receivedDescriptorID = descriptorID
+        }
+
+        _ = PluginTrustGate.disable(
+            manifest: FakeDisableTerminalPlugin.manifest,
+            source: .host
+        )
+        XCTAssertNil(receivedDescriptorID)
+        PluginTrustGate.onPluginDisabled = nil
+    }
+
+    private final class FakeDisableTerminalPlugin: NSObject, TerminalPlugin {
+        static let manifest = PluginManifest(
+            id: "com.example.disable.terminal",
+            kind: .terminal,
+            displayName: "Term",
+            version: SemVer(major: 1, minor: 0, patch: 0),
+            minHostAPIVersion: SemVer(major: 0, minor: 1, patch: 0),
+            permissions: [],
+            principalClass: "FakeDisableTerminalPlugin"
+        )
+        let descriptor = TerminalDescriptor(
+            id: "com.example.disable.terminal",
+            displayName: "Term",
+            category: .terminal,
+            bundleIdentifiers: ["com.example.term"],
+            terminalNameAliases: ["term"],
+            processNameHints: ["term"],
+            focusPrecision: .appOnly,
+            autoLaunchPriority: nil
+        )
+        override init() { super.init() }
+    }
 }
 
 /// `PluginUninstaller.uninstall` must (1) reject host/bundled
@@ -1220,7 +1333,7 @@ final class PluginUninstallerTests: XCTestCase {
         // Wire registry into the gate so disable() can unregister.
         PluginTrustGate.setPluginRegistry(registry)
         var disableCallbackFired = false
-        PluginTrustGate.onPluginDisabled = { id in
+        PluginTrustGate.onPluginDisabled = { id, _ in
             XCTAssertEqual(id, "com.example.uninstall-target")
             disableCallbackFired = true
         }

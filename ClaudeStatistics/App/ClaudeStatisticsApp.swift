@@ -299,6 +299,23 @@ final class AppState: ObservableObject {
         switchProvider(to: fallback)
     }
 
+    /// Tear down the per-provider store + secondary usage VM whose
+    /// plugin just got disabled. Without this the SessionDataStore's
+    /// FSEvent watcher and the secondary UsageViewModel's auto-refresh
+    /// keep running until the app restarts, wasting CPU and re-fetching
+    /// usage data the user can no longer see. Skips the current
+    /// provider — `handleProviderPluginDisabled` already promoted a
+    /// fallback in that case, and tearing down the active store would
+    /// leave UI bound to a dead reference.
+    private func teardownProviderState(forDescriptorID descriptorID: String?) {
+        guard let descriptorID,
+              let kind = ProviderKind(rawValue: descriptorID),
+              kind != providerKind
+        else { return }
+        providerContexts.remove(for: kind)
+        usageVMs.remove(secondaryFor: kind)
+    }
+
     /// Wires the focus coordinator to consult `pluginRegistry` before
     /// falling back to `TerminalFocusRouteRegistry`. Phase 4 of the
     /// terminal-plugin migration: in v4.0-alpha all 8 builtins return
@@ -441,7 +458,7 @@ final class AppState: ObservableObject {
                 "Plugin hot-loaded: \(manifest.id) v\(manifest.version)"
             )
         }
-        PluginTrustGate.onPluginDisabled = { [weak self] pluginID in
+        PluginTrustGate.onPluginDisabled = { [weak self] pluginID, providerDescriptorID in
             // Plugin's bundle stays in memory (macOS can't truly
             // unload a dlopen'd bundle); we just stop resolving it
             // from the registry. The dynamic-terminal-registry
@@ -453,6 +470,7 @@ final class AppState: ObservableObject {
             self?.wirePluginProviderInstances()
             self?.handleProviderPluginDisabled(pluginID: pluginID)
             self?.recomputeAvailableProviderKinds()
+            self?.teardownProviderState(forDescriptorID: providerDescriptorID)
             DiagnosticLogger.shared.info("Plugin disabled: \(pluginID)")
         }
 

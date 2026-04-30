@@ -51,8 +51,12 @@ enum PluginTrustGate {
     /// Fired after a plugin is removed from `pluginRegistry` via
     /// `disable(...)`. Host re-derives dynamic registries so the
     /// disabled plugin's bundle ids / aliases / strategies stop
-    /// resolving.
-    static var onPluginDisabled: ((String) -> Void)?
+    /// resolving. The second argument is the plugin's provider
+    /// descriptor id (e.g. "codex") for `.provider`/`.both` plugins
+    /// — captured *before* unregister so the host can map manifest id
+    /// → `ProviderKind` for store/VM teardown without re-querying the
+    /// already-emptied registry. `nil` for non-provider plugins.
+    static var onPluginDisabled: ((String, String?) -> Void)?
 
     static func setPluginRegistry(_ registry: PluginRegistry) {
         pluginRegistry = registry
@@ -183,6 +187,10 @@ enum PluginTrustGate {
         }
         disabledStore.setDisabled(true, for: manifest.id)
         guard let registry = pluginRegistry else { return false }
+        // Capture descriptor id before unregister wipes the bucket —
+        // host uses it to find the matching `ProviderKind` for store
+        // and VM teardown. Non-provider plugins yield nil.
+        let providerDescriptorID = registry.providerPlugin(id: manifest.id)?.descriptor.id
         let removed = registry.unregister(id: manifest.id)
         // Always record the disabled snapshot — even if `unregister`
         // returned false (e.g. a `.both` plugin already pruned by an
@@ -190,7 +198,7 @@ enum PluginTrustGate {
         // "Disabled" so the user can flip it back on.
         registry.recordDisabled(manifest: manifest, source: source)
         if removed {
-            onPluginDisabled?(manifest.id)
+            onPluginDisabled?(manifest.id, providerDescriptorID)
         }
         return removed
     }
