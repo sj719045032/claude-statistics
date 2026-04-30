@@ -118,13 +118,8 @@ find "$ARCHIVE_DIR" -maxdepth 1 -name "*.delta" 2>/dev/null | sort > "$AFTER_DEL
 mapfile -t NEW_DELTAS < <(comm -13 "$BEFORE_DELTAS" "$AFTER_DELTAS")
 rm -f "$BEFORE_DELTAS" "$AFTER_DELTAS"
 
-# Marketplace plugin bundles produced by build-dmg.sh's pack step.
-# These ship to the **catalog repo's** GitHub release (separate from
-# the host app release on the main repo) so the catalog itself owns
-# both the metadata (index.json) and the bytes.
-mapfile -t PLUGIN_ARTIFACTS < <(find build/marketplace -maxdepth 1 -name "*.csplugin.zip" 2>/dev/null | sort)
-
-# Host app artifacts → main repo release.
+# Plugin bundles ship through the catalog repo's own releases —
+# this script only handles the host app release.
 HOST_ASSET_LIST=(
     "$DMG"
     "$ZIP"
@@ -137,14 +132,6 @@ for a in "${HOST_ASSET_LIST[@]}"; do
     sz=$(du -h "$a" | cut -f1 | xargs)
     echo "      - $(basename "$a") (${sz})"
 done
-if [[ ${#PLUGIN_ARTIFACTS[@]} -gt 0 ]]; then
-    echo ""
-    echo "    Catalog repo (${CATALOG_REPO_URL}) v${VERSION} assets:"
-    for a in "${PLUGIN_ARTIFACTS[@]}"; do
-        sz=$(du -h "$a" | cut -f1 | xargs)
-        echo "      - $(basename "$a") (${sz})"
-    done
-fi
 echo ""
 
 # ── Step 2: Commit + push ─────────────────────────────────────────────────────
@@ -168,12 +155,11 @@ git push
 echo "    Pushed."
 echo ""
 
-# ── Step 3: GitHub releases ───────────────────────────────────────────────────
+# ── Step 3: Host GitHub release ───────────────────────────────────────────────
 
 echo "==> [3/4] Switching to publish account (${PUBLISH_ACCOUNT})..."
 gh auth switch --hostname github.com --user "$PUBLISH_ACCOUNT"
 
-# 3a: host app release on the main repo.
 echo "==> Creating host release v${VERSION} on $(basename "$REPO_URL")..."
 RELEASE_URL=$(gh release create "v${VERSION}" \
     "${HOST_ASSET_LIST[@]}" \
@@ -182,24 +168,6 @@ RELEASE_URL=$(gh release create "v${VERSION}" \
     --notes "$RELEASE_NOTES")
 
 echo "    Host release: ${RELEASE_URL}"
-
-# 3b: plugin release on the catalog repo (only if there are plugin
-# bundles to ship). Same version tag so both repos move in lockstep.
-if [[ ${#PLUGIN_ARTIFACTS[@]} -gt 0 ]]; then
-    echo ""
-    echo "==> Creating plugin release v${VERSION} on $(basename "$CATALOG_REPO_URL")..."
-    PLUGIN_RELEASE_NOTES="Plugin bundles for Claude Statistics v${VERSION}.
-
-Each <Plugin>-${VERSION}.csplugin.zip is the .csplugin payload referenced
-by the matching entry in https://raw.githubusercontent.com/sj719045032/claude-statistics-plugins/main/index.json
-— no manual download needed; users install via Settings → Plugins → Discover."
-    CATALOG_RELEASE_URL=$(gh release create "v${VERSION}" \
-        "${PLUGIN_ARTIFACTS[@]}" \
-        --repo "$CATALOG_REPO_URL" \
-        --title "v${VERSION}" \
-        --notes "$PLUGIN_RELEASE_NOTES")
-    echo "    Plugin release: ${CATALOG_RELEASE_URL}"
-fi
 echo ""
 
 # ── Step 4: Restore account ───────────────────────────────────────────────────

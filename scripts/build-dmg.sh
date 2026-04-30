@@ -76,26 +76,11 @@ cd "${BUILD_DIR}/Build/Products/Release"
 ditto -c -k --keepParent "${APP_NAME}.app" "${OLDPWD}/${ZIP_OUTPUT}"
 cd "${OLDPWD}"
 
-# Pack every standalone .csplugin produced by this Release build into
-# `build/marketplace/<Name>.csplugin.zip` + sidecar `<Name>.sha256`.
-# These are the artifacts the marketplace catalog points at — they
-# need to be uploaded to the same GitHub release so users can install
-# plugins from Settings → Plugins → Discover. Wiping the dir first
-# keeps stale zips from previous releases out of the upload list.
-echo "==> Packing .csplugin marketplace artifacts..."
-MARKETPLACE_DIR="build/marketplace"
-mkdir -p "${MARKETPLACE_DIR}"
-rm -f "${MARKETPLACE_DIR}"/*.csplugin.zip "${MARKETPLACE_DIR}"/*.sha256
-RELEASE_PRODUCTS="${BUILD_DIR}/Build/Products/Release"
-PACKED_COUNT=0
-for csplugin in "${RELEASE_PRODUCTS}"/*.csplugin; do
-    [ -d "${csplugin}" ] || continue
-    name="$(basename "${csplugin}" .csplugin)"
-    bash scripts/pack-csplugin.sh "${name}" "${RELEASE_PRODUCTS}" >/dev/null
-    PACKED_COUNT=$((PACKED_COUNT + 1))
-done
-echo "    Packed ${PACKED_COUNT} .csplugin bundles → ${MARKETPLACE_DIR}/"
-
+# Plugin .csplugin bundles are NOT built or packed by this script —
+# they live in the catalog repo (claude-statistics-plugins) and ship
+# through that repo's own GitHub releases. See PLUGIN_ARCHITECTURE.md
+# §1.1 in this repo + the catalog repo's release script.
+#
 # Clean up intermediate build to avoid duplicate app registrations
 rm -rf "${BUILD_DIR}"
 
@@ -183,20 +168,13 @@ if [ "${DELTA_COUNT}" -gt 0 ]; then
 else
   echo "    Deltas: none (archive had no prior versions to diff against)"
 fi
-if [ "${PACKED_COUNT}" -gt 0 ]; then
-  echo "    Plugins: ${PACKED_COUNT} .csplugin.zip in ${MARKETPLACE_DIR}/ — marketplace artifacts"
-fi
-
 echo ""
 echo "==> appcast.xml updated with v${VERSION}"
 echo ""
 
 # Build the gh release upload file list for the host app release on
-# the main repo (claude-statistics). Plugin .csplugin.zip files are
-# NOT included — they ship through their own release on the catalog
-# repo (claude-statistics-plugins) so the catalog can host both the
-# metadata and the bytes. release.sh creates that second release;
-# build-dmg's job is just to produce the artifacts.
+# the main repo. Plugin bundles ship through the catalog repo's own
+# releases — see catalog repo's `scripts/release-plugins.sh`.
 UPLOAD_ARGS="${DMG_OUTPUT} ${ZIP_OUTPUT}"
 while IFS= read -r d; do
   [ -z "$d" ] && continue

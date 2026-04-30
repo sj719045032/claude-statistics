@@ -187,71 +187,55 @@ match exists.
 - Measured: 12 MB → few KB for no-code-change diff; real point releases
   typically land at single-digit MB deltas.
 
-### Marketplace plugin artifacts
+### Releasing the SDK (xcframework)
 
-`build-dmg.sh` packs every `.csplugin` produced by the Release build
-into `build/marketplace/<Name>.csplugin.zip` (plus a sidecar
-`.sha256`) by calling `scripts/pack-csplugin.sh <Name> <products-dir>`
-in a loop. The host app release on the main repo
-(`claude-statistics`) only contains the host artifacts (DMG / ZIP /
-Sparkle deltas). The plugin bundles ship through their **own**
-`v<version>` GitHub release on the catalog repo
-(`claude-statistics-plugins`) — the catalog repo owns both the
-`index.json` metadata and the `.csplugin.zip` bytes, so
-`PluginCatalogEntry.downloadURL` points right back at the same repo
-that served the catalog. `release.sh` creates both releases in the
-same run (step 3a host, step 3b catalog).
-
-- Manual pack (Debug build): `bash scripts/pack-csplugin.sh CodexPlugin`
-  finds the bundle under `/tmp/claude-stats-build/Build/Products/{Debug,Release}/`.
-- Pack from a custom build dir (release pipeline does this): pass the
-  Products directory as the second argument:
-  `bash scripts/pack-csplugin.sh CodexPlugin build/release/Build/Products/Release`.
-- `build/marketplace/` is wiped before each pack run so the upload set
-  reflects only the current release's bundles. The directory is
-  gitignored.
-
-### Sync the marketplace catalog after release
-
-The catalog repo is **`github.com/sj719045032/claude-statistics-plugins`**
-(public). The host's `PluginCatalog.defaultRemoteURL` points at its
-`main` branch's `index.json`. Each release ships new
-`.csplugin.zip` artifacts with new SHAs — the catalog must be
-updated or users see stale `sha256Mismatch` install errors.
+The SDK (`ClaudeStatisticsKit`) ships to third-party plugin authors as
+an `.xcframework` referenced via SwiftPM `.binaryTarget(url:, checksum:)`
+from `Package.swift` at repo root. SDK versions are independent of host
+app versions — bump them only when SDK ABI changes.
 
 ```bash
-# After scripts/release.sh succeeds, sync the catalog (offline-safe;
-# no GitHub writes until the final push):
-bash scripts/sync-catalog.sh <version>
-# Review the diff:
-cd build/catalog-repo && git diff index.json
-# Push from sj719045032's account:
+# 1. Build the xcframework + zip + checksum.
+bash scripts/build-xcframework.sh
+# Prints the SwiftPM checksum (lowercase hex). Copy it.
+
+# 2. Create a sdk-v<x.y.z> release on the host repo, upload the zip:
 gh auth switch --hostname github.com --user sj719045032
-git commit -am "sync catalog for v<version>"
-git push
+gh release create sdk-v<x.y.z> \
+    build/xcframework/ClaudeStatisticsKit.xcframework.zip \
+    --repo https://github.com/sj719045032/claude-statistics \
+    --title "ClaudeStatisticsKit SDK v<x.y.z>" \
+    --notes "..."
 gh auth switch --hostname github.com --user tinystone007
+
+# 3. Update Package.swift's `.binaryTarget(url:, checksum:)` to the new
+#    sdk-v<x.y.z> URL + checksum, commit, push.
 ```
 
-What sync-catalog.sh does:
-1. Clones (or `git pull --rebase`s) the catalog repo into
-   `build/catalog-repo/` (gitignored).
-2. For each `build/marketplace/<Name>.sha256`, finds the matching
-   entry in `index.json` (by the plugin name embedded in
-   `downloadURL`) and rewrites `sha256`, `version`, and
-   `downloadURL`. The new download URL points at
-   `https://github.com/sj719045032/claude-statistics-plugins/releases/download/v<version>/<Name>-<version>.csplugin.zip`
-   — i.e. the catalog repo's own v<version> release tag, which
-   release.sh's step 3b just populated.
-3. Bumps `updatedAt` to ISO-8601 UTC now.
-4. Prints the exact `git commit` + `git push` commands and leaves
-   the actual push to the operator (publishing to a public repo on
-   another GitHub account stays a deliberate manual step, not
-   automated).
+The catalog repo's `project.yml` references the SDK as
+`packages.ClaudeStatisticsKit.url: https://github.com/sj719045032/claude-statistics, branch: main`,
+so as soon as Package.swift is pushed every plugin in the catalog
+picks up the new SDK on its next build.
 
-`raw.githubusercontent.com` takes ≤ 5 min to propagate after push.
-Apple Terminal is intentionally absent from the catalog (chassis
-built-in per `docs/PLUGIN_ARCHITECTURE.md` §1.1) — the script
-correctly warns "no matching entry" for its sidecar and skips.
+### Marketplace plugin artifacts
+
+Plugin bundles do **not** ship from this repo — they live in
+**`github.com/sj719045032/claude-statistics-plugins`** (the catalog
+repo). The catalog repo owns both `index.json` metadata and the
+`.csplugin.zip` bytes; `PluginCatalogEntry.downloadURL` points at
+that repo's own GitHub releases. The host's
+`PluginCatalog.defaultRemoteURL` is set to
+`https://raw.githubusercontent.com/sj719045032/claude-statistics-plugins/main/index.json`.
+
+The catalog repo has its own build + release workflow (see its
+README and `scripts/`). When you bump the SDK in this repo (above),
+the catalog repo just needs to rebuild + repack its plugins so they
+link the new SDK; the catalog operator runs the catalog repo's
+release script. Apple Terminal is the one chassis built-in terminal
+plugin (system-bundled with macOS, lives in
+`ClaudeStatistics/Terminal/Capabilities/AppleTerminalBuiltin.swift`);
+every other plugin is installed at runtime via Settings → Plugins
+→ Discover.
 
 ## Deploy Website to Vercel
 
