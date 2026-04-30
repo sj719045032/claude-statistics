@@ -33,7 +33,7 @@ final class UsageVMRegistryTests: XCTestCase {
     func test_swap_promotesIncomingAndDemotesOutgoing() {
         // lookupStore must report the outgoing kind has a store, otherwise
         // swap skips re-creating its secondary VM.
-        let store = SessionDataStore(provider: ClaudeProvider.shared)
+        let store = SessionDataStore(kind: .claude)
         let registry = UsageVMRegistry(lookupStore: { kind in kind == .claude ? store : nil })
 
         // Start: codex is in the secondary pool, claude is current.

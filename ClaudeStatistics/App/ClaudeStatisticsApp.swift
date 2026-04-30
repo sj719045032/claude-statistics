@@ -361,21 +361,16 @@ final class AppState: ObservableObject {
         }
 
         // Register plugin-supplied provider instances into
-        // `ProviderRegistry`'s dynamic store BEFORE any code reads
-        // `ProviderRegistry.provider(for:)`. The bootstrap loop just
-        // below creates a `SessionDataStore(provider: ProviderRegistry.provider(for: kind))`
-        // for every startup kind — if the dynamic-providers store
-        // is still empty, the lookup falls back to
-        // `ClaudeProvider.shared` (the registry's last-resort
-        // default) and the Codex / Gemini stores get baked with
-        // Claude as their `provider`, which then propagates to
-        // `usageSource`, `usagePresentation`, etc. The Usage tab
-        // would render Claude's 5h/7d/7d-Sonnet rate-limit panels
-        // even when the user is on Codex. Wiring early fixes the
-        // root: every store sees the right provider from creation.
+        // `ProviderRegistry`'s dynamic store. Must run before
+        // `SessionDataStore.start()` (called from `bootstrap` →
+        // `store.start()` → `provider.makeWatcher`) so the watcher
+        // starts on the correct provider's filesystem layout. Now
+        // that `SessionDataStore.provider` is a computed property
+        // that resolves through `ProviderRegistry`, the value
+        // automatically reflects later plugin enable/disable too —
+        // we only need a one-time pre-bootstrap registration here.
         // Uses the static overload because not every `AppState`
-        // stored property is initialized yet — Swift won't let an
-        // instance method run during phase-1 init.
+        // stored property is initialized yet (phase-1 init).
         Self.wirePluginProviderInstances(pluginRegistry: pluginRegistry)
 
         let tracker = ActiveSessionsTracker()
@@ -383,7 +378,15 @@ final class AppState: ObservableObject {
         let contexts = ProviderContextRegistry(activeSessionsTracker: tracker)
         self.providerContexts = contexts
         contexts.bootstrap(startupKinds)
-        let lookupStore: (ProviderKind) -> SessionDataStore? = { [weak contexts] in contexts?.store(for: $0) }
+        // `ensureContext` (not `store(for:)`) so a hot-loaded
+        // provider's session store is materialized the first time
+        // any consumer (e.g. `UsageVMRegistry.viewModel`) asks for
+        // it. No more hand-coded `bootstrap` / `bootSecondary` calls
+        // in `onPluginHotLoaded` — the strip's lazy lookup pulls
+        // the chain.
+        let lookupStore: (ProviderKind) -> SessionDataStore? = { [weak contexts] in
+            contexts?.ensureContext(for: $0).store
+        }
         self.usageVMs = UsageVMRegistry(lookupStore: lookupStore)
         self.notchRuntime = NotchRuntimeCoordinator(
             notchCenter: notchCenter,

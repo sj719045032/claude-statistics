@@ -31,7 +31,19 @@ final class SessionDataStore: ObservableObject {
     private var isProcessingDirtyBatch = false
     private var isPopoverVisible = false
     private var watcher: (any SessionWatcher)?
-    let provider: any SessionProvider
+
+    /// The store binds to a `ProviderKind`, not to a specific
+    /// `SessionProvider` instance. Every read of `provider` resolves
+    /// through `ProviderRegistry.provider(for: kind)`, which is the
+    /// single source of truth for plugin-supplied providers — when
+    /// a plugin is hot-loaded, disabled, or re-registered, the store
+    /// (and therefore every view bound to it) sees the new instance
+    /// on the next access. Stored-instance form was the root cause
+    /// of "Codex tab shows Claude usage": the registry was empty
+    /// when the store was constructed during `bootstrap`, so the
+    /// fallback Claude provider got baked in for life.
+    let kind: ProviderKind
+    var provider: any SessionProvider { ProviderRegistry.provider(for: kind) }
     private let db = DatabaseService.shared
     private let maxQueuedRetryAttempts = 3
     private let parseQueue: OperationQueue = {
@@ -42,8 +54,8 @@ final class SessionDataStore: ObservableObject {
         return q
     }()
 
-    init(provider: any SessionProvider) {
-        self.provider = provider
+    init(kind: ProviderKind) {
+        self.kind = kind
     }
 
     // MARK: - Lifecycle

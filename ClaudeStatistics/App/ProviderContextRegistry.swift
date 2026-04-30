@@ -29,8 +29,7 @@ final class ProviderContextRegistry {
     /// user-driven switch.
     func bootstrap(_ kinds: [ProviderKind]) {
         for kind in kinds where stores[kind] == nil {
-            let provider = ProviderRegistry.provider(for: kind)
-            let store = SessionDataStore(provider: provider)
+            let store = SessionDataStore(kind: kind)
             let viewModel = SessionViewModel(store: store)
             stores[kind] = store
             sessionViewModels[kind] = viewModel
@@ -48,8 +47,7 @@ final class ProviderContextRegistry {
         if let store = stores[kind], let viewModel = sessionViewModels[kind] {
             return (store, viewModel)
         }
-        let provider = ProviderRegistry.provider(for: kind)
-        let store = SessionDataStore(provider: provider)
+        let store = SessionDataStore(kind: kind)
         let viewModel = SessionViewModel(store: store)
         stores[kind] = store
         sessionViewModels[kind] = viewModel
@@ -73,8 +71,7 @@ final class ProviderContextRegistry {
         if let existing = stores[kind] {
             existing.stop()
         }
-        let provider = ProviderRegistry.provider(for: kind)
-        let store = SessionDataStore(provider: provider)
+        let store = SessionDataStore(kind: kind)
         let viewModel = SessionViewModel(store: store)
         stores[kind] = store
         sessionViewModels[kind] = viewModel

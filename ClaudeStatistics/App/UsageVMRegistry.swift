@@ -27,11 +27,21 @@ final class UsageVMRegistry {
     }
 
     /// Resolve the live VM for a kind. Current provider → primary;
-    /// other providers → secondary pool. Returns nil only for providers
-    /// that haven't been booted yet (rare, only during startup races).
+    /// other providers → secondary pool, lazily created on first
+    /// access. Lazy creation is the root of the post-plugin-hot-load
+    /// fix: the menu-bar strip (and anything else that calls this)
+    /// triggers a fresh secondary VM the moment a new provider
+    /// becomes visible, instead of relying on a hand-coded
+    /// `bootSecondary` from every wire-up callback.
+    /// Returns nil only when there is no `SessionDataStore` for the
+    /// kind yet — `lookupStore` is the gate.
     func viewModel(for kind: ProviderKind, currentProvider: ProviderKind) -> UsageViewModel? {
         if kind == currentProvider { return primary }
-        return secondaries[kind]
+        if let existing = secondaries[kind] { return existing }
+        guard lookupStore(kind) != nil else { return nil }
+        let vm = makeSecondary(for: kind)
+        secondaries[kind] = vm
+        return vm
     }
 
     // MARK: Lifecycle
