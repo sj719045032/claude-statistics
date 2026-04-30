@@ -376,6 +376,18 @@ final class AppState: ObservableObject {
             }
             .store(in: &cancellables)
 
+        // Wire plugin-driven dispatch on top of the legacy registries.
+        // Must run after all stored properties are initialized so the
+        // closures can read `pluginRegistry`. MUST also run before
+        // `bootSecondary` below — otherwise `UsageVMRegistry.makeSecondary`
+        // calls `ProviderRegistry.provider(for: kind)` while the
+        // dynamic-providers store is still empty, the lookup falls back
+        // to `ClaudeProvider.shared`, and the secondary VM ends up
+        // wired to Claude's usageSource for non-Claude providers (the
+        // Usage tab on Codex shows Claude's 5h/7d quotas).
+        wirePluginProviderInstances()
+        wirePluginFocusStrategyResolver()
+
         // Boot one independent UsageViewModel per non-current startup provider
         // so the menu bar can display all enabled providers' usage in
         // parallel, using the same refresh cadence as the single-provider
@@ -383,12 +395,6 @@ final class AppState: ObservableObject {
         for kind in startupKinds where kind != selectedKind {
             usageVMs.bootSecondary(for: kind)
         }
-
-        // Wire plugin-driven dispatch on top of the legacy registries.
-        // Must run after all stored properties are initialized so the
-        // closures can read `pluginRegistry`.
-        wirePluginProviderInstances()
-        wirePluginFocusStrategyResolver()
         recomputeAvailableProviderKinds()
 
         // Wire hot-load: when the user clicks Allow on the prompt, the
