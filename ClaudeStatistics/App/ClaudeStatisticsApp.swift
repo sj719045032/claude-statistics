@@ -255,6 +255,18 @@ final class AppState: ObservableObject {
     /// to flip a switch. Idempotent — `registerDefault(forDescriptorID:)`
     /// is a no-op when the key has already been set.
     private func wirePluginProviderInstances() {
+        Self.wirePluginProviderInstances(pluginRegistry: pluginRegistry)
+    }
+
+    /// Static variant safe to call before all `AppState` stored
+    /// properties are initialized — `init` runs this *before*
+    /// `contexts.bootstrap(...)` so the dynamic-providers store has
+    /// the right plugin instances by the time
+    /// `ProviderContextRegistry.bootstrap` calls
+    /// `ProviderRegistry.provider(for: kind)` for each startup kind.
+    /// The instance-method overload above is what hot-load /
+    /// disable callbacks use after init has completed.
+    private static func wirePluginProviderInstances(pluginRegistry: PluginRegistry) {
         ProviderRegistry.clearDynamicProviders()
         for (_, plugin) in pluginRegistry.providers {
             guard let providerPlugin = plugin as? any ProviderPlugin else { continue }
@@ -348,6 +360,24 @@ final class AppState: ObservableObject {
             startupKinds.append(selectedKind)
         }
 
+        // Register plugin-supplied provider instances into
+        // `ProviderRegistry`'s dynamic store BEFORE any code reads
+        // `ProviderRegistry.provider(for:)`. The bootstrap loop just
+        // below creates a `SessionDataStore(provider: ProviderRegistry.provider(for: kind))`
+        // for every startup kind — if the dynamic-providers store
+        // is still empty, the lookup falls back to
+        // `ClaudeProvider.shared` (the registry's last-resort
+        // default) and the Codex / Gemini stores get baked with
+        // Claude as their `provider`, which then propagates to
+        // `usageSource`, `usagePresentation`, etc. The Usage tab
+        // would render Claude's 5h/7d/7d-Sonnet rate-limit panels
+        // even when the user is on Codex. Wiring early fixes the
+        // root: every store sees the right provider from creation.
+        // Uses the static overload because not every `AppState`
+        // stored property is initialized yet — Swift won't let an
+        // instance method run during phase-1 init.
+        Self.wirePluginProviderInstances(pluginRegistry: pluginRegistry)
+
         let tracker = ActiveSessionsTracker()
         self.activeSessionsTracker = tracker
         let contexts = ProviderContextRegistry(activeSessionsTracker: tracker)
@@ -376,16 +406,10 @@ final class AppState: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // Wire plugin-driven dispatch on top of the legacy registries.
-        // Must run after all stored properties are initialized so the
-        // closures can read `pluginRegistry`. MUST also run before
-        // `bootSecondary` below — otherwise `UsageVMRegistry.makeSecondary`
-        // calls `ProviderRegistry.provider(for: kind)` while the
-        // dynamic-providers store is still empty, the lookup falls back
-        // to `ClaudeProvider.shared`, and the secondary VM ends up
-        // wired to Claude's usageSource for non-Claude providers (the
-        // Usage tab on Codex shows Claude's 5h/7d quotas).
-        wirePluginProviderInstances()
+        // Plugin-driven terminal focus dispatch — instance method,
+        // safe now that all stored properties are initialized.
+        // (Provider dynamic registration already happened above,
+        // before bootstrap.)
         wirePluginFocusStrategyResolver()
 
         // Boot one independent UsageViewModel per non-current startup provider
