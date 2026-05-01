@@ -383,17 +383,20 @@ final class AppState: ObservableObject {
         // every downstream filter on this path.
         StatusLineSync.refreshManagedIntegrations(plugins: pluginRegistry)
         // Pull every active provider plugin's subscription adapters
-        // and endpoint detector into the router. Builtin Claude
-        // contributes GLM here; future third-party `.csplugin`s
-        // contribute additional adapters (OpenRouter, Kimi, …) the
-        // same way without host code changes.
+        // and endpoint detector into the router. Subscription
+        // extension plugins (GLM Coding Plan / OpenRouter / Kimi /
+        // …) contribute their adapters and account managers here
+        // without any host-side changes — the host code only knows
+        // the SDK protocols, not vendor specifics.
         SubscriptionAdapterRouter.shared.refresh(from: pluginRegistry)
-        // First-run migration: pre-Phase-C users who configured GLM
-        // through `~/.claude/settings.json` had no `IdentityStore`,
-        // so its default `.anthropicOAuth` would silently flip them
-        // away from GLM. If the synced-from-CLI GLM identity exists
-        // and IdentityStore hasn't been touched yet, activate it so
-        // the new release matches their previous experience.
+        // First-run migration: users who pre-configured a third-party
+        // subscription token through their provider's CLI had no
+        // `IdentityStore` before this version, so its default
+        // `.anthropicOAuth` would silently route them to OAuth. If
+        // any installed subscription plugin's account manager
+        // already reports an active account, flip to that
+        // subscription so the new release matches their previous
+        // experience.
         Self.migrateIdentityFromCLISettingsIfNeeded()
 
         let selectedKind = ProviderRegistry.selectedProviderKind()
@@ -705,25 +708,32 @@ final class AppState: ObservableObject {
 
     private static let identityMigrationKey = "IdentityStore.didMigrate.v1"
 
-    /// First-run migration that nudged users with existing GLM CLI
-    /// config into the GLM subscription identity. Now that GLM moved
-    /// out of the host bundle into the catalog (`com.bigmodel.glm-subscription`),
-    /// the migration runs only when the user has installed the GLM
-    /// plugin from marketplace — `accountManager(adapterID: "glm")`
-    /// returns nil otherwise and the migration silently no-ops.
+    /// First-run migration: if any installed subscription plugin
+    /// (GLM Coding Plan / OpenRouter / Kimi / …) already reports an
+    /// active account — meaning the user pre-configured a token
+    /// through their provider's CLI before this version landed — flip
+    /// `IdentityStore` to that subscription so the new release shows
+    /// quota immediately instead of silently falling back to OAuth.
+    ///
+    /// Stays vendor-agnostic: iterates every registered manager via
+    /// the SDK protocol and picks the first one with state. Adding
+    /// another subscription plugin tomorrow needs no host change.
     @MainActor
     private static func migrateIdentityFromCLISettingsIfNeeded() {
         guard !UserDefaults.standard.bool(forKey: identityMigrationKey) else { return }
         defer { UserDefaults.standard.set(true, forKey: identityMigrationKey) }
         guard IdentityStore.shared.activeIdentity == .anthropicOAuth else { return }
-        guard let glmManager = SubscriptionAdapterRouter.shared.accountManager(adapterID: "glm"),
-              let activeID = glmManager.activeAccountID else {
+        for manager in SubscriptionAdapterRouter.shared.allAccountManagers() {
+            guard let activeID = manager.activeAccountID else { continue }
+            IdentityStore.shared.activate(.subscription(
+                adapterID: manager.adapterID,
+                accountID: activeID
+            ))
+            DiagnosticLogger.shared.info(
+                "IdentityStore: migrated to subscription(\(manager.adapterID), \(activeID)) from existing CLI config"
+            )
             return
         }
-        IdentityStore.shared.activate(.subscription(adapterID: "glm", accountID: activeID))
-        DiagnosticLogger.shared.info(
-            "IdentityStore: migrated to subscription(glm, \(activeID)) from existing CLI config"
-        )
     }
 
     private func configureProfileLoader(for provider: any SessionProvider) {
