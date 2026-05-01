@@ -142,7 +142,7 @@ public final class CodexPlugin: ProviderPlugin, ProviderAccountUIProviding {
 - 多个 capability 协议化（`TerminalFocusStrategy` / `TerminalAppleScriptFocusing` / `TerminalFrontmostSessionProbing` / `ShareRolePlugin` 等）。
 - **`PluginPermission` rawValue chassis bug 已修**：之前 enum rawValue 用 dotted form (`"filesystem.home"`) 而所有 `.csplugin` Info.plist 写 camelCase (`"filesystemHome"`)，导致 `PluginManifest(bundle:)` 对每一个磁盘上的 `.csplugin` 都默默 decode 失败 —— host 一直走 fallback 路径让用户感知不到。修后所有 `.csplugin`（13 个）真正通过 `PluginLoader.loadOne` 注册到 `PluginRegistry`。
 - **Codex 作为 marketplace pilot 已落地**：`project.yml` 不再把 `CodexPlugin.csplugin` build-time copy 进 `.app/Contents/PlugIns/`，用户必须从 Settings → 插件 → Discover 安装。`PluginsSettingsView` 支持 `dev.pluginCatalog.remoteURL` `UserDefaults` 覆盖（dev/QA 用 file:// 指向本地 `index.json`），生产环境走 `PluginCatalog.defaultRemoteURL`。
-- **Plugin 列表 UI 按 category chip 筛选**：`PluginCategoryFilterBar` 是个 capsule-style chip bar，Installed + Discover 两个 tab 都有，按 `provider / terminal / chat-app / editor-integration / share-card / utility` 顺序显示有内容的分类（带计数），点击切换。chip 用 `Text(LocalizedStringKey)` 通过 `.environment(\.locale)` 对运行时语言切换响应（不像 `NSLocalizedString` 提前 stringify）。
+- **Plugin 列表 UI 按 category chip 筛选**：`PluginCategoryFilterBar` 是个 capsule-style chip bar，Installed + Discover 两个 tab 都有，按 `provider / terminal / share-card / subscription / utility` 顺序显示有内容的分类（带计数），点击切换。legacy `chat-app` / `editor-integration` 会归到 `terminal`，legacy `vendor` 会归到 `provider`。chip 用 `Text(LocalizedStringKey)` 通过 `.environment(\.locale)` 对运行时语言切换响应（不像 `NSLocalizedString` 提前 stringify）。
 - **`vendor` → `provider` 命名统一**：Catalog category 字符串、enum case、plist `category` 字段、本地化 key（`settings.plugins.category.provider`）全部对齐到代码体系内的 `ProviderPlugin` / `ProviderDescriptor` / `ProviderRegistry` 命名。
 - **`PluginInstaller` 加 fallback 路径**：`Bundle(url:)` 在 `NSTemporaryDirectory()` 内的 staging dir 偶发返回 nil（macOS 行为），fallback 改为直接读 `Contents/Info.plist` 通过 `PropertyListSerialization`。`InstallError` 拆 `manifestMissing` 为 `bundleLoadFailed(path:)` + `manifestKeyMissing(path:)` + 加 `DiagnosticLogger` 详细日志。
 - **CodexPlugin pilot 真正不进 `.app`**：`project.yml` 给 CodexPlugin dependency 加 `embed: false` + `link: false`。XcodeGen 默认对 cfbundle dependency 即使没 `copy:` 段也会落到 main app 的 Resources build phase（之前 commit 漏了这一点 —— `.csplugin` 仍被偷偷 copy 到 `Contents/Resources/`）。修后 `.app` 内确认零 CodexPlugin 痕迹。
@@ -152,7 +152,7 @@ public final class CodexPlugin: ProviderPlugin, ProviderAccountUIProviding {
 - 新增（第三方或自定义）的 provider / terminal / share role / share theme plugin 走本文模板。Chassis built-ins（Claude provider / 内置 share roles / 内置 share themes）永久 host-bundled，详见 §1.1 —— 它们不抽 `.csplugin`，但 SDK 协议保持 open，新卡片新主题等扩展走 plugin。
 - 第三方 `.csplugin` 通过 marketplace 安装后零 host 改动即工作。
 - 把其它 `.csplugin`（Gemini / Kitty / WezTerm / Warp / Alacritty / AppleTerminal / ClaudeAppPlugin / CodexAppPlugin / VSCode / Cursor / Windsurf / Trae / Zed）逐个从 `.app` build-time copy 移除（同 Codex pilot：`embed: false` + `link: false` + 移除 `copy:` 块），统一走 marketplace 安装路径。前置已就位 —— release pipeline 自动 upload + Codex pilot 模板齐活。
-- catalog repo（`github.com/sj719045032/claude-statistics-plugins`）真正建立 + `index.json` 填充。release pipeline 已经在产出 artifacts 并 upload 到主 repo 的 GitHub release，catalog repo 只需要 host 一份 `index.json` 指过去即可。
+- catalog repo（`github.com/sj719045032/claude-statistics-plugins`）已建立并填充 `index.json`；当前 release pipeline 已能产出 marketplace artifacts，catalog repo 维护 release asset URL + hash 即可。
 - 切语言时 install error toast / loaded.count 等 `NSLocalizedString` 路径残留的 reactive 缺口（已识别，chip + 主入口已修）。
 
 ## 7. Provider Plugin 抽 .csplugin 路线图（参考模板）
@@ -199,7 +199,7 @@ public final class CodexPlugin: ProviderPlugin, ProviderAccountUIProviding {
   - `CodexHookNormalizer`（193 行；用 SDK `DiagnosticLogger` / `AppRuntimePaths`）
   - `CodexStatusLineInstaller`（135 行）
   - `ProviderAccountUIProviding` conformance（包含 `CodexProviderAccountCardAccessory` view，view 内直接引用 plugin 自持 `accountManager`，**不再** cast `ProviderSettingsContext`）
-- `Plugins/Sources/CodexPlugin/Info.plist`（manifest id `com.openai.codex`，category `chat-app`，permissions 看 `BuiltinProviderPlugins.CodexPluginDogfood.manifest`）
+- `Plugins/Sources/CodexPlugin/Info.plist`（manifest id `com.openai.codex`，category `provider`，permissions 看 plugin manifest）
 
 **Host 侧**（删除/改造）：
 

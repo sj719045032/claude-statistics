@@ -2,13 +2,15 @@
 
 **[中文文档](docs/README_zh.md)**
 
-A native macOS menu bar app for monitoring your [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), and Gemini CLI sessions, subscription usage, and token/cost analytics in real time.
+A native macOS menu bar app for monitoring your [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), Gemini CLI, and marketplace-installed AI workflow plugins: sessions, subscription usage, accounts, tokens, and cost analytics in real time.
 
-## v3.1.0 Highlights
+## Current Highlights
 
 - **Notch Island** — live activity surface docked to the MacBook notch for every running Claude Code / Codex / Gemini session. Permission cards (Allow/Deny), waiting-input hints, and one-keystroke focus back into the exact terminal tab where the session lives.
+- **Plugin Marketplace** — install, update, disable, or uninstall `.csplugin` bundles from Settings → Plugins → Discover. The official catalog lives at [`claude-statistics-plugins`](https://github.com/sj719045032/claude-statistics-plugins).
 - **Ghostty tab-accurate focus** — clicking a session card jumps to the exact Ghostty tab the session is running in, even when multiple sessions share the same project directory (surface id → window+tab → cwd fallbacks).
 - **Multi-provider menu bar strip** — menu bar shows every enabled provider (Claude / Codex / Gemini) side by side: icon + rotating window/quota usage, colour-coded at 50% (orange) and 80% (red) consumed.
+- **Subscription extensions** — third-party endpoint plugins such as GLM Coding Plan can add token-based subscription identities alongside native OAuth/JWT accounts.
 - **Gemini OAuth auto-refresh** — attaches the Gemini CLI `client_secret` so refresh no longer silently fails with `HTTP 400 client_secret is missing`.
 - **Hooks engine rewritten in Swift** — replaced Python hook scripts with a single Swift HookCLI binary; faster cold start, simpler install, uniform diagnostics.
 
@@ -49,6 +51,18 @@ bash scripts/run-debug.sh
 ```
 
 This script builds using the dedicated debug DerivedData path and relaunches the menu bar app safely.
+
+## Plugin Marketplace
+
+Claude Statistics has a built-in marketplace for provider adapters, terminal/editor integrations, share-card extensions, and subscription endpoints.
+
+- Open **Settings → Plugins → Discover** to fetch the official catalog.
+- Click **Install** to download a `.csplugin.zip`, verify its SHA-256, unzip it, trust it, and hot-load it without restarting.
+- Installed user plugins can be disabled, updated, or uninstalled from **Settings → Plugins → Installed**.
+- Current catalog categories are `provider`, `terminal` (shown as Integrations), `share-card`, `subscription`, and `utility`.
+- Legacy catalog values remain compatible: `vendor` maps to `provider`, while `chat-app` and `editor-integration` map to `terminal`.
+
+The public plugin catalog is maintained in [`sj719045032/claude-statistics-plugins`](https://github.com/sj719045032/claude-statistics-plugins). Plugin authors can publish `.csplugin.zip` assets on GitHub Releases and open a catalog PR with `downloadURL`, `sha256`, `version`, and permissions.
 
 ## Screenshots
 
@@ -159,7 +173,9 @@ Analyze usage from the local transcript data you already have.
 Fetches provider-specific live usage data and combines it with local session analytics.
 
 - Claude: 5-hour and 7-day windows with utilization, reset countdown, and per-model windows when available
+- Codex: local JWT-derived identity and plan context, plus transcript-based usage reconstruction
 - Gemini: grouped quota buckets (Pro / Flash / Flash Lite) with reset countdown and local token trend charts
+- Marketplace subscription extensions: token-based accounts and quotas for third-party endpoints such as GLM Coding Plan
 - Menu bar usage text adapts to the active provider's best metric
 - Extra Usage credit tracking when available
 - Usage trend chart with cumulative token and cost view
@@ -170,11 +186,12 @@ Fetches provider-specific live usage data and combines it with local session ana
 
 ### Provider Switcher
 
-A compact switcher in the footer lets you toggle between providers at any time:
+A compact switcher in the footer lets you toggle between providers at any time. Claude ships as the default chassis provider; Codex, Gemini, and future providers can be delivered as plugins.
 
 - **Claude Code** — reads `~/.claude/projects/`, fetches usage from Anthropic's OAuth API
 - **Codex CLI** — reads `~/.codex/projects/`, decodes profile from local JWT
 - **Gemini CLI** — reads `~/.gemini/tmp/`, fetches usage from Gemini API, and exposes provider-specific grouped usage/trend views
+- **Marketplace providers** — provider plugins can contribute descriptors, account UI, pricing, hooks, status line integration, and transcript/session parsing
 
 Providers that are not installed are hidden or disabled automatically depending on the current control.
 
@@ -192,6 +209,7 @@ Providers that are not installed are hidden or disabled automatically depending 
 - Language selection: Auto / English / Simplified Chinese
 - Font scale control
 - Custom tab ordering
+- Plugin marketplace: Discover / Installed tabs, install/update/disable/uninstall, trust reset, and catalog refresh
 - Model pricing management (view, edit, fetch latest pricing)
 - Status line integration for Claude Code, Codex CLI, and Gemini CLI
 - OAuth token detection from macOS Keychain or `~/.claude/.credentials.json`
@@ -245,7 +263,11 @@ Claude Statistics supports three providers, each with its own local-first data s
 - Keeps the latest snapshot when Gemini writes multiple files for the same logical session
 - Uses lightweight search indexing and provider-specific usage/menu bar presentation
 
-All parsing and analytics happen locally on your machine.
+**Plugin system**
+- Loads `.csplugin` bundles from the official marketplace catalog, the app bundle, or the user plugin folder
+- Verifies marketplace downloads with SHA-256 and manifest ID matching before hot-loading
+- Lets provider, terminal/editor, share-card, and subscription plugins register capabilities through `ClaudeStatisticsKit`
+- Keeps parsing and analytics local on your machine; catalog metadata is fetched only when Discover is opened or refreshed
 
 ## Architecture
 
@@ -263,6 +285,7 @@ ClaudeStatistics/
 ├── ViewModels/             # SessionViewModel, UsageViewModel, ProfileViewModel
 ├── Views/                  # Sessions, statistics, usage, transcript, settings, theme, share cards
 ├── Resources/              # Localizable strings and assets
+├── Plugins/                # ClaudeStatisticsKit SDK + first-party plugin targets
 └── scripts/                # Debug build/run and DMG release helpers
 ```
 
@@ -298,6 +321,7 @@ bash scripts/build-dmg.sh 2.9.1
 #   build/ClaudeStatistics-2.9.1.dmg
 #   build/ClaudeStatistics-2.9.1.zip           — full Sparkle update
 #   build/releases-archive/*.delta             — incremental Sparkle updates
+#   build/marketplace/*.csplugin.zip           — marketplace plugin artifacts
 ```
 
 The script will:
@@ -308,8 +332,9 @@ The script will:
 4. Maintain `build/releases-archive/` (historical ZIPs + deltas)
 5. Regenerate `appcast.xml` via `generate_appcast`, including a
    `<sparkle:deltas>` block for every prior version still in the archive
-6. Print a ready-to-paste `gh release create` command at the end with all
-   required assets (DMG, full ZIP, every new `.delta` file)
+6. Package marketplace `.csplugin.zip` artifacts with matching `.sha256` files
+7. Print a ready-to-paste `gh release create` command at the end with all
+   required assets (DMG, full ZIP, every new `.delta` file, and plugin artifacts)
 
 **Incremental updates**: first release ships full ZIPs only; starting from
 the second release, existing users auto-download tiny `.delta` patches
@@ -349,6 +374,7 @@ Model pricing is stored in `~/.claude-statistics/pricing.json` and can be edited
 | Launch at Login | Start Claude Statistics automatically on login |
 | Auto Refresh | Refresh subscription usage data on an interval |
 | Preferred Terminal | Terminal app used for resuming Claude sessions |
+| Plugins | Browse Discover, install/update plugins, disable/uninstall user plugins, and reset trust decisions |
 | Model Pricing | View, edit, or fetch latest model pricing |
 | Status Line | Install/update Claude Code status line integration |
 | Tab Order | Reorder the main tabs |

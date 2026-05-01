@@ -52,7 +52,7 @@ Optional:
 | Key | Type | Notes |
 |---|---|---|
 | `iconAsset` | String | Bundle-relative resource name (24×24 template PDF preferred). `nil` falls back to a generic puzzle-piece glyph. |
-| `category` | String | One of the six values listed in `submitting.md`. Backwards-compatible: bundles without this field land in `utility`. |
+| `category` | String | One of the five current values listed in `submitting.md`. Backwards-compatible: bundles without this field land in `utility`; legacy `vendor` maps to `provider`, and legacy `chat-app` / `editor-integration` map to `terminal`. |
 
 The host also reads the standard `CFBundleIdentifier`,
 `CFBundleExecutable`, `CFBundlePackageType` (`BNDL`), and

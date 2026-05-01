@@ -17,10 +17,11 @@ Release assets.
 treats it as opaque and trusts whatever bytes come back, gated by the
 SHA-256 in the same entry. We use that flexibility as follows:
 
-- **First-party plugins** (the 13 bundles delivered through the
+- **First-party plugins** (the bundles delivered through the
   marketplace — Gemini / Codex providers, Claude.app / Codex.app
-  chat-app, Alacritty / Kitty / Warp / WezTerm terminals, VSCode /
-  Cursor / Windsurf / Trae / Zed editors): every `.csplugin.zip` is
+  deep-links, Alacritty / Kitty / Warp / WezTerm terminals, VSCode /
+  Cursor / Windsurf / Trae / Zed editors, plus subscription
+  extensions): every `.csplugin.zip` is
   uploaded as a release asset on **this catalog repo's** GitHub
   Releases under a tag matching the host app version (e.g. `v3.2.0`).
   The host's `scripts/release.sh` step 3b creates that release on
@@ -58,7 +59,7 @@ the host repo). The exact field set:
       "description": "<one-line summary>",
       "author": "<author name or org>",
       "homepage": "<https URL to project / docs, or null>",
-      "category": "<one of: provider | terminal | chat-app | share-card | editor-integration | utility>",
+      "category": "<one of: provider | terminal | share-card | subscription | utility>",
       "version": "<MAJOR.MINOR.PATCH>",
       "minHostAPIVersion": "<MAJOR.MINOR.PATCH>",
       "downloadURL": "<https URL of the .csplugin.zip>",
@@ -77,7 +78,7 @@ Field rules the host enforces:
 | `schemaVersion` | Must equal `1`. The host rejects feeds with a higher value as `schemaVersionTooNew` and refuses to fall back. |
 | `updatedAt` | ISO-8601 with timezone. Shown in the Discover footer. |
 | `id` | Must match the `id` inside the downloaded `.csplugin`'s `Info.plist → CSPluginManifest`. Mismatch → install aborts with `manifestIDMismatch`. |
-| `category` | Strings outside the known six (`provider`, `terminal`, `chat-app`, `share-card`, `editor-integration`, `utility`) are accepted but rendered under "Utility" in the UI. |
+| `category` | Strings outside the known five (`provider`, `terminal`, `share-card`, `subscription`, `utility`) are accepted but rendered under "Utility" in the UI. Legacy `vendor` maps to `provider`; legacy `chat-app` / `editor-integration` map to `terminal`. |
 | `version`, `minHostAPIVersion` | Strict dotted-numeric SemVer (`MAJOR.MINOR.PATCH`). Pre-release suffixes are rejected by `SemVer`'s decoder. |
 | `downloadURL` | HTTPS, public, no auth, must serve the raw `.csplugin.zip` bytes. GitHub Release assets are the recommended host. |
 | `sha256` | Lowercase hex of the bytes returned by `downloadURL`. Comparison is case-insensitive. Mismatch → install aborts with `sha256Mismatch`. |

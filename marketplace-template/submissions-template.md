@@ -12,13 +12,12 @@
 
 ## Category
 
-<!-- Pick exactly one of the six. Delete the others. -->
+<!-- Pick exactly one of the five current categories. Delete the others. -->
 
-- [ ] `vendor` — CLI vendor adapter
-- [ ] `terminal` — Terminal-app focus integration
-- [ ] `chat-app` — Desktop chat-app deep-link
+- [ ] `provider` — CLI provider / endpoint adapter
+- [ ] `terminal` — Terminal, desktop app deep-link, or editor integration
 - [ ] `share-card` — Persona / share-card theme
-- [ ] `editor-integration` — Code editor integration
+- [ ] `subscription` — Subscription / endpoint extension
 - [ ] `utility` — Other / catch-all
 
 ## Repo URL

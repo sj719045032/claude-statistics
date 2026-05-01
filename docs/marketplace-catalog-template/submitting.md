@@ -26,7 +26,7 @@ You should already have:
   `minHostAPIVersion` your code actually uses (start at the host's
   `SDKInfo.apiVersion`), the `permissions` you declare, and the
   `principalClass` matching your Swift class name. Optionally a
-  `category` (one of the six listed below).
+  `category` (one of the five current values listed below).
 - The plugin builds as a `.csplugin` bundle (see
   `docs/PLUGIN_PACKAGING.md`).
 
@@ -98,7 +98,7 @@ the existing entries as a template. Required fields:
   "description": "<one line>",
   "author": "<your name or org>",
   "homepage": "<https URL to your repo / docs, or null>",
-  "category": "<provider | terminal | chat-app | share-card | editor-integration | utility>",
+  "category": "<provider | terminal | share-card | subscription | utility>",
   "version": "<MAJOR.MINOR.PATCH>",
   "minHostAPIVersion": "<MAJOR.MINOR.PATCH>",
   "downloadURL": "<https URL of the .csplugin.zip you uploaded>",
@@ -119,16 +119,19 @@ user**, not the protocol it implements:
 | `category` | Pick this if… |
 |---|---|
 | `provider` | You ship a provider adapter for an AI coding CLI (Codex / Gemini / Aider / …). Note: Claude is the chassis's built-in default provider — see `PLUGIN_ARCHITECTURE.md` §1.1. |
-| `terminal` | You adapt a terminal emulator for focus return + new-session launching (iTerm2, Kitty, Alacritty, …). |
-| `chat-app` | You integrate a desktop chat app via deep-link (Claude.app, Codex.app, …). |
+| `terminal` | You adapt a terminal emulator, desktop chat app deep-link, or editor integration (iTerm2, Kitty, Claude.app, Codex.app, VSCode, Cursor, Zed, …). |
 | `share-card` | You contribute share-card roles, scoring, or visual themes. |
-| `editor-integration` | You integrate a code editor (VSCode, Cursor, Zed, …). |
+| `subscription` | You add a third-party subscription or endpoint extension (GLM Coding Plan, OpenRouter, Kimi, …). |
 | `utility` | Anything else. Also the fallback the UI uses for unknown values. |
 
 Custom strings outside this set are accepted by the loader but the
 UI groups them under **Utility**. If you think a new bucket is
 warranted, propose it in your PR description and we can add it to
 the host-side enum in the same release cycle.
+
+Legacy values are still accepted for old entries: `vendor` maps to
+`provider`, while `chat-app` and `editor-integration` map to
+`terminal`.
 
 ## Signing requirements
 

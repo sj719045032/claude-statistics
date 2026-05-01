@@ -67,7 +67,7 @@ The host validates every download with **SHA-256** before unzipping, so even if 
 | `description` | yes | One sentence. Keep it under ~140 chars. |
 | `author` | yes | Person or org name. |
 | `homepage` | yes | Plugin source repo or project page. |
-| `category` | yes | One of the six values in [Categories](#categories). Lowercase, hyphenated. Falls back to `utility` if missing. |
+| `category` | yes | One of the five current values in [Categories](#categories). Lowercase, hyphenated. Falls back to `utility` if missing. |
 | `version` | yes | Pure dotted SemVer (`1.0.0`, `2.10.3`). No `-beta` suffix — the host's SemVer comparison won't rank suffixed versions. |
 | `minHostAPIVersion` | yes | Minimum host SDK API version your plugin needs. Current host ships `0.1.0`; bumping triggers a host-side reject for older app versions. |
 | `downloadURL` | yes | **HTTPS only.** Must be publicly reachable. GitHub Releases recommended. |
@@ -83,16 +83,17 @@ Top-level ISO-8601 UTC timestamp. Bump it whenever you merge a PR — the host d
 
 ## Categories
 
-The host groups Discover entries by `category`. Six values, defined in `docs/PLUGIN_MARKETPLACE.md` §3 of the main repo:
+The host groups Discover entries by `category`. Five current values are defined in `docs/PLUGIN_MARKETPLACE.md` §3 of the main repo:
 
 | `category` | Display name | Scope |
 |---|---|---|
-| `vendor` | Vendor | CLI vendor adapters: Claude / Codex / Gemini / Aider variants. |
-| `terminal` | Terminal | Terminal-app focus integrations: iTerm2 / Ghostty / Kitty / Alacritty / WezTerm / Hyper. |
-| `chat-app` | Chat App | Desktop chat-app deep-link plugins: Claude.app / Codex.app / similar. |
+| `provider` | Provider | CLI provider or endpoint adapters: Codex / Gemini / Aider / GLM variants. |
+| `terminal` | Integrations | Terminal-app focus, desktop app deep-link, and editor integrations: iTerm2 / Ghostty / Kitty / Claude.app / Codex.app / VSCode / Cursor / Zed. |
 | `share-card` | Share Card | Persona cards and shareable session-card themes. |
-| `editor-integration` | Editor | Code-editor integrations: VSCode / Cursor / Zed. |
+| `subscription` | Subscription | Third-party subscription and endpoint extensions: GLM Coding Plan / OpenRouter / Kimi. |
 | `utility` | Utility | Catch-all. Use when nothing else fits. |
+
+Legacy values remain accepted for old entries: `vendor` maps to `provider`, while `chat-app` and `editor-integration` map to `terminal`.
 
 **Adding a new category** requires a PR that updates `docs/PLUGIN_MARKETPLACE.md` §3 in the main repo first (so the host UI knows about it). Don't invent ad-hoc category strings — they fall back to `utility`.
 
@@ -166,18 +167,19 @@ PRs that don't follow `submissions-template.md`, fail SHA-256 verification, or u
 - `version` 必须是纯数字 SemVer（`1.0.0`），不要带 `-beta` 后缀，否则主 App 比版本时排不动。
 - `downloadURL` **必须** HTTPS、公开可下；不要塞 token，不要塞需要登录的私链接。
 - `sha256` 是对**已上传的那份 zip 文件**计算得到的 64 位 16 进制字符串；重新上传必须重算。
-- `category` 取 6 选 1（见下表），缺省 fallback 到 `utility`。
+- `category` 取 5 选 1（见下表），缺省 fallback 到 `utility`。
 
-### 6 大分类
+### 5 大分类
 
 | `category` | 中文显示名 | 涵盖 |
 |---|---|---|
-| `vendor` | Vendor | Claude / Codex / Gemini / Aider 等 CLI 适配 |
-| `terminal` | Terminal | iTerm / Ghostty / Kitty / Alacritty / WezTerm / Hyper 焦点回归 |
-| `chat-app` | Chat App | Claude.app / Codex.app 等桌面 chat-app deep-link |
+| `provider` | Provider | Codex / Gemini / Aider / GLM 等 provider 或 endpoint 适配 |
+| `terminal` | Integrations | 终端、桌面 app deep-link、编辑器集成 |
 | `share-card` | Share Card | 角色卡 + 分享卡片主题 |
-| `editor-integration` | Editor | VSCode / Cursor / Zed 集成 |
+| `subscription` | Subscription | GLM Coding Plan / OpenRouter / Kimi 等订阅扩展 |
 | `utility` | Utility | 工具类 fallback |
+
+旧值仍兼容：`vendor` 会归到 `provider`；`chat-app` / `editor-integration` 会归到 `terminal`。
 
 新增分类需要先在主仓 `docs/PLUGIN_MARKETPLACE.md` §3 提 PR，主 App UI 才会识别；私自创新值会被当成 `utility`。
 
