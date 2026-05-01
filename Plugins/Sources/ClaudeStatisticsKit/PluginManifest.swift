@@ -68,6 +68,13 @@ public enum PluginCatalogCategory {
     /// reads "Integrations" / "集成" so editors and chat apps don't
     /// look out of place under "Terminal".
     public static let terminal = "terminal"
+    /// Legacy category constants kept for binary compatibility with
+    /// already-installed marketplace plugins built before the category
+    /// rename/collapse. New manifests should use `provider` or
+    /// `terminal`; `canonicalize` aliases these values at display time.
+    public static let vendor = "vendor"
+    public static let chatApp = "chat-app"
+    public static let editorIntegration = "editor-integration"
     /// Share-card role scorers and visual themes (`PluginKind.shareRole` /
     /// `.shareCardTheme`). Catalog entries shipped under this category
     /// still get their own chip — even though no public plugin uses
@@ -86,15 +93,18 @@ public enum PluginCatalogCategory {
     ]
 
     /// Coerce any catalog-supplied string into one of the canonical
-    /// buckets. Older marketplaces that shipped separate `chat-app`
-    /// and `editor-integration` strings get aliased onto `terminal`
-    /// — user feedback was the three-way split felt over-categorised
+    /// buckets. Older marketplaces that shipped `vendor` get aliased
+    /// onto `provider`; entries that shipped separate `chat-app` and
+    /// `editor-integration` strings get aliased onto `terminal` —
+    /// user feedback was the three-way split felt over-categorised
     /// when each had only a couple of entries. Unknown strings fall
     /// back to `utility`.
     public static func canonicalize(_ raw: String) -> String {
         switch raw {
         case provider, terminal, shareCard, subscription, utility:
             return raw
+        case "vendor":
+            return provider
         case "chat-app", "editor-integration":
             return terminal
         default:
