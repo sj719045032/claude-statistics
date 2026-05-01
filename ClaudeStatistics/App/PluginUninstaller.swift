@@ -48,6 +48,17 @@ enum PluginUninstaller {
             throw UninstallError.sourceNotUserInstalled
         }
 
+        // 1.5. Uninstall-only cleanup: drop the plugin's disk side-
+        //      effects (notch hooks in ~/.claude/settings.json,
+        //      status-line script lines in shell RC) BEFORE the
+        //      registry stops resolving it. Disable on its own is a
+        //      reversible kill-switch — the user may flip it back on
+        //      and expect their hook config intact. Uninstall is
+        //      permanent: leaving stale references to a removed plugin
+        //      causes hooks to invoke missing binaries and status-line
+        //      sources to keep loading on every shell init.
+        cleanupProviderSideEffects(manifest: manifest, registry: registry)
+
         // 2. Disable: drop from registry, set the kill-switch flag,
         //    fire onPluginDisabled so host glue refreshes terminal
         //    aliases / provider lookup. PluginTrustGate has the
@@ -75,5 +86,35 @@ enum PluginUninstaller {
         registry.removeDisabledRecord(id: manifest.id)
 
         return bundleURL
+    }
+
+    /// Pre-disable hook for uninstall: ask the to-be-removed provider
+    /// plugin's hook + status-line installers to undo their on-disk
+    /// effects. Called only from `uninstall(...)`, never from a plain
+    /// disable — keeping the asymmetry deliberate so users who
+    /// kill-switch a plugin temporarily don't lose their hook config.
+    ///
+    /// Status-line restoration is synchronous (`StatusLineInstalling`
+    /// has no `uninstall`; `restore()` rolls back to the pre-install
+    /// backup, which is what we want when the plugin is going away).
+    /// Hook uninstall is async per `HookInstalling.uninstall`, so it
+    /// runs as a fire-and-forget Task — the settings.json mutation is
+    /// independent of bundle deletion + trust cleanup, so racing the
+    /// remaining uninstall steps is safe. Errors swallowed: best-
+    /// effort cleanup on a path the user has already chosen to take.
+    private static func cleanupProviderSideEffects(
+        manifest: PluginManifest,
+        registry: PluginRegistry
+    ) {
+        guard let providerPlugin = registry.providerPlugin(id: manifest.id),
+              let kind = ProviderKind(rawValue: providerPlugin.descriptor.id)
+        else { return }
+        let provider = ProviderRegistry.provider(for: kind)
+        if let installer = provider.statusLineInstaller, installer.isInstalled {
+            try? installer.restore()
+        }
+        if let installer = provider.notchHookInstaller {
+            Task { _ = try? await installer.uninstall() }
+        }
     }
 }
