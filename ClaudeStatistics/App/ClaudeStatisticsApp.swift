@@ -855,6 +855,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             Task { @MainActor in self?.handleNotchStateChanged() }
         }
+
+        WhatsNewPresenter.presentIfNeededOnLaunch()
     }
 
     private static func registerForAccessibilityVisibility() {

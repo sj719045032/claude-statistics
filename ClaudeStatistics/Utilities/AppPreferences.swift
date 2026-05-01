@@ -30,6 +30,10 @@ enum AppPreferences {
     static let ignoredUpdateVersion = "ignoredUpdateVersion"
     /// Persisted ordering of the four panel tabs (encoded JSON of `[String]`).
     static let tabOrder = "tabOrder"
+    /// Last app version for which the user has seen the What's New
+    /// panel. `nil` ⇒ fresh install (we stay silent and record the
+    /// current version so the panel only appears after a real upgrade).
+    static let whatsNewLastSeenVersion = "whatsNew.lastSeenVersion"
 
     // MARK: Notch
 

@@ -175,6 +175,14 @@ struct SettingsView: View {
                 }
                 .disabled(!updaterService.canCheckForUpdates)
 
+                SettingsRowButton(action: { WhatsNewPresenter.presentManually() }) {
+                    HStack {
+                        Label("settings.whatsNew", systemImage: "sparkles")
+                            .labelStyle(SettingsRowLabelStyle())
+                        Spacer()
+                    }
+                }
+
                 SettingsRowButton(action: {
                     if let url = URL(string: "https://github.com/sj719045032/claude-statistics") {
                         NSWorkspace.shared.open(url)

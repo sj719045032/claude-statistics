@@ -329,8 +329,13 @@
 "settings.about" = "About";
 "settings.version" = "Version";
 "settings.checkForUpdates" = "Check for Updates";
+"settings.whatsNew" = "What's New";
 "settings.github" = "GitHub";
 "settings.reportIssue" = "Report an Issue";
+
+/* What's New panel */
+"whatsnew.window.title" = "What's New";
+"whatsnew.dismiss" = "Got it";
 "settings.back" = "Back";
 "settings.cancel" = "Cancel";
 
