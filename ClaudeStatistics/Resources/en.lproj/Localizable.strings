@@ -697,36 +697,5 @@
 /* Account source — subscription scope note */
 "claude.accountSource.help.subscriptionNote" = "This setting only affects Anthropic OAuth credential routing. Token-based subscription plans (GLM Coding Plan / 第三方) keep their own per-account state in the identity picker.";
 
-/* GLM subscription plugin */
-"glm.plan.name" = "GLM Coding Plan";
-"glm.identity.syncedFromCLI" = "GLM (from CLI)";
-"glm.identity.syncedDetail" = "Synced from ~/.claude/settings.json";
-"glm.identity.appManagedDetail" = "App-managed · %@";
 
-"glm.add.title" = "Add GLM Token";
-"glm.add.label" = "Label";
-"glm.add.label.placeholder" = "e.g. Personal";
-"glm.add.token" = "API token";
-"glm.add.token.placeholder" = "paste token from GLM dashboard";
-"glm.add.dashboardLink" = "Open GLM dashboard ↗";
-"glm.add.baseURL" = "Base URL";
-"glm.add.baseURL.preset.bigmodel" = "智谱清言 — open.bigmodel.cn";
-"glm.add.baseURL.preset.zai" = "Z.ai 国际版 — api.z.ai";
-"glm.add.baseURL.preset.custom" = "Custom URL…";
-"glm.add.baseURL.custom.placeholder" = "https://your-proxy.example.com/api/anthropic";
-"glm.add.baseURL.custom.hint" = "Any URL that speaks the GLM quota API. Quota lookup will hit this host's `/api/monitor/usage/quota/limit`.";
-"glm.add.cancel" = "Cancel";
-"glm.add.save" = "Save";
 
-"glm.section.syncToCLI" = "Sync to CLI on switch";
-"glm.section.syncToCLI.subtitle" = "Off = app-only (cc keeps its current token)";
-
-"glm.error.emptyToken" = "Token cannot be empty";
-"glm.error.invalidBaseURL" = "Base URL must be a valid http(s) URL";
-"glm.error.cannotRemoveSynced" = "The synced-from-CLI identity is read-only — edit ~/.claude/settings.json to change it";
-"glm.error.keychain" = "Keychain error %d";
-"glm.error.missingBaseURL" = "GLM adapter: ANTHROPIC_BASE_URL not set";
-"glm.error.missingAPIKey" = "GLM adapter: ANTHROPIC_AUTH_TOKEN / ANTHROPIC_API_KEY not set";
-"glm.error.invalidBaseURL.adapter" = "GLM adapter: ANTHROPIC_BASE_URL is malformed";
-"glm.error.transport" = "GLM adapter: network error";
-"glm.error.httpStatus" = "GLM adapter: HTTP %d";
