@@ -170,7 +170,7 @@ extension UsageView {
             ProgressView()
                 .scaleEffect(0.6)
                 .frame(width: 24, height: 24)
-        } else if subscriptionRouter.allAccountManagers().isEmpty {
+        } else if subscriptionManagersForCurrentProvider.isEmpty {
             // No subscription adapters registered for this provider —
             // fall back to the legacy OAuth-only account accessory
             // (Codex / Gemini paths today).
@@ -206,6 +206,11 @@ extension UsageView {
                 .padding(.vertical, 6)
             }
         }
+    }
+
+    private var subscriptionManagersForCurrentProvider: [SubscriptionAccountManager] {
+        subscriptionRouter.allAccountManagers()
+            .filter { $0.providerID == store.provider.providerId }
     }
 
     private var accountSwitcherTriggerStyle: AccountSwitcherTriggerStyle {
