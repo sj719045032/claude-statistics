@@ -313,6 +313,23 @@
 "settings.plugins.category.editor-integration" = "编辑器";
 "settings.plugins.category.subscription" = "订阅";
 "settings.identitySwitcher.button" = "切换账号";
+
+/* 身份选择器 */
+"identityPicker.anthropicOAuth" = "Anthropic OAuth";
+"identityPicker.signInHint" = "请在设置中登录";
+"identityPicker.noAccounts" = "暂无账号";
+"identityPicker.addAccount" = "添加账号";
+
+/* 订阅账号卡片 */
+"subscription.card.active" = "已激活";
+"subscription.card.openDashboard" = "打开后台";
+"subscription.card.noQuotaDetails" = "已检测到订阅 — 暂无配额详情";
+
+/* 订阅配额视图 */
+"subscription.quotas.noData" = "暂无配额数据";
+"subscription.quotas.resets.minutes %d" = "%d 分钟后重置";
+"subscription.quotas.resets.hoursMinutes %d %d" = "%d 小时 %d 分钟后重置";
+"subscription.quotas.resets.days %d" = "%d 天后重置";
 "settings.plugins.category.utility" = "工具";
 "settings.developer.rebuildIndexes" = "重建数据";
 "settings.developer.rebuildProviderIndex" = "重建 %@ 索引";

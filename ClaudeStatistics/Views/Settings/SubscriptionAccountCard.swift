@@ -20,7 +20,7 @@ struct SubscriptionAccountCard: View {
                 Text(info.planName)
                     .font(.system(size: 13, weight: .medium))
                 if info.note == nil, !info.quotas.isEmpty {
-                    Text("Active")
+                    Text("subscription.card.active")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.blue)
                         .padding(.horizontal, 6)
@@ -36,7 +36,7 @@ struct SubscriptionAccountCard: View {
             } else if let dashboardURL = info.dashboardURL {
                 Link(destination: dashboardURL) {
                     HStack(spacing: 3) {
-                        Text("Open dashboard")
+                        Text("subscription.card.openDashboard")
                         Image(systemName: "arrow.up.right.square")
                             .font(.system(size: 9))
                     }

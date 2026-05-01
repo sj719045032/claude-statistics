@@ -50,12 +50,19 @@ struct IdentityPickerView: View {
                     .font(.system(size: 16))
                     .foregroundStyle(.blue)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Anthropic OAuth")
+                    Text("identityPicker.anthropicOAuth")
                         .font(.system(size: 12, weight: .medium))
-                    Text(email ?? "Sign in via Settings")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    if let email {
+                        Text(email)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    } else {
+                        Text("identityPicker.signInHint")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
                 Spacer()
                 if isActive {
@@ -89,7 +96,7 @@ private struct SubscriptionSourceSection: View {
                 .padding(.bottom, 4)
 
             if manager.accounts.isEmpty {
-                Text("No accounts yet")
+                Text("identityPicker.noAccounts")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 12)
@@ -106,7 +113,7 @@ private struct SubscriptionSourceSection: View {
                 HStack(spacing: 6) {
                     Image(systemName: "plus")
                         .font(.system(size: 10, weight: .semibold))
-                    Text("Add account")
+                    Text("identityPicker.addAccount")
                         .font(.system(size: 11))
                 }
                 .foregroundStyle(.blue)

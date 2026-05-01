@@ -300,6 +300,23 @@
 "settings.plugins.category.editor-integration" = "Editor";
 "settings.plugins.category.subscription" = "Subscription";
 "settings.identitySwitcher.button" = "Switch Account";
+
+/* Identity picker */
+"identityPicker.anthropicOAuth" = "Anthropic OAuth";
+"identityPicker.signInHint" = "Sign in via Settings";
+"identityPicker.noAccounts" = "No accounts yet";
+"identityPicker.addAccount" = "Add account";
+
+/* Subscription account card */
+"subscription.card.active" = "Active";
+"subscription.card.openDashboard" = "Open dashboard";
+"subscription.card.noQuotaDetails" = "Subscription detected — no quota details";
+
+/* Subscription quotas view */
+"subscription.quotas.noData" = "No quota data";
+"subscription.quotas.resets.minutes %d" = "Resets in %dm";
+"subscription.quotas.resets.hoursMinutes %d %d" = "Resets in %dh %dm";
+"subscription.quotas.resets.days %d" = "Resets in %dd";
 "settings.plugins.category.utility" = "Utility";
 "settings.developer.rebuildIndexes" = "Rebuild Data";
 "settings.developer.rebuildProviderIndex" = "Rebuild %@ Index";

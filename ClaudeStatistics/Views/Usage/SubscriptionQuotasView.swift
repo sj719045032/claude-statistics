@@ -39,7 +39,7 @@ struct SubscriptionQuotasView: View {
             Image(systemName: "tray")
                 .font(.system(size: 22))
                 .foregroundStyle(.tertiary)
-            Text("No quota data")
+            Text("subscription.quotas.noData")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
@@ -102,15 +102,19 @@ private struct SubscriptionQuotaCard: View {
         let interval = resetAt.timeIntervalSinceNow
         guard interval > 0 else { return nil }
         if interval < 3600 {
-            return String(format: "Resets in %dm", Int(interval / 60))
+            let m = Int(interval / 60)
+            let format = NSLocalizedString("subscription.quotas.resets.minutes %d", comment: "")
+            return String(format: format, m)
         }
         if interval < 86400 {
             let h = Int(interval / 3600)
             let m = Int((interval.truncatingRemainder(dividingBy: 3600)) / 60)
-            return "Resets in \(h)h \(m)m"
+            let format = NSLocalizedString("subscription.quotas.resets.hoursMinutes %d %d", comment: "")
+            return String(format: format, h, m)
         }
         let days = Int(interval / 86400)
-        return "Resets in \(days)d"
+        let format = NSLocalizedString("subscription.quotas.resets.days %d", comment: "")
+        return String(format: format, days)
     }
 
     private func formatted(_ amount: SubscriptionAmount) -> String {
