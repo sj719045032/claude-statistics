@@ -126,6 +126,52 @@ const providers = [
   }
 ];
 
+const marketplaceCards = isZh
+  ? [
+      {
+        title: "Discover",
+        text: "从官方 claude-statistics-plugins 目录拉取可安装插件，按 Provider、Integrations、Subscription、Share Card、Utility 分类展示。",
+        meta: "catalog live"
+      },
+      {
+        title: "Verified install",
+        text: "安装时下载 .csplugin.zip，校验 SHA-256 和 manifest id，然后写入用户插件目录并热加载。",
+        meta: "hash + id"
+      },
+      {
+        title: "Subscription extensions",
+        text: "GLM Coding Plan 等第三方 endpoint 可以加入 token-based 身份，与 Claude / Codex / Gemini 账号一起管理。",
+        meta: "GLM ready"
+      },
+      {
+        title: "Installed control",
+        text: "用户插件可以在 Installed 里更新、禁用、卸载，信任记录也可以重置。",
+        meta: "no restart"
+      }
+    ]
+  : [
+      {
+        title: "Discover",
+        text: "Fetch the official claude-statistics-plugins catalog and browse Provider, Integrations, Subscription, Share Card, and Utility entries.",
+        meta: "catalog live"
+      },
+      {
+        title: "Verified install",
+        text: "Downloads are .csplugin.zip bundles checked with SHA-256 and manifest ID matching before hot-loading.",
+        meta: "hash + id"
+      },
+      {
+        title: "Subscription extensions",
+        text: "Third-party endpoints such as GLM Coding Plan can add token-based identities beside Claude / Codex / Gemini accounts.",
+        meta: "GLM ready"
+      },
+      {
+        title: "Installed control",
+        text: "User plugins can be updated, disabled, uninstalled, and have trust decisions reset from Installed.",
+        meta: "no restart"
+      }
+    ];
+
 const chartData = [320, 410, 380, 520, 610, 540, 720, 680, 810, 760, 920, 1050, 980, 1120, 1280, 1200, 1380, 1428];
 
 function buildCurvePath(data: number[], width: number, height: number, inset = 10) {
@@ -488,8 +534,8 @@ const bentoLinks = ["sessions", "usage", "analytics", "notch-island", "accounts"
         <span class="eyebrow">{isZh ? "Provider-aware 设计" : "Provider-aware by design"}</span>
         <h2 class="h2" style="margin-top:16px;">
           {isZh
-            ? "Claude、Codex、Gemini 各自独立解析、独立计量、独立切账号。"
-            : "Claude, Codex, Gemini — each parses, meters, and switches identity independently."}
+            ? "Claude、Codex、Gemini 与插件 provider 各自独立解析、独立计量、独立切账号。"
+            : "Claude, Codex, Gemini, and plugin providers each parse, meter, and switch identity independently."}
         </h2>
         <p>{copy.accounts.text}</p>
       </div>
@@ -512,6 +558,38 @@ const bentoLinks = ["sessions", "usage", "analytics", "notch-island", "accounts"
               {provider.badges.map((badge) => <span class="prov-pill">{badge}</span>)}
             </div>
           </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section id="marketplace">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">{isZh ? "插件市场" : "Plugin Marketplace"}</span>
+        <h2 class="h2" style="margin-top:16px;">
+          {isZh
+            ? "从 Discover 安装插件，把新 provider、订阅 endpoint 和集成带进应用。"
+            : "Install from Discover and bring new providers, subscription endpoints, and integrations into the app."}
+        </h2>
+        <p>
+          {isZh
+            ? "官方目录维护在 claude-statistics-plugins。插件不会静默替换：下载、校验、信任、热加载每一步都在应用内完成。"
+            : "The official catalog lives in claude-statistics-plugins. Plugins are not silently swapped: download, verify, trust, and hot-load all happen inside the app."}
+        </p>
+      </div>
+      <div class="market-grid">
+        {marketplaceCards.map((card) => (
+          <div class="market-card">
+            <div class="market-meta">{card.meta}</div>
+            <h3>{card.title}</h3>
+            <p>{card.text}</p>
+          </div>
+        ))}
+      </div>
+      <div class="market-strip">
+        {["provider", "terminal", "share-card", "subscription", "utility"].map((category) => (
+          <span>{category}</span>
         ))}
       </div>
     </div>

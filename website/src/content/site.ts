@@ -96,7 +96,7 @@ export const siteCopy: Record<Language, SiteCopy> = {
     meta: {
       title: "Claude Statistics | Native macOS analytics for AI coding sessions",
       description:
-        "Track Claude Code, Codex CLI, and Gemini CLI sessions, quotas, accounts, tokens, and cost in one native macOS menu bar app."
+        "Track Claude Code, Codex CLI, Gemini CLI, and marketplace plugins: sessions, quotas, accounts, tokens, and cost in one native macOS menu bar app."
     },
     nav: {
       features: "Features",
@@ -119,15 +119,15 @@ export const siteCopy: Record<Language, SiteCopy> = {
       eyebrow: "Native analytics for serious AI workflows",
       title: "See every token, quota window, and session arc without leaving your menu bar.",
       text:
-        "Claude Statistics turns local AI coding history into a polished macOS command center for Claude Code, Codex CLI, and Gemini CLI.",
-      points: ["Local-first transcript parsing", "Quota and cost monitoring", "Multi-account and CLI switching"],
-      summaryTitle: "Claude + Codex + Gemini",
-      summaryText: "Switch providers instantly and keep each parsing pipeline running independently.",
+        "Claude Statistics turns local AI coding history into a polished macOS command center for Claude Code, Codex CLI, Gemini CLI, and marketplace-installed workflow plugins.",
+      points: ["Local-first transcript parsing", "Quota and cost monitoring", "Plugin marketplace and CLI switching"],
+      summaryTitle: "Claude + plugins",
+      summaryText: "Install provider, terminal, subscription, and share-card plugins without restarting the app.",
       usageTitle: "5h / 7d / grouped quota tracking",
       floatingTitle: "Analytics from transcripts you already own"
     },
     proofStats: [
-      { value: "3", label: "AI coding providers in one app" },
+      { value: "Marketplace", label: "provider, integration, subscription, and share-card plugins" },
       { value: "53-week", label: "heatmap and all-time trends" },
       { value: "Local", label: "parsing, search, and cost analysis" },
       { value: "9 + 11", label: "share roles and unlockable badges" }
@@ -145,7 +145,7 @@ export const siteCopy: Record<Language, SiteCopy> = {
         {
           kicker: "Usage visibility",
           title: "Track live quota pressure before a workflow stalls.",
-          text: "Follow 5-hour and 7-day Claude windows, Gemini grouped buckets, and menu bar status at a glance."
+          text: "Follow Claude windows, Codex plan context, Gemini grouped buckets, and plugin subscription endpoints at a glance."
         },
         {
           kicker: "All-time analytics",
@@ -154,8 +154,8 @@ export const siteCopy: Record<Language, SiteCopy> = {
         },
         {
           kicker: "Provider-aware design",
-          title: "Claude, Codex, and Gemini each keep their own parsing and account model.",
-          text: "Provider switching feels instant without stopping background indexing for the others."
+          title: "Providers and subscription endpoints can arrive through plugins.",
+          text: "Claude stays as the chassis provider; Codex, Gemini, GLM, and future integrations can ship through the marketplace."
         },
         {
           kicker: "Account switching",
@@ -215,7 +215,8 @@ export const siteCopy: Record<Language, SiteCopy> = {
           title: "Watch usage windows before they surprise you mid-flow.",
           items: [
             "Claude 5h and 7d tracking plus provider-aware menu bar status",
-            "Gemini grouped quota buckets and local usage trends",
+            "Codex plan context, Gemini grouped quota buckets, and local usage trends",
+            "Subscription plugins such as GLM Coding Plan can add token-based identities",
             "Auto-refresh, retry states, and clearer local usage visibility"
           ]
         }
@@ -261,8 +262,13 @@ export const siteCopy: Record<Language, SiteCopy> = {
       cards: [
         {
           kicker: "Workflow settings",
-          title: "Preferred terminal, launch-at-login, language, font scale, and tab order.",
+          title: "Preferred terminal, launch-at-login, language, font scale, plugins, and tab order.",
           text: "Built for daily use, not one-off inspection."
+        },
+        {
+          kicker: "Plugin marketplace",
+          title: "Browse Discover, install verified .csplugin bundles, and remove them from Installed.",
+          text: "Downloads are checked with SHA-256 and manifest ID matching before hot-loading."
         },
         {
           kicker: "Pricing and status line",
@@ -328,7 +334,7 @@ export const siteCopy: Record<Language, SiteCopy> = {
     meta: {
       title: "Claude Statistics | 原生 macOS AI 编码会话分析工具",
       description:
-        "在一个原生 macOS 菜单栏应用里统一查看 Claude Code、Codex CLI 和 Gemini CLI 的会话、配额、账号、Token 与成本。"
+        "在一个原生 macOS 菜单栏应用里统一查看 Claude Code、Codex CLI、Gemini CLI 和 marketplace 插件的会话、配额、账号、Token 与成本。"
     },
     nav: {
       features: "亮点",
@@ -351,15 +357,15 @@ export const siteCopy: Record<Language, SiteCopy> = {
       eyebrow: "为重度 AI 工作流打造的原生分析工具",
       title: "在菜单栏里看清 Token、配额窗口和会话轨迹。",
       text:
-        "Claude Statistics 把本地 AI 编码历史整理成一个精致、快速、原生的 macOS 控制中心，统一覆盖 Claude Code、Codex CLI 和 Gemini CLI。",
-      points: ["本地优先的 transcript 解析", "配额与成本监控", "多账号与 CLI 账号切换"],
-      summaryTitle: "Claude + Codex + Gemini",
-      summaryText: "随时切换 provider，同时保留各自独立的解析与缓存管线。",
+        "Claude Statistics 把本地 AI 编码历史整理成一个精致、快速、原生的 macOS 控制中心，统一覆盖 Claude Code、Codex CLI、Gemini CLI 和插件市场安装的工作流插件。",
+      points: ["本地优先的 transcript 解析", "配额与成本监控", "插件市场与 CLI 账号切换"],
+      summaryTitle: "Claude + 插件",
+      summaryText: "无需重启即可安装 provider、终端、订阅和分享卡插件。",
       usageTitle: "5h / 7d / 分组配额追踪",
       floatingTitle: "从你已拥有的 transcript 里提炼分析结果"
     },
     proofStats: [
-      { value: "3", label: "一个应用覆盖三种 AI 编码工具" },
+      { value: "Marketplace", label: "provider、集成、订阅和分享卡插件" },
       { value: "53 周", label: "热力图与全时段趋势分析" },
       { value: "本地", label: "解析、搜索与成本分析都在本机完成" },
       { value: "9 + 11", label: "角色卡与可解锁徽章系统" }
@@ -377,7 +383,7 @@ export const siteCopy: Record<Language, SiteCopy> = {
         {
           kicker: "配额可见性",
           title: "在工作流被打断前，先看到实时配额压力。",
-          text: "快速查看 Claude 的 5 小时与 7 天窗口、Gemini 分组 quota，以及菜单栏状态。"
+          text: "快速查看 Claude 窗口、Codex 套餐信息、Gemini 分组 quota，以及插件订阅 endpoint。"
         },
         {
           kicker: "全时段分析",
@@ -386,8 +392,8 @@ export const siteCopy: Record<Language, SiteCopy> = {
         },
         {
           kicker: "Provider 感知设计",
-          title: "Claude、Codex、Gemini 各自维护独立的解析和账号模型。",
-          text: "切换 provider 时足够快，同时不会中断其他 provider 的后台索引。"
+          title: "Provider 和订阅 endpoint 可以通过插件进入应用。",
+          text: "Claude 保持 chassis provider；Codex、Gemini、GLM 和未来集成都可以通过 marketplace 交付。"
         },
         {
           kicker: "账号切换",
@@ -447,7 +453,8 @@ export const siteCopy: Record<Language, SiteCopy> = {
           title: "在中途撞 quota 之前，先看到风险变化。",
           items: [
             "Claude 5 小时 / 7 天窗口与菜单栏动态状态",
-            "Gemini 分组 quota 与本地趋势图",
+            "Codex 套餐信息、Gemini 分组 quota 与本地趋势图",
+            "GLM Coding Plan 等订阅插件可加入 token-based 身份",
             "自动刷新、重试状态与本地使用趋势"
           ]
         }
@@ -493,8 +500,13 @@ export const siteCopy: Record<Language, SiteCopy> = {
       cards: [
         {
           kicker: "工作流设置",
-          title: "偏好终端、开机启动、语言、字号和 Tab 顺序。",
+          title: "偏好终端、开机启动、语言、字号、插件和 Tab 顺序。",
           text: "它不是一次性查看器，而是适合每天常驻使用的工具。"
+        },
+        {
+          kicker: "插件市场",
+          title: "浏览 Discover，安装经过校验的 .csplugin，并从 Installed 管理移除。",
+          text: "下载会经过 SHA-256 与 manifest ID 校验，确认后热加载。"
         },
         {
           kicker: "定价与状态栏",

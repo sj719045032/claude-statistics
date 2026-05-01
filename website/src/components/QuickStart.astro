@@ -16,13 +16,13 @@ const hero = isZh
       eyebrow: "快速开始",
       title: "从下载到看到第一份数据,大约 5 分钟。",
       lede:
-        "Claude Statistics 是个原生 macOS 应用。安装、授权、自动索引,然后所有功能都已就绪 — 不需要登录、不需要订阅、不需要配置文件。"
+        "Claude Statistics 是个原生 macOS 应用。安装、授权、自动索引,然后基础功能就绪；需要更多 provider、订阅 endpoint 或集成时,再从插件市场安装。"
     }
   : {
       eyebrow: "Quick Start",
       title: "From download to first data in about five minutes.",
       lede:
-        "Claude Statistics is a native macOS app. Install it, grant access, let it index — every feature is ready immediately. No login, no subscription, no config files."
+        "Claude Statistics is a native macOS app. Install it, grant access, let it index — the core app is ready immediately, and extra providers, subscription endpoints, or integrations come from the plugin marketplace."
     };
 
 const steps = isZh
@@ -98,6 +98,16 @@ const steps = isZh
             text:
               "Settings → Accounts。每个 provider 可以保存多个账号,一键切换激活身份 — 应用直接重写 CLI 读取的认证文件,下一次 claude / codex / gemini 调用就以新身份运行。",
             lines: []
+          },
+          {
+            title: "安装插件",
+            text:
+              "Settings → Plugins → Discover。应用会从 claude-statistics-plugins 拉取目录,安装时校验 SHA-256 和 manifest id,然后热加载 provider、集成或订阅扩展。",
+            lines: [
+              "Provider / Integrations / Subscription / Share Card / Utility 五类",
+              "GLM Coding Plan 等第三方 endpoint 通过 Subscription 插件接入",
+              "Installed tab 可更新、禁用、卸载和重置信任"
+            ]
           },
           {
             title: "导出 Share Card",
@@ -191,6 +201,16 @@ const steps = isZh
             text:
               "Settings → Accounts. Save multiple accounts per provider; one-click switches the active identity — the app rewrites the auth file the CLI reads, so your next claude / codex / gemini invocation runs as the new user.",
             lines: []
+          },
+          {
+            title: "Install plugins",
+            text:
+              "Settings → Plugins → Discover. The app fetches the claude-statistics-plugins catalog, verifies SHA-256 and manifest ID on install, then hot-loads providers, integrations, or subscription extensions.",
+            lines: [
+              "Five categories: Provider / Integrations / Subscription / Share Card / Utility",
+              "Third-party endpoints such as GLM Coding Plan arrive through Subscription plugins",
+              "The Installed tab can update, disable, uninstall, and reset trust decisions"
+            ]
           },
           {
             title: "Export a Share Card",

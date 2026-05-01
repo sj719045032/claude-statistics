@@ -234,6 +234,18 @@ section { padding: 100px 0; position: relative; }
 .prov-badges { display: flex; gap: 5px; flex-wrap: wrap; padding-top: 12px; border-top: 1px dashed var(--hair); }
 .prov-pill { font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; border-radius: 4px; background: rgba(0,0,0,0.03); border: 1px solid var(--hair); color: var(--fg2); }
 
+/* MARKETPLACE */
+.market-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+@media (max-width: 960px) { .market-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .market-grid { grid-template-columns: 1fr; } }
+.market-card { background: var(--surface); border: 1px solid var(--hair); border-radius: var(--radius); padding: 22px; min-height: 188px; display: flex; flex-direction: column; transition: transform .2s, border-color .2s, box-shadow .2s; }
+.market-card:hover { border-color: var(--hair-strong); transform: translateY(-2px); box-shadow: var(--shadow); }
+.market-meta { font-family: var(--font-mono); font-size: 10px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.8px; }
+.market-card h3 { margin: 10px 0 0; font-size: 17px; letter-spacing: -0.2px; }
+.market-card p { margin: 10px 0 0; color: var(--fg2); font-size: 13.5px; line-height: 1.55; }
+.market-strip { margin-top: 18px; display: flex; gap: 8px; flex-wrap: wrap; }
+.market-strip span { font-family: var(--font-mono); font-size: 11px; padding: 6px 9px; border: 1px solid var(--hair); border-radius: 6px; background: rgba(255,255,255,0.55); color: var(--fg2); }
+
 /* BENTO */
 .bento { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
 .bento-card { background: var(--surface); border: 1px solid var(--hair); border-radius: var(--radius); padding: 22px; transition: transform .25s, border-color .2s, box-shadow .2s; position: relative; overflow: hidden; }
