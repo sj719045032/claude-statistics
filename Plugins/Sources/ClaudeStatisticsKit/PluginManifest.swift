@@ -59,37 +59,53 @@ public enum PluginCatalogCategory {
     /// Aider / …). Matches the SDK protocol naming
     /// (`ProviderPlugin` / `ProviderDescriptor` / `ProviderRegistry`).
     public static let provider = "provider"
-    /// Terminal-emulator adapter (focus return + launching).
+    /// Catch-all "integrations" bucket: native terminals
+    /// (Alacritty / iTerm2 / Kitty / Warp / Ghostty / WezTerm / …),
+    /// editor deep-link integrations (VSCode / Cursor / Zed / …) and
+    /// chat-app deep-link integrations (Claude.app / Codex.app).
+    /// String id stays `terminal` for backward compatibility with
+    /// already-installed plugin manifests; the user-visible label
+    /// reads "Integrations" / "集成" so editors and chat apps don't
+    /// look out of place under "Terminal".
     public static let terminal = "terminal"
-    /// Desktop chat-app integration with deep-link focus
-    /// (Claude.app / Codex.app / …).
-    public static let chatApp = "chat-app"
-    /// Share-card role scorers and visual themes.
+    /// Share-card role scorers and visual themes (`PluginKind.shareRole` /
+    /// `.shareCardTheme`). Catalog entries shipped under this category
+    /// still get their own chip — even though no public plugin uses
+    /// it yet, the host shouldn't bake in that assumption.
     public static let shareCard = "share-card"
-    /// Editor integration (VSCode / Cursor / Zed deep-link).
-    public static let editorIntegration = "editor-integration"
     /// Subscription extension — third-party endpoint adapters
     /// (GLM Coding Plan, OpenRouter, Kimi, …) implementing
-    /// `SubscriptionExtensionPlugin`. Distinct from `provider` because
-    /// these plugins don't ship a CLI; they piggy-back on an existing
-    /// provider's CLI by routing through a custom base URL and adding
-    /// quota / token-management UI.
+    /// `SubscriptionExtensionPlugin`.
     public static let subscription = "subscription"
-    /// Catch-all for tools that don't fit the buckets above.
+    /// Catch-all for everything else.
     public static let utility = "utility"
 
-    /// Every category recognised by the bundled host. Marketplace
-    /// catalogs may publish additional values; the UI handles unknown
-    /// strings by falling back to `utility`.
+    /// Every category recognised by the bundled host's filter bar.
     public static let known: [String] = [
-        provider, terminal, chatApp, shareCard, editorIntegration, subscription, utility
+        provider, terminal, shareCard, subscription, utility
     ]
+
+    /// Coerce any catalog-supplied string into one of the canonical
+    /// buckets. Older marketplaces that shipped separate `chat-app`
+    /// and `editor-integration` strings get aliased onto `terminal`
+    /// — user feedback was the three-way split felt over-categorised
+    /// when each had only a couple of entries. Unknown strings fall
+    /// back to `utility`.
+    public static func canonicalize(_ raw: String) -> String {
+        switch raw {
+        case provider, terminal, shareCard, subscription, utility:
+            return raw
+        case "chat-app", "editor-integration":
+            return terminal
+        default:
+            return utility
+        }
+    }
 
     /// Category to use when a plugin's manifest doesn't declare one
     /// explicitly. Derived from the plugin's `kind` so the Installed
     /// tab's filter bar groups plugins under the right chip even
-    /// when the plugin author hasn't set a category. Returns
-    /// `utility` for any future kind without a clear bucket.
+    /// when the plugin author hasn't set a category.
     public static func fallback(forKind kind: PluginKind) -> String {
         switch kind {
         case .provider:               return provider

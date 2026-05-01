@@ -294,7 +294,7 @@
 "settings.plugins.install.error.load %@" = "Plugin loaded but registration failed: %@";
 "settings.plugins.category.all" = "All";
 "settings.plugins.category.provider" = "Provider";
-"settings.plugins.category.terminal" = "Terminal";
+"settings.plugins.category.terminal" = "Integrations";
 "settings.plugins.category.chat-app" = "Chat App";
 "settings.plugins.category.share-card" = "Share Card";
 "settings.plugins.category.editor-integration" = "Editor";

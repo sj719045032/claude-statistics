@@ -55,7 +55,7 @@ struct PluginsSettingsView: View {
         var byCategory: [String: Int] = [:]
         for row in rows {
             let raw = row.manifest.category ?? PluginCatalogCategory.fallback(forKind: row.manifest.kind)
-            let key = PluginCatalogCategory.known.contains(raw) ? raw : PluginCatalogCategory.fallback(forKind: row.manifest.kind)
+            let key = PluginCatalogCategory.canonicalize(raw)
             byCategory[key, default: 0] += 1
         }
         return PluginCatalogCategory.known.compactMap { cat in
@@ -70,7 +70,7 @@ struct PluginsSettingsView: View {
         guard let selectedInstalledCategory else { return rows }
         return rows.filter { row in
             let raw = row.manifest.category ?? PluginCatalogCategory.fallback(forKind: row.manifest.kind)
-            let key = PluginCatalogCategory.known.contains(raw) ? raw : PluginCatalogCategory.fallback(forKind: row.manifest.kind)
+            let key = PluginCatalogCategory.canonicalize(raw)
             return key == selectedInstalledCategory
         }
     }

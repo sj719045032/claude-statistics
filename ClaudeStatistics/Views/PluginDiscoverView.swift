@@ -93,9 +93,7 @@ struct PluginDiscoverView: View {
         _ = refreshTick
         var byCategory: [String: Int] = [:]
         for entry in entries {
-            let key = PluginCatalogCategory.known.contains(entry.category)
-                ? entry.category
-                : PluginCatalogCategory.utility
+            let key = PluginCatalogCategory.canonicalize(entry.category)
             byCategory[key, default: 0] += 1
         }
         return PluginCatalogCategory.known.compactMap { cat in
@@ -111,9 +109,7 @@ struct PluginDiscoverView: View {
         }
         return entries
             .filter { entry in
-                let key = PluginCatalogCategory.known.contains(entry.category)
-                    ? entry.category
-                    : PluginCatalogCategory.utility
+                let key = PluginCatalogCategory.canonicalize(entry.category)
                 return key == selectedCategory
             }
             .sorted { $0.name < $1.name }
@@ -422,25 +418,20 @@ struct PluginDiscoverView: View {
     }
 
     private func displayName(for category: String) -> LocalizedStringKey {
-        switch category {
+        switch PluginCatalogCategory.canonicalize(category) {
         case PluginCatalogCategory.provider: return "settings.plugins.category.provider"
         case PluginCatalogCategory.terminal: return "settings.plugins.category.terminal"
-        case PluginCatalogCategory.chatApp: return "settings.plugins.category.chat-app"
         case PluginCatalogCategory.shareCard: return "settings.plugins.category.share-card"
-        case PluginCatalogCategory.editorIntegration: return "settings.plugins.category.editor-integration"
         case PluginCatalogCategory.subscription: return "settings.plugins.category.subscription"
-        case PluginCatalogCategory.utility: return "settings.plugins.category.utility"
         default: return "settings.plugins.category.utility"
         }
     }
 
     private func glyph(for category: String) -> String {
-        switch category {
+        switch PluginCatalogCategory.canonicalize(category) {
         case PluginCatalogCategory.provider: return "shippingbox"
-        case PluginCatalogCategory.terminal: return "terminal"
-        case PluginCatalogCategory.chatApp: return "bubble.left.and.bubble.right"
+        case PluginCatalogCategory.terminal: return "rectangle.connected.to.line.below"
         case PluginCatalogCategory.shareCard: return "person.crop.square"
-        case PluginCatalogCategory.editorIntegration: return "text.cursor"
         case PluginCatalogCategory.subscription: return "creditcard"
         default: return "wrench.and.screwdriver"
         }

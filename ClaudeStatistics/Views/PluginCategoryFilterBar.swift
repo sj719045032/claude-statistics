@@ -89,14 +89,11 @@ struct PluginCategoryFilterBar: View {
     /// Mirror of the same string keys both Installed and Discover use
     /// so the chip label matches the section header label exactly.
     private func localizationKey(for category: String) -> LocalizedStringKey {
-        switch category {
+        switch PluginCatalogCategory.canonicalize(category) {
         case PluginCatalogCategory.provider: return "settings.plugins.category.provider"
         case PluginCatalogCategory.terminal: return "settings.plugins.category.terminal"
-        case PluginCatalogCategory.chatApp: return "settings.plugins.category.chat-app"
         case PluginCatalogCategory.shareCard: return "settings.plugins.category.share-card"
-        case PluginCatalogCategory.editorIntegration: return "settings.plugins.category.editor-integration"
         case PluginCatalogCategory.subscription: return "settings.plugins.category.subscription"
-        case PluginCatalogCategory.utility: return "settings.plugins.category.utility"
         default: return "settings.plugins.category.utility"
         }
     }

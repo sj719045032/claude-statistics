@@ -307,7 +307,7 @@
 "settings.plugins.install.error.load %@" = "插件已加载但注册失败：%@";
 "settings.plugins.category.all" = "全部";
 "settings.plugins.category.provider" = "Provider";
-"settings.plugins.category.terminal" = "终端";
+"settings.plugins.category.terminal" = "集成";
 "settings.plugins.category.chat-app" = "聊天应用";
 "settings.plugins.category.share-card" = "分享卡片";
 "settings.plugins.category.editor-integration" = "编辑器";

@@ -108,6 +108,22 @@ public final class SubscriptionAdapterRouter: ObservableObject {
         DiagnosticLogger.shared.info(
             "SubscriptionRouter.refresh: adapters=\(adapters.count) detectors=\(detectors.count) managers=\(accountManagers.count)"
         )
+
+        // Self-heal a dangling IdentityStore selection: if the
+        // persisted active identity points at a subscription whose
+        // plugin is no longer registered (uninstalled, disabled,
+        // builtin was removed in an upgrade), the UI gets stuck on a
+        // disabled picker showing OAuth data with subscription state
+        // underneath. Reset to `.anthropicOAuth` so every consumer
+        // sees a coherent identity. The OAuth profile path takes
+        // over automatically.
+        if case .subscription(let adapterID, _) = IdentityStore.shared.activeIdentity,
+           accountManagers[adapterID] == nil {
+            DiagnosticLogger.shared.info(
+                "SubscriptionRouter.refresh: dropping dangling identity subscription(\(adapterID), …) — adapter not registered"
+            )
+            IdentityStore.shared.activate(.anthropicOAuth)
+        }
     }
 
     private func registerAdapter(_ adapter: any SubscriptionAdapter) {

@@ -488,6 +488,11 @@ final class AppState: ObservableObject {
         PluginTrustGate.setHostPluginFactories(AppState.hostPluginFactories)
         PluginTrustGate.onPluginHotLoaded = { [weak self] manifest, _ in
             Self.refreshDynamicTerminalRegistries(from: registry)
+            // Hot-loaded plugin may have contributed a
+            // SubscriptionAdapter / SubscriptionAccountManager (GLM,
+            // future OpenRouter / Kimi); re-collect them so the
+            // identity picker shows new sources without a restart.
+            SubscriptionAdapterRouter.shared.refresh(from: registry)
             self?.wirePluginProviderInstances()
             self?.recomputeAvailableProviderKinds()
             // Reuse the per-provider notch toggle's state-changed
@@ -514,6 +519,12 @@ final class AppState: ObservableObject {
             // the registry's current contents, so the disabled
             // plugin's contributions disappear.
             Self.refreshDynamicTerminalRegistries(from: registry)
+            // Same refresh on disable: rebuild the router so a
+            // disabled subscription plugin's adapter / manager
+            // disappears from the identity picker. The router's
+            // self-heal also resets IdentityStore if the user's
+            // active identity belonged to the now-gone plugin.
+            SubscriptionAdapterRouter.shared.refresh(from: registry)
             ProviderRegistry.unregisterDynamicProvider(id: pluginID)
             self?.wirePluginProviderInstances()
             self?.handleProviderPluginDisabled(pluginID: pluginID)
