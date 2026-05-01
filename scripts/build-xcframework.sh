@@ -70,13 +70,14 @@ echo ""
 echo "==> Zipping for distribution..."
 ZIP_PATH="${OUTPUT_DIR}/${FRAMEWORK_NAME}.xcframework.zip"
 rm -f "${ZIP_PATH}"
-# `ditto` (macOS-native, PKZIP) preserves the framework's `Versions/Current
-# -> A` symlink correctly. Plain `zip` dereferences symlinks by default
-# unless `-y` is passed, which corrupts the unzipped xcframework on
-# the consumer side (Xcode warns: "Couldn't resolve framework symlink
-# for ... Versions/Current" and the framework's Headers / Modules
-# subtrees become inaccessible to the linker).
-( cd "${OUTPUT_DIR}" && ditto -c -k --sequesterRsrc --keepParent "${FRAMEWORK_NAME}.xcframework" "${FRAMEWORK_NAME}.xcframework.zip" )
+# `zip -y` preserves the framework's `Versions/Current -> A` symlink
+# in a way SwiftPM unpacks correctly on the consumer side. `ditto`
+# also preserves symlinks but SwiftPM's binaryTarget unzip pipeline
+# deref's them back to directories — `zip -y` produces standard
+# PKZIP entries SwiftPM round-trips cleanly. Without this Xcode
+# warns: "Couldn't resolve framework symlink for ... Versions/Current"
+# and consumer plugin builds fail with `cannot find <SDK type> in scope`.
+( cd "${OUTPUT_DIR}" && zip -qry "${FRAMEWORK_NAME}.xcframework.zip" "${FRAMEWORK_NAME}.xcframework" )
 SHA256="$(swift package compute-checksum "${ZIP_PATH}" 2>/dev/null || shasum -a 256 "${ZIP_PATH}" | awk '{print $1}')"
 echo "    zip: ${ZIP_PATH} ($(du -h "${ZIP_PATH}" | cut -f1 | xargs))"
 echo "    SwiftPM checksum (.binaryTarget): ${SHA256}"
