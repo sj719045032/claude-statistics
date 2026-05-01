@@ -33,6 +33,13 @@ struct PluginsSettingsView: View {
     /// dictionary, not a published value, so SwiftUI doesn't know to
     /// re-render unless we nudge it.
     @State private var refreshTick = 0
+    /// Live catalog entries fetched on appear so the Installed tab
+    /// shows the marketplace's current display name / category /
+    /// version (drives the Update button) without depending on
+    /// whoever last opened Discover. Always-fresh; no per-view
+    /// cache check.
+    @State private var liveCatalogEntries: [PluginCatalogEntry] = []
+    @State private var updatingIDs: Set<String> = []
 
     private struct Row: Identifiable {
         let manifest: PluginManifest
@@ -49,20 +56,13 @@ struct PluginsSettingsView: View {
             .map { Row(manifest: $0, source: pluginRegistry.source(for: $0.id)) }
     }
 
-    /// Cached marketplace entries keyed by plugin id. Read from disk
-    /// whenever the body recomputes; the Discover panel writes this
-    /// cache on every successful fetch, so installed-side renders
-    /// stay in sync with the marketplace's display name / version /
-    /// description without us re-fetching here. nil entry means
-    /// "this plugin isn't in the catalog right now" and the row
-    /// falls back to plugin-bundle metadata.
+    /// Live marketplace entries keyed by plugin id. Populated from
+    /// the `task` modifier on appear so every Installed-tab visit
+    /// pulls a fresh catalog (no cached fallback here — that's the
+    /// Discover panel's offline behaviour). Used both for display
+    /// (name / category / description) and for the Update button.
     private var catalogEntriesByID: [String: PluginCatalogEntry] {
-        _ = refreshTick
-        guard let data = try? Data(contentsOf: PluginCatalog.defaultCacheURL),
-              let index = try? PluginCatalog.decode(data) else {
-            return [:]
-        }
-        return Dictionary(uniqueKeysWithValues: index.entries.map { ($0.id, $0) })
+        Dictionary(uniqueKeysWithValues: liveCatalogEntries.map { ($0.id, $0) })
     }
 
     /// Categories present in the loaded list, in canonical order, with
@@ -72,7 +72,7 @@ struct PluginsSettingsView: View {
         for row in rows {
             let raw = catalogEntriesByID[row.manifest.id]?.category
                 ?? row.manifest.category
-                ?? PluginCatalogCategory.fallback(forKind: row.manifest.kind)
+                ?? PluginCatalogCategory.utility
             let key = PluginCatalogCategory.canonicalize(raw)
             byCategory[key, default: 0] += 1
         }
@@ -89,7 +89,7 @@ struct PluginsSettingsView: View {
         return rows.filter { row in
             let raw = catalogEntriesByID[row.manifest.id]?.category
                 ?? row.manifest.category
-                ?? PluginCatalogCategory.fallback(forKind: row.manifest.kind)
+                ?? PluginCatalogCategory.utility
             let key = PluginCatalogCategory.canonicalize(raw)
             return key == selectedInstalledCategory
         }
@@ -261,6 +261,46 @@ struct PluginsSettingsView: View {
         } message: {
             Text(uninstallError ?? "")
         }
+        .task(id: tab) {
+            // Always pull a fresh catalog when the panel opens (or
+            // when the user flips between Installed / Discover) so
+            // the Installed tab's display name / category / Update
+            // button reflect the current marketplace, not whatever
+            // was last cached.
+            await refreshLiveCatalog()
+        }
+    }
+
+    private func refreshLiveCatalog() async {
+        let url = developerCatalogOverrideURL ?? PluginCatalog.defaultRemoteURL
+        let catalog = PluginCatalog(remoteURL: url)
+        if let outcome = try? await catalog.fetch() {
+            liveCatalogEntries = outcome.index.entries
+        }
+    }
+
+    /// Triggered by the Update button on a row. Reuses the same
+    /// `PluginInstaller` path the Discover tab uses; a successful
+    /// install replaces the on-disk bundle. macOS keeps the old
+    /// dlopen'd image in memory so the user has to relaunch — we
+    /// surface that via the existing `pendingRestartIds` badge.
+    private func update(_ entry: PluginCatalogEntry) {
+        updatingIDs.insert(entry.id)
+        Task { @MainActor in
+            let destination = PluginLoader.defaultDirectory
+            do {
+                _ = try await PluginInstaller.install(
+                    entry: entry,
+                    into: pluginRegistry,
+                    destination: { destination }
+                )
+                pendingRestartIds.insert(entry.id)
+            } catch {
+                enableError = String(describing: error)
+            }
+            updatingIDs.remove(entry.id)
+            refreshTick &+= 1
+        }
     }
 
     @ViewBuilder
@@ -363,6 +403,31 @@ struct PluginsSettingsView: View {
                         .clipShape(Capsule())
                 }
                 Spacer()
+                // Update button: visible when the live catalog
+                // advertises a newer version than the installed one.
+                // Hidden in disabled rows because the user should
+                // re-enable before updating (matches Discover's
+                // semantics of update-on-installed-and-loaded).
+                if !isDisabled,
+                   let catalog = catalogEntriesByID[manifest.id],
+                   catalog.version > manifest.version {
+                    let isUpdating = updatingIDs.contains(manifest.id)
+                    Button(action: { update(catalog) }) {
+                        if isUpdating {
+                            ProgressView().controlSize(.mini)
+                        } else {
+                            Text(String(
+                                format: NSLocalizedString("settings.plugins.update.toVersion %@", comment: ""),
+                                catalog.version.description
+                            ))
+                            .font(.system(size: 10))
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+                    .tint(.blue)
+                    .disabled(isUpdating)
+                }
                 if isDisabled {
                     Button(action: { handleEnable(row) }) {
                         Text("settings.plugins.enable")

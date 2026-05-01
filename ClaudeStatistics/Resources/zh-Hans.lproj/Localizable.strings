@@ -312,6 +312,7 @@
 "settings.plugins.category.share-card" = "分享卡片";
 "settings.plugins.category.editor-integration" = "编辑器";
 "settings.plugins.category.subscription" = "订阅";
+"settings.plugins.update.toVersion %@" = "升级到 v%@";
 "settings.identitySwitcher.button" = "切换账号";
 
 /* 身份选择器 */
