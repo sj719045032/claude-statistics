@@ -84,6 +84,22 @@ public enum PluginCatalogCategory {
     public static let known: [String] = [
         provider, terminal, chatApp, shareCard, editorIntegration, subscription, utility
     ]
+
+    /// Category to use when a plugin's manifest doesn't declare one
+    /// explicitly. Derived from the plugin's `kind` so the Installed
+    /// tab's filter bar groups plugins under the right chip even
+    /// when the plugin author hasn't set a category. Returns
+    /// `utility` for any future kind without a clear bucket.
+    public static func fallback(forKind kind: PluginKind) -> String {
+        switch kind {
+        case .provider:               return provider
+        case .terminal:               return terminal
+        case .shareRole:              return shareCard
+        case .shareCardTheme:         return shareCard
+        case .both:                   return provider
+        case .subscriptionExtension:  return subscription
+        }
+    }
 }
 
 /// Static metadata every plugin must publish. Loaded from
