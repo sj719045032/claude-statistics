@@ -48,7 +48,7 @@ let package = Package(
         .binaryTarget(
             name: "ClaudeStatisticsKit",
             url: "https://github.com/sj719045032/claude-statistics/releases/download/sdk-v0.2.0/ClaudeStatisticsKit.xcframework.zip",
-            checksum: "e2eb3ab054a30974faa62f0044c4793286bebe1c448ac1fc80d256458901f992"
+            checksum: "6190d48e372551d80b1b8fd0f5a1b1ac06edc2f22e6a4ab738e1030cb0349c2c"
         )
     ]
 )
