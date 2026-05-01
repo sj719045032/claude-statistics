@@ -48,6 +48,9 @@ func sendToSocket(
     }
     guard connectResult == 0 else {
         let code = errno
+        if ProcessInfo.processInfo.environment["CLAUDE_STATS_HOOK_PRINT_PATHS"] == "1" {
+            FileHandle.standardError.write(Data("connect errno=\(code) reason=\(String(cString: strerror(code)))\n".utf8))
+        }
         DiagnosticLogger.shared.warning(
             "HookCLI socket connect failed provider=\(diagnosticContext.provider.rawValue) event=\(diagnosticContext.event) session=\(diagnosticContext.sessionId) toolUseId=\(diagnosticContext.toolUseId) path=\(path) errno=\(code) reason=\(String(cString: strerror(code)))"
         )
@@ -65,6 +68,9 @@ func sendToSocket(
 
     guard writeAll(fd: fd, data: payload) else {
         let code = errno
+        if ProcessInfo.processInfo.environment["CLAUDE_STATS_HOOK_PRINT_PATHS"] == "1" {
+            FileHandle.standardError.write(Data("write errno=\(code) reason=\(String(cString: strerror(code)))\n".utf8))
+        }
         DiagnosticLogger.shared.warning(
             "HookCLI socket write failed provider=\(diagnosticContext.provider.rawValue) event=\(diagnosticContext.event) session=\(diagnosticContext.sessionId) toolUseId=\(diagnosticContext.toolUseId) path=\(path) errno=\(code) reason=\(String(cString: strerror(code)))"
         )

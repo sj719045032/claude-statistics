@@ -4,13 +4,12 @@ import ClaudeStatisticsKit
 /// Bridge between HookCLI's switch and the plugin's
 /// `ProviderHookNormalizing` capability. Loaded once per CLI
 /// invocation: the plugin registry is rebuilt from
-/// `<app>/Contents/PlugIns/` because hook CLI mode skips the regular
-/// AppState bootstrap.
+/// `<app>/Contents/PlugIns/` plus the per-user plugin directory because
+/// hook CLI mode skips the regular AppState bootstrap.
 ///
-/// Builtin Claude / Codex hooks stay outside this path while their
-/// plugins haven't been extracted yet — HookRunner's switch dispatches
-/// them directly. Anything else (Gemini today, third-party tomorrow)
-/// arrives here through the `default` arm.
+/// Claude still has a host-owned normalizer and is dispatched directly by
+/// HookRunner. Extracted providers such as Codex / Gemini, plus third-party
+/// plugins, arrive here through the `default` arm.
 @MainActor
 enum HookPluginRouter {
     private static var cachedRegistry: PluginRegistry?
@@ -18,13 +17,8 @@ enum HookPluginRouter {
     private static func registry() -> PluginRegistry {
         if let r = cachedRegistry { return r }
         let r = PluginRegistry()
-        // PlugIns dir lives at .app/Contents/PlugIns/ for installed
-        // builds and at the equivalent path inside the test host
-        // / debug build product. Bundle.main.builtInPlugInsURL wraps
-        // both cases.
-        if let url = Bundle.main.builtInPlugInsURL {
-            _ = PluginLoader.loadAll(from: url, into: r, sourceKind: .bundled)
-        }
+        PluginRegistryBootstrap.loadBundledPlugins(into: r)
+        PluginRegistryBootstrap.loadUserPlugins(into: r)
         cachedRegistry = r
         return r
     }
@@ -40,6 +34,9 @@ enum HookPluginRouter {
             .first(where: { $0.hookProviderId == providerId }),
               let envelope = normalizer.normalize(payload: payload, helper: helper)
         else {
+            DiagnosticLogger.shared.warning(
+                "HookPluginRouter no normalizer provider=\(providerId) loadedProviders=\(plugins.map { type(of: $0).manifest.id }.sorted().joined(separator: ","))"
+            )
             return nil
         }
 

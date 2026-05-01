@@ -5,7 +5,6 @@ import ClaudeStatisticsKit
 enum HookCLI {
     private static let providerFlag = "--claude-stats-hook-provider"
 
-    @MainActor
     static func runIfNeeded(arguments: [String]) -> Int32? {
         guard let flagIndex = arguments.firstIndex(of: providerFlag) else {
             return nil
@@ -47,11 +46,15 @@ struct HookAction {
     }
 }
 
-@MainActor
 struct HookRunner: HookHelperContext {
     let provider: ProviderKind
 
     func run() -> Int32 {
+        if ProcessInfo.processInfo.environment["CLAUDE_STATS_HOOK_PRINT_PATHS"] == "1" {
+            let line = "root=\(AppRuntimePaths.rootDirectory) socket=\(AttentionBridgeAuth.socketPath)\n"
+            FileHandle.standardError.write(Data(line.utf8))
+        }
+
         guard let payload = readPayload() else {
             return 0
         }
@@ -65,7 +68,9 @@ struct HookRunner: HookHelperContext {
             // the plugin router. Each plugin implements
             // `ProviderHookNormalizing` and HookPluginRouter looks it
             // up in PluginRegistry by `hookProviderId`.
-            action = HookPluginRouter.action(for: provider.rawValue, payload: payload, helper: self)
+            action = MainActor.assumeIsolated {
+                HookPluginRouter.action(for: provider.rawValue, payload: payload, helper: self)
+            }
         }
 
         guard let action else { return 0 }
@@ -180,13 +185,18 @@ struct HookRunner: HookHelperContext {
             toolUseId: stringValue(message["tool_use_id"]) ?? "-"
         )
         for path in socketPathCandidates {
-            guard let responseData = sendToSocket(
+            let responseData = sendToSocket(
                 path: path,
                 payload: payloadData,
                 expectsResponse: expectsResponse,
                 responseTimeoutSeconds: responseTimeoutSeconds,
                 diagnosticContext: diagnosticContext
-            ) else {
+            )
+            if ProcessInfo.processInfo.environment["CLAUDE_STATS_HOOK_PRINT_PATHS"] == "1" {
+                let status = responseData == nil ? "nil" : "ok(\(responseData?.count ?? 0))"
+                FileHandle.standardError.write(Data("send path=\(path) status=\(status)\n".utf8))
+            }
+            guard let responseData else {
                 continue
             }
 

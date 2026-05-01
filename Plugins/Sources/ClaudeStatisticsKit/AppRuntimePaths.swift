@@ -14,10 +14,12 @@ public enum AppRuntimePaths {
     public static let rootDirectory: String = {
         let bundleID = Bundle.main.bundleIdentifier ?? ""
         let execPath = ProcessInfo.processInfo.arguments.first ?? ""
+        let execName = (execPath as NSString).lastPathComponent
 
         let isDebug = bundleID.hasSuffix(".debug") ||
                       execPath.contains("/Debug/") ||
-                      execPath.hasSuffix("-debug")
+                      execPath.hasSuffix("-debug") ||
+                      execName.localizedCaseInsensitiveContains("debug")
 
         let folderName = isDebug ? ".claude-statistics-debug" : ".claude-statistics"
         return (NSHomeDirectory() as NSString).appendingPathComponent(folderName)
@@ -26,7 +28,13 @@ public enum AppRuntimePaths {
     public static let runDirectory = (rootDirectory as NSString).appendingPathComponent("run")
 
     public static var hookBinaryName: String {
-        let isDebug = (Bundle.main.bundleIdentifier ?? "").hasSuffix(".debug")
+        let bundleID = Bundle.main.bundleIdentifier ?? ""
+        let execPath = ProcessInfo.processInfo.arguments.first ?? ""
+        let execName = (execPath as NSString).lastPathComponent
+        let isDebug = bundleID.hasSuffix(".debug") ||
+                      execPath.contains("/Debug/") ||
+                      execPath.hasSuffix("-debug") ||
+                      execName.localizedCaseInsensitiveContains("debug")
         return isDebug ? "claude-stats-hook-debug" : "claude-stats-hook"
     }
     /// Disk buffer for hook events that arrived while the app's socket wasn't
