@@ -454,6 +454,18 @@ final class AppState: ObservableObject {
             Self.refreshDynamicTerminalRegistries(from: registry)
             self?.wirePluginProviderInstances()
             self?.recomputeAvailableProviderKinds()
+            // Reuse the per-provider notch toggle's state-changed
+            // notification so AppDelegate's `applyNotchProviderPreferences`
+            // re-runs: a freshly hot-loaded provider plugin needs its
+            // hook installed (subject to the user's NotchPreferences
+            // master switch) without waiting for a Settings toggle.
+            // The notification name is general enough — "things that
+            // affect notch state changed" — and avoids a parallel
+            // observer purely for plugin lifecycle.
+            NotificationCenter.default.post(
+                name: NotchPreferences.stateChangedNotification,
+                object: nil
+            )
             DiagnosticLogger.shared.info(
                 "Plugin hot-loaded: \(manifest.id) v\(manifest.version)"
             )
@@ -471,6 +483,15 @@ final class AppState: ObservableObject {
             self?.handleProviderPluginDisabled(pluginID: pluginID)
             self?.recomputeAvailableProviderKinds()
             self?.teardownProviderState(forDescriptorID: providerDescriptorID)
+            // Trigger AppDelegate's notch reconciliation so the
+            // disabled plugin's notch runtime (cards, sessions,
+            // dock badge) gets purged. Hooks in settings.json are
+            // intentionally left alone — disable is reversible, only
+            // PluginUninstaller drops them.
+            NotificationCenter.default.post(
+                name: NotchPreferences.stateChangedNotification,
+                object: nil
+            )
             DiagnosticLogger.shared.info("Plugin disabled: \(pluginID)")
         }
 
