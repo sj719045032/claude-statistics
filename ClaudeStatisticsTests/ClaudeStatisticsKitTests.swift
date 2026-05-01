@@ -1288,11 +1288,11 @@ final class PluginUninstallerTests: XCTestCase {
         try? FileManager.default.removeItem(at: sandbox)
     }
 
-    func testUninstallRejectsHostSource() throws {
+    func testUninstallRejectsHostSource() async throws {
         let registry = PluginRegistry()
         try registry.register(FakeTerminalPlugin(), source: .host)
         do {
-            try PluginUninstaller.uninstall(
+            _ = try await PluginUninstaller.uninstall(
                 manifest: manifest,
                 source: .host,
                 registry: registry
@@ -1303,11 +1303,11 @@ final class PluginUninstallerTests: XCTestCase {
         }
     }
 
-    func testUninstallRejectsBundledSource() throws {
+    func testUninstallRejectsBundledSource() async throws {
         let registry = PluginRegistry()
         try registry.register(FakeTerminalPlugin(), source: .bundled(url: bundleURL))
         do {
-            try PluginUninstaller.uninstall(
+            _ = try await PluginUninstaller.uninstall(
                 manifest: manifest,
                 source: .bundled(url: bundleURL),
                 registry: registry
@@ -1318,7 +1318,7 @@ final class PluginUninstallerTests: XCTestCase {
         }
     }
 
-    func testUninstallUserPluginRemovesFromRegistryDeletesFileAndClearsTrust() throws {
+    func testUninstallUserPluginRemovesFromRegistryDeletesFileAndClearsTrust() async throws {
         let registry = PluginRegistry()
         let plugin = FakeTerminalPlugin()
         try registry.register(plugin, source: .user(url: bundleURL))
@@ -1338,7 +1338,7 @@ final class PluginUninstallerTests: XCTestCase {
             disableCallbackFired = true
         }
 
-        let returned = try PluginUninstaller.uninstall(
+        let returned = try await PluginUninstaller.uninstall(
             manifest: manifest,
             source: .user(url: bundleURL),
             registry: registry
@@ -1356,14 +1356,14 @@ final class PluginUninstallerTests: XCTestCase {
         XCTAssertTrue(disableCallbackFired)
     }
 
-    func testUninstallSurfacesFileRemovalError() throws {
+    func testUninstallSurfacesFileRemovalError() async throws {
         // Hand the uninstaller a bundleURL that doesn't exist on disk.
         let registry = PluginRegistry()
         try registry.register(FakeTerminalPlugin(), source: .user(url: bundleURL))
         PluginTrustGate.setPluginRegistry(registry)
         let missingURL = sandbox.appendingPathComponent("missing.csplugin")
         do {
-            try PluginUninstaller.uninstall(
+            _ = try await PluginUninstaller.uninstall(
                 manifest: manifest,
                 source: .user(url: missingURL),
                 registry: registry

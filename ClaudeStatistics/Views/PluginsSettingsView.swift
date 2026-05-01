@@ -207,10 +207,14 @@ struct PluginsSettingsView: View {
         ) { row in
             Button("settings.cancel", role: .cancel) { pendingUninstall = nil }
             Button("settings.plugins.uninstall.confirmButton", role: .destructive) {
-                if let source = row.source {
+                let manifest = row.manifest
+                let source = row.source
+                pendingUninstall = nil
+                guard let source else { return }
+                Task { @MainActor in
                     do {
-                        try PluginUninstaller.uninstall(
-                            manifest: row.manifest,
+                        _ = try await PluginUninstaller.uninstall(
+                            manifest: manifest,
                             source: source,
                             registry: pluginRegistry
                         )
@@ -219,7 +223,6 @@ struct PluginsSettingsView: View {
                         uninstallError = String(describing: error)
                     }
                 }
-                pendingUninstall = nil
             }
         } message: { row in
             Text(String(

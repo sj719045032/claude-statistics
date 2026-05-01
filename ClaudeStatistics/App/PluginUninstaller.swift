@@ -38,7 +38,7 @@ enum PluginUninstaller {
         source: PluginSource,
         registry: PluginRegistry,
         trustStore: TrustStore? = nil
-    ) throws -> URL {
+    ) async throws -> URL {
         let resolvedTrustStore = trustStore ?? PluginTrustGate.trustStore
         // 1. Sanity-gate: only `.user(...)` is allowed. host plugins
         //    come back next launch, bundled plugins ship with the
@@ -57,7 +57,7 @@ enum PluginUninstaller {
         //      permanent: leaving stale references to a removed plugin
         //      causes hooks to invoke missing binaries and status-line
         //      sources to keep loading on every shell init.
-        cleanupProviderSideEffects(manifest: manifest, registry: registry)
+        await cleanupProviderSideEffects(manifest: manifest, registry: registry)
 
         // 2. Disable: drop from registry, set the kill-switch flag,
         //    fire onPluginDisabled so host glue refreshes terminal
@@ -94,18 +94,17 @@ enum PluginUninstaller {
     /// disable — keeping the asymmetry deliberate so users who
     /// kill-switch a plugin temporarily don't lose their hook config.
     ///
-    /// Status-line restoration is synchronous (`StatusLineInstalling`
-    /// has no `uninstall`; `restore()` rolls back to the pre-install
-    /// backup, which is what we want when the plugin is going away).
-    /// Hook uninstall is async per `HookInstalling.uninstall`, so it
-    /// runs as a fire-and-forget Task — the settings.json mutation is
-    /// independent of bundle deletion + trust cleanup, so racing the
-    /// remaining uninstall steps is safe. Errors swallowed: best-
-    /// effort cleanup on a path the user has already chosen to take.
+    /// Both calls are awaited so `uninstall(...)` returns only after
+    /// every disk side-effect has settled. Without the await on the
+    /// hook uninstall, a user opening a Claude session in the few
+    /// hundred milliseconds after uninstalling would still see the
+    /// stale hook in `~/.claude/settings.json` invoke a now-missing
+    /// binary. Errors swallowed: best-effort cleanup on a path the
+    /// user has already chosen to take.
     private static func cleanupProviderSideEffects(
         manifest: PluginManifest,
         registry: PluginRegistry
-    ) {
+    ) async {
         guard let providerPlugin = registry.providerPlugin(id: manifest.id),
               let kind = ProviderKind(rawValue: providerPlugin.descriptor.id)
         else { return }
@@ -114,7 +113,7 @@ enum PluginUninstaller {
             try? installer.restore()
         }
         if let installer = provider.notchHookInstaller {
-            Task { _ = try? await installer.uninstall() }
+            _ = try? await installer.uninstall()
         }
     }
 }
