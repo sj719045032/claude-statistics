@@ -95,6 +95,7 @@ struct PluginCategoryFilterBar: View {
         case PluginCatalogCategory.chatApp: return "settings.plugins.category.chat-app"
         case PluginCatalogCategory.shareCard: return "settings.plugins.category.share-card"
         case PluginCatalogCategory.editorIntegration: return "settings.plugins.category.editor-integration"
+        case PluginCatalogCategory.subscription: return "settings.plugins.category.subscription"
         case PluginCatalogCategory.utility: return "settings.plugins.category.utility"
         default: return "settings.plugins.category.utility"
         }

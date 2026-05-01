@@ -18,7 +18,37 @@ public struct PluginCatalogEntry: Codable, Sendable, Equatable, Identifiable {
     /// Display name shown in the Discover row.
     public let name: String
     /// One-line description; longer content goes on the homepage.
+    /// Plain string used as the canonical fallback when no localized
+    /// variant matches the user's preferred language.
     public let description: String
+    /// Optional localized variants keyed by BCP-47 language code
+    /// (`"en"`, `"zh-Hans"`, `"ja"`, …). When the user's preferred
+    /// language matches one of these keys, `localizedDescription`
+    /// returns it; otherwise it falls back to `description`.
+    /// Backward-compatible — existing catalogs without this field
+    /// decode fine and behave exactly as before.
+    public let descriptionLocalized: [String: String]?
+
+    /// Best-fit description for the current locale: the first match
+    /// among the user's preferred languages found in
+    /// `descriptionLocalized`, otherwise `description`. Use this in
+    /// UI rather than reading `description` directly.
+    public var localizedDescription: String {
+        guard let localized = descriptionLocalized, !localized.isEmpty else {
+            return description
+        }
+        for code in Locale.preferredLanguages {
+            if let exact = localized[code] { return exact }
+            // Try the language-only prefix (`zh-Hans-CN` → `zh-Hans` → `zh`).
+            var trimmed = code
+            while let dash = trimmed.lastIndex(of: "-") {
+                trimmed = String(trimmed[..<dash])
+                if let match = localized[trimmed] { return match }
+            }
+        }
+        if let en = localized["en"] { return en }
+        return description
+    }
     public let author: String
     /// Optional project / docs URL. The detail row links here.
     public let homepage: URL?

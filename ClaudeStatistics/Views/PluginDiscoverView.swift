@@ -212,7 +212,7 @@ struct PluginDiscoverView: View {
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
-            Text(entry.description)
+            Text(entry.localizedDescription)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             HStack(spacing: 6) {
@@ -424,6 +424,7 @@ struct PluginDiscoverView: View {
         case PluginCatalogCategory.chatApp: return "settings.plugins.category.chat-app"
         case PluginCatalogCategory.shareCard: return "settings.plugins.category.share-card"
         case PluginCatalogCategory.editorIntegration: return "settings.plugins.category.editor-integration"
+        case PluginCatalogCategory.subscription: return "settings.plugins.category.subscription"
         case PluginCatalogCategory.utility: return "settings.plugins.category.utility"
         default: return "settings.plugins.category.utility"
         }
@@ -436,6 +437,7 @@ struct PluginDiscoverView: View {
         case PluginCatalogCategory.chatApp: return "bubble.left.and.bubble.right"
         case PluginCatalogCategory.shareCard: return "person.crop.square"
         case PluginCatalogCategory.editorIntegration: return "text.cursor"
+        case PluginCatalogCategory.subscription: return "creditcard"
         default: return "wrench.and.screwdriver"
         }
     }

@@ -68,6 +68,13 @@ public enum PluginCatalogCategory {
     public static let shareCard = "share-card"
     /// Editor integration (VSCode / Cursor / Zed deep-link).
     public static let editorIntegration = "editor-integration"
+    /// Subscription extension — third-party endpoint adapters
+    /// (GLM Coding Plan, OpenRouter, Kimi, …) implementing
+    /// `SubscriptionExtensionPlugin`. Distinct from `provider` because
+    /// these plugins don't ship a CLI; they piggy-back on an existing
+    /// provider's CLI by routing through a custom base URL and adding
+    /// quota / token-management UI.
+    public static let subscription = "subscription"
     /// Catch-all for tools that don't fit the buckets above.
     public static let utility = "utility"
 
@@ -75,7 +82,7 @@ public enum PluginCatalogCategory {
     /// catalogs may publish additional values; the UI handles unknown
     /// strings by falling back to `utility`.
     public static let known: [String] = [
-        provider, terminal, chatApp, shareCard, editorIntegration, utility
+        provider, terminal, chatApp, shareCard, editorIntegration, subscription, utility
     ]
 }
 
