@@ -8,6 +8,9 @@ struct SettingsView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var usageViewModel: UsageViewModel
     @ObservedObject var profileViewModel: ProfileViewModel
+    @ObservedObject private var identityStore = IdentityStore.shared
+    @ObservedObject private var subscriptionRouter = SubscriptionAdapterRouter.shared
+    @State private var isIdentityPickerPresented = false
     @Binding var tabOrder: [AppTab]
     @ObservedObject var updaterService: UpdaterService
     let provider: any SessionProvider
@@ -294,10 +297,11 @@ struct SettingsView: View {
                 if let info = profileViewModel.subscriptionInfo {
                     SubscriptionAccountCard(info: info)
                     Spacer()
-                    // Switch Account hidden in subscription mode —
-                    // the OAuth identity picker doesn't apply to a
-                    // token-based GLM/third-party plan. Phase C
-                    // adds a per-adapter account picker here.
+                    // Identity picker now works in both modes —
+                    // subscription users want to switch back to OAuth
+                    // or pick a different GLM token, OAuth users want
+                    // to discover GLM identities to switch into.
+                    providerAccountCardAccessory
                 } else if let profile = profileViewModel.userProfile {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
@@ -360,7 +364,34 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var providerAccountCardAccessory: some View {
-        if let uiProvider = provider as? any ProviderAccountUIProviding {
+        // When the active provider has subscription extension plugins
+        // registered (GLM Coding Plan, future OpenRouter / Kimi),
+        // route the Switch Account button to the unified identity
+        // picker — same UI Usage tab uses — so OAuth + token
+        // identities live side by side. Falls back to the legacy
+        // OAuth-only switcher for providers without any subscription
+        // contributors (Codex / Gemini today).
+        if !subscriptionRouter.allAccountManagers()
+            .filter({ $0.providerID == provider.providerId })
+            .isEmpty {
+            Button {
+                isIdentityPickerPresented = true
+            } label: {
+                Text("settings.identitySwitcher.button")
+                    .font(.system(size: 12))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .popover(isPresented: $isIdentityPickerPresented, arrowEdge: .bottom) {
+                IdentityPickerView(
+                    profileViewModel: profileViewModel,
+                    identityStore: identityStore,
+                    router: subscriptionRouter,
+                    isPresented: $isIdentityPickerPresented
+                )
+                .padding(.vertical, 6)
+            }
+        } else if let uiProvider = provider as? any ProviderAccountUIProviding {
             uiProvider.makeAccountCardAccessory(
                 context: ProviderSettingsContext(
                     appState: appState,

@@ -299,6 +299,7 @@
 "settings.plugins.category.share-card" = "Share Card";
 "settings.plugins.category.editor-integration" = "Editor";
 "settings.plugins.category.subscription" = "Subscription";
+"settings.identitySwitcher.button" = "Switch Account";
 "settings.plugins.category.utility" = "Utility";
 "settings.developer.rebuildIndexes" = "Rebuild Data";
 "settings.developer.rebuildProviderIndex" = "Rebuild %@ Index";
