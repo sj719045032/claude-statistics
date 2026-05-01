@@ -116,16 +116,35 @@ final class PluginManifestTests: XCTestCase {
             version: SemVer(major: 1, minor: 0, patch: 0),
             minHostAPIVersion: SemVer(major: 0, minor: 1, patch: 0),
             principalClass: "CatPlugin",
-            category: PluginCatalogCategory.chatApp
+            category: PluginCatalogCategory.terminal
         )
         let dict = try withCategory.encodedAsPlistDictionary()
-        XCTAssertEqual(dict["category"] as? String, "chat-app")
+        XCTAssertEqual(dict["category"] as? String, "terminal")
         let data = try PropertyListSerialization.data(
             fromPropertyList: dict, format: .binary, options: 0
         )
         let decoded = try PluginManifest(plistData: data)
         XCTAssertEqual(decoded, withCategory)
-        XCTAssertEqual(decoded.category, "chat-app")
+        XCTAssertEqual(decoded.category, "terminal")
+    }
+
+    func testCategoryCanonicalizesLegacyBuckets() {
+        XCTAssertEqual(
+            PluginCatalogCategory.canonicalize("vendor"),
+            PluginCatalogCategory.provider
+        )
+        XCTAssertEqual(
+            PluginCatalogCategory.canonicalize("chat-app"),
+            PluginCatalogCategory.terminal
+        )
+        XCTAssertEqual(
+            PluginCatalogCategory.canonicalize("editor-integration"),
+            PluginCatalogCategory.terminal
+        )
+        XCTAssertEqual(
+            PluginCatalogCategory.canonicalize("surprise"),
+            PluginCatalogCategory.utility
+        )
     }
 
     func testCategoryDecodesMissingKeyAsNil() throws {
@@ -149,10 +168,10 @@ final class PluginManifestTests: XCTestCase {
         XCTAssertNil(decoded.category)
     }
 
-    func testKnownCategoriesContainAllSixDocumentedValues() {
+    func testKnownCategoriesContainDocumentedValues() {
         XCTAssertEqual(
             Set(PluginCatalogCategory.known),
-            ["provider", "terminal", "chat-app", "share-card", "editor-integration", "utility"]
+            ["provider", "terminal", "share-card", "subscription", "utility"]
         )
     }
 }
@@ -210,6 +229,7 @@ final class PluginCatalogEntryTests: XCTestCase {
             id: "com.example.foo",
             name: "Foo",
             description: "x",
+            descriptionLocalized: nil,
             author: "y",
             homepage: nil,
             category: "utility",
@@ -462,6 +482,7 @@ final class PluginInstallerStageTests: XCTestCase {
             id: id,
             name: "Foo",
             description: "x",
+            descriptionLocalized: nil,
             author: "y",
             homepage: nil,
             category: "utility",
@@ -639,7 +660,7 @@ final class PluginInstallerIntegrationTests: XCTestCase {
 
     private func makeEntry(id: String, sha256: String) -> PluginCatalogEntry {
         PluginCatalogEntry(
-            id: id, name: "Integration", description: "x", author: "y",
+            id: id, name: "Integration", description: "x", descriptionLocalized: nil, author: "y",
             homepage: nil, category: "utility",
             version: SemVer(major: 1, minor: 0, patch: 0),
             minHostAPIVersion: SemVer(major: 0, minor: 1, patch: 0),
@@ -816,7 +837,7 @@ final class PluginRegistryTests: XCTestCase {
     }
 
     func testHostAPIVersionExposed() {
-        XCTAssertEqual(SDKInfo.apiVersion, SemVer(major: 0, minor: 1, patch: 0))
+        XCTAssertEqual(SDKInfo.apiVersion, SemVer(major: 0, minor: 2, patch: 0))
     }
 
     private final class FakeProviderPluginImpl: NSObject, ProviderPlugin {
