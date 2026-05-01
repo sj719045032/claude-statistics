@@ -307,6 +307,14 @@ final class AppState: ObservableObject {
     /// provider — `handleProviderPluginDisabled` already promoted a
     /// fallback in that case, and tearing down the active store would
     /// leave UI bound to a dead reference.
+    ///
+    /// Also drops the disabled provider's `AccountManagers` reloader so
+    /// `accounts.reload(for: kind)` from a future account-change path
+    /// can't fire a closure capturing now-dead plugin state. Builtin
+    /// Claude's reloader is seeded in `AccountManagers.init` and the
+    /// Claude plugin can't be disabled (chassis built-in, refused by
+    /// `PluginTrustGate.disable`), so this is effectively a no-op for
+    /// builtins and meaningful only for plugin-registered reloaders.
     private func teardownProviderState(forDescriptorID descriptorID: String?) {
         guard let descriptorID,
               let kind = ProviderKind(rawValue: descriptorID),
@@ -314,6 +322,7 @@ final class AppState: ObservableObject {
         else { return }
         providerContexts.remove(for: kind)
         usageVMs.remove(secondaryFor: kind)
+        accounts.unregisterReloader(for: descriptorID)
     }
 
     /// Wires the focus coordinator to consult `pluginRegistry` before
