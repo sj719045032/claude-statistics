@@ -49,6 +49,22 @@ struct PluginsSettingsView: View {
             .map { Row(manifest: $0, source: pluginRegistry.source(for: $0.id)) }
     }
 
+    /// Cached marketplace entries keyed by plugin id. Read from disk
+    /// whenever the body recomputes; the Discover panel writes this
+    /// cache on every successful fetch, so installed-side renders
+    /// stay in sync with the marketplace's display name / version /
+    /// description without us re-fetching here. nil entry means
+    /// "this plugin isn't in the catalog right now" and the row
+    /// falls back to plugin-bundle metadata.
+    private var catalogEntriesByID: [String: PluginCatalogEntry] {
+        _ = refreshTick
+        guard let data = try? Data(contentsOf: PluginCatalog.defaultCacheURL),
+              let index = try? PluginCatalog.decode(data) else {
+            return [:]
+        }
+        return Dictionary(uniqueKeysWithValues: index.entries.map { ($0.id, $0) })
+    }
+
     /// Categories present in the loaded list, in canonical order, with
     /// row counts. Feeds the chip-style filter bar.
     private var installedCategoryCounts: [(id: String, count: Int)] {
@@ -323,7 +339,7 @@ struct PluginsSettingsView: View {
                 Image(systemName: kindGlyph(manifest.kind))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                Text(manifest.displayName)
+                Text(catalogEntriesByID[manifest.id]?.name ?? manifest.displayName)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(isDisabled ? .secondary : .primary)
                 Text(sourceLabel(source))

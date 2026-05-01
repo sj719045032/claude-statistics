@@ -102,7 +102,7 @@ public actor PluginCatalog {
         return Outcome(index: index, kind: .offlineFallback)
     }
 
-    static func decode(_ data: Data) throws -> PluginCatalogIndex {
+    public static func decode(_ data: Data) throws -> PluginCatalogIndex {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let index: PluginCatalogIndex
