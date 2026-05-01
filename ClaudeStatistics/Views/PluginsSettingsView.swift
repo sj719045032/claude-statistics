@@ -70,7 +70,9 @@ struct PluginsSettingsView: View {
     private var installedCategoryCounts: [(id: String, count: Int)] {
         var byCategory: [String: Int] = [:]
         for row in rows {
-            let raw = row.manifest.category ?? PluginCatalogCategory.fallback(forKind: row.manifest.kind)
+            let raw = catalogEntriesByID[row.manifest.id]?.category
+                ?? row.manifest.category
+                ?? PluginCatalogCategory.fallback(forKind: row.manifest.kind)
             let key = PluginCatalogCategory.canonicalize(raw)
             byCategory[key, default: 0] += 1
         }
@@ -85,7 +87,9 @@ struct PluginsSettingsView: View {
     private var filteredRows: [Row] {
         guard let selectedInstalledCategory else { return rows }
         return rows.filter { row in
-            let raw = row.manifest.category ?? PluginCatalogCategory.fallback(forKind: row.manifest.kind)
+            let raw = catalogEntriesByID[row.manifest.id]?.category
+                ?? row.manifest.category
+                ?? PluginCatalogCategory.fallback(forKind: row.manifest.kind)
             let key = PluginCatalogCategory.canonicalize(raw)
             return key == selectedInstalledCategory
         }
