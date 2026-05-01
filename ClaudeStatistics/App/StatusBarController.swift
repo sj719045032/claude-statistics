@@ -254,9 +254,13 @@ struct MenuBarUsageStrip: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            ForEach(visibleKinds, id: \.self) { kind in
-                if let vm = appState.usageViewModel(for: kind) {
-                    MenuBarUsageCell(kind: kind, viewModel: vm, tick: tick)
+            if renderableKinds.isEmpty {
+                MenuBarFallbackIcon()
+            } else {
+                ForEach(renderableKinds, id: \.self) { kind in
+                    if let vm = appState.usageViewModel(for: kind) {
+                        MenuBarUsageCell(kind: kind, viewModel: vm, tick: tick)
+                    }
                 }
             }
         }
@@ -290,6 +294,32 @@ struct MenuBarUsageStrip: View {
                 guard MenuBarPreferences.isVisible(descriptorID: descriptor.id) else { return nil }
                 return ProviderKind(rawValue: descriptor.id)
             }
+    }
+
+    /// Subset of `visibleKinds` for which a `UsageViewModel` actually
+    /// exists. If this is empty (user toggled every provider off, or no
+    /// usage-providing plugin is installed) the strip falls back to the
+    /// app icon so the menu bar entry stays clickable.
+    private var renderableKinds: [ProviderKind] {
+        visibleKinds.filter { appState.usageViewModel(for: $0) != nil }
+    }
+}
+
+/// Shown in the menu bar when no provider cell would render. Without
+/// this the `HStack` collapses to zero size and the status item becomes
+/// an invisible 28pt strip — technically clickable, but users can't see
+/// where to click. Uses the template-rendered `MenuBarIcon` asset so it
+/// adapts to light/dark menu bar appearance.
+private struct MenuBarFallbackIcon: View {
+    var body: some View {
+        Image("MenuBarIcon")
+            .resizable()
+            .renderingMode(.template)
+            .aspectRatio(contentMode: .fit)
+            .frame(width: 22, height: 22)
+            .foregroundStyle(.primary)
+            .frame(width: 32, alignment: .center)
+            .help(Text("Claude Statistics"))
     }
 }
 
@@ -335,7 +365,37 @@ private struct MenuBarUsageCell: View {
     }
 
     private var segments: [MenuBarStripSegment] {
-        ProviderRegistry.provider(for: kind).menuBarStripSegments(from: viewModel.usageData)
+        let providerSegments = ProviderRegistry.provider(for: kind)
+            .menuBarStripSegments(from: viewModel.usageData)
+        if !providerSegments.isEmpty { return providerSegments }
+        // Subscription fallback: when the user is on a third-party
+        // endpoint (e.g. GLM) the provider's usage source returns
+        // nothing, so we synthesize segments from the subscription
+        // adapter's quota windows. One segment per window, rotating
+        // through them with the same tick the provider segments use.
+        if let info = viewModel.subscriptionInfo, !info.quotas.isEmpty {
+            return info.quotas.map { quota in
+                MenuBarStripSegment(
+                    prefix: subscriptionPrefix(for: quota.id),
+                    value: "\(Int(quota.percentage))%",
+                    usedPercent: quota.percentage
+                )
+            }
+        }
+        return []
+    }
+
+    /// Short label that appears above the percentage in the menu-bar
+    /// strip cell. Mirrors the bucket-id-to-prefix conventions the
+    /// provider adapters use ("5h", "7d") so a GLM cell visually
+    /// matches an Anthropic cell at the same glance distance.
+    private func subscriptionPrefix(for id: String) -> String {
+        switch id {
+        case "5h":      return "5h"
+        case "weekly":  return "7d"
+        case "monthly": return "1M"
+        default:        return MenuBarStripFormat.initials(of: id)
+        }
     }
 
     private var currentSegment: MenuBarStripSegment? {

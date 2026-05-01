@@ -26,6 +26,14 @@ final class ClaudePluginDogfood: NSObject, ProviderPlugin {
     )
     var descriptor: ProviderDescriptor { .claude }
     func makeProvider() -> (any BundledSessionProvider)? { ClaudeProvider.shared }
+    /// Claude provider only contributes its own endpoint detector
+    /// (knowledge of `~/.claude/settings.json`'s shape). Subscription
+    /// adapters for third-party endpoints (GLM, OpenRouter, …) live
+    /// in their own `SubscriptionExtensionPlugin`s — see
+    /// `BuiltinGLMSubscriptionPlugin` for the in-tree GLM bundle.
+    func makeEndpointDetector() -> (any EndpointDetector)? {
+        ClaudeEndpointDetector()
+    }
     override init() { super.init() }
 }
 

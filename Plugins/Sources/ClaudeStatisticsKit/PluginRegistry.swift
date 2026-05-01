@@ -59,6 +59,11 @@ public final class PluginRegistry {
     public private(set) var terminals:   [String: any Plugin] = [:]
     public private(set) var shareRoles:  [String: any Plugin] = [:]
     public private(set) var shareThemes: [String: any Plugin] = [:]
+    /// Subscription-extension plugins (GLM, OpenRouter, …) keyed by
+    /// `manifest.id`. They piggy-back on an existing provider's CLI
+    /// and contribute `SubscriptionAdapter`s through the
+    /// `SubscriptionExtensionPlugin` protocol.
+    public private(set) var subscriptionExtensions: [String: any Plugin] = [:]
 
     /// Per-id record of how each plugin reached the registry. Source
     /// information is keyed by `manifest.id` — `.both` plugins land
@@ -96,6 +101,8 @@ public final class PluginRegistry {
         case .both:
             try insert(plugin, into: &providers, id: manifest.id, bucket: "provider")
             try insert(plugin, into: &terminals, id: manifest.id, bucket: "terminal")
+        case .subscriptionExtension:
+            try insert(plugin, into: &subscriptionExtensions, id: manifest.id, bucket: "subscriptionExtension")
         }
         sources[manifest.id] = source
     }
@@ -142,7 +149,8 @@ public final class PluginRegistry {
         let inTerminals = terminals.removeValue(forKey: id) != nil
         let inShareRoles = shareRoles.removeValue(forKey: id) != nil
         let inShareThemes = shareThemes.removeValue(forKey: id) != nil
-        let removed = inProviders || inTerminals || inShareRoles || inShareThemes
+        let inSubExt = subscriptionExtensions.removeValue(forKey: id) != nil
+        let removed = inProviders || inTerminals || inShareRoles || inShareThemes || inSubExt
         if removed {
             sources.removeValue(forKey: id)
         }
@@ -182,6 +190,7 @@ public final class PluginRegistry {
             + Array(terminals.values)
             + Array(shareRoles.values)
             + Array(shareThemes.values)
+            + Array(subscriptionExtensions.values)
         // Dedup by id (a `.both` plugin shows up twice across buckets).
         var seen: Set<String> = []
         return all.compactMap { plugin in

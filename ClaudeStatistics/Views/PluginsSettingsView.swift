@@ -453,6 +453,7 @@ struct PluginsSettingsView: View {
         case .shareRole: return "person.crop.square"
         case .shareCardTheme: return "paintpalette"
         case .both: return "rectangle.connected.to.line.below"
+        case .subscriptionExtension: return "creditcard"
         }
     }
 }

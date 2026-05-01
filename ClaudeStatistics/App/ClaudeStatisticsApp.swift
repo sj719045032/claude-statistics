@@ -357,6 +357,17 @@ final class AppState: ObservableObject {
     var usageViewModel: UsageViewModel { usageVMs.primary }
 
     private var cancellables: Set<AnyCancellable> = []
+    /// Subscription info flows from `ProfileViewModel` to the active
+    /// `UsageViewModel` so the menu-bar percentage tracks the GLM /
+    /// third-party quota when no Anthropic usage data is available.
+    /// Re-built on every `configureProfileLoader` so it always points
+    /// at the current provider's view model.
+    private var subscriptionInfoSync: AnyCancellable?
+    /// When `IdentityStore.activeIdentity` flips (user picked a
+    /// different OAuth account / subscription token), reload the
+    /// active provider's profile + usage so the displayed data
+    /// matches the new identity.
+    private var identityChangeSync: AnyCancellable?
 
     init() {
         DefaultSettings.register()
@@ -371,6 +382,19 @@ final class AppState: ObservableObject {
         // property closure), so plugin-disabled state is honoured by
         // every downstream filter on this path.
         StatusLineSync.refreshManagedIntegrations(plugins: pluginRegistry)
+        // Pull every active provider plugin's subscription adapters
+        // and endpoint detector into the router. Builtin Claude
+        // contributes GLM here; future third-party `.csplugin`s
+        // contribute additional adapters (OpenRouter, Kimi, …) the
+        // same way without host code changes.
+        SubscriptionAdapterRouter.shared.refresh(from: pluginRegistry)
+        // First-run migration: pre-Phase-C users who configured GLM
+        // through `~/.claude/settings.json` had no `IdentityStore`,
+        // so its default `.anthropicOAuth` would silently flip them
+        // away from GLM. If the synced-from-CLI GLM identity exists
+        // and IdentityStore hasn't been touched yet, activate it so
+        // the new release matches their previous experience.
+        Self.migrateIdentityFromCLISettingsIfNeeded()
 
         let selectedKind = ProviderRegistry.selectedProviderKind()
         providerKind = selectedKind
@@ -679,8 +703,116 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func configureProfileLoader(for provider: any AccountProvider) {
-        profileViewModel.configure(loader: { await provider.fetchProfile() })
+    private static let identityMigrationKey = "IdentityStore.didMigrate.v1"
+
+    /// First-run migration that nudged users with existing GLM CLI
+    /// config into the GLM subscription identity. Now that GLM moved
+    /// out of the host bundle into the catalog (`com.bigmodel.glm-subscription`),
+    /// the migration runs only when the user has installed the GLM
+    /// plugin from marketplace — `accountManager(adapterID: "glm")`
+    /// returns nil otherwise and the migration silently no-ops.
+    @MainActor
+    private static func migrateIdentityFromCLISettingsIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: identityMigrationKey) else { return }
+        defer { UserDefaults.standard.set(true, forKey: identityMigrationKey) }
+        guard IdentityStore.shared.activeIdentity == .anthropicOAuth else { return }
+        guard let glmManager = SubscriptionAdapterRouter.shared.accountManager(adapterID: "glm"),
+              let activeID = glmManager.activeAccountID else {
+            return
+        }
+        IdentityStore.shared.activate(.subscription(adapterID: "glm", accountID: activeID))
+        DiagnosticLogger.shared.info(
+            "IdentityStore: migrated to subscription(glm, \(activeID)) from existing CLI config"
+        )
+    }
+
+    private func configureProfileLoader(for provider: any SessionProvider) {
+        let providerId = provider.providerId
+
+        // Subscription loader fires only when the user has actually
+        // overridden the base URL AND a non-default adapter claims
+        // that host. Returning `nil` lets `ProfileViewModel` fall
+        // through to the legacy OAuth profile loader, so the
+        // Anthropic-on-official-endpoint case is byte-for-byte
+        // unchanged. The detector is owned by whichever provider
+        // plugin claimed `providerId` — `nil` means that plugin
+        // doesn't support custom endpoints (Codex / Gemini today).
+        let subscriptionLoader: () async -> SubscriptionInfo? = { @MainActor in
+            // When `IdentityStore` has explicitly selected a
+            // subscription account, route by adapter id — the user's
+            // custom base URL might be outside the adapter's declared
+            // `matchingHosts` (custom GLM proxy, future regional
+            // mirror, …) and we shouldn't second-guess them.
+            if case .subscription(let adapterID, _) = IdentityStore.shared.activeIdentity {
+                guard let manager = SubscriptionAdapterRouter.shared
+                    .accountManager(adapterID: adapterID),
+                    let endpoint = manager.activeEndpoint,
+                    let baseURL = endpoint.baseURL,
+                    let adapter = SubscriptionAdapterRouter.shared
+                        .adapter(forAdapterID: adapterID) else {
+                    DiagnosticLogger.shared.info("subscriptionLoader[\(providerId)]: identity-based lookup found no live adapter for id=\(adapterID)")
+                    return nil
+                }
+                do {
+                    return try await adapter.fetchSubscription(
+                        context: SubscriptionContext(
+                            providerID: providerId,
+                            baseURL: baseURL,
+                            apiKey: endpoint.apiKey
+                        )
+                    )
+                } catch {
+                    DiagnosticLogger.shared.warning("subscriptionLoader[\(providerId)]: \(error.localizedDescription)")
+                    return nil
+                }
+            }
+            // No subscription identity selected — fall through to
+            // the legacy host-matching path so an unset IdentityStore
+            // (fresh install, OAuth-only user) still discovers GLM
+            // via `~/.claude/settings.json`-derived endpoints.
+            guard let detector = SubscriptionAdapterRouter.shared
+                .detector(forProviderID: providerId) else { return nil }
+            let endpoint = detector.detect()
+            guard let baseURL = endpoint.baseURL,
+                  let adapter = SubscriptionAdapterRouter.shared
+                    .adapter(forProviderID: providerId, baseURL: baseURL),
+                  !adapter.matchingHosts.contains("default") else {
+                return nil
+            }
+            return try? await adapter.fetchSubscription(
+                context: SubscriptionContext(
+                    providerID: providerId,
+                    baseURL: baseURL,
+                    apiKey: endpoint.apiKey
+                )
+            )
+        }
+
+        profileViewModel.configure(
+            profileLoader: { await provider.fetchProfile() },
+            subscriptionLoader: subscriptionLoader
+        )
+
+        subscriptionInfoSync?.cancel()
+        subscriptionInfoSync = profileViewModel.$subscriptionInfo
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] info in
+                self?.usageViewModel.subscriptionInfo = info
+            }
+
+        identityChangeSync?.cancel()
+        identityChangeSync = IdentityStore.shared.$activeIdentity
+            .removeDuplicates()
+            .dropFirst()  // first emission is the persisted value at startup
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                Task { @MainActor in
+                    await self.profileViewModel.forceRefresh()
+                    await self.usageViewModel.forceRefresh()
+                }
+            }
     }
 
 }

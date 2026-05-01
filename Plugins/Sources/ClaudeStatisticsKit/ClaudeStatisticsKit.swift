@@ -11,5 +11,5 @@ public enum SDKInfo {
     /// Semantic version of the SDK API surface. Plugins declare a
     /// `minHostAPIVersion` in their manifest; the host loader rejects
     /// plugins whose required version exceeds this value.
-    public static let apiVersion = SemVer(major: 0, minor: 1, patch: 0)
+    public static let apiVersion = SemVer(major: 0, minor: 2, patch: 0)
 }

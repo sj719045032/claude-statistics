@@ -705,3 +705,40 @@
 "settings.menuBarDisplay" = "菜单栏显示";
 "settings.menuBarDisplay.all" = "全部";
 "settings.menuBarDisplay.none" = "无";
+
+/* Account source — subscription scope note */
+"claude.accountSource.help.subscriptionNote" = "此设置只影响 Anthropic OAuth 凭证的来源。GLM Coding Plan / 其他第三方订阅有自己的账号管理,在身份选择器内切换。";
+
+/* GLM 订阅插件 */
+"glm.plan.name" = "GLM Coding Plan";
+"glm.identity.syncedFromCLI" = "GLM(来自 CLI)";
+"glm.identity.syncedDetail" = "从 ~/.claude/settings.json 同步";
+"glm.identity.appManagedDetail" = "应用管理 · %@";
+
+"glm.add.title" = "添加 GLM Token";
+"glm.add.label" = "标签";
+"glm.add.label.placeholder" = "例如:个人";
+"glm.add.token" = "API token";
+"glm.add.token.placeholder" = "粘贴 GLM 控制台的 token";
+"glm.add.dashboardLink" = "打开 GLM 控制台 ↗";
+"glm.add.baseURL" = "Base URL";
+"glm.add.baseURL.preset.bigmodel" = "智谱清言 — open.bigmodel.cn";
+"glm.add.baseURL.preset.zai" = "Z.ai 国际版 — api.z.ai";
+"glm.add.baseURL.preset.custom" = "自定义 URL…";
+"glm.add.baseURL.custom.placeholder" = "https://your-proxy.example.com/api/anthropic";
+"glm.add.baseURL.custom.hint" = "任意支持 GLM 配额接口的 URL。配额查询会请求该 host 的 `/api/monitor/usage/quota/limit`。";
+"glm.add.cancel" = "取消";
+"glm.add.save" = "保存";
+
+"glm.section.syncToCLI" = "切换时同步到 CLI";
+"glm.section.syncToCLI.subtitle" = "关闭 = 仅应用内(cc 保留当前 token)";
+
+"glm.error.emptyToken" = "Token 不能为空";
+"glm.error.invalidBaseURL" = "Base URL 必须是合法的 http(s) URL";
+"glm.error.cannotRemoveSynced" = "同步自 CLI 的身份是只读的 — 修改 ~/.claude/settings.json 来更改";
+"glm.error.keychain" = "Keychain 错误 %d";
+"glm.error.missingBaseURL" = "GLM 适配器:未设置 ANTHROPIC_BASE_URL";
+"glm.error.missingAPIKey" = "GLM 适配器:未设置 ANTHROPIC_AUTH_TOKEN / ANTHROPIC_API_KEY";
+"glm.error.invalidBaseURL.adapter" = "GLM 适配器:ANTHROPIC_BASE_URL 格式错误";
+"glm.error.transport" = "GLM 适配器:网络错误";
+"glm.error.httpStatus" = "GLM 适配器:HTTP %d";

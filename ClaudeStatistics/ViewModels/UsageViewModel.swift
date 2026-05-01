@@ -101,6 +101,12 @@ private final class UsageCacheWatcher {
 @MainActor
 final class UsageViewModel: ObservableObject {
     @Published var usageData: UsageData?
+    /// Mirrors `ProfileViewModel.subscriptionInfo` for the same
+    /// provider — populated only when a `SubscriptionAdapter`
+    /// (e.g. GLM) is in use. When non-nil, the menu-bar percentage
+    /// and color tracks the highest-utilization quota window
+    /// instead of the (unavailable) Anthropic 5h/7d data.
+    @Published var subscriptionInfo: SubscriptionInfo?
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var lastFetchedAt: Date?
@@ -340,7 +346,21 @@ final class UsageViewModel: ObservableObject {
         return buckets.first { $0.remainingPercentage > 0 } ?? buckets.first
     }
 
+    /// Highest-utilization quota across all subscription windows.
+    /// Used by the menu bar when `subscriptionInfo` is non-nil so a
+    /// GLM user sees their most-strained window (5h tokens vs.
+    /// monthly calls) at a glance, matching how the existing
+    /// `preferredWindow` metric picks between 5h / 7d for Anthropic.
+    private var primarySubscriptionQuota: SubscriptionQuotaWindow? {
+        subscriptionInfo?.quotas.max(by: { $0.percentage < $1.percentage })
+    }
+
     var statusColor: Color {
+        if let quota = primarySubscriptionQuota {
+            if quota.percentage >= 80 { return .red }
+            if quota.percentage >= 50 { return .orange }
+            return .green
+        }
         switch usagePresentation.menuBarMetric {
         case .preferredWindow:
             let preferredUtilization: Double
@@ -361,6 +381,9 @@ final class UsageViewModel: ObservableObject {
     }
 
     var menuBarText: String {
+        if let quota = primarySubscriptionQuota {
+            return "\(Int(quota.percentage))%"
+        }
         switch usagePresentation.menuBarMetric {
         case .preferredWindow:
             switch usagePresentation.preferredWindow {

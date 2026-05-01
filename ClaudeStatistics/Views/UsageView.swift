@@ -28,8 +28,11 @@ struct UsageView: View {
     @ObservedObject var viewModel: UsageViewModel
     @ObservedObject var profileViewModel: ProfileViewModel
     @ObservedObject var store: SessionDataStore
+    @ObservedObject private var identityStore = IdentityStore.shared
+    @ObservedObject private var subscriptionRouter = SubscriptionAdapterRouter.shared
     @State private var selectedWindowTab: UsageWindowTab = .fiveHour
     @State private var selectedTrendWindowID: String = ""
+    @State private var isIdentityPickerPresented = false
 
     private var usagePresentation: ProviderUsagePresentation {
         store.provider.usagePresentation
@@ -39,7 +42,15 @@ struct UsageView: View {
         VStack(alignment: .leading, spacing: 12) {
             header
 
-            if let usage = viewModel.usageData {
+            if let info = viewModel.subscriptionInfo {
+                // Third-party endpoint (GLM, OpenRouter, …): the
+                // vendor's OAuth-only `usageData` shape isn't
+                // applicable, so render the adapter-supplied quotas
+                // instead. Local trend chart still appears below
+                // because JSONL token accounting is endpoint-agnostic.
+                SubscriptionQuotasView(info: info)
+                localTrendContent(usage: nil)
+            } else if let usage = viewModel.usageData {
                 if let error = viewModel.errorMessage {
                     errorBanner(error)
                 }
@@ -159,15 +170,41 @@ extension UsageView {
             ProgressView()
                 .scaleEffect(0.6)
                 .frame(width: 24, height: 24)
-        } else if let uiProvider = store.provider as? any ProviderAccountUIProviding {
-            uiProvider.makeAccountCardAccessory(
-                context: ProviderSettingsContext(
-                    appState: appState,
+        } else if subscriptionRouter.allAccountManagers().isEmpty {
+            // No subscription adapters registered for this provider —
+            // fall back to the legacy OAuth-only account accessory
+            // (Codex / Gemini paths today).
+            if let uiProvider = store.provider as? any ProviderAccountUIProviding {
+                uiProvider.makeAccountCardAccessory(
+                    context: ProviderSettingsContext(
+                        appState: appState,
+                        profileViewModel: profileViewModel,
+                        providerKind: store.provider.kind
+                    ),
+                    triggerStyle: accountSwitcherTriggerStyle
+                )
+            }
+        } else {
+            // Provider has subscription adapters (GLM / future
+            // OpenRouter / …) — show the unified identity picker so
+            // OAuth and token-based identities live side by side.
+            Button {
+                isIdentityPickerPresented = true
+            } label: {
+                Image(systemName: "person.crop.circle")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $isIdentityPickerPresented, arrowEdge: .bottom) {
+                IdentityPickerView(
                     profileViewModel: profileViewModel,
-                    providerKind: store.provider.kind
-                ),
-                triggerStyle: accountSwitcherTriggerStyle
-            )
+                    identityStore: identityStore,
+                    router: subscriptionRouter,
+                    isPresented: $isIdentityPickerPresented
+                )
+                .padding(.vertical, 6)
+            }
         }
     }
 

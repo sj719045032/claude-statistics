@@ -15,6 +15,13 @@ public enum PluginKind: String, Codable, Sendable {
     case shareCardTheme
     /// Combined Provider + Terminal (rare; e.g. an editor that ships both).
     case both
+    /// Adds a third-party subscription endpoint (GLM Coding Plan,
+    /// OpenRouter, Kimi, …) that piggy-backs on an existing
+    /// provider's CLI. The plugin contributes a `SubscriptionAdapter`
+    /// + optionally a `SubscriptionAccountManager`; it does NOT bring
+    /// its own `ProviderDescriptor` (the user is still using the
+    /// host provider's CLI, just pointed at a different base URL).
+    case subscriptionExtension
 }
 
 /// Coarse permission a plugin declares up front. The host shows these to

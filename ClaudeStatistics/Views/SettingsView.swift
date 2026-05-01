@@ -257,7 +257,7 @@ struct SettingsView: View {
 
     private var accountCard: some View {
         Group {
-            if profileViewModel.profileLoading || (profileViewModel.userProfile == nil && hasToken == nil) {
+            if profileViewModel.profileLoading || (profileViewModel.userProfile == nil && profileViewModel.subscriptionInfo == nil && hasToken == nil) {
                 // Loading state — no avatar, just a centered spinner
                 HStack {
                     Spacer()
@@ -291,7 +291,14 @@ struct SettingsView: View {
                         .foregroundStyle(.blue)
                 }
 
-                if let profile = profileViewModel.userProfile {
+                if let info = profileViewModel.subscriptionInfo {
+                    SubscriptionAccountCard(info: info)
+                    Spacer()
+                    // Switch Account hidden in subscription mode —
+                    // the OAuth identity picker doesn't apply to a
+                    // token-based GLM/third-party plan. Phase C
+                    // adds a per-adapter account picker here.
+                } else if let profile = profileViewModel.userProfile {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
                             Text(profile.account?.displayName ?? "–")
