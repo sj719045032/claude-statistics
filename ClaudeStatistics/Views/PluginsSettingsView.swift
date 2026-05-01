@@ -352,6 +352,15 @@ struct PluginsSettingsView: View {
                     .controlSize(.mini)
                     .tint(.green)
                     .disabled(needsRestart)
+                    if isUninstallable(source) {
+                        Button(action: { pendingUninstall = row }) {
+                            Text("settings.plugins.uninstall")
+                                .font(.system(size: 10))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                        .tint(.red)
+                    }
                 } else {
                     let canDisable = canDisable(row)
                     Button(action: { pendingDisable = row }) {

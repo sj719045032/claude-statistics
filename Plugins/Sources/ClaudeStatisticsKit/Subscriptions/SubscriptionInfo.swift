@@ -12,9 +12,11 @@ public struct SubscriptionInfo: Sendable, Codable, Equatable {
     public let nextResetAt: Date?
     /// Adapter-supplied secondary line shown under the plan name in
     /// Settings. Used when the adapter reached the API but the user
-    /// has no active subscription (e.g. GLM returns
-    /// "当前用户不存在 coding plan") — the UI then shows the plan
-    /// name + this note + dashboard link instead of an empty card.
+    /// has no active subscription (e.g. an upstream "no active
+    /// coding plan" response) — the UI then shows the plan name +
+    /// this note + dashboard link instead of an empty card.
+    /// Adapters should localize this string themselves before
+    /// returning it; the host renders it verbatim.
     public let note: String?
 
     public init(planName: String, quotas: [SubscriptionQuotaWindow], dashboardURL: URL?, nextResetAt: Date?, note: String? = nil) {
