@@ -391,8 +391,10 @@ struct SettingsView: View {
                 )
                 .padding(.vertical, 6)
             }
-        } else if let uiProvider = provider as? any ProviderAccountUIProviding {
-            uiProvider.makeAccountCardAccessory(
+        } else {
+            ProviderAccountUIResolver.makeAccountCardAccessory(
+                provider: provider,
+                pluginRegistry: appState.pluginRegistry,
                 context: ProviderSettingsContext(
                     appState: appState,
                     profileViewModel: profileViewModel,

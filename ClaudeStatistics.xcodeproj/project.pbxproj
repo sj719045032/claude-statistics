@@ -198,6 +198,7 @@
 		8D240F8C55163EE6DD3DAC08 /* SearchUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EBE034854D1539811ED0D5F /* SearchUtils.swift */; };
 		8E4A0F1CC4494773DA52E9CF /* LivenessChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1495CB41B3081140E52E690 /* LivenessChecker.swift */; };
 		8F439312E3BFA84853019A27 /* ProviderBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 736108D4DB88CF8CCD52C603 /* ProviderBadge.swift */; };
+		919DCD18CA287C0FAAB95D1B /* ProviderAccountUIResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0BFB1D124794DCB5E6CC0BE /* ProviderAccountUIResolver.swift */; };
 		91D2E279FAD94E26C6F0B099 /* PluginCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29815F55EA9A454B0D335B53 /* PluginCatalog.swift */; };
 		9316665886245686434A4BF4 /* IndependentClaudeAccountManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0CA06E1C8046BE97A74F7C3 /* IndependentClaudeAccountManager.swift */; };
 		93297DA896BDA0FD88E5F706 /* SessionDataProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9475E31557D267CDA75C200B /* SessionDataProvider.swift */; };
@@ -243,6 +244,7 @@
 		B98C3A36B759BBAD6E398BCA /* DaySlice+Pricing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CE65D192C24051486ABF875 /* DaySlice+Pricing.swift */; };
 		B9A5C66558E16202BDCFE5C5 /* UsageProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14840617E1654CC07B39EFB8 /* UsageProvider.swift */; };
 		BA575C0E4FE7D4951C34C21D /* TerminalFocusTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 126F623A129A8B92DD5E3181 /* TerminalFocusTarget.swift */; };
+		BAFC53B3813AFCC2ED19329A /* PluginRegistryBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E294D4FCCB923E3E4874C5B /* PluginRegistryBootstrap.swift */; };
 		BB6858F502827249DFC7E71E /* AccountProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561139B5156918EA6069C129 /* AccountProvider.swift */; };
 		BB9902B8A5E35FB7C78F63F0 /* SharePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52FF7E2030D328036A1F8F6D /* SharePreviewView.swift */; };
 		BBA47A77F246EFB16B12C0F3 /* SubscriptionInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23BBA9F6A3D46D23F288B25B /* SubscriptionInfo.swift */; };
@@ -445,6 +447,7 @@
 		29815F55EA9A454B0D335B53 /* PluginCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginCatalog.swift; sourceTree = "<group>"; };
 		2B9773A98AC4CF98E562C4BD /* TerminalReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalReadiness.swift; sourceTree = "<group>"; };
 		2E023CB9F472AC7C93777B50 /* ActiveSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveSession.swift; sourceTree = "<group>"; };
+		2E294D4FCCB923E3E4874C5B /* PluginRegistryBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginRegistryBootstrap.swift; sourceTree = "<group>"; };
 		2E8E4DC8B420779A317D82BC /* SessionEventFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionEventFilter.swift; sourceTree = "<group>"; };
 		2EDF09CC0594DB9C35748FF4 /* AggregateStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AggregateStats.swift; sourceTree = "<group>"; };
 		30A2C90E33CD4B1328D25897 /* TranscriptParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptParserTests.swift; sourceTree = "<group>"; };
@@ -606,6 +609,7 @@
 		AD9EAD578F58BF668BBBFC13 /* TerminalReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalReadiness.swift; sourceTree = "<group>"; };
 		AED35908F8D6A2C41A2A6E59 /* MenuBarBanners.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarBanners.swift; sourceTree = "<group>"; };
 		B0439EE1DDEC92CC5D5D1A59 /* TerminalProcessRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalProcessRunner.swift; sourceTree = "<group>"; };
+		B0BFB1D124794DCB5E6CC0BE /* ProviderAccountUIResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderAccountUIResolver.swift; sourceTree = "<group>"; };
 		B109C795299FC3EF95E7AAD2 /* DisabledPluginsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisabledPluginsStore.swift; sourceTree = "<group>"; };
 		B2F24500B4C9F3F375B97402 /* TerminalAppleScriptRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalAppleScriptRunner.swift; sourceTree = "<group>"; };
 		B529AA80E4E380946F9AB4B7 /* AppRuntimePaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRuntimePaths.swift; sourceTree = "<group>"; };
@@ -1168,6 +1172,7 @@
 			children = (
 				2365B90C4B9B32DEA0C8687B /* BuiltinProviderPlugins.swift */,
 				93CE07D7E98CD2B87F87C0E0 /* PricingFetchService.swift */,
+				B0BFB1D124794DCB5E6CC0BE /* ProviderAccountUIResolver.swift */,
 				6A3763EF17B80F22CAE77EB0 /* ProviderDescriptor+Builtins.swift */,
 				6AE7C2A2D6731BCD2D826C90 /* ProviderRegistry.swift */,
 				0A1B35CE39EF2CA012E3BAC2 /* ProviderSettingsSectionProviding.swift */,
@@ -1223,6 +1228,7 @@
 				BF23C58F1F4E3E5605623ECE /* Info.plist */,
 				15809DA1BE38EFE9D002FB73 /* main.swift */,
 				06379230FC976FFF3DCD0718 /* NotchRuntimeCoordinator.swift */,
+				2E294D4FCCB923E3E4874C5B /* PluginRegistryBootstrap.swift */,
 				CBF2E6F7720B297179A63812 /* PluginTrustGate.swift */,
 				707D55141321BADA4D8BD93C /* PluginUninstaller.swift */,
 				0AD3D99C9F42189EFF639E71 /* ProviderContextRegistry.swift */,
@@ -1573,6 +1579,7 @@
 				3054AF8F8A6177EDB151996F /* PluginBackedTerminalCapability.swift in Sources */,
 				76DE471855D0D0D5F9874A3A /* PluginCategoryFilterBar.swift in Sources */,
 				49CB17C9F9F3741C3B0BB281 /* PluginDiscoverView.swift in Sources */,
+				BAFC53B3813AFCC2ED19329A /* PluginRegistryBootstrap.swift in Sources */,
 				DF30CD5504F391E42C582602 /* PluginTrustGate.swift in Sources */,
 				EC8566C210AB59F29E27E735 /* PluginUninstaller.swift in Sources */,
 				327E97FCAE851D21F494E518 /* PluginsSettingsView.swift in Sources */,
@@ -1582,6 +1589,7 @@
 				0BD1DED6EC1DFF9326A1CAE5 /* ProfileViewModel.swift in Sources */,
 				1DD56466FA2EB5FEF570FF9B /* ProjectAnalyticsView.swift in Sources */,
 				9AFF6FE3091911EFD6FFDB9A /* ProjectGroupHeader.swift in Sources */,
+				919DCD18CA287C0FAAB95D1B /* ProviderAccountUIResolver.swift in Sources */,
 				8F439312E3BFA84853019A27 /* ProviderBadge.swift in Sources */,
 				E3520EEEBFD2FB2FACC19D45 /* ProviderContextRegistry.swift in Sources */,
 				6CB15E196B0E4A38B471E499 /* ProviderDescriptor+Builtins.swift in Sources */,

@@ -174,16 +174,16 @@ extension UsageView {
             // No subscription adapters registered for this provider —
             // fall back to the legacy OAuth-only account accessory
             // (Codex / Gemini paths today).
-            if let uiProvider = store.provider as? any ProviderAccountUIProviding {
-                uiProvider.makeAccountCardAccessory(
-                    context: ProviderSettingsContext(
-                        appState: appState,
-                        profileViewModel: profileViewModel,
-                        providerKind: store.provider.kind
-                    ),
-                    triggerStyle: accountSwitcherTriggerStyle
-                )
-            }
+            ProviderAccountUIResolver.makeAccountCardAccessory(
+                provider: store.provider,
+                pluginRegistry: appState.pluginRegistry,
+                context: ProviderSettingsContext(
+                    appState: appState,
+                    profileViewModel: profileViewModel,
+                    providerKind: store.provider.kind
+                ),
+                triggerStyle: accountSwitcherTriggerStyle
+            )
         } else {
             // Provider has subscription adapters (GLM / future
             // OpenRouter / …) — show the unified identity picker so

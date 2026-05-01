@@ -59,47 +59,14 @@ final class AppState: ObservableObject {
     /// re-enable path in `PluginTrustGate.enable(...)` calls the
     /// matching factory so a previously-disabled host plugin comes
     /// back live without restart.
-    static let hostPluginFactories: [String: () -> any Plugin] = [
-        ClaudePluginDogfood.manifest.id:    { ClaudePluginDogfood() },
-        AppleTerminalPlugin.manifest.id:    { AppleTerminalPlugin() }
-        // Chassis built-ins per `docs/PLUGIN_ARCHITECTURE.md` §1.1:
-        // Claude provider (the app's namesake) + Apple Terminal (the
-        // OS-bundled terminal every Mac ships with). These are the
-        // out-of-box experience that must work the moment a fresh
-        // install opens the app — fresh installs literally cannot
-        // depend on the marketplace yet. Every other plugin (Gemini
-        // / Codex providers, iTerm2 / Ghostty / Warp / Alacritty /
-        // Kitty / WezTerm terminals, Claude.app / Codex.app
-        // chat-apps, VSCode / Cursor / Windsurf / Trae / Zed
-        // editors) ships through the catalog repo's marketplace;
-        // users install from Settings → Plugins → Discover.
-    ]
+    static let hostPluginFactories = PluginRegistryBootstrap.hostPluginFactories
 
     let pluginRegistry: PluginRegistry = {
         let registry = PluginRegistry()
-        let plugins: [any Plugin] = AppState.hostPluginFactories
-            .sorted { $0.key < $1.key }
-            .map { $0.value() }
-        for plugin in plugins {
-            let manifest = type(of: plugin).manifest
-            // Honour the kill-switch for host plugins too: a
-            // user-disabled id is parked under `registry.disabled`
-            // so the Settings panel can show an Enable row, but the
-            // live instance is never inserted into the lookup
-            // buckets. Re-enabling a host plugin requires a restart
-            // because the host owns this instantiation list.
-            if PluginTrustGate.isDisabled(manifest.id) {
-                registry.recordDisabled(manifest: manifest, source: .host)
-                continue
-            }
-            do {
-                try registry.register(plugin)
-            } catch {
-                DiagnosticLogger.shared.warning(
-                    "PluginRegistry dogfood register failed for \(type(of: plugin)): \(error)"
-                )
-            }
-        }
+        // Chassis built-ins per `docs/PLUGIN_ARCHITECTURE.md` §1.1:
+        // Claude provider + Apple Terminal are compiled into the host
+        // and always considered before marketplace plugins.
+        PluginRegistryBootstrap.registerHostPlugins(into: registry)
         // Discover .csplugin bundles. Bundled samples live in
         // Contents/PlugIns (shipped inside the .app, implicitly trusted);
         // user-installed plugins live under
@@ -109,33 +76,8 @@ final class AppState: ObservableObject {
         // plugins are queued for the post-launch NSAlert prompt.
         // Both paths consult the disabled-set so a kill-switched
         // plugin never reaches the trust prompt regardless of source.
-        if let pluginsDir = Bundle.main.builtInPlugInsURL {
-            let report = PluginLoader.loadAll(
-                from: pluginsDir,
-                into: registry,
-                trustEvaluator: { _, _ in true },
-                disabledChecker: PluginTrustGate.isDisabled,
-                sourceKind: .bundled
-            )
-            DiagnosticLogger.shared.info(
-                "PluginLoader (bundled): loaded=\(report.loaded.count) skipped=\(report.skipped.count)"
-            )
-            for skip in report.skipped {
-                DiagnosticLogger.shared.warning(
-                    "PluginLoader skipped \(skip.url.lastPathComponent): \(skip.reason)"
-                )
-            }
-        }
-        let userReport = PluginLoader.loadAll(
-            from: PluginLoader.defaultDirectory,
-            into: registry,
-            trustEvaluator: PluginTrustGate.evaluate,
-            disabledChecker: PluginTrustGate.isDisabled,
-            sourceKind: .user
-        )
-        DiagnosticLogger.shared.info(
-            "PluginLoader (user): loaded=\(userReport.loaded.count) skipped=\(userReport.skipped.count) pending=\(PluginTrustGate.snapshotPending().count)"
-        )
+        PluginRegistryBootstrap.loadBundledPlugins(into: registry)
+        PluginRegistryBootstrap.loadUserPlugins(into: registry)
         // Emergency fallback: if every provider plugin is disabled
         // (or none ever loaded), force-restore Claude so the status
         // bar entry stays reachable. Without this, a user who has
