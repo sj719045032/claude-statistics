@@ -219,6 +219,10 @@ struct PluginDiscoverView: View {
                 Text(entry.author)
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
+                Text("·").foregroundStyle(.tertiary)
+                Text(displayName(for: entry.category))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
                 if !entry.permissions.isEmpty {
                     Text("·").foregroundStyle(.tertiary)
                     Text(entry.permissions.map(\.rawValue).joined(separator: ", "))
