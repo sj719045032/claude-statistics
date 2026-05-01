@@ -21,7 +21,8 @@ final class AppleTerminalPlugin: NSObject, TerminalPlugin {
         version: SemVer(major: 1, minor: 0, patch: 0),
         minHostAPIVersion: SDKInfo.apiVersion,
         permissions: [.appleScript],
-        principalClass: "AppleTerminalPlugin"
+        principalClass: "AppleTerminalPlugin",
+        category: PluginCatalogCategory.terminal
     )
 
     let descriptor = TerminalDescriptor(
