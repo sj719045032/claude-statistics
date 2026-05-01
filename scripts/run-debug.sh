@@ -51,7 +51,18 @@ rm -f "${HOME}/.claude-statistics-debug/run/attention.sock" \
 echo "==> Cleaning stale builds..."
 find ~/Library/Developer/Xcode/DerivedData -path "*/Debug/${APP_NAME}.app" -type d -exec rm -rf {} + 2>/dev/null || true
 
-# 3. Build — override bundle ID so Debug has its own TCC slot in System Settings.
+# 3. Regenerate the Xcode project so newly-added Swift files under
+#    `ClaudeStatistics/` are picked up automatically by the XcodeGen source
+#    directory rules. The checked-in `.xcodeproj` is still a generated static
+#    file list, so xcodebuild itself won't notice new files until this runs.
+if command -v xcodegen >/dev/null 2>&1; then
+  echo "==> Regenerating Xcode project..."
+  xcodegen generate >/dev/null
+else
+  echo "==> WARNING: xcodegen not found; new source files may be missing from the project"
+fi
+
+# 4. Build — override bundle ID so Debug has its own TCC slot in System Settings.
 # Full xcodebuild output goes to a log file; on failure we grep out
 # error/warning lines so the caller sees what actually broke without having
 # to re-run xcodebuild by hand. `-quiet` is dropped (the log file keeps noise
@@ -84,7 +95,7 @@ fi
 
 echo "** BUILD SUCCEEDED **"
 
-# 4. Rename the bundle folder so System Settings labels it differently from
+# 5. Rename the bundle folder so System Settings labels it differently from
 #    the installed Release build. Also tag CFBundleDisplayName for Finder/
 #    Dock consistency. Bundle path references below use ${APP_PATH}.
 rm -rf "${APP_PATH}"
@@ -109,7 +120,7 @@ fi
 /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable ${DEBUG_APP_NAME}" "${PLIST}" 2>/dev/null || \
   /usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string ${DEBUG_APP_NAME}" "${PLIST}"
 
-# 5. Re-sign after all bundle/executable renames so the final app keeps a
+# 6. Re-sign after all bundle/executable renames so the final app keeps a
 # stable designated requirement. That lets Debug reuse the same local TCC /
 # Keychain identity across rebuilds instead of looking like a fresh ad-hoc app
 # every time. If the named local identity is missing, fall back to ad-hoc so
@@ -132,7 +143,7 @@ else
   codesign --force --deep --sign - --entitlements "${ENTITLEMENTS_PATH}" "${APP_PATH}"
 fi
 
-# 6. Copy to ~/Applications for stable TCC registration. Apps in /tmp are not
+# 7. Copy to ~/Applications for stable TCC registration. Apps in /tmp are not
 # treated as persistent by macOS and won't appear in System Settings →
 # Accessibility. Copying to ~/Applications gives TCC a stable bundle path.
 echo "==> Installing to ${STABLE_APP_PATH}..."
@@ -140,21 +151,21 @@ mkdir -p "${STABLE_APP_DIR}"
 rm -rf "${STABLE_APP_PATH}"
 cp -R "${APP_PATH}" "${STABLE_APP_PATH}"
 
-# 7. Re-register with Launch Services. Unregister both the pre-rename path and
+# 8. Re-register with Launch Services. Unregister both the pre-rename path and
 # the /tmp path, then register the stable ~/Applications path so the TCC UI
 # can resolve the bundle.
 ${LSREGISTER} -u "${BUILT_APP_PATH}" 2>/dev/null || true
 ${LSREGISTER} -u "${APP_PATH}" 2>/dev/null || true
 ${LSREGISTER} -f -R "${STABLE_APP_PATH}"
 
-# 8. Reset the one-shot accessibility prompt flag. The app only shows the
+# 9. Reset the one-shot accessibility prompt flag. The app only shows the
 # AXIsProcessTrustedWithOptions dialog if this key is absent AND the app is
 # not yet trusted. Deleting it here means a fresh build always re-prompts
 # when needed; if already authorized AXIsProcessTrusted() is true and the
 # whole block is skipped — so this is safe to run unconditionally.
 defaults delete "${DEBUG_BUNDLE_ID}" "debug.accessibility.promptShown" 2>/dev/null || true
 
-# 9. Final kill + launch of Debug only.
+# 10. Final kill + launch of Debug only.
 killall "${DEBUG_APP_NAME}" 2>/dev/null || true
 while pgrep -x "${DEBUG_APP_NAME}" >/dev/null 2>&1; do sleep 0.2; done
 
