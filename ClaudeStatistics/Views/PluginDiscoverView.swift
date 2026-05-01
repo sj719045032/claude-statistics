@@ -259,7 +259,10 @@ struct PluginDiscoverView: View {
 
     private func installedManifest(id: String) -> PluginManifest? {
         _ = refreshTick
-        return pluginRegistry.loadedManifests().first { $0.id == id }
+        if let loaded = pluginRegistry.loadedManifests().first(where: { $0.id == id }) {
+            return loaded
+        }
+        return pluginRegistry.disabledRecords().first { $0.manifest.id == id }?.manifest
     }
 
     @ViewBuilder
