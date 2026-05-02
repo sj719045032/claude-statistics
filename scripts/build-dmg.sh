@@ -100,6 +100,48 @@ find "${ARCHIVE_DIR}" -maxdepth 1 -name "*.delta" 2>/dev/null | sort > "${BEFORE
 # don't delete them; that's what powers the deltas.)
 cp "${ZIP_OUTPUT}" "${ARCHIVE_DIR}/"
 
+# Sparkle's generate_appcast picks up an HTML file with the same basename
+# as the ZIP and inlines it as <description> in the appcast item — that's
+# what shows up in Sparkle's "Update available" sheet. Convert the
+# bilingual markdown notes (passed by release.sh via env var) into HTML
+# right before generate_appcast runs. Format we accept is the one
+# release.sh enforces: `## Heading` / `- bullet` / `**bold**` / `` `code` ``,
+# which keeps the converter scope tight and dependency-free.
+NOTES_FILE="${CLAUDE_STATS_NOTES_FILE:-}"
+if [[ -n "${NOTES_FILE}" ]] && [[ -f "${NOTES_FILE}" ]]; then
+    echo "==> Embedding release notes from ${NOTES_FILE}..."
+    NOTES_HTML="${ARCHIVE_DIR}/${DMG_NAME}-${VERSION}.html"
+    awk '
+        BEGIN { in_list = 0 }
+        /^## / {
+            if (in_list) { print "</ul>"; in_list = 0 }
+            sub(/^## /, "")
+            print "<h2>" $0 "</h2>"
+            next
+        }
+        /^- / {
+            if (!in_list) { print "<ul>"; in_list = 1 }
+            sub(/^- /, "")
+            print "<li>" $0 "</li>"
+            next
+        }
+        /^[[:space:]]*$/ {
+            if (in_list) { print "</ul>"; in_list = 0 }
+            next
+        }
+        {
+            if (in_list) { print "</ul>"; in_list = 0 }
+            print "<p>" $0 "</p>"
+        }
+        END { if (in_list) print "</ul>" }
+    ' "${NOTES_FILE}" \
+    | sed -E '
+        s|`([^`]+)`|<code>\1</code>|g
+        s|\*\*([^*]+)\*\*|<strong>\1</strong>|g
+    ' > "${NOTES_HTML}"
+    echo "    Wrote ${NOTES_HTML}"
+fi
+
 echo "==> Generating appcast.xml (with Sparkle deltas)..."
 DOWNLOAD_URL_PREFIX="${REPO_URL}/releases/download/v${VERSION}/"
 "${SPARKLE_BIN}/generate_appcast" \

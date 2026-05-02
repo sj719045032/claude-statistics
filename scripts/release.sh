@@ -98,7 +98,14 @@ BEFORE_DELTAS=$(mktemp)
 find "$ARCHIVE_DIR" -maxdepth 1 -name "*.delta" 2>/dev/null | sort > "$BEFORE_DELTAS"
 
 echo "==> [1/4] Building v${VERSION}..."
-bash scripts/build-dmg.sh "$VERSION"
+# Stash the (already-validated) bilingual notes in a temp markdown file
+# and hand its path to build-dmg.sh via env var. build-dmg.sh converts
+# it to HTML so generate_appcast can inline it as <description> in the
+# appcast item — that's what Sparkle's update sheet renders.
+NOTES_MD=$(mktemp /tmp/release-notes-md-XXXXXX.md)
+printf '%s\n' "$RELEASE_NOTES" > "$NOTES_MD"
+trap 'rm -f "$NOTES_MD"' EXIT
+CLAUDE_STATS_NOTES_FILE="$NOTES_MD" bash scripts/build-dmg.sh "$VERSION"
 
 DMG="build/ClaudeStatistics-${VERSION}.dmg"
 ZIP="build/ClaudeStatistics-${VERSION}.zip"
