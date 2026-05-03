@@ -30,8 +30,8 @@ set -euo pipefail
 # `published` mode's url + checksum are kept in the constants below.
 # Bump them in lockstep with each new sdk-v<x.y.z> release.
 
-PUBLISHED_SDK_TAG="sdk-v0.2.0"
-PUBLISHED_SDK_CHECKSUM="52f21c3b93a0e01409cc669d09822d86efff1f80c45351972820d1a749b2052a"
+PUBLISHED_SDK_TAG="sdk-v0.3.0"
+PUBLISHED_SDK_CHECKSUM="fc28f2e91118688922f47ab9f46dec614ed509cc9bf67a3798e8ee12acb7a80c"
 PUBLISHED_SDK_URL="https://github.com/sj719045032/claude-statistics/releases/download/${PUBLISHED_SDK_TAG}/ClaudeStatisticsKit.xcframework.zip"
 CATALOG_PUBLISHED_URL="https://github.com/sj719045032/claude-statistics"
 CATALOG_PUBLISHED_BRANCH="main"
