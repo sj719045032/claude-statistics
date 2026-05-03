@@ -148,6 +148,25 @@ enum TerminalRegistry {
             }
     }
 
+    static func option(for rawValue: String, providerID: String? = nil) -> TerminalPreferenceOption? {
+        if rawValue == TerminalPreferences.autoOptionID {
+            return TerminalPreferenceOption(
+                id: TerminalPreferences.autoOptionID,
+                title: TerminalPreferences.autoOptionID,
+                isInstalled: true
+            )
+        }
+        guard let capability = enabledSelectableCapabilities(forProvider: providerID)
+            .first(where: { $0.optionID == rawValue }) else {
+            return nil
+        }
+        return TerminalPreferenceOption(
+            id: rawValue,
+            title: capability.displayName,
+            isInstalled: true
+        )
+    }
+
     static var readinessOptions: [TerminalOptionStatus] {
         readinessOptions(forProvider: nil)
     }
@@ -195,7 +214,7 @@ enum TerminalRegistry {
     }
 
     static func capability(forOptionID optionID: String) -> (any TerminalCapability)? {
-        appCapabilities.first { $0.optionID == optionID }
+        enabledSelectableCapabilities().first { $0.optionID == optionID }
     }
 
     static func effectiveCapability(
@@ -211,7 +230,7 @@ enum TerminalRegistry {
             return effectiveCapability(for: preferredOptionID)?.displayName ?? TerminalPreferences.autoOptionID
         }
         return capability(forOptionID: preferredOptionID)?.displayName
-            ?? TerminalPreferences.option(for: preferredOptionID)?.title
+            ?? option(for: preferredOptionID)?.title
             ?? preferredOptionID
     }
 

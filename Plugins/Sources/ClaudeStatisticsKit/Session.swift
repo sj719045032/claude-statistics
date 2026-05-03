@@ -19,6 +19,7 @@ public struct Session: Identifiable, Hashable, Sendable {
     public let startTime: Date?
     public let lastModified: Date
     public let fileSize: Int64
+    public let metadata: [String: String]
 
     /// Real project working directory, lifted from the transcript's `cwd`
     /// field on first parse. `nil` until the parser fills it in.
@@ -33,7 +34,8 @@ public struct Session: Identifiable, Hashable, Sendable {
         startTime: Date?,
         lastModified: Date,
         fileSize: Int64,
-        cwd: String? = nil
+        cwd: String? = nil,
+        metadata: [String: String] = [:]
     ) {
         self.id = id
         self.externalID = externalID
@@ -44,6 +46,7 @@ public struct Session: Identifiable, Hashable, Sendable {
         self.lastModified = lastModified
         self.fileSize = fileSize
         self.cwd = cwd
+        self.metadata = metadata
     }
 
     public var displayName: String {

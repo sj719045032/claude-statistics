@@ -115,6 +115,17 @@ struct HookRunner: HookHelperContext {
         set(&message, "terminal_tab_id", terminalContext.tabID)
         set(&message, "terminal_surface_id", terminalContext.surfaceID)
 
+        // Forward the raw env piece the host needs for plugin-driven
+        // terminal recognition. We don't try to interpret any of these
+        // — the host walks every `TerminalEnvIdentifying` plugin
+        // against `terminal_env` and reverse-looks up
+        // `host_app_bundle_id` against descriptor bundle ids. This
+        // keeps the hook CLI ignorant of plugin metadata; new
+        // terminals don't need a CLI rebuild.
+        let env = ProcessInfo.processInfo.environment
+        set(&message, "host_app_bundle_id", env["__CFBundleIdentifier"])
+        message["terminal_env"] = env
+
         return message
     }
 
@@ -124,13 +135,16 @@ struct HookRunner: HookHelperContext {
         cwd: String?,
         ghosttyFrontmostEvents: Set<String>
     ) -> HookTerminalContext {
-        terminalContext(
-            event: event,
-            terminalName: terminalName,
-            cwd: cwd,
-            ghosttyFrontmostEvents: ghosttyFrontmostEvents,
-            ghosttyFallbackMode: .uniqueDirectoryMatch
-        )
+        // Hook CLI no longer derives terminal IPC fields. The host's
+        // `HookTerminalResolver` (running on the main actor against
+        // the live plugin registry) computes socket / surface /
+        // window / tab on receipt — see `AttentionBridge`. We keep
+        // the SDK signature (including `ghosttyFrontmostEvents`)
+        // unchanged so already-built `.csplugin` bundles linked
+        // against the binary SDK don't lose their witness table
+        // entry; the parameter is simply ignored.
+        _ = ghosttyFrontmostEvents
+        return HookTerminalContext()
     }
 
     // The free-function `resolvedHookCWD(payload:)` and
@@ -154,16 +168,11 @@ struct HookRunner: HookHelperContext {
     }
 
     func canonicalTerminalName(_ raw: String?) -> String? {
-        let env = ProcessInfo.processInfo.environment
-        if env["KITTY_WINDOW_ID"] != nil || env["KITTY_LISTEN_ON"] != nil {
-            return "kitty"
-        }
-        if env["WEZTERM_PANE"] != nil || env["WEZTERM_UNIX_SOCKET"] != nil {
-            return "wezterm"
-        }
-        if env["ITERM_SESSION_ID"] != nil {
-            return "iTerm2"
-        }
+        // Hook CLI is a dumb pipe — forward TERM/TERM_PROGRAM raw to
+        // the host, which runs `HookTerminalResolver` against plugin
+        // descriptors to derive the canonical name. Old Kitty /
+        // WezTerm / iTerm env-var hardcoding lived here; it's now
+        // in each plugin's `TerminalEnvIdentifying` declaration.
         return raw
     }
 

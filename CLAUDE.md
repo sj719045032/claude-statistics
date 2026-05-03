@@ -194,12 +194,65 @@ an `.xcframework` referenced via SwiftPM `.binaryTarget(url:, checksum:)`
 from `Package.swift` at repo root. SDK versions are independent of host
 app versions — bump them only when SDK ABI changes.
 
-```bash
-# 1. Build the xcframework + zip + checksum.
-bash scripts/build-xcframework.sh
-# Prints the SwiftPM checksum (lowercase hex). Copy it.
+#### SDK source mode is automatic
 
-# 2. Create a sdk-v<x.y.z> release on the host repo, upload the zip:
+`Package.swift` and `build/catalog-repo/project.yml` carry an
+`SDK_MODE_BEGIN` / `SDK_MODE_END` block managed by
+`scripts/sdk-mode.sh`. You do **not** flip it by hand:
+
+- `scripts/run-debug.sh` calls `sdk-mode.sh local` at the top, so
+  any local rebuild + `dev-install.sh` of a catalog plugin links
+  the in-progress SDK source.
+- `scripts/release.sh` calls `sdk-mode.sh published` before its
+  build/commit step, so what gets pushed always cites the published
+  sdk-v<x.y.z> URL+checksum (catalog-repo branch:main).
+- Both invocations short-circuit when the file is already in the
+  target mode (no diff, no mtime change, no SwiftPM re-resolve).
+
+Run `bash scripts/sdk-mode.sh` (no args) to confirm where the two
+files currently point. Manual `sdk-mode.sh local|published` is only
+needed for ad-hoc workflows, e.g. building the xcframework outside
+of `release.sh` (see below). Don't remove the marker comments — the
+script depends on them.
+
+#### Local SDK iteration (typical loop)
+
+```bash
+# 1. Edit Plugins/Sources/ClaudeStatisticsKit/*.swift.
+
+# 2. Rebuild the xcframework so catalog plugins see the changes.
+bash scripts/build-xcframework.sh
+
+# 3. dev-install the affected catalog plugins.
+cd build/catalog-repo
+bash scripts/dev-install.sh KittyPlugin
+bash scripts/dev-install.sh GhosttyPlugin   # etc.
+cd -
+
+# 4. Relaunch the host (also pins SDK references at local).
+bash scripts/run-debug.sh
+```
+
+#### Publishing a new sdk-v<x.y.z>
+
+```bash
+# 1. Make sure both files quote the published refs and smoke-build.
+bash scripts/sdk-mode.sh published
+bash scripts/run-debug.sh    # flips back to local; that's fine
+
+# 2. Build the xcframework. (sdk-mode.sh state doesn't matter for
+#    build-xcframework — it archives source either way.)
+bash scripts/sdk-mode.sh published
+bash scripts/build-xcframework.sh
+# Copy the printed SwiftPM checksum.
+
+# 3. Update PUBLISHED_SDK_TAG / PUBLISHED_SDK_CHECKSUM in
+#    scripts/sdk-mode.sh and the matching url/checksum literals in
+#    the Package.swift SDK_MODE_BEGIN/END block. Re-run
+#    `bash scripts/sdk-mode.sh published` to make sure both files
+#    end up quoting the new tag.
+
+# 4. Create the sdk-v<x.y.z> GitHub release.
 gh auth switch --hostname github.com --user sj719045032
 gh release create sdk-v<x.y.z> \
     build/xcframework/ClaudeStatisticsKit.xcframework.zip \
@@ -208,8 +261,7 @@ gh release create sdk-v<x.y.z> \
     --notes "..."
 gh auth switch --hostname github.com --user tinystone007
 
-# 3. Update Package.swift's `.binaryTarget(url:, checksum:)` to the new
-#    sdk-v<x.y.z> URL + checksum, commit, push.
+# 5. Commit + push Package.swift / scripts/sdk-mode.sh.
 ```
 
 The catalog repo's `project.yml` references the SDK as

@@ -40,6 +40,41 @@ extension PluginManifest {
         self = decoded
     }
 
+    /// Decode a manifest directly from a `.csplugin` bundle's
+    /// `Contents/Info.plist`. This deliberately bypasses `Bundle` so
+    /// callers can inspect a bundle that was replaced on disk while an
+    /// older image with the same identifier is still loaded in the
+    /// current process.
+    public init(contentsOfBundleAt bundleURL: URL) throws {
+        let infoURL = bundleURL.appendingPathComponent("Contents/Info.plist")
+        guard FileManager.default.fileExists(atPath: infoURL.path),
+              let data = try? Data(contentsOf: infoURL) else {
+            throw PluginManifestPlistError.infoPlistMissing(path: infoURL.path)
+        }
+
+        let plist: Any
+        do {
+            plist = try PropertyListSerialization.propertyList(from: data, options: [], format: nil)
+        } catch {
+            throw PluginManifestPlistError.infoPlistUnreadable(path: infoURL.path, reason: error.localizedDescription)
+        }
+
+        guard let dict = plist as? [String: Any] else {
+            throw PluginManifestPlistError.infoPlistNotDictionary(path: infoURL.path)
+        }
+        guard let raw = dict[PluginManifest.infoDictionaryKey] else {
+            throw PluginManifestPlistError.manifestMissing(path: infoURL.path)
+        }
+        guard let manifestData = try? PropertyListSerialization.data(
+            fromPropertyList: raw,
+            format: .binary,
+            options: 0
+        ) else {
+            throw PluginManifestPlistError.manifestInvalid(path: infoURL.path)
+        }
+        self = try PluginManifest(plistData: manifestData)
+    }
+
     /// Encode the manifest as a `plist` dictionary suitable for embedding
     /// in a `.csplugin` Info.plist. Plugin packagers (and tests) call
     /// this when generating the bundle's Info.plist.
@@ -59,11 +94,26 @@ extension PluginManifest {
 
 public enum PluginManifestPlistError: Error, CustomStringConvertible {
     case notADictionary
+    case infoPlistMissing(path: String)
+    case infoPlistUnreadable(path: String, reason: String)
+    case infoPlistNotDictionary(path: String)
+    case manifestMissing(path: String)
+    case manifestInvalid(path: String)
 
     public var description: String {
         switch self {
         case .notADictionary:
             return "PluginManifest plist encoding did not produce a top-level dictionary"
+        case .infoPlistMissing(let path):
+            return "Info.plist not found at \(path)"
+        case .infoPlistUnreadable(let path, let reason):
+            return "Info.plist unreadable at \(path): \(reason)"
+        case .infoPlistNotDictionary(let path):
+            return "Info.plist top-level is not a dictionary at \(path)"
+        case .manifestMissing(let path):
+            return "\(PluginManifest.infoDictionaryKey) missing at \(path)"
+        case .manifestInvalid(let path):
+            return "\(PluginManifest.infoDictionaryKey) is invalid at \(path)"
         }
     }
 }

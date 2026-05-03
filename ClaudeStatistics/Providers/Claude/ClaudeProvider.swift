@@ -82,8 +82,10 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
             TerminalLaunchRequest(
                 executable: "claude",
                 arguments: [],
-                cwd: resolvedProjectPath(for: session)
-            )
+                cwd: resolvedProjectPath(for: session),
+                intent: .newSession(metadata: session.metadata)
+            ),
+            preferredOptionID: TerminalPreferences.preferredOptionID(forProvider: providerId)
         )
     }
 
@@ -92,8 +94,10 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
             TerminalLaunchRequest(
                 executable: "claude",
                 arguments: ["--resume", session.externalID],
-                cwd: resolvedProjectPath(for: session)
-            )
+                cwd: resolvedProjectPath(for: session),
+                intent: .resumeSession(sessionID: session.externalID, metadata: session.metadata)
+            ),
+            preferredOptionID: TerminalPreferences.preferredOptionID(forProvider: providerId)
         )
     }
 
@@ -110,8 +114,10 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
             TerminalLaunchRequest(
                 executable: "claude",
                 arguments: [],
-                cwd: path
-            )
+                cwd: path,
+                intent: .newSession()
+            ),
+            preferredOptionID: TerminalPreferences.preferredOptionID(forProvider: providerId)
         )
     }
 }

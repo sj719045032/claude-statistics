@@ -45,10 +45,11 @@ let package = Package(
         )
     ],
     targets: [
+        // SDK_MODE_BEGIN — managed by scripts/sdk-mode.sh
         .binaryTarget(
             name: "ClaudeStatisticsKit",
-            url: "https://github.com/sj719045032/claude-statistics/releases/download/sdk-v0.2.0/ClaudeStatisticsKit.xcframework.zip",
-            checksum: "52f21c3b93a0e01409cc669d09822d86efff1f80c45351972820d1a749b2052a"
+            path: "build/xcframework/ClaudeStatisticsKit.xcframework"
         )
+        // SDK_MODE_END
     ]
 )

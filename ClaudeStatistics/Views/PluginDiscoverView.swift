@@ -30,6 +30,11 @@ struct PluginDiscoverView: View {
     /// `objectWillChange`).
     @State private var refreshTick: Int = 0
     @State private var installingIDs: Set<String> = []
+    /// Plugin ids the user installed/updated within this app session
+    /// but where the dlopen'd image is still the previous build.
+    /// Drives the "Restart" badge — see `state(for:)` below for why
+    /// disk-vs-runtime version comparison was abandoned.
+    @State private var pendingRestartIds: Set<String> = []
     /// Active chip in the category filter bar. `nil` ⇒ "All".
     @State private var selectedCategory: String?
 
@@ -195,45 +200,90 @@ struct PluginDiscoverView: View {
 
     @ViewBuilder
     private func entryRow(_ entry: PluginCatalogEntry) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Image(systemName: glyph(for: entry.category))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                Text(entry.name)
-                    .font(.system(size: 12, weight: .semibold))
-                Spacer()
-                actionButton(for: entry)
-                Text("v\(entry.version)")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.secondary)
-            }
-            Text(entry.localizedDescription)
+        let subcategory = subcategory(for: entry)
+        // Matches `PluginsSettingsView.pluginRow` skeleton: leading
+        // glyph rail at fixed 14×18, content stack to the right with
+        // 4pt row spacing. Both lists share the same vertical order —
+        // title + version, description, metadata, and the action
+        // button(s) trailing-aligned on the last row — so flipping
+        // between Installed and Discover doesn't shuffle the eye.
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: subcategory.glyph)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
-            HStack(spacing: 6) {
-                Text(entry.author)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-                Text("·").foregroundStyle(.tertiary)
-                Text(displayName(for: entry.category))
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-                if !entry.permissions.isEmpty {
-                    Text("·").foregroundStyle(.tertiary)
-                    Text(entry.permissions.map(\.rawValue).joined(separator: ", "))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+                .frame(width: 14, height: 18, alignment: .center)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(entry.name)
+                        .font(.system(size: 12, weight: .semibold))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .layoutPriority(1)
+                    Spacer(minLength: 8)
+                    Text("v\(entry.version)")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .fixedSize()
                 }
+                Text(entry.localizedDescription)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Text(entry.id)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                HStack(spacing: 6) {
+                    if !entry.author.isEmpty {
+                        Text(entry.author)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                        Text("·").foregroundStyle(.tertiary)
+                    }
+                    Text(subcategory.displayKey)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    if !entry.permissions.isEmpty {
+                        Text("·").foregroundStyle(.tertiary)
+                        Text(entry.permissions.map(\.rawValue).joined(separator: ", "))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                actionButton(for: entry)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
         .padding(.vertical, 2)
+    }
+
+    /// Resolve the subcategory for a catalog entry. Prefers the live
+    /// plugin instance when the entry is already installed (gives us
+    /// the App / Editor / Terminal split via TerminalDescriptor); for
+    /// uninstalled entries we still pass the catalog category string
+    /// so legacy "chat-app" / "editor-integration" markers refine the
+    /// label even before download.
+    private func subcategory(for entry: PluginCatalogEntry) -> PluginCatalogSubcategory {
+        let plugin = livePlugin(id: entry.id)
+        return PluginCatalogSubcategory.resolve(
+            plugin: plugin,
+            manifestKind: loadedManifest(id: entry.id)?.kind,
+            manifestCategoryString: loadedManifest(id: entry.id)?.category,
+            catalogCategoryString: entry.category
+        )
+    }
+
+    private func livePlugin(id: String) -> (any Plugin)? {
+        pluginRegistry.terminalPlugin(id: id)
+            ?? pluginRegistry.providerPlugin(id: id)
+            ?? pluginRegistry.shareRolePlugin(id: id)
+            ?? pluginRegistry.shareThemePlugin(id: id)
+            ?? pluginRegistry.subscriptionExtensions[id]
     }
 
     private enum InstallState: Equatable {
         case canInstall
         case installing
         case installed(SemVer)
+        case restartRequired(SemVer)
         case updateAvailable(installed: SemVer, latest: SemVer)
         case incompatible
     }
@@ -244,6 +294,19 @@ struct PluginDiscoverView: View {
         }
         guard entry.minHostAPIVersion <= SDKInfo.apiVersion else {
             return .incompatible
+        }
+        // `pendingRestartIds` is the only Restart-required signal: a
+        // plugin the user just installed/updated within this session
+        // whose dlopen'd image is still the previous build. We used
+        // to also flag `disk.version > runtime.version` here, but
+        // that triggered a permanent (un-resolvable) Restart whenever
+        // a plugin's `Info.plist` version drifted from the Swift
+        // `static let manifest` version (e.g. catalog repacked the
+        // bundle without bumping the source manifest). Re-launching
+        // can't fix that — only the plugin author can — so the badge
+        // was misleading.
+        if pendingRestartIds.contains(entry.id) {
+            return .restartRequired(entry.version)
         }
         if let installed = installedManifest(id: entry.id) {
             if entry.version > installed.version {
@@ -259,10 +322,29 @@ struct PluginDiscoverView: View {
 
     private func installedManifest(id: String) -> PluginManifest? {
         _ = refreshTick
-        if let loaded = pluginRegistry.loadedManifests().first(where: { $0.id == id }) {
+        if let loaded = loadedManifest(id: id) {
+            if let manifest = diskManifest(for: id, source: pluginRegistry.source(for: id)) {
+                return manifest
+            }
             return loaded
         }
-        return pluginRegistry.disabledRecords().first { $0.manifest.id == id }?.manifest
+        if let disabled = pluginRegistry.disabledRecords().first(where: { $0.manifest.id == id }) {
+            return diskManifest(for: id, source: disabled.source) ?? disabled.manifest
+        }
+        return nil
+    }
+
+    private func loadedManifest(id: String) -> PluginManifest? {
+        pluginRegistry.loadedManifests().first(where: { $0.id == id })
+    }
+
+    private func diskManifest(for id: String, source: PluginSource?) -> PluginManifest? {
+        guard let url = source?.bundleURL,
+              let manifest = try? PluginManifest(contentsOfBundleAt: url),
+              manifest.id == id else {
+            return nil
+        }
+        return manifest
     }
 
     @ViewBuilder
@@ -286,6 +368,14 @@ struct PluginDiscoverView: View {
                 .background(Color.green.opacity(0.15))
                 .foregroundStyle(.green)
                 .clipShape(Capsule())
+        case .restartRequired:
+            Button(action: { AppRelauncher.relaunch() }) {
+                Label("settings.plugins.restartNow", systemImage: "arrow.clockwise")
+                    .font(.system(size: 10))
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.mini)
+            .tint(.orange)
         case .updateAvailable(_, let latest):
             Button(action: { install(entry) }) {
                 Text(String(
@@ -341,6 +431,11 @@ struct PluginDiscoverView: View {
                 // refresh, provider lookup, etc.) by reusing the
                 // same hook the trust prompt fires.
                 PluginTrustGate.onPluginHotLoaded?(entry.toManifestStub(), URL(fileURLWithPath: ""))
+                // The bundle on disk is replaced but macOS keeps the
+                // previous `.csplugin` Mach-O image alive in this
+                // process. Surface the Restart hint until the user
+                // relaunches.
+                pendingRestartIds.insert(entry.id)
             } catch let installError as PluginInstaller.InstallError {
                 errorMessage = mapInstallError(installError)
                 loadingState = .failed
@@ -420,25 +515,6 @@ struct PluginDiscoverView: View {
         }
     }
 
-    private func displayName(for category: String) -> LocalizedStringKey {
-        switch PluginCatalogCategory.canonicalize(category) {
-        case PluginCatalogCategory.provider: return "settings.plugins.category.provider"
-        case PluginCatalogCategory.terminal: return "settings.plugins.category.terminal"
-        case PluginCatalogCategory.shareCard: return "settings.plugins.category.share-card"
-        case PluginCatalogCategory.subscription: return "settings.plugins.category.subscription"
-        default: return "settings.plugins.category.utility"
-        }
-    }
-
-    private func glyph(for category: String) -> String {
-        switch PluginCatalogCategory.canonicalize(category) {
-        case PluginCatalogCategory.provider: return "shippingbox"
-        case PluginCatalogCategory.terminal: return "rectangle.connected.to.line.below"
-        case PluginCatalogCategory.shareCard: return "person.crop.square"
-        case PluginCatalogCategory.subscription: return "creditcard"
-        default: return "wrench.and.screwdriver"
-        }
-    }
 }
 
 private extension PluginCatalogEntry {

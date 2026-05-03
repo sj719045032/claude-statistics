@@ -3,6 +3,12 @@ import ClaudeStatisticsKit
 
 final class AttentionBridge {
     weak var notchCenter: NotchNotificationCenter?
+    /// Set by `ClaudeStatisticsApp` after registry boot. Used to run
+    /// `HookTerminalResolver` against plugin descriptors so the row
+    /// `terminal_name` / context comes from plugin authorship, not
+    /// hook CLI hardcoding. `weak` because the registry's lifetime is
+    /// owned by `AppState`. Read on the main actor only.
+    weak var pluginRegistry: PluginRegistry?
 
     private let socketPath: String
     private let authToken: String?
@@ -181,40 +187,56 @@ final class AttentionBridge {
             pending = nil
         }
 
-        let event = WireEventTranslator.makeEvent(
-            from: msg,
-            provider: provider,
-            kind: kind,
-            pending: pending
-        )
-
-        let promptLen = msg.prompt_text?.count ?? 0
-        let commentaryLen = msg.commentary_text?.count ?? 0
-        let msgLen = msg.message?.count ?? 0
-        DiagnosticLogger.shared.verbose(
-            "Bridge rx event=\(event.rawEventName) provider=\(event.provider.rawValue) session=\(event.sessionId) tool=\(event.toolName ?? "-") toolUseId=\(event.toolUseId ?? "-") expectsResp=\(msg.expects_response == true) replayed=\(replayed) notif=\(event.notificationType ?? "-") promptLen=\(promptLen) commentaryLen=\(commentaryLen) msgLen=\(msgLen) commentaryTs=\(msg.commentary_timestamp ?? "-") parsedTs=\(event.commentaryAt?.timeIntervalSince1970.description ?? "-")"
-        )
-
-        // On permission-like events, dump the tool_input schema (keys +
-        // JSON-type of each value, NOT the full content) so we can see
-        // the per-provider shape without leaking secrets from user
-        // commands or file paths. Lets us fill the permissionPreview
-        // field-mapping table with ground truth instead of guesswork.
-        if event.rawEventName == "PermissionRequest" || event.rawEventName == "ToolPermission" {
-            let schema: String = {
-                guard let input = msg.tool_input, !input.isEmpty else { return "-" }
-                return input
-                    .sorted(by: { $0.key < $1.key })
-                    .map { "\($0.key):\(WireEventTranslator.jsonKindLabel($0.value))" }
-                    .joined(separator: ",")
-            }()
-            DiagnosticLogger.shared.verbose(
-                "Bridge perm-schema provider=\(event.provider.rawValue) tool=\(event.toolName ?? "-") rawEvent=\(event.rawEventName) notif=\(event.notificationType ?? "-") schema={\(schema)}"
-            )
-        }
-
+        // Resolver + event creation hop to the main actor: the plugin
+        // registry is `@MainActor` and Ghostty's enricher invokes
+        // osascript, so we batch resolver + makeEvent + enqueue
+        // together to avoid bouncing the message between queues.
         DispatchQueue.main.async { [weak self] in
-            self?.notchCenter?.enqueue(event)
+            guard let self else { return }
+            // Hop the actor explicitly: PluginRegistry and the
+            // resolver are `@MainActor`, but `DispatchQueue.main.async`
+            // is not actor-isolated to the type checker. We're already
+            // on the main thread, so assume the actor.
+            let resolved = MainActor.assumeIsolated {
+                HookTerminalResolver.resolve(
+                    env: msg.terminal_env ?? [:],
+                    hostAppBundleId: msg.host_app_bundle_id,
+                    fallbackTerminalName: msg.terminal_name,
+                    event: msg.event,
+                    cwd: msg.cwd,
+                    plugins: self.pluginRegistry?.terminals ?? [:]
+                )
+            }
+            let event = WireEventTranslator.makeEvent(
+                from: msg,
+                provider: provider,
+                kind: kind,
+                pending: pending,
+                resolvedTerminalName: resolved.canonicalName,
+                resolvedTerminalContext: resolved.context
+            )
+
+            let promptLen = msg.prompt_text?.count ?? 0
+            let commentaryLen = msg.commentary_text?.count ?? 0
+            let msgLen = msg.message?.count ?? 0
+            DiagnosticLogger.shared.verbose(
+                "Bridge rx event=\(event.rawEventName) provider=\(event.provider.rawValue) session=\(event.sessionId) tool=\(event.toolName ?? "-") toolUseId=\(event.toolUseId ?? "-") expectsResp=\(msg.expects_response == true) replayed=\(replayed) notif=\(event.notificationType ?? "-") promptLen=\(promptLen) commentaryLen=\(commentaryLen) msgLen=\(msgLen) commentaryTs=\(msg.commentary_timestamp ?? "-") parsedTs=\(event.commentaryAt?.timeIntervalSince1970.description ?? "-") hostApp=\(msg.host_app_bundle_id ?? "-") resolvedTerminal=\(resolved.canonicalName ?? "-")"
+            )
+
+            if event.rawEventName == "PermissionRequest" || event.rawEventName == "ToolPermission" {
+                let schema: String = {
+                    guard let input = msg.tool_input, !input.isEmpty else { return "-" }
+                    return input
+                        .sorted(by: { $0.key < $1.key })
+                        .map { "\($0.key):\(WireEventTranslator.jsonKindLabel($0.value))" }
+                        .joined(separator: ",")
+                }()
+                DiagnosticLogger.shared.verbose(
+                    "Bridge perm-schema provider=\(event.provider.rawValue) tool=\(event.toolName ?? "-") rawEvent=\(event.rawEventName) notif=\(event.notificationType ?? "-") schema={\(schema)}"
+                )
+            }
+
+            self.notchCenter?.enqueue(event)
         }
     }
 

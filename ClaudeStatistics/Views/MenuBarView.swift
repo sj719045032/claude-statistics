@@ -54,6 +54,10 @@ struct MenuBarView: View {
         }
         .onAppear { ensureSelectedTabIsAvailable() }
         .onAppear { terminalSetupCoordinator.evaluateStartupHint() }
+        .onReceive(NotificationCenter.default.publisher(for: .terminalLaunchNotice)) { notification in
+            guard let message = notification.userInfo?["message"] as? String else { return }
+            toastCenter.show(message, duration: 2.5)
+        }
         .onChange(of: appState.providerKind) { _, _ in
             ensureSelectedTabIsAvailable()
         }
@@ -253,9 +257,6 @@ struct MenuBarView: View {
                 onNewSession: { sessionViewModel.openNewSession(session) },
                 onResume: {
                     sessionViewModel.resumeSession(session)
-                    if TerminalPreferences.isEditorPreferred {
-                        toastCenter.show(TerminalPreferences.resumeCopiedToastMessage)
-                    }
                 },
                 resumeCommand: sessionViewModel.resumeCommand(for: session),
                 loadTrendData: { granularity in
@@ -289,9 +290,6 @@ struct MenuBarView: View {
             onNewSession: { sessionViewModel.openNewSession($0) },
             onResume: { session in
                 sessionViewModel.resumeSession(session)
-                if TerminalPreferences.isEditorPreferred {
-                    toastCenter.show(TerminalPreferences.resumeCopiedToastMessage)
-                }
             },
             onDelete: { sessionViewModel.deleteSession($0) },
             onOpenTranscript: nil

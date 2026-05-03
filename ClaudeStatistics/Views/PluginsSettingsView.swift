@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import ClaudeStatisticsKit
 
@@ -40,6 +41,13 @@ struct PluginsSettingsView: View {
     /// cache check.
     @State private var liveCatalogEntries: [PluginCatalogEntry] = []
     @State private var updatingIDs: Set<String> = []
+
+    /// Drives the live "modifier held" indicator on the Reset Trust
+    /// row so the icon flips between caution-triangle and red bolt as
+    /// the user presses the skip-confirm modifier — the row uses a
+    /// `SettingsRowButton` (not `DestructiveActionButton`), so the
+    /// monitor has to be observed at the parent view.
+    @ObservedObject private var skipConfirmMonitor = SkipConfirmKeyMonitor.shared
 
     private struct Row: Identifiable {
         let manifest: PluginManifest
@@ -178,8 +186,7 @@ struct PluginsSettingsView: View {
         .alert("settings.plugins.resetTrust.confirmTitle", isPresented: $showResetConfirmation) {
             Button("settings.cancel", role: .cancel) {}
             Button("settings.plugins.resetTrust.confirmButton", role: .destructive) {
-                TrustStore().clearAll()
-                resetMessage = NSLocalizedString("settings.plugins.resetTrust.done", comment: "")
+                performResetTrust()
             }
         } message: {
             Text("settings.plugins.resetTrust.confirmMessage")
@@ -194,10 +201,7 @@ struct PluginsSettingsView: View {
         ) { row in
             Button("settings.cancel", role: .cancel) { pendingDisable = nil }
             Button("settings.plugins.disable.confirmButton", role: .destructive) {
-                if let source = row.source {
-                    PluginTrustGate.disable(manifest: row.manifest, source: source)
-                    refreshTick &+= 1
-                }
+                performDisable(row)
                 pendingDisable = nil
             }
         } message: { row in
@@ -227,22 +231,9 @@ struct PluginsSettingsView: View {
         ) { row in
             Button("settings.cancel", role: .cancel) { pendingUninstall = nil }
             Button("settings.plugins.uninstall.confirmButton", role: .destructive) {
-                let manifest = row.manifest
-                let source = row.source
+                let target = row
                 pendingUninstall = nil
-                guard let source else { return }
-                Task { @MainActor in
-                    do {
-                        _ = try await PluginUninstaller.uninstall(
-                            manifest: manifest,
-                            source: source,
-                            registry: pluginRegistry
-                        )
-                        refreshTick &+= 1
-                    } catch {
-                        uninstallError = String(describing: error)
-                    }
-                }
+                performUninstall(target)
             }
         } message: { row in
             Text(String(
@@ -349,16 +340,38 @@ struct PluginsSettingsView: View {
                 }
 
                 Section("settings.plugins.trust") {
-                    SettingsRowButton(action: { showResetConfirmation = true }) {
+                    // Whole-row tap → click checks the live modifier
+                    // flags so the configured skip-confirm shortcut
+                    // (Settings → Skip Confirmation) turns the click
+                    // into an immediate reset, matching the per-row
+                    // Disable / Uninstall buttons. The bolt icon
+                    // appears while the modifier is held so the user
+                    // sees the change of state before clicking.
+                    SettingsRowButton(action: {
+                        if SkipConfirmShortcut.matches(NSEvent.modifierFlags) {
+                            performResetTrust()
+                        } else {
+                            showResetConfirmation = true
+                        }
+                    }) {
                         HStack {
                             Label("settings.plugins.resetTrust", systemImage: "arrow.counterclockwise.circle")
                                 .labelStyle(SettingsRowLabelStyle())
                             Spacer()
-                            Image(systemName: "exclamationmark.triangle")
-                                .font(.system(size: 10))
-                                .foregroundStyle(.orange)
+                            if skipConfirmMonitor.isPressed {
+                                Image(systemName: "bolt.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.red)
+                            } else {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.orange)
+                            }
                         }
                     }
+                    .help(skipConfirmMonitor.isPressed
+                          ? NSLocalizedString("settings.plugins.resetTrust.immediate.help", comment: "")
+                          : "")
 
                     if let resetMessage {
                         Text(resetMessage)
@@ -377,126 +390,246 @@ struct PluginsSettingsView: View {
         isDisabled: Bool
     ) -> some View {
         let row = Row(manifest: manifest, source: source)
-        let needsRestart = pendingRestartIds.contains(manifest.id)
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Image(systemName: kindGlyph(manifest.kind))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                Text(catalogEntriesByID[manifest.id]?.name ?? manifest.displayName)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(isDisabled ? .secondary : .primary)
-                Text(sourceLabel(source))
-                    .font(.system(size: 9, weight: .medium))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(sourceTint(source).opacity(0.15))
-                    .foregroundStyle(sourceTint(source))
-                    .clipShape(Capsule())
-                if needsRestart {
-                    Text("settings.plugins.enable.restartRequired")
+        let needsRestart = pendingRestartIds.contains(manifest.id) || updateNeedsRestart(row)
+        let subcategory = subcategory(for: manifest)
+        // Same skeleton as `PluginDiscoverView.entryRow` so both lists
+        // share the leading glyph rail + indented content stack;
+        // metadata rows (manifest id, subcategory, bundle path) live
+        // under the rail too so the indentation is consistent.
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: subcategory.glyph)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .frame(width: 14, height: 18, alignment: .center)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(catalogEntriesByID[manifest.id]?.name ?? manifest.displayName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(isDisabled ? .secondary : .primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .layoutPriority(1)
+                    Text(sourceLabel(source))
                         .font(.system(size: 9, weight: .medium))
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
-                        .background(Color.orange.opacity(0.15))
-                        .foregroundStyle(.orange)
+                        .background(sourceTint(source).opacity(0.15))
+                        .foregroundStyle(sourceTint(source))
                         .clipShape(Capsule())
+                        .fixedSize()
+                    if needsRestart {
+                        Text("settings.plugins.enable.restartRequired")
+                            .font(.system(size: 9, weight: .medium))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Color.orange.opacity(0.15))
+                            .foregroundStyle(.orange)
+                            .clipShape(Capsule())
+                            .fixedSize()
+                    }
+                    Spacer(minLength: 8)
+                    Text("v\(manifest.version)")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .fixedSize()
                 }
-                Spacer()
-                // Update button: visible when the live catalog
-                // advertises a newer version than the installed one.
-                // Hidden in disabled rows because the user should
-                // re-enable before updating (matches Discover's
-                // semantics of update-on-installed-and-loaded).
-                if !isDisabled,
-                   let catalog = catalogEntriesByID[manifest.id],
-                   catalog.version > manifest.version {
-                    let isUpdating = updatingIDs.contains(manifest.id)
-                    Button(action: { update(catalog) }) {
-                        if isUpdating {
-                            ProgressView().controlSize(.mini)
-                        } else {
-                            Text(String(
-                                format: NSLocalizedString("settings.plugins.update.toVersion %@", comment: ""),
-                                catalog.version.description
-                            ))
-                            .font(.system(size: 10))
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
-                    .tint(.blue)
-                    .disabled(isUpdating)
-                }
-                if isDisabled {
-                    Button(action: { handleEnable(row) }) {
-                        Text("settings.plugins.enable")
-                            .font(.system(size: 10))
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
-                    .tint(.green)
-                    .disabled(needsRestart)
-                    if isUninstallable(source) {
-                        Button(action: { pendingUninstall = row }) {
-                            Text("settings.plugins.uninstall")
-                                .font(.system(size: 10))
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
-                        .tint(.red)
-                    }
-                } else {
-                    let canDisable = canDisable(row)
-                    Button(action: { pendingDisable = row }) {
-                        Text("settings.plugins.disable")
-                            .font(.system(size: 10))
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
-                    .disabled(!canDisable)
-                    .help(canDisable ? "" : NSLocalizedString(
-                        "settings.plugins.disable.lastProviderHint",
-                        comment: ""
-                    ))
-                    if isUninstallable(source) {
-                        Button(action: { pendingUninstall = row }) {
-                            Text("settings.plugins.uninstall")
-                                .font(.system(size: 10))
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
-                        .tint(.red)
-                    }
-                }
-                Text("v\(manifest.version)")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.secondary)
-            }
-            Text(manifest.id)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(.tertiary)
-            HStack(spacing: 6) {
-                Text(manifest.kind.rawValue)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                if !manifest.permissions.isEmpty {
-                    Text("·").foregroundStyle(.tertiary)
-                    Text(manifest.permissions.map(\.rawValue).joined(separator: ", "))
-                        .font(.system(size: 10))
+
+                if let description = catalogEntriesByID[manifest.id]?.localizedDescription,
+                   !description.isEmpty {
+                    Text(description)
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
-            }
-            if let url = source?.bundleURL {
-                Text(url.path)
-                    .font(.system(size: 9, design: .monospaced))
+
+                Text(manifest.id)
+                    .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                HStack(spacing: 6) {
+                    if let author = catalogEntriesByID[manifest.id]?.author,
+                       !author.isEmpty {
+                        Text(author)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                        Text("·").foregroundStyle(.tertiary)
+                    }
+                    Text(subcategory.displayKey)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    if !manifest.permissions.isEmpty {
+                        Text("·").foregroundStyle(.tertiary)
+                        Text(manifest.permissions.map(\.rawValue).joined(separator: ", "))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                pluginActionRow(row, isDisabled: isDisabled, needsRestart: needsRestart)
             }
         }
         .padding(.vertical, 2)
         .opacity(isDisabled ? 0.65 : 1)
+    }
+
+    @ViewBuilder
+    private func pluginActionRow(
+        _ row: Row,
+        isDisabled: Bool,
+        needsRestart: Bool
+    ) -> some View {
+        let manifest = row.manifest
+        HStack(spacing: 6) {
+            // Update button: visible when the live catalog advertises
+            // a newer version than the installed one. Hidden in
+            // disabled rows because the user should re-enable before
+            // updating.
+            if needsRestart {
+                Button(action: { AppRelauncher.relaunch() }) {
+                    Label("settings.plugins.restartNow", systemImage: "arrow.clockwise")
+                        .font(.system(size: 10))
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.mini)
+                .tint(.orange)
+            }
+            if !needsRestart,
+               !isDisabled,
+               let catalog = catalogEntriesByID[manifest.id],
+               catalog.version > installedVersion(for: row) {
+                let isUpdating = updatingIDs.contains(manifest.id)
+                Button(action: { update(catalog) }) {
+                    if isUpdating {
+                        ProgressView().controlSize(.mini)
+                    } else {
+                        Text(String(
+                            format: NSLocalizedString("settings.plugins.update.toVersion %@", comment: ""),
+                            catalog.version.description
+                        ))
+                        .font(.system(size: 10))
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+                .tint(.blue)
+                .disabled(isUpdating)
+            }
+            if isDisabled {
+                Button(action: { handleEnable(row) }) {
+                    Text("settings.plugins.enable")
+                        .font(.system(size: 10))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+                .tint(.green)
+                .disabled(needsRestart)
+                if isUninstallable(row.source) {
+                    uninstallButton(row)
+                }
+            } else {
+                disableButton(row)
+                if isUninstallable(row.source) {
+                    uninstallButton(row)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+
+    /// Disable button wired to `DestructiveActionButton` so holding the
+    /// skip-confirm modifier bypasses the alert and disables the plugin
+    /// in one click. The `canDisable` guard for "last provider must
+    /// stay enabled" still wins — a held modifier doesn't override the
+    /// runtime safety check.
+    @ViewBuilder
+    private func disableButton(_ row: Row) -> some View {
+        let canDisable = canDisable(row)
+        DestructiveActionButton(
+            action: { skipConfirm in
+                guard canDisable else { return }
+                if skipConfirm {
+                    performDisable(row)
+                } else {
+                    pendingDisable = row
+                }
+            },
+            helpKey: "",
+            pressedHelpKey: "settings.plugins.disable.immediate.help"
+        ) { pressed in
+            destructiveButtonLabel(
+                "settings.plugins.disable",
+                pressed: pressed && canDisable
+            )
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.mini)
+        .disabled(!canDisable)
+        .help(canDisable ? "" : NSLocalizedString(
+            "settings.plugins.disable.lastProviderHint",
+            comment: ""
+        ))
+    }
+
+    /// Uninstall button wired through `DestructiveActionButton` so the
+    /// configured skip-confirm modifier (Settings → Skip Confirmation)
+    /// turns the click into an immediate uninstall instead of opening
+    /// the confirmation alert.
+    @ViewBuilder
+    private func uninstallButton(_ row: Row) -> some View {
+        DestructiveActionButton(
+            action: { skipConfirm in
+                if skipConfirm {
+                    performUninstall(row)
+                } else {
+                    pendingUninstall = row
+                }
+            },
+            helpKey: "",
+            pressedHelpKey: "settings.plugins.uninstall.immediate.help"
+        ) { pressed in
+            destructiveButtonLabel(
+                "settings.plugins.uninstall",
+                pressed: pressed
+            )
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.mini)
+        .tint(.red)
+    }
+
+    /// Shared label for the bordered mini destructive buttons (Disable
+    /// / Uninstall). When the skip-confirm modifier is held, prepend a
+    /// red bolt glyph and bold the text so the user can see the click
+    /// is about to skip the confirmation alert before they commit.
+    @ViewBuilder
+    private func destructiveButtonLabel(
+        _ titleKey: LocalizedStringKey,
+        pressed: Bool
+    ) -> some View {
+        HStack(spacing: 3) {
+            if pressed {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.red)
+            }
+            Text(titleKey)
+                .font(.system(size: 10, weight: pressed ? .semibold : .regular))
+        }
+    }
+
+    private func installedVersion(for row: Row) -> SemVer {
+        if let url = row.source?.bundleURL,
+           let diskManifest = try? PluginManifest(contentsOfBundleAt: url),
+           diskManifest.id == row.manifest.id {
+            return diskManifest.version
+        }
+        return row.manifest.version
+    }
+
+    private func updateNeedsRestart(_ row: Row) -> Bool {
+        guard let url = row.source?.bundleURL,
+              let diskManifest = try? PluginManifest(contentsOfBundleAt: url),
+              diskManifest.id == row.manifest.id else {
+            return false
+        }
+        return diskManifest.version > row.manifest.version
     }
 
     /// Uninstall stays gated to `.user` — we can't delete files we
@@ -522,6 +655,42 @@ struct PluginsSettingsView: View {
         return activeProviderCount > 1
     }
 
+    /// Reset path shared by the alert (Confirm button) and the
+    /// skip-confirm shortcut. Centralised so both entry points emit
+    /// the same status message.
+    private func performResetTrust() {
+        TrustStore().clearAll()
+        resetMessage = NSLocalizedString("settings.plugins.resetTrust.done", comment: "")
+    }
+
+    /// Disable path used by both the alert (default) and the
+    /// skip-confirm shortcut path. Identical effect — split out so the
+    /// `DestructiveActionButton` skip branch and the alert button
+    /// don't drift.
+    private func performDisable(_ row: Row) {
+        guard let source = row.source else { return }
+        PluginTrustGate.disable(manifest: row.manifest, source: source)
+        refreshTick &+= 1
+    }
+
+    /// Uninstall path shared by alert + skip-confirm shortcut.
+    private func performUninstall(_ row: Row) {
+        let manifest = row.manifest
+        guard let source = row.source else { return }
+        Task { @MainActor in
+            do {
+                _ = try await PluginUninstaller.uninstall(
+                    manifest: manifest,
+                    source: source,
+                    registry: pluginRegistry
+                )
+                refreshTick &+= 1
+            } catch {
+                uninstallError = String(describing: error)
+            }
+        }
+    }
+
     private func handleEnable(_ row: Row) {
         guard let source = row.source else { return }
         let outcome = PluginTrustGate.enable(manifest: row.manifest, source: source)
@@ -540,14 +709,21 @@ struct PluginsSettingsView: View {
         refreshTick &+= 1
     }
 
-    private func kindGlyph(_ kind: PluginKind) -> String {
-        switch kind {
-        case .provider: return "shippingbox"
-        case .terminal: return "terminal"
-        case .shareRole: return "person.crop.square"
-        case .shareCardTheme: return "paintpalette"
-        case .both: return "rectangle.connected.to.line.below"
-        case .subscriptionExtension: return "creditcard"
-        }
+    private func subcategory(for manifest: PluginManifest) -> PluginCatalogSubcategory {
+        let plugin = livePlugin(id: manifest.id)
+        return PluginCatalogSubcategory.resolve(
+            plugin: plugin,
+            manifestKind: manifest.kind,
+            manifestCategoryString: manifest.category,
+            catalogCategoryString: catalogEntriesByID[manifest.id]?.category
+        )
+    }
+
+    private func livePlugin(id: String) -> (any Plugin)? {
+        pluginRegistry.terminalPlugin(id: id)
+            ?? pluginRegistry.providerPlugin(id: id)
+            ?? pluginRegistry.shareRolePlugin(id: id)
+            ?? pluginRegistry.shareThemePlugin(id: id)
+            ?? pluginRegistry.subscriptionExtensions[id]
     }
 }

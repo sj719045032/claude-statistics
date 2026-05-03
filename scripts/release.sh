@@ -98,6 +98,14 @@ BEFORE_DELTAS=$(mktemp)
 find "$ARCHIVE_DIR" -maxdepth 1 -name "*.delta" 2>/dev/null | sort > "$BEFORE_DELTAS"
 
 echo "==> [1/4] Building v${VERSION}..."
+
+# Pin SDK references back to the published sdk-v<x.y.z> URL+checksum
+# (and catalog-repo branch:main). Local-mode markers committed to git
+# would break SwiftPM resolution for anyone consuming Package.swift,
+# so this is non-negotiable before the commit step below. Idempotent
+# when already in published mode.
+bash scripts/sdk-mode.sh published >/dev/null
+
 # Stash the (already-validated) bilingual notes in a temp markdown file
 # and hand its path to build-dmg.sh via env var. build-dmg.sh converts
 # it to HTML so generate_appcast can inline it as <description> in the

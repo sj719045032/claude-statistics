@@ -50,11 +50,13 @@ public struct ActivateAppFocusStrategy: TerminalFocusStrategy {
 
     @MainActor
     private func activate(candidates: [String]) -> Bool {
+        DiagnosticLogger.shared.info("SDK activate focus candidates=\(candidates.joined(separator: ","))")
         // First try any currently-running candidate.
         for candidate in candidates {
-            if let app = NSRunningApplication.runningApplications(withBundleIdentifier: candidate).first,
-               app.activate(options: [.activateAllWindows]) {
-                return true
+            if let app = NSRunningApplication.runningApplications(withBundleIdentifier: candidate).first {
+                let result = activate(app, bundleIdentifier: candidate)
+                DiagnosticLogger.shared.info("SDK activate focus running result=\(result) bundle=\(candidate) pid=\(app.processIdentifier)")
+                return result
             }
         }
         // Then any installed candidate.
@@ -65,9 +67,84 @@ public struct ActivateAppFocusStrategy: TerminalFocusStrategy {
             let configuration = NSWorkspace.OpenConfiguration()
             configuration.activates = true
             NSWorkspace.shared.openApplication(at: appURL, configuration: configuration)
+            DiagnosticLogger.shared.info("SDK activate focus opened app bundle=\(candidate)")
             return true
         }
+        DiagnosticLogger.shared.warning("SDK activate focus no installed candidates=\(candidates.joined(separator: ","))")
         return false
+    }
+
+    @MainActor
+    private func activate(_ app: NSRunningApplication, bundleIdentifier: String) -> Bool {
+        let restoredBefore = restoreMinimizedWindow(pid: app.processIdentifier)
+        app.unhide()
+        let activated = app.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+        let appleScriptReopened = runAppleScript(command: "reopen", bundleIdentifier: bundleIdentifier)
+        let appleScriptActivated = activateWithAppleScript(bundleIdentifier: bundleIdentifier)
+        let restoredAfter = restoreMinimizedWindow(pid: app.processIdentifier)
+        DiagnosticLogger.shared.info(
+            "SDK activate focus steps pid=\(app.processIdentifier) bundle=\(bundleIdentifier) restoredBefore=\(restoredBefore) nsActivate=\(activated) reopen=\(appleScriptReopened) appleActivate=\(appleScriptActivated) restoredAfter=\(restoredAfter)"
+        )
+        return restoredBefore || activated || appleScriptReopened || appleScriptActivated || restoredAfter
+    }
+
+    @MainActor
+    private func activateWithAppleScript(bundleIdentifier: String) -> Bool {
+        runAppleScript(command: "activate", bundleIdentifier: bundleIdentifier)
+    }
+
+    @MainActor
+    private func runAppleScript(command: String, bundleIdentifier: String) -> Bool {
+        let escaped = bundleIdentifier
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        let source = "tell application id \"\(escaped)\" to \(command)"
+        var error: NSDictionary?
+        guard let script = NSAppleScript(source: source) else { return false }
+        script.executeAndReturnError(&error)
+        if let error {
+            DiagnosticLogger.shared.warning("SDK activate focus AppleScript \(command) failed bundle=\(bundleIdentifier) error=\(error)")
+            return false
+        }
+        return true
+    }
+
+    @MainActor
+    private func restoreMinimizedWindow(pid: pid_t) -> Bool {
+        guard AXIsProcessTrusted() else {
+            DiagnosticLogger.shared.info("SDK AX restore skipped pid=\(pid) reason=notTrusted")
+            return false
+        }
+
+        let app = AXUIElementCreateApplication(pid)
+        var rawWindows: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &rawWindows)
+        guard result == .success,
+              let windows = rawWindows as? [AXUIElement],
+              !windows.isEmpty else {
+            DiagnosticLogger.shared.info("SDK AX restore miss pid=\(pid) result=\(String(describing: result))")
+            return false
+        }
+
+        var restored = false
+        for window in windows {
+            var rawMinimized: CFTypeRef?
+            let minimizedResult = AXUIElementCopyAttributeValue(window, kAXMinimizedAttribute as CFString, &rawMinimized)
+            if minimizedResult == .success,
+               (rawMinimized as? Bool) == true,
+               AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanFalse) == .success {
+                restored = true
+            }
+
+            AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+            AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
+            AXUIElementSetAttributeValue(window, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+            if restored {
+                break
+            }
+        }
+        DiagnosticLogger.shared.info("SDK AX restore result pid=\(pid) windows=\(windows.count) restored=\(restored)")
+        return restored
     }
 }
 
@@ -116,6 +193,7 @@ public struct OpenInEditorLauncher: TerminalLauncher {
     public func launch(_ request: TerminalLaunchRequest) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(request.commandInWorkingDirectory, forType: .string)
+        TerminalDispatch.notify(Self.copiedCommandMessage(displayName: displayName()))
 
         guard let appURL = bundleIdentifiers
             .lazy
@@ -123,10 +201,29 @@ public struct OpenInEditorLauncher: TerminalLauncher {
             .first
         else { return }
 
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
         NSWorkspace.shared.open(
             [URL(fileURLWithPath: request.cwd)],
             withApplicationAt: appURL,
-            configuration: NSWorkspace.OpenConfiguration()
+            configuration: configuration
+        )
+    }
+
+    private func displayName() -> String {
+        for bundleIdentifier in bundleIdentifiers {
+            if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
+                return FileManager.default.displayName(atPath: appURL.path)
+                    .replacingOccurrences(of: ".app", with: "")
+            }
+        }
+        return "editor"
+    }
+
+    private static func copiedCommandMessage(displayName: String) -> String {
+        String(
+            format: NSLocalizedString("detail.resumeCopiedHint %@", comment: ""),
+            displayName
         )
     }
 }

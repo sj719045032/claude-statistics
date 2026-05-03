@@ -64,7 +64,7 @@ final class ActiveSessionsTracker: ObservableObject {
     private var droppedSessionIds: Set<String> = []
 
     init() {
-        self.runtimeByKey = TerminalIdentityResolver.sanitizedGhosttyCollisions(
+        self.runtimeByKey = TerminalIdentityResolver.sanitizedTransientSurfaceCollisions(
             (persistor.load() ?? [:])
                 .mapValues { TerminalIdentityResolver.sanitized($0) }
         )
@@ -105,7 +105,7 @@ final class ActiveSessionsTracker: ObservableObject {
     private func pruneInactiveSessions() {
         let now = Date()
         let cutoff = now.addingTimeInterval(-activeWindow)
-        let filtered = TerminalIdentityResolver.sanitizedGhosttyCollisions(
+        let filtered = TerminalIdentityResolver.sanitizedTransientSurfaceCollisions(
             runtimeByKey
                 .filter { shouldKeep(runtime: $0.value, cutoff: cutoff, now: now) }
                 .mapValues { TerminalIdentityResolver.sanitized($0) }
@@ -193,6 +193,7 @@ final class ActiveSessionsTracker: ObservableObject {
                     existing.projectPath = launchDir
                 }
                 RuntimeSessionEventApplier.merge(runtime: &existing, signals: signals)
+                recoverClaudeProcessContextIfNeeded(for: &existing)
                 if existing != before {
                     runtimeByKey[key] = TerminalIdentityResolver.sanitized(existing)
                     didRestore = true
@@ -222,6 +223,7 @@ final class ActiveSessionsTracker: ObservableObject {
                 currentToolDetail: nil
             )
             RuntimeSessionEventApplier.merge(runtime: &fresh, signals: signals)
+            recoverClaudeProcessContextIfNeeded(for: &fresh)
             runtimeByKey[key] = TerminalIdentityResolver.sanitized(fresh)
             DiagnosticLogger.shared.verbose(
                 "Active restore provider=\(provider.rawValue) session=\(runtimeSessionID) sourceID=\(session.id) project=\(session.cwd?.nilIfEmpty ?? session.projectPath.nilIfEmpty ?? "-") lastModified=\(session.lastModified.timeIntervalSince1970) signals=\(signals.count)"
@@ -464,6 +466,7 @@ final class ActiveSessionsTracker: ObservableObject {
                 runtime.projectPath = session.projectPath.nilIfEmpty
             }
             RuntimeSessionEventApplier.merge(runtime: &runtime, signals: signals)
+            recoverClaudeProcessContextIfNeeded(for: &runtime)
 
             if runtime != before {
                 runtimeByKey[key] = TerminalIdentityResolver.sanitized(runtime)
@@ -508,6 +511,31 @@ final class ActiveSessionsTracker: ObservableObject {
             incomingStableID: incomingStableID,
             in: runtimeByKey
         )
+    }
+
+    private func recoverClaudeProcessContextIfNeeded(for runtime: inout RuntimeSession) {
+        guard runtime.provider == .claude else { return }
+        let needsPid = runtime.pid == nil
+        let needsTTY = runtime.tty?.nilIfEmpty == nil
+        guard needsPid || needsTTY else { return }
+        guard let projectPath = runtime.projectPath?.nilIfEmpty,
+              let recovered = ProcessTreeWalker.findClaudeProcess(projectPath: projectPath) else {
+            return
+        }
+
+        if needsPid {
+            runtime.pid = Int32(recovered.pid)
+        }
+        if needsTTY {
+            runtime.tty = recovered.tty
+        }
+        if runtime.terminalName?.nilIfEmpty == nil {
+            if let cached = inferredTerminalNameByPid[recovered.pid] {
+                runtime.terminalName = cached
+            } else {
+                kickOffTerminalNameInference(forPid: recovered.pid)
+            }
+        }
     }
 
     private func filterContext(forEvent event: AttentionEvent) -> SessionFilterContext {
@@ -600,7 +628,7 @@ final class ActiveSessionsTracker: ObservableObject {
                 }
             }
         }
-        runtimeByKey = TerminalIdentityResolver.sanitizedGhosttyCollisions(runtimeByKey
+        runtimeByKey = TerminalIdentityResolver.sanitizedTransientSurfaceCollisions(runtimeByKey
             .filter { shouldKeep(runtime: $0.value, cutoff: cutoff, now: now) }
             .mapValues { TerminalIdentityResolver.sanitized($0) })
         persistRuntime()

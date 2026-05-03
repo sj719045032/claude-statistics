@@ -7,7 +7,6 @@ import AppKit
 struct SessionListView: View {
     @ObservedObject var viewModel: SessionViewModel
     @ObservedObject var store: SessionDataStore
-    @EnvironmentObject var toastCenter: ToastCenter
     @State private var showDeleteConfirm = false
     @State private var deleteTarget: Set<String> = []
     @State private var selectedProjectForAnalytics: ProjectGroup?
@@ -34,9 +33,6 @@ struct SessionListView: View {
                     onNewSession: { viewModel.openNewSession($0) },
                     onResume: { session in
                         viewModel.resumeSession(session)
-                        if TerminalPreferences.isEditorPreferred {
-                            toastCenter.show(TerminalPreferences.resumeCopiedToastMessage)
-                        }
                     },
                     onDelete: { viewModel.deleteSession($0) },
                     onOpenTranscript: { viewModel.openTranscript(for: $0) }
@@ -181,9 +177,6 @@ struct SessionListView: View {
                                 onNewSession: { viewModel.openNewSession(session) },
                                 onResume: {
                                     viewModel.resumeSession(session)
-                                    if TerminalPreferences.isEditorPreferred {
-                                        toastCenter.show(TerminalPreferences.resumeCopiedToastMessage)
-                                    }
                                 },
                                 onViewTranscript: { viewModel.openTranscript(for: session) }
                             )
@@ -245,9 +238,6 @@ struct SessionListView: View {
                                     onNewSession: { viewModel.openNewSession(session) },
                                     onResume: {
                                         viewModel.resumeSession(session)
-                                        if TerminalPreferences.isEditorPreferred {
-                                            toastCenter.show(TerminalPreferences.resumeCopiedToastMessage)
-                                        }
                                     },
                                     onDelete: { skipConfirm in
                                         if skipConfirm {

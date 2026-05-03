@@ -23,6 +23,19 @@ struct ActiveSessionRow: View {
         session.triptychContent
     }
 
+    private var terminalSourceName: String? {
+        guard let raw = session.terminalName?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else {
+            return nil
+        }
+
+        if let capability = TerminalRegistry.capabilities.first(where: { $0.matchesTerminalName(raw) }) {
+            return capability.displayName
+        }
+
+        return raw
+    }
+
     /// Active tools to render in the detail section. Always surface every
     /// in-flight tool — MIDDLE in detailed mode is a CLI-style count
     /// aggregate ("Reading 1 file"), so the specific target belongs here
@@ -82,6 +95,20 @@ struct ActiveSessionRow: View {
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
                             .background(session.provider.descriptor.badgeColor.opacity(0.16), in: Capsule())
+                        if let terminalSourceName {
+                            HStack(spacing: 3) {
+                                Image(systemName: "terminal")
+                                    .font(.system(size: 7, weight: .semibold))
+                                Text(terminalSourceName)
+                                    .font(.system(size: 8, weight: .semibold, design: .rounded))
+                                    .lineLimit(1)
+                            }
+                            .foregroundStyle(.white.opacity(0.62))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color.white.opacity(0.09), in: Capsule())
+                            .help(terminalSourceName)
+                        }
                         if session.activeSubagentCount > 0 {
                             HStack(spacing: 2) {
                                 Image(systemName: "wand.and.stars")

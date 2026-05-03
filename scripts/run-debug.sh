@@ -23,6 +23,15 @@ LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Framewo
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENSURE_DEBUG_CODE_SIGN_SCRIPT="${SCRIPT_DIR}/ensure-debug-codesign.sh"
 
+# 0. Pin SDK references at the locally-built xcframework so any
+# catalog plugin you `dev-install.sh` afterwards links the in-progress
+# SDK source you're iterating on. Idempotent — sdk-mode.sh checks the
+# current marker block and only rewrites when the mode actually changes,
+# so this stays a no-op for `bash run-debug.sh` runs that follow another
+# `bash run-debug.sh`. The `release.sh` flow flips the modes back to
+# published before its commit step.
+bash "${SCRIPT_DIR}/sdk-mode.sh" local >/dev/null
+
 # 1. Kill both the previous Debug instance and the Release instance. lsregister
 # -trusted can cause backgroundd to re-evaluate SMAppService registrations and
 # restart the Release build if it was previously running. Stopping it here keeps

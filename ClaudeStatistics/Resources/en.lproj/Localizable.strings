@@ -43,6 +43,8 @@
 "detail.copyId" = "Copy session ID";
 "detail.copyResumeCommand" = "Copy resume command";
 "detail.resumeCopiedHint %@" = "Copied · Paste in %@ terminal (⌘V)";
+"detail.resumeCopiedManual" = "Copied resume command · Run it manually in a terminal";
+"detail.newCopiedManual" = "Copied new-session command · Run it manually in a terminal";
 "update.banner.available %@" = "%@ available";
 "update.banner.notes" = "Release notes";
 "update.banner.install" = "Install now";
@@ -245,6 +247,7 @@
 "settings.plugins.loaded.count %lld" = "Loaded plugins (%lld)";
 "settings.plugins.trust" = "Trust";
 "settings.plugins.resetTrust" = "Reset all plugin trust decisions";
+"settings.plugins.resetTrust.immediate.help" = "Reset now (skip confirmation)";
 "settings.plugins.resetTrust.confirmTitle" = "Reset trust decisions?";
 "settings.plugins.resetTrust.confirmMessage" = "Every user-installed plugin will be re-prompted on the next launch. Bundled plugins inside the app are not affected.";
 "settings.plugins.resetTrust.confirmButton" = "Reset";
@@ -253,16 +256,19 @@
 "settings.plugins.source.bundled" = "bundled";
 "settings.plugins.source.user" = "user";
 "settings.plugins.disable" = "Disable";
+"settings.plugins.disable.immediate.help" = "Disable now (skip confirmation)";
 "settings.plugins.disable.confirmTitle" = "Disable this plugin?";
 "settings.plugins.disable.confirmMessage" = "%@ will be removed from the plugin registry and skipped on every future launch. You can re-enable it from this panel at any time.";
 "settings.plugins.disable.confirmButton" = "Disable";
 "settings.plugins.disable.lastProviderHint" = "At least one provider must stay enabled — disabling this would make the menu bar entry unreachable.";
 "settings.plugins.enable" = "Enable";
 "settings.plugins.enable.restartRequired" = "Restart required";
+"settings.plugins.restartNow" = "Restart";
 "settings.plugins.enable.errorTitle" = "Enable failed";
 "settings.plugins.enable.hotLoadFailed" = "%@ couldn't be re-loaded without restart (%@). Quit and relaunch Claude Statistics to bring it back.";
 "settings.plugins.disabled.count %lld" = "Disabled (%lld)";
 "settings.plugins.uninstall" = "Uninstall";
+"settings.plugins.uninstall.immediate.help" = "Uninstall now (skip confirmation)";
 "settings.plugins.uninstall.confirmTitle" = "Uninstall this plugin?";
 "settings.plugins.uninstall.confirmMessage" = "%@ will be unloaded, the .csplugin file deleted from disk, and its trust record cleared. The plugin can be reinstalled from Discover later.";
 "settings.plugins.uninstall.confirmButton" = "Uninstall";
@@ -315,10 +321,14 @@
 
 /* Subscription quotas view */
 "subscription.quotas.noData" = "No quota data";
-"subscription.quotas.resets.minutes %d" = "Resets in %dm";
-"subscription.quotas.resets.hoursMinutes %d %d" = "Resets in %dh %dm";
-"subscription.quotas.resets.days %d" = "Resets in %dd";
 "settings.plugins.category.utility" = "Utility";
+"settings.plugins.subcategory.provider" = "Provider";
+"settings.plugins.subcategory.terminal" = "Terminal";
+"settings.plugins.subcategory.editor" = "Editor";
+"settings.plugins.subcategory.app" = "App";
+"settings.plugins.subcategory.subscription" = "Subscription";
+"settings.plugins.subcategory.share-card" = "Share Card";
+"settings.plugins.subcategory.utility" = "Utility";
 "settings.developer.rebuildIndexes" = "Rebuild Data";
 "settings.developer.rebuildProviderIndex" = "Rebuild %@ Index";
 "settings.developer.rebuildProviderIndexHint" = "Deletes cached parsed data and rebuilds the search index for this provider.";
@@ -715,6 +725,4 @@
 
 /* Account source — subscription scope note */
 "claude.accountSource.help.subscriptionNote" = "This setting only affects Anthropic OAuth credential routing. Token-based subscription plans (GLM Coding Plan / 第三方) keep their own per-account state in the identity picker.";
-
-
 

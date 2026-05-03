@@ -144,14 +144,14 @@ final class TerminalIdentityResolverTests: XCTestCase {
         XCTAssertEqual(result.approvalToolUseId, "tool-use-1")
     }
 
-    // MARK: - sanitizedGhosttyCollisions
+    // MARK: - sanitizedTransientSurfaceCollisions
 
-    func test_sanitizedGhosttyCollisions_emptyDictReturnsEmpty() {
-        let result = TerminalIdentityResolver.sanitizedGhosttyCollisions([:])
+    func test_sanitizedTransientSurfaceCollisions_emptyDictReturnsEmpty() {
+        let result = TerminalIdentityResolver.sanitizedTransientSurfaceCollisions([:])
         XCTAssertTrue(result.isEmpty)
     }
 
-    func test_sanitizedGhosttyCollisions_nonGhosttyEntryUnchanged() {
+    func test_sanitizedTransientSurfaceCollisions_nonGhosttyEntryUnchanged() {
         let runtime = makeRuntime(
             tty: "/dev/ttys001",
             terminalName: "iTerm2",
@@ -160,14 +160,14 @@ final class TerminalIdentityResolverTests: XCTestCase {
             terminalStableID: "stable-1"
         )
         let input = ["k1": runtime]
-        let result = TerminalIdentityResolver.sanitizedGhosttyCollisions(input)
+        let result = TerminalIdentityResolver.sanitizedTransientSurfaceCollisions(input)
 
         XCTAssertEqual(result["k1"]?.terminalStableID, "stable-1", "non-Ghostty entries are not touched")
         XCTAssertEqual(result["k1"]?.terminalTabID, "tab-1")
         XCTAssertEqual(result["k1"]?.terminalWindowID, "win-1")
     }
 
-    func test_sanitizedGhosttyCollisions_singleGhosttyEntryUnchanged() {
+    func test_sanitizedTransientSurfaceCollisions_singleGhosttyEntryUnchanged() {
         let runtime = makeRuntime(
             tty: "/dev/ttys001",
             terminalName: "ghostty",
@@ -175,14 +175,14 @@ final class TerminalIdentityResolverTests: XCTestCase {
             terminalTabID: "tab-1",
             terminalStableID: "stable-1"
         )
-        let result = TerminalIdentityResolver.sanitizedGhosttyCollisions(["k1": runtime])
+        let result = TerminalIdentityResolver.sanitizedTransientSurfaceCollisions(["k1": runtime])
 
         XCTAssertEqual(result["k1"]?.terminalStableID, "stable-1", "a lone Ghostty entry has nothing to collide with")
         XCTAssertEqual(result["k1"]?.terminalTabID, "tab-1")
         XCTAssertEqual(result["k1"]?.terminalWindowID, "win-1")
     }
 
-    func test_sanitizedGhosttyCollisions_distinctStableIDsLeftAlone() {
+    func test_sanitizedTransientSurfaceCollisions_distinctStableIDsLeftAlone() {
         let a = makeRuntime(
             sessionId: "a",
             tty: "/dev/ttys001",
@@ -195,13 +195,13 @@ final class TerminalIdentityResolverTests: XCTestCase {
             terminalName: "ghostty",
             terminalStableID: "stable-B"
         )
-        let result = TerminalIdentityResolver.sanitizedGhosttyCollisions(["a": a, "b": b])
+        let result = TerminalIdentityResolver.sanitizedTransientSurfaceCollisions(["a": a, "b": b])
 
         XCTAssertEqual(result["a"]?.terminalStableID, "stable-A", "different stableIDs are not a collision")
         XCTAssertEqual(result["b"]?.terminalStableID, "stable-B")
     }
 
-    func test_sanitizedGhosttyCollisions_sameStableIDSameTTYNotConsideredCollision() {
+    func test_sanitizedTransientSurfaceCollisions_sameStableIDSameTTYNotConsideredCollision() {
         // Same stableID + same TTY isn't a real ambiguity — there's only one
         // distinct TTY in the group, so the resolver leaves both records alone.
         let a = makeRuntime(
@@ -216,13 +216,13 @@ final class TerminalIdentityResolverTests: XCTestCase {
             terminalName: "ghostty",
             terminalStableID: "stable-shared"
         )
-        let result = TerminalIdentityResolver.sanitizedGhosttyCollisions(["a": a, "b": b])
+        let result = TerminalIdentityResolver.sanitizedTransientSurfaceCollisions(["a": a, "b": b])
 
         XCTAssertEqual(result["a"]?.terminalStableID, "stable-shared", "same TTY means no real collision")
         XCTAssertEqual(result["b"]?.terminalStableID, "stable-shared")
     }
 
-    func test_sanitizedGhosttyCollisions_sameStableIDDifferentTTYClearsLoser() {
+    func test_sanitizedTransientSurfaceCollisions_sameStableIDDifferentTTYClearsLoser() {
         let older = Date(timeIntervalSince1970: 1_700_000_000)
         let newer = older.addingTimeInterval(60)
 
@@ -245,7 +245,7 @@ final class TerminalIdentityResolverTests: XCTestCase {
             terminalStableID: "stable-shared"
         )
 
-        let result = TerminalIdentityResolver.sanitizedGhosttyCollisions([
+        let result = TerminalIdentityResolver.sanitizedTransientSurfaceCollisions([
             "loser": loser,
             "winner": winner
         ])

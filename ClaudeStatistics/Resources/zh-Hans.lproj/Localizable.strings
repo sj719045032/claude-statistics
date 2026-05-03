@@ -43,6 +43,8 @@
 "detail.copyId" = "复制会话 ID";
 "detail.copyResumeCommand" = "复制恢复命令";
 "detail.resumeCopiedHint %@" = "已复制 · 到 %@ 终端 ⌘V 粘贴";
+"detail.resumeCopiedManual" = "已复制恢复命令 · 请在终端手动执行";
+"detail.newCopiedManual" = "已复制新建命令 · 请在终端手动执行";
 "update.banner.available %@" = "%@ 可用";
 "update.banner.notes" = "查看更新";
 "update.banner.install" = "立即更新";
@@ -258,6 +260,7 @@
 "settings.plugins.loaded.count %lld" = "已加载插件（%lld）";
 "settings.plugins.trust" = "信任";
 "settings.plugins.resetTrust" = "重置所有插件信任决定";
+"settings.plugins.resetTrust.immediate.help" = "立即重置（跳过确认）";
 "settings.plugins.resetTrust.confirmTitle" = "重置信任决定？";
 "settings.plugins.resetTrust.confirmMessage" = "下次启动时所有用户安装的插件都会重新提示。App 内捆绑的插件不受影响。";
 "settings.plugins.resetTrust.confirmButton" = "重置";
@@ -266,16 +269,19 @@
 "settings.plugins.source.bundled" = "随包";
 "settings.plugins.source.user" = "用户";
 "settings.plugins.disable" = "禁用";
+"settings.plugins.disable.immediate.help" = "立即禁用（跳过确认）";
 "settings.plugins.disable.confirmTitle" = "禁用此插件？";
 "settings.plugins.disable.confirmMessage" = "%@ 将从插件注册表移除，且后续每次启动都会跳过加载。你随时可以在此面板将它重新启用。";
 "settings.plugins.disable.confirmButton" = "禁用";
 "settings.plugins.disable.lastProviderHint" = "至少需要保留一个 Provider 处于启用状态，否则菜单栏入口会消失。";
 "settings.plugins.enable" = "启用";
 "settings.plugins.enable.restartRequired" = "需要重启";
+"settings.plugins.restartNow" = "重启";
 "settings.plugins.enable.errorTitle" = "启用失败";
 "settings.plugins.enable.hotLoadFailed" = "%@ 无法在不重启的情况下重新加载（%@）。请退出并重启 Claude Statistics。";
 "settings.plugins.disabled.count %lld" = "已禁用（%lld）";
 "settings.plugins.uninstall" = "卸载";
+"settings.plugins.uninstall.immediate.help" = "立即卸载（跳过确认）";
 "settings.plugins.uninstall.confirmTitle" = "卸载此插件？";
 "settings.plugins.uninstall.confirmMessage" = "%@ 将被从注册表移除、磁盘上的 .csplugin 文件被删除、信任记录被清空。之后可以从市场重新安装。";
 "settings.plugins.uninstall.confirmButton" = "卸载";
@@ -328,10 +334,14 @@
 
 /* 订阅配额视图 */
 "subscription.quotas.noData" = "暂无配额数据";
-"subscription.quotas.resets.minutes %d" = "%d 分钟后重置";
-"subscription.quotas.resets.hoursMinutes %d %d" = "%d 小时 %d 分钟后重置";
-"subscription.quotas.resets.days %d" = "%d 天后重置";
 "settings.plugins.category.utility" = "工具";
+"settings.plugins.subcategory.provider" = "Provider";
+"settings.plugins.subcategory.terminal" = "终端";
+"settings.plugins.subcategory.editor" = "编辑器";
+"settings.plugins.subcategory.app" = "应用";
+"settings.plugins.subcategory.subscription" = "订阅";
+"settings.plugins.subcategory.share-card" = "分享卡片";
+"settings.plugins.subcategory.utility" = "工具";
 "settings.developer.rebuildIndexes" = "重建数据";
 "settings.developer.rebuildProviderIndex" = "重建 %@ 索引";
 "settings.developer.rebuildProviderIndexHint" = "删除该 provider 的解析缓存，并重新构建搜索索引。";
@@ -728,6 +738,4 @@
 
 /* Account source — subscription scope note */
 "claude.accountSource.help.subscriptionNote" = "此设置只影响 Anthropic OAuth 凭证的来源。GLM Coding Plan / 其他第三方订阅有自己的账号管理,在身份选择器内切换。";
-
-
 

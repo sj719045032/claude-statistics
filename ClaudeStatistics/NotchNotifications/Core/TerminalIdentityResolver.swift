@@ -2,42 +2,39 @@ import Foundation
 import ClaudeStatisticsKit
 
 /// Pure rules around mapping `RuntimeSession` records to terminal tabs.
-/// Three families of logic that all hinge on Ghostty's quirks (a single
-/// stable surface ID can briefly appear under two TTYs across split tabs;
-/// closed tabs leave stale persisted records claiming the new tab's IDs):
+/// Three families of logic that all hinge on terminals whose surface
+/// IDs are merely best-effort (a single stable surface ID can briefly
+/// appear under two TTYs across split tabs; closed tabs leave stale
+/// persisted records claiming the new tab's IDs):
 ///
 /// 1. Per-record sanitization — drop generic "waiting for input" previews,
 ///    expire stale approvals so the notch doesn't show a grey "Allow?"
 ///    button for a session the user already moved on from.
-/// 2. Cross-record sanitization — when two sessions claim the same Ghostty
-///    `stableID` via different TTYs, strip the contested IDs from all but
-///    the most recently active so focus targeting can't bind to the wrong
-///    surface.
+/// 2. Cross-record sanitization — when two sessions claim the same
+///    `stableID` via different TTYs, strip the contested IDs from all
+///    but the most recently active so focus targeting can't bind to the
+///    wrong surface. Only relevant for terminals whose plugin declares
+///    `focusPrecision == .bestEffort` (Ghostty being the canonical
+///    case); for `.exact` terminals every surface ID is trusted.
 /// 3. Tab-level displacement — when a brand new SessionStart fires, find
 ///    the prior sessions sitting on the same TTY/tab/stableID so the
 ///    tracker can evict them. Returned as a list of (key, sessionId) so
 ///    the tracker can update both `runtimeByKey` and `displacedSessionIds`.
 enum TerminalIdentityResolver {
-    private static let ghosttyBundleID = "com.mitchellh.ghostty"
-
-    /// Lowercased terminal-name aliases that resolve to Ghostty even
-    /// when the GhosttyPlugin hasn't registered with `PluginRegistry`
-    /// yet (or in unit tests where no plugin loader runs). This
-    /// keeps the resolver's hardcoded `ghosttyBundleID` rule
-    /// well-defined without requiring the catalog plugin to be
-    /// installed first. The aliases mirror GhosttyPlugin's own
-    /// `descriptor.terminalNameAliases` — keep them in sync.
-    private static let ghosttyTerminalNameAliases: Set<String> = ["ghostty", "xterm-ghostty"]
-
-    /// Whether `terminalName` (or its registry-resolved bundle id)
-    /// identifies a Ghostty session — checks the plugin registry's
-    /// alias table first, falls back to the hardcoded alias list.
-    private static func isGhosttyTerminal(name terminalName: String?) -> Bool {
-        if TerminalRegistry.bundleId(forTerminalName: terminalName) == ghosttyBundleID {
-            return true
+    /// Whether the terminal owning `terminalName` exposes
+    /// best-effort (transiently colliding) surface IDs. Resolved via
+    /// the plugin descriptor's `focusPrecision` — no hardcoded bundle
+    /// id list — so a third-party plugin that ships with
+    /// `.bestEffort` precision automatically gets the same collision
+    /// arbitration.
+    private static func hasTransientSurfaceIDs(name terminalName: String?) -> Bool {
+        guard let bundleId = TerminalRegistry.bundleId(forTerminalName: terminalName) else {
+            return false
         }
-        guard let lower = terminalName?.lowercased() else { return false }
-        return ghosttyTerminalNameAliases.contains(lower)
+        guard let cap = TerminalRegistry.capabilities.first(where: { $0.ownsBundleIdentifier(bundleId) }) else {
+            return false
+        }
+        return cap.tabFocusPrecision == .bestEffort
     }
 
     // MARK: - Per-record
@@ -63,12 +60,12 @@ enum TerminalIdentityResolver {
     /// live on distinct TTYs, the stable ID is ambiguous — clear it (and
     /// the window/tab IDs) on every entry except the most-recently-active
     /// one so focus targeting falls back to TTY-only.
-    static func sanitizedGhosttyCollisions(
+    static func sanitizedTransientSurfaceCollisions(
         _ runtimes: [String: RuntimeSession]
     ) -> [String: RuntimeSession] {
         var result = runtimes
-        let ghosttyEntries = runtimes.compactMap { key, runtime -> (key: String, runtime: RuntimeSession)? in
-            guard isGhosttyTerminal(name: runtime.terminalName),
+        let candidates = runtimes.compactMap { key, runtime -> (key: String, runtime: RuntimeSession)? in
+            guard hasTransientSurfaceIDs(name: runtime.terminalName),
                   runtime.terminalStableID?.nilIfEmpty != nil,
                   runtime.tty?.nilIfEmpty != nil else {
                 return nil
@@ -76,7 +73,7 @@ enum TerminalIdentityResolver {
             return (key, runtime)
         }
 
-        let grouped = Dictionary(grouping: ghosttyEntries) { $0.runtime.terminalStableID ?? "" }
+        let grouped = Dictionary(grouping: candidates) { $0.runtime.terminalStableID ?? "" }
         for (stableID, entries) in grouped where entries.count > 1 {
             let distinctTTYs = Set(entries.compactMap { $0.runtime.tty?.nilIfEmpty })
             guard distinctTTYs.count > 1 else { continue }
@@ -91,7 +88,7 @@ enum TerminalIdentityResolver {
                 runtime.terminalStableID = nil
                 result[entry.key] = runtime
                 DiagnosticLogger.shared.warning(
-                    "Cleared ambiguous Ghostty terminal id key=\(entry.key) stableID=\(stableID) tty=\(entry.runtime.tty ?? "-")"
+                    "Cleared ambiguous terminal surface id key=\(entry.key) terminal=\(entry.runtime.terminalName ?? "-") stableID=\(stableID) tty=\(entry.runtime.tty ?? "-")"
                 )
             }
         }
@@ -117,7 +114,7 @@ enum TerminalIdentityResolver {
         let tty = event.tty?.nilIfEmpty
         let tabID = event.terminalTabID?.nilIfEmpty
         let stableID = event.terminalStableID?.nilIfEmpty
-        let isGhostty = isGhosttyTerminal(name: event.terminalName)
+        let surfaceIDsTransient = hasTransientSurfaceIDs(name: event.terminalName)
         // Need at least one terminal identity to match on, otherwise we'd
         // evict unrelated sessions across different tabs.
         guard tty != nil || tabID != nil || stableID != nil else { return [] }
@@ -128,12 +125,12 @@ enum TerminalIdentityResolver {
                 return DisplacedSession(key: key, sessionId: runtime.sessionId)
             }
             if let stableID, runtime.terminalStableID == stableID {
-                if isGhostty, let eventTTY = tty, let runtimeTTY = runtime.tty, runtimeTTY != eventTTY {
+                if surfaceIDsTransient, let eventTTY = tty, let runtimeTTY = runtime.tty, runtimeTTY != eventTTY {
                     return nil
                 }
                 return DisplacedSession(key: key, sessionId: runtime.sessionId)
             }
-            if !isGhostty, let tabID, runtime.terminalTabID == tabID {
+            if !surfaceIDsTransient, let tabID, runtime.terminalTabID == tabID {
                 return DisplacedSession(key: key, sessionId: runtime.sessionId)
             }
             return nil
@@ -142,8 +139,9 @@ enum TerminalIdentityResolver {
 
     /// Decide whether an incoming event's terminal identity should be
     /// trusted for `key`, given everything else currently in `runtimes`.
-    /// Only Ghostty surfaces this problem — other terminals' IDs are
-    /// trustworthy. When two Ghostty surfaces briefly claim the same
+    /// Only terminals whose plugin advertises `focusPrecision == .bestEffort`
+    /// surface this problem — `.exact` terminals' IDs are trustworthy.
+    /// When two best-effort surfaces briefly claim the same
     /// stableID/tabID via different TTYs, reject the new claim and log
     /// once so the operator can investigate.
     static func acceptsTerminalIdentity(
@@ -154,7 +152,7 @@ enum TerminalIdentityResolver {
         incomingStableID: String?,
         in runtimes: [String: RuntimeSession]
     ) -> Bool {
-        guard isGhosttyTerminal(name: terminalName) else {
+        guard hasTransientSurfaceIDs(name: terminalName) else {
             return true
         }
         guard incomingStableID != nil || incomingTabID != nil else { return true }
@@ -166,7 +164,7 @@ enum TerminalIdentityResolver {
             if let incomingStableID,
                runtime.terminalStableID == incomingStableID {
                 DiagnosticLogger.shared.warning(
-                    "Ignored Ghostty terminal id collision key=\(key) stableID=\(incomingStableID) incomingTTY=\(incomingTTY) existingTTY=\(runtimeTTY)"
+                    "Ignored terminal surface id collision key=\(key) terminal=\(terminalName ?? "-") stableID=\(incomingStableID) incomingTTY=\(incomingTTY) existingTTY=\(runtimeTTY)"
                 )
                 return false
             }
@@ -175,7 +173,7 @@ enum TerminalIdentityResolver {
                let incomingTabID,
                runtime.terminalTabID == incomingTabID {
                 DiagnosticLogger.shared.warning(
-                    "Ignored Ghostty tab id collision key=\(key) tabID=\(incomingTabID) incomingTTY=\(incomingTTY) existingTTY=\(runtimeTTY)"
+                    "Ignored terminal tab id collision key=\(key) terminal=\(terminalName ?? "-") tabID=\(incomingTabID) incomingTTY=\(incomingTTY) existingTTY=\(runtimeTTY)"
                 )
                 return false
             }

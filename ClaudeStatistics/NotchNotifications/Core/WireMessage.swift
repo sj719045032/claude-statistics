@@ -25,6 +25,19 @@ struct WireMessage: Decodable {
     let terminal_window_id: String?
     let terminal_tab_id: String?
     let terminal_surface_id: String?
+    /// `__CFBundleIdentifier` from the hook's process env, transmitted
+    /// raw by the hook CLI. The host resolves it against plugin
+    /// descriptors' `bundleIdentifiers` to recognise chat-app GUI hosts
+    /// (Claude.app, Codex.app, etc.) regardless of what the user shell
+    /// rc happened to leak into TERM/TERM_PROGRAM. The hook CLI does
+    /// no plugin-aware lookup — it's a dumb pipe.
+    let host_app_bundle_id: String?
+    /// Subset of the hook's process env relevant to terminal
+    /// identification, transmitted raw. The host walks every
+    /// `TerminalEnvIdentifying` plugin against this dictionary to
+    /// pick the right terminal and pull socket / surface / window /
+    /// tab ids out without hardcoding any env-var name in host code.
+    let terminal_env: [String: String]?
     let tool_name: String?
     let tool_input: [String: JSONValue]?
     let tool_use_id: String?

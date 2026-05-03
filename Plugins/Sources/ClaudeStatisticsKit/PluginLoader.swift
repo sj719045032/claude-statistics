@@ -175,7 +175,19 @@ public enum PluginLoader {
         guard trustEvaluator(manifest, url) else {
             return .failure(.trustDenied)
         }
-        guard bundle.load() else {
+        // `Bundle.load()` swallows the underlying dyld / code-signing
+        // error, so the host previously surfaced an opaque
+        // `bundleLoadFailed` regardless of whether dlopen failed on
+        // missing symbols, library validation, or a stripped principal
+        // class. `loadAndReturnError(_:)` exposes the NSError; we log
+        // it (path + domain/code/description) so the next install /
+        // launch failure has a real lead instead of "something failed".
+        do {
+            try bundle.loadAndReturnError()
+        } catch {
+            DiagnosticLogger.shared.error(
+                "PluginLoader.loadOne: bundle.load failed at \(url.path); error=\(String(describing: error))"
+            )
             return .failure(.bundleLoadFailed)
         }
         guard let cls = bundle.classNamed(manifest.principalClass) else {

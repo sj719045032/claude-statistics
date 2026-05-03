@@ -1,4 +1,5 @@
 import Foundation
+import ClaudeStatisticsKit
 
 /// Pure translation from the hook wire protocol (`WireMessage`) to the
 /// in-app event type (`AttentionEvent` + `AttentionKind`). No I/O — no
@@ -77,11 +78,22 @@ enum WireEventTranslator {
     /// `pending` (for live socket connections that expect a reply) and
     /// resolved kind — the latter so the bridge can pass the
     /// permissionRequest case with proper toolUseId/input/tool plugged in.
+    /// Build the full `AttentionEvent`. `resolvedTerminalName` /
+    /// `resolvedTerminalContext` (when supplied) override the wire
+    /// message's `terminal_*` fields — the bridge runs
+    /// `HookTerminalResolver` on the main actor before getting here so
+    /// plugin-driven recognition can correct what the hook CLI shipped
+    /// (e.g. shell rc leaking `TERM=xterm-ghostty` into a Claude.app
+    /// session). Leave them nil to fall back to the raw message
+    /// fields, which preserves behaviour for tests and any caller that
+    /// hasn't wired plugin lookup yet.
     static func makeEvent(
         from msg: WireMessage,
         provider: ProviderKind,
         kind: AttentionKind,
-        pending: PendingResponse?
+        pending: PendingResponse?,
+        resolvedTerminalName: String? = nil,
+        resolvedTerminalContext: HookTerminalContext? = nil
     ) -> AttentionEvent {
         AttentionEvent(
             id: UUID(),
@@ -98,11 +110,11 @@ enum WireEventTranslator {
             transcriptPath: msg.transcript_path,
             tty: msg.tty,
             pid: msg.pid.map { Int32($0) },
-            terminalName: msg.terminal_name,
-            terminalSocket: msg.terminal_socket,
-            terminalWindowID: msg.terminal_window_id,
-            terminalTabID: msg.terminal_tab_id,
-            terminalStableID: msg.terminal_surface_id,
+            terminalName: resolvedTerminalName ?? msg.terminal_name,
+            terminalSocket: resolvedTerminalContext?.socket ?? msg.terminal_socket,
+            terminalWindowID: resolvedTerminalContext?.windowID ?? msg.terminal_window_id,
+            terminalTabID: resolvedTerminalContext?.tabID ?? msg.terminal_tab_id,
+            terminalStableID: resolvedTerminalContext?.surfaceID ?? msg.terminal_surface_id,
             receivedAt: Date(),
             promptText: msg.prompt_text,
             commentaryText: msg.commentary_text,

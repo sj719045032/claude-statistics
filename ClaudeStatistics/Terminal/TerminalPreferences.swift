@@ -46,14 +46,14 @@ enum TerminalPreferences {
         let d = UserDefaults.standard
         // 1. Per-provider key takes precedence.
         if let raw = d.string(forKey: perProviderKey(providerID)),
-           let option = option(for: raw) {
+           let option = option(for: raw, providerID: providerID) {
             return option.id
         }
         // 2. Fall back to the legacy single key during migration.
         //    Don't write it back per-provider here — the first
         //    explicit pick fills the per-provider entry naturally.
         if let raw = d.string(forKey: preferredTerminalKey),
-           let option = option(for: raw) {
+           let option = option(for: raw, providerID: providerID) {
             return option.id
         }
         return autoOptionID
@@ -97,7 +97,7 @@ enum TerminalPreferences {
         )
     }
 
-    static func option(for rawValue: String) -> TerminalPreferenceOption? {
-        TerminalRegistry.launchOptions.first { $0.id == rawValue }
+    static func option(for rawValue: String, providerID: String? = nil) -> TerminalPreferenceOption? {
+        TerminalRegistry.option(for: rawValue, providerID: providerID)
     }
 }

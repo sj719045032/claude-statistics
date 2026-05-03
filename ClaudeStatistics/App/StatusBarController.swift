@@ -250,17 +250,21 @@ struct MenuBarUsageStrip: View {
     /// list itself comes from `ProviderRegistry.allKnownDescriptors`,
     /// which already merges builtins with plugin contributions.
     @State private var preferenceRevision: Int = 0
+    /// Sum of "I'm currently rendering" flags reported by each
+    /// `MenuBarUsageCell` via preference. `nil` until the first
+    /// reduction lands so we don't briefly force the fallback icon
+    /// before cells finish their first measurement pass.
+    @State private var visibleCellCount: Int? = nil
     private static let rotationInterval: TimeInterval = 3
 
     var body: some View {
         HStack(spacing: 4) {
-            if renderableKinds.isEmpty {
+            if shouldShowFallback {
                 MenuBarFallbackIcon()
-            } else {
-                ForEach(renderableKinds, id: \.self) { kind in
-                    if let vm = appState.usageViewModel(for: kind) {
-                        MenuBarUsageCell(kind: kind, viewModel: vm, tick: tick)
-                    }
+            }
+            ForEach(renderableKinds, id: \.self) { kind in
+                if let vm = appState.usageViewModel(for: kind) {
+                    MenuBarUsageCell(kind: kind, viewModel: vm, tick: tick)
                 }
             }
         }
@@ -271,12 +275,26 @@ struct MenuBarUsageStrip: View {
             }
         )
         .onPreferenceChange(MenuBarStripSizeKey.self, perform: onSizeChange)
+        .onPreferenceChange(MenuBarVisibleCellCountKey.self) { count in
+            visibleCellCount = count
+        }
         .onReceive(Timer.publish(every: Self.rotationInterval, on: .main, in: .common).autoconnect()) { _ in
             tick &+= 1
         }
         .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
             preferenceRevision &+= 1
         }
+    }
+
+    /// Fallback icon kicks in when no provider is even a candidate
+    /// (everything toggled off / no usage plugin installed) **or** when
+    /// every visible candidate self-hid because it has no usage data
+    /// yet (e.g. all credentials expired). Without the second case the
+    /// status item collapses to its 28pt minimum and renders an empty
+    /// button — clickable but invisible.
+    private var shouldShowFallback: Bool {
+        if renderableKinds.isEmpty { return true }
+        return visibleCellCount == 0
     }
 
     /// Resolve every descriptor whose toggle is currently on, then map
@@ -330,6 +348,16 @@ private struct MenuBarStripSizeKey: PreferenceKey {
     }
 }
 
+/// Each cell contributes 1 if it's actively rendering (has usage data
+/// to show), 0 if it's self-hiding. The strip sums them to decide
+/// whether to fall back to the bare app icon.
+private struct MenuBarVisibleCellCountKey: PreferenceKey {
+    static var defaultValue: Int = 0
+    static func reduce(value: inout Int, nextValue: () -> Int) {
+        value += nextValue()
+    }
+}
+
 private struct MenuBarUsageCell: View {
     let kind: ProviderKind
     @ObservedObject var viewModel: UsageViewModel
@@ -343,25 +371,31 @@ private struct MenuBarUsageCell: View {
     private static let cellWidth: CGFloat = 42
 
     var body: some View {
-        HStack(spacing: 5) {
-            Image(kind.descriptor.iconAssetName)
-                .resizable()
-                .renderingMode(.template)
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 15, height: 15)
-                .foregroundStyle(.primary)
-            VStack(alignment: .center, spacing: -1) {
-                Text(currentSegment?.prefix ?? "—")
-                    .font(.system(size: 9, weight: .medium, design: .monospaced))
-                Text(currentSegment?.value ?? " ")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+        let hasData = !segments.isEmpty
+        Group {
+            if hasData {
+                HStack(spacing: 5) {
+                    Image(kind.descriptor.iconAssetName)
+                        .resizable()
+                        .renderingMode(.template)
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 15, height: 15)
+                        .foregroundStyle(.primary)
+                    VStack(alignment: .center, spacing: -1) {
+                        Text(currentSegment?.prefix ?? "—")
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        Text(currentSegment?.value ?? " ")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    }
+                    .foregroundStyle(color(for: currentSegment))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                }
+                .frame(width: Self.cellWidth, alignment: .leading)
+                .help(kind.descriptor.displayName)
             }
-            .foregroundStyle(color(for: currentSegment))
-            .lineLimit(1)
-            .minimumScaleFactor(0.7)
         }
-        .frame(width: Self.cellWidth, alignment: .leading)
-        .help(kind.descriptor.displayName)
+        .preference(key: MenuBarVisibleCellCountKey.self, value: hasData ? 1 : 0)
     }
 
     private var segments: [MenuBarStripSegment] {

@@ -16,6 +16,7 @@ import Foundation
 public enum TerminalDispatch {
     private static let lock = NSLock()
     private static var _dispatcher: (@Sendable (TerminalLaunchRequest) -> Void)?
+    private static var _noticeDispatcher: (@Sendable (String) -> Void)?
 
     /// Wire the host-side launcher. Idempotent — calling twice replaces
     /// the previous closure (host shouldn't, but a future test harness
@@ -24,6 +25,12 @@ public enum TerminalDispatch {
         lock.lock()
         defer { lock.unlock() }
         _dispatcher = dispatcher
+    }
+
+    public static func setNoticeDispatcher(_ dispatcher: @escaping @Sendable (String) -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+        _noticeDispatcher = dispatcher
     }
 
     /// Forward a launch request to whatever the host registered. Calls
@@ -35,5 +42,12 @@ public enum TerminalDispatch {
         let dispatcher = _dispatcher
         lock.unlock()
         dispatcher?(request)
+    }
+
+    public static func notify(_ message: String) {
+        lock.lock()
+        let dispatcher = _noticeDispatcher
+        lock.unlock()
+        dispatcher?(message)
     }
 }

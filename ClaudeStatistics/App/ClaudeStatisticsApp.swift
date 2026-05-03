@@ -10,6 +10,10 @@ private enum DefaultSettings {
     }
 }
 
+extension Notification.Name {
+    static let terminalLaunchNotice = Notification.Name("terminalLaunchNotice")
+}
+
 private enum StatusLineSync {
     /// Refreshes already-installed status-line integrations on
     /// startup. `plugins` filter so disabled provider plugins don't
@@ -280,13 +284,17 @@ final class AppState: ObservableObject {
             await TerminalFocusCoordinator.shared.setPluginStrategyResolver { [registry] bundleId in
                 guard let bundleId else { return nil }
                 return await MainActor.run {
-                    for (_, plugin) in registry.terminals {
+                    for (manifestId, plugin) in registry.terminals {
                         guard let terminal = plugin as? any TerminalPlugin else { continue }
                         if terminal.descriptor.bundleIdentifiers.contains(bundleId),
                            let strategy = terminal.makeFocusStrategy() {
+                            DiagnosticLogger.shared.info(
+                                "Terminal focus plugin strategy match bundle=\(bundleId) plugin=\(manifestId) strategy=\(String(describing: type(of: strategy)))"
+                            )
                             return strategy
                         }
                     }
+                    DiagnosticLogger.shared.info("Terminal focus plugin strategy miss bundle=\(bundleId)")
                     return nil
                 }
             }
@@ -319,6 +327,15 @@ final class AppState: ObservableObject {
         // because they can't import the host's `TerminalRegistry`.
         TerminalDispatch.setDispatcher { request in
             TerminalRegistry.launch(request)
+        }
+        TerminalDispatch.setNoticeDispatcher { message in
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: .terminalLaunchNotice,
+                    object: nil,
+                    userInfo: ["message": message]
+                )
+            }
         }
         // pluginRegistry is initialised before init body runs (stored
         // property closure), so plugin-disabled state is honoured by
@@ -916,6 +933,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if notchBridge == nil {
                 let bridge = AttentionBridge()
                 bridge.notchCenter = appState.notchCenter
+                bridge.pluginRegistry = appState.pluginRegistry
                 bridge.start()
                 notchBridge = bridge
             }

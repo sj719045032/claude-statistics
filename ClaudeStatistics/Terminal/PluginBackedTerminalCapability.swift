@@ -1,6 +1,6 @@
 import AppKit
 import Foundation
-import ClaudeStatisticsKit
+@preconcurrency import ClaudeStatisticsKit
 
 /// Bridges a `TerminalPlugin` (SDK-side) into the host's
 /// `TerminalCapability` protocol so it can sit in the same
@@ -28,6 +28,7 @@ final class PluginBackedTerminalCapability: NSObject, TerminalCapability {
     let lazyLauncher: (any TerminalLauncher)?
     let lazyReadinessProvider: (any TerminalReadinessProviding)?
     let lazySetupProvider: (any TerminalSetupProviding)?
+    private let installationCache = PluginInstallationCache()
 
     init(plugin: any TerminalPlugin, manifestId: String) {
         self.plugin = plugin
@@ -37,6 +38,8 @@ final class PluginBackedTerminalCapability: NSObject, TerminalCapability {
         self.lazyReadinessProvider = plugin.makeReadinessProvider()
         self.lazySetupProvider = plugin.makeSetupWizard()
         super.init()
+        installationCache.seed(from: descriptor)
+        refreshInstallationCache()
     }
 
     // The descriptor's `id` doubles as the picker option id. Builtin
@@ -55,10 +58,31 @@ final class PluginBackedTerminalCapability: NSObject, TerminalCapability {
         // logic still treats them as focus targets.
         .accessibility
     }
-    var isInstalled: Bool { plugin.detectInstalled() }
+    var isInstalled: Bool {
+        refreshInstallationCache()
+        return installationCache.snapshot.status == .installed
+    }
     var tabFocusPrecision: TerminalTabFocusPrecision { descriptor.focusPrecision }
     var autoLaunchPriority: Int? { descriptor.autoLaunchPriority }
     var boundProviderID: String? { descriptor.boundProviderID }
+
+    private func refreshInstallationCache() {
+        installationCache.refreshIfNeeded(manifestId: manifestId) { [plugin, lazyReadinessProvider] in
+            if let lazyReadinessProvider {
+                let status = lazyReadinessProvider.installationStatus()
+                return PluginInstallationSnapshot(
+                    status: status,
+                    requirements: lazyReadinessProvider.setupRequirements()
+                )
+            }
+
+            let isInstalled = plugin.detectInstalled()
+            return PluginInstallationSnapshot(
+                status: isInstalled ? .installed : .notInstalled,
+                requirements: isInstalled ? [] : [.appInstalled]
+            )
+        }
+    }
 }
 
 extension PluginBackedTerminalCapability: TerminalLauncher {
@@ -75,21 +99,71 @@ extension PluginBackedTerminalCapability: TerminalLauncher {
 
 extension PluginBackedTerminalCapability: TerminalReadinessProviding {
     func installationStatus() -> TerminalInstallationStatus {
-        if let lazyReadinessProvider {
-            return lazyReadinessProvider.installationStatus()
-        }
-        return isInstalled ? .installed : .notInstalled
+        refreshInstallationCache()
+        return installationCache.snapshot.status
     }
 
     func setupRequirements() -> [TerminalRequirement] {
-        if let lazyReadinessProvider {
-            return lazyReadinessProvider.setupRequirements()
-        }
-        return isInstalled ? [] : [.appInstalled]
+        refreshInstallationCache()
+        return installationCache.snapshot.requirements
     }
 
     func setupActions() -> [TerminalSetupAction] {
         lazyReadinessProvider?.setupActions() ?? []
+    }
+}
+
+private struct PluginInstallationSnapshot {
+    let status: TerminalInstallationStatus
+    let requirements: [TerminalRequirement]
+}
+
+private final class PluginInstallationCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cached = PluginInstallationSnapshot(status: .notInstalled, requirements: [.appInstalled])
+    private var refreshInFlight = false
+    private var hasRefreshed = false
+
+    var snapshot: PluginInstallationSnapshot {
+        lock.lock()
+        defer { lock.unlock() }
+        return cached
+    }
+
+    func seed(from descriptor: TerminalDescriptor) {
+        let appInstalled = descriptor.bundleIdentifiers.contains {
+            NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) != nil
+        }
+        lock.lock()
+        cached = PluginInstallationSnapshot(
+            status: appInstalled ? .installed : .notInstalled,
+            requirements: appInstalled ? [] : [.appInstalled]
+        )
+        lock.unlock()
+    }
+
+    func refreshIfNeeded(
+        manifestId: String,
+        resolve: @escaping @Sendable () -> PluginInstallationSnapshot
+    ) {
+        lock.lock()
+        if refreshInFlight || hasRefreshed {
+            lock.unlock()
+            return
+        }
+        refreshInFlight = true
+        lock.unlock()
+
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let resolved = resolve()
+            guard let self else { return }
+            lock.lock()
+            cached = resolved
+            hasRefreshed = true
+            refreshInFlight = false
+            lock.unlock()
+            DiagnosticLogger.shared.verbose("PluginBackedTerminalCapability(\(manifestId)): refreshed installation cache status=\(resolved.status)")
+        }
     }
 }
 
