@@ -18,13 +18,62 @@ public struct SubscriptionInfo: Sendable, Codable, Equatable {
     /// Adapters should localize this string themselves before
     /// returning it; the host renders it verbatim.
     public let note: String?
+    /// Local-JSONL trend chart configuration the host should render
+    /// alongside the quota progress bars. Adapters that have a
+    /// matching local-model footprint (e.g. GLM Coding Plan → JSONL
+    /// rows tagged `glm-*`) point each window's `subscriptionQuotaID`
+    /// at one of `quotas` so the chart's window end aligns with the
+    /// upstream reset time. Excluded from `Codable` because
+    /// `Calendar.Component` doesn't conform — the host never persists
+    /// `SubscriptionInfo`, so this is in-memory only.
+    public let localTrendWindows: [ProviderUsageTrendPresentation]
 
-    public init(planName: String, quotas: [SubscriptionQuotaWindow], dashboardURL: URL?, nextResetAt: Date?, note: String? = nil) {
+    public init(
+        planName: String,
+        quotas: [SubscriptionQuotaWindow],
+        dashboardURL: URL?,
+        nextResetAt: Date?,
+        note: String? = nil,
+        localTrendWindows: [ProviderUsageTrendPresentation] = []
+    ) {
         self.planName = planName
         self.quotas = quotas
         self.dashboardURL = dashboardURL
         self.nextResetAt = nextResetAt
         self.note = note
+        self.localTrendWindows = localTrendWindows
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case planName, quotas, dashboardURL, nextResetAt, note
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.planName = try c.decode(String.self, forKey: .planName)
+        self.quotas = try c.decode([SubscriptionQuotaWindow].self, forKey: .quotas)
+        self.dashboardURL = try c.decodeIfPresent(URL.self, forKey: .dashboardURL)
+        self.nextResetAt = try c.decodeIfPresent(Date.self, forKey: .nextResetAt)
+        self.note = try c.decodeIfPresent(String.self, forKey: .note)
+        self.localTrendWindows = []
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(planName, forKey: .planName)
+        try c.encode(quotas, forKey: .quotas)
+        try c.encodeIfPresent(dashboardURL, forKey: .dashboardURL)
+        try c.encodeIfPresent(nextResetAt, forKey: .nextResetAt)
+        try c.encodeIfPresent(note, forKey: .note)
+    }
+
+    public static func == (lhs: SubscriptionInfo, rhs: SubscriptionInfo) -> Bool {
+        lhs.planName == rhs.planName
+            && lhs.quotas == rhs.quotas
+            && lhs.dashboardURL == rhs.dashboardURL
+            && lhs.nextResetAt == rhs.nextResetAt
+            && lhs.note == rhs.note
+            && lhs.localTrendWindows == rhs.localTrendWindows
     }
 }
 
@@ -38,14 +87,31 @@ public struct SubscriptionQuotaWindow: Sendable, Codable, Equatable, Identifiabl
     public let limit: SubscriptionAmount?
     public let percentage: Double
     public let resetAt: Date?
+    /// Total length of the window (e.g. `5 * 3600` for a 5-hour
+    /// bucket, `7 * 86400` for a weekly bucket). When set together
+    /// with `resetAt`, the host renders an "exhausts in …" estimate
+    /// next to the title using linear extrapolation
+    /// (`utilization / elapsed`). `nil` opts out — adapters whose
+    /// upstream API doesn't reveal the window length should leave
+    /// it unset so the host doesn't fabricate a duration.
+    public let windowDuration: TimeInterval?
 
-    public init(id: String, title: String, used: SubscriptionAmount, limit: SubscriptionAmount?, percentage: Double, resetAt: Date?) {
+    public init(
+        id: String,
+        title: String,
+        used: SubscriptionAmount,
+        limit: SubscriptionAmount?,
+        percentage: Double,
+        resetAt: Date?,
+        windowDuration: TimeInterval? = nil
+    ) {
         self.id = id
         self.title = title
         self.used = used
         self.limit = limit
         self.percentage = percentage
         self.resetAt = resetAt
+        self.windowDuration = windowDuration
     }
 }
 

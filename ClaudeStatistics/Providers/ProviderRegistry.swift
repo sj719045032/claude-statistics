@@ -79,6 +79,16 @@ enum ProviderRegistry {
             guard let provider = providerPlugin.makeProvider() else { continue }
             merged.merge(provider.builtinPricingModels) { current, _ in current }
         }
+        // Subscription-extension plugins (GLM Coding Plan, future
+        // OpenRouter-style endpoints) contribute their own pricing
+        // for the models they unlock — even though they don't bring
+        // a new ProviderDescriptor, their model ids
+        // (`glm-4.6`, `glm-4.5-air`, …) still show up in JSONL
+        // and need rates so cost rendering doesn't read $0.
+        for plugin in plugins.subscriptionExtensions.values {
+            guard let extPlugin = plugin as? any SubscriptionExtensionPlugin else { continue }
+            merged.merge(extPlugin.builtinPricingModels) { current, _ in current }
+        }
         extraPricingStore.set(merged)
     }
 

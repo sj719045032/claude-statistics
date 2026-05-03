@@ -102,6 +102,9 @@ struct UsageView: View {
             ensureValidSelectedWindow()
             ensureValidSelectedTrendWindow()
         }
+        .onChange(of: viewModel.subscriptionInfo) { _, _ in
+            ensureValidSelectedTrendWindow()
+        }
     }
 }
 
@@ -450,7 +453,7 @@ extension UsageView {
 
     @ViewBuilder
     private func localTrendContent(usage: UsageData?) -> some View {
-        let trendWindows = usagePresentation.localTrendWindows
+        let trendWindows = effectiveLocalTrendWindows
         if !trendWindows.isEmpty {
             Divider()
 
@@ -522,6 +525,17 @@ extension UsageView {
     }
 
     private func quotaResetAnchor(for descriptor: ProviderUsageTrendPresentation, from usage: UsageData?) -> Date? {
+        // Subscription-driven path (GLM Coding Plan and friends): the
+        // descriptor names a `SubscriptionQuotaWindow` by id and we
+        // anchor the chart end on that quota's upstream reset time.
+        // Falls through to the bucket-driven path (Gemini) if no
+        // matching subscription quota is present.
+        if let quotaID = descriptor.subscriptionQuotaID,
+           let quota = viewModel.subscriptionInfo?.quotas.first(where: { $0.id == quotaID }),
+           let resetAt = quota.resetAt {
+            return resetAt
+        }
+
         guard let buckets = usage?.providerBuckets else { return nil }
 
         let targetBuckets: [ProviderUsageBucket]
@@ -602,7 +616,20 @@ extension UsageView {
     }
 
     private var selectedLocalTrendWindow: ProviderUsageTrendPresentation? {
-        usagePresentation.localTrendWindows.first { $0.id == selectedTrendWindowID }
+        effectiveLocalTrendWindows.first { $0.id == selectedTrendWindowID }
+    }
+
+    /// Trend windows to render below the quota progress bars. When an
+    /// active subscription has supplied its own (e.g. GLM Coding Plan
+    /// → 5h tokens / 7d weekly tokens), they take precedence over the
+    /// provider's static `localTrendWindows`. Falls back to the
+    /// provider's own list otherwise (Gemini's per-model-family tabs).
+    private var effectiveLocalTrendWindows: [ProviderUsageTrendPresentation] {
+        if let subscriptionWindows = viewModel.subscriptionInfo?.localTrendWindows,
+           !subscriptionWindows.isEmpty {
+            return subscriptionWindows
+        }
+        return usagePresentation.localTrendWindows
     }
 
     private func compactUpdatedText(_ date: Date) -> String {
@@ -622,7 +649,7 @@ extension UsageView {
     }
 
     private func ensureValidSelectedTrendWindow() {
-        let trendWindows = usagePresentation.localTrendWindows
+        let trendWindows = effectiveLocalTrendWindows
         guard !trendWindows.isEmpty else { return }
         if !trendWindows.contains(where: { $0.id == selectedTrendWindowID }) {
             selectedTrendWindowID = trendWindows[0].id

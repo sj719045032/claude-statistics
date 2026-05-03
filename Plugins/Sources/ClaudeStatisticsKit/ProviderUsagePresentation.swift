@@ -52,6 +52,11 @@ public struct ProviderUsageTrendPresentation: Identifiable, Hashable, Sendable {
     public let granularity: TrendGranularity
     public let anchor: Anchor
     public var modelFamily: String?
+    /// When `anchor == .quotaReset` and the active provider has a
+    /// `SubscriptionInfo` (e.g. GLM Coding Plan), look up `resetAt`
+    /// from the matching `SubscriptionQuotaWindow.id` instead of from
+    /// `UsageData.providerBuckets` (which is the Gemini path).
+    public let subscriptionQuotaID: String?
 
     public init(
         id: String,
@@ -61,7 +66,8 @@ public struct ProviderUsageTrendPresentation: Identifiable, Hashable, Sendable {
         durationComponent: Calendar.Component,
         granularity: TrendGranularity,
         anchor: Anchor,
-        modelFamily: String? = nil
+        modelFamily: String? = nil,
+        subscriptionQuotaID: String? = nil
     ) {
         self.id = id
         self.titleLocalizationKey = titleLocalizationKey
@@ -71,6 +77,7 @@ public struct ProviderUsageTrendPresentation: Identifiable, Hashable, Sendable {
         self.granularity = granularity
         self.anchor = anchor
         self.modelFamily = modelFamily
+        self.subscriptionQuotaID = subscriptionQuotaID
     }
 }
 

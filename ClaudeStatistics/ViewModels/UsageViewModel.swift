@@ -298,27 +298,34 @@ final class UsageViewModel: ObservableObject {
         guard let window,
               let timeUntilReset = window.timeUntilReset else { return nil }
 
-        let elapsed = windowDuration - timeUntilReset
-        guard elapsed > 0 else { return nil }
-
-        let remaining = 100.0 - window.utilization
-        guard remaining > 0 else { return nil }
-
-        let rate: Double
         if isFiveHour {
-            guard window.utilization >= 10 else { return nil }
-            rate = window.utilization / elapsed
-        } else if let histRate = usageSource?.historyStore?.sevenDayAverageRate() {
-            rate = histRate
-        } else {
-            guard elapsed >= 86400 else { return nil }
-            rate = window.utilization / elapsed
+            return LinearExhaustEstimator.estimate(
+                utilization: window.utilization,
+                timeUntilReset: timeUntilReset,
+                windowDuration: windowDuration,
+                minUtilization: 10
+            )
         }
 
-        guard rate > 0 else { return nil }
-        let secondsToExhaust = remaining / rate
-        let willExhaust = secondsToExhaust < timeUntilReset
-        return (text: TimeFormatter.countdown(from: secondsToExhaust), willExhaust: willExhaust)
+        // 7d: prefer 14-day historical rate when at least one
+        // completed window is on disk.
+        if let histRate = usageSource?.historyStore?.sevenDayAverageRate() {
+            let remaining = 100.0 - window.utilization
+            guard remaining > 0, histRate > 0 else { return nil }
+            let secondsToExhaust = remaining / histRate
+            return (
+                text: TimeFormatter.countdown(from: secondsToExhaust),
+                willExhaust: secondsToExhaust < timeUntilReset
+            )
+        }
+
+        // Linear fallback: only meaningful after at least a day of usage.
+        return LinearExhaustEstimator.estimate(
+            utilization: window.utilization,
+            timeUntilReset: timeUntilReset,
+            windowDuration: windowDuration,
+            minElapsed: 86400
+        )
     }
 
     var fiveHourExhaustEstimate: (text: String, willExhaust: Bool)? {

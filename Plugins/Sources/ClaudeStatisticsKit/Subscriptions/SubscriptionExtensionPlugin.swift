@@ -26,4 +26,19 @@ public protocol SubscriptionExtensionPlugin: Plugin {
     /// active base URL.
     @MainActor
     func makeSubscriptionAdapters() -> [any SubscriptionAdapter]
+
+    /// Per-model pricing rates the extension contributes to the
+    /// host's pricing catalog. Keyed by raw model id as it appears
+    /// in transcript JSONL (e.g. `"glm-4.6"`, `"glm-4.5-air"`).
+    /// The host merges these into the extra-pricing pool consulted
+    /// by `ModelPricing.builtinModels()` so cost rendering for
+    /// JSONL rows tagged with these models lights up automatically
+    /// — Tokens & Models card, trend chart `$` axis, Stats page,
+    /// menu-bar tooltips. Default `[:]` opts out for extensions
+    /// whose users don't need cost figures.
+    var builtinPricingModels: [String: ModelPricingRates] { get }
+}
+
+extension SubscriptionExtensionPlugin {
+    public var builtinPricingModels: [String: ModelPricingRates] { [:] }
 }
