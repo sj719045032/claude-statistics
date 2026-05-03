@@ -100,68 +100,18 @@ find "${ARCHIVE_DIR}" -maxdepth 1 -name "*.delta" 2>/dev/null | sort > "${BEFORE
 # don't delete them; that's what powers the deltas.)
 cp "${ZIP_OUTPUT}" "${ARCHIVE_DIR}/"
 
-# Sparkle's generate_appcast picks up an HTML file with the same basename
-# as the ZIP and inlines it as <description> in the appcast item — that's
-# what shows up in Sparkle's "Update available" sheet. Convert the
-# bilingual markdown notes (passed by release.sh via env var) into HTML
-# right before generate_appcast runs. Format we accept is the one
-# release.sh enforces: `## Heading` / `- bullet` / `**bold**` / `` `code` ``,
-# which keeps the converter scope tight and dependency-free.
+# generate_appcast auto-picks a same-basename `.md` next to the ZIP, inlines
+# it into `<description>` as CDATA, and stamps `sparkle:format="markdown"`
+# so the Sparkle 2.9+ client renders it through the system Markdown parser
+# (requires macOS 12+ — this app targets 14.0). Drop the bilingual notes
+# (passed by release.sh via env var) in place verbatim; no host-side
+# markdown→HTML conversion.
 NOTES_FILE="${CLAUDE_STATS_NOTES_FILE:-}"
 if [[ -n "${NOTES_FILE}" ]] && [[ -f "${NOTES_FILE}" ]]; then
     echo "==> Embedding release notes from ${NOTES_FILE}..."
-    NOTES_HTML="${ARCHIVE_DIR}/${DMG_NAME}-${VERSION}.html"
-    # Heading rules are listed deepest-first so e.g. `### Foo` doesn't
-    # get matched by the `## ` rule. (Each pattern requires a literal
-    # space after the hashes, so they're already mutually exclusive,
-    # but keeping the order sorted by depth makes the intent obvious.)
-    awk '
-        BEGIN { in_list = 0 }
-        /^#### / {
-            if (in_list) { print "</ul>"; in_list = 0 }
-            sub(/^#### /, "")
-            print "<h4>" $0 "</h4>"
-            next
-        }
-        /^### / {
-            if (in_list) { print "</ul>"; in_list = 0 }
-            sub(/^### /, "")
-            print "<h3>" $0 "</h3>"
-            next
-        }
-        /^## / {
-            if (in_list) { print "</ul>"; in_list = 0 }
-            sub(/^## /, "")
-            print "<h2>" $0 "</h2>"
-            next
-        }
-        /^# / {
-            if (in_list) { print "</ul>"; in_list = 0 }
-            sub(/^# /, "")
-            print "<h1>" $0 "</h1>"
-            next
-        }
-        /^- / {
-            if (!in_list) { print "<ul>"; in_list = 1 }
-            sub(/^- /, "")
-            print "<li>" $0 "</li>"
-            next
-        }
-        /^[[:space:]]*$/ {
-            if (in_list) { print "</ul>"; in_list = 0 }
-            next
-        }
-        {
-            if (in_list) { print "</ul>"; in_list = 0 }
-            print "<p>" $0 "</p>"
-        }
-        END { if (in_list) print "</ul>" }
-    ' "${NOTES_FILE}" \
-    | sed -E '
-        s|`([^`]+)`|<code>\1</code>|g
-        s|\*\*([^*]+)\*\*|<strong>\1</strong>|g
-    ' > "${NOTES_HTML}"
-    echo "    Wrote ${NOTES_HTML}"
+    NOTES_MD="${ARCHIVE_DIR}/${DMG_NAME}-${VERSION}.md"
+    cp "${NOTES_FILE}" "${NOTES_MD}"
+    echo "    Wrote ${NOTES_MD}"
 fi
 
 echo "==> Generating appcast.xml (with Sparkle deltas)..."
@@ -171,6 +121,7 @@ DOWNLOAD_URL_PREFIX="${REPO_URL}/releases/download/v${VERSION}/"
   --maximum-deltas 3 \
   --maximum-versions 3 \
   --link "${REPO_URL}" \
+  --embed-release-notes \
   "${ARCHIVE_DIR}"
 
 # Rename generated deltas so they don't contain spaces — GitHub's release
