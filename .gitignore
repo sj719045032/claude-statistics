@@ -53,6 +53,7 @@ xcuserdata/
 node_modules/
 website/dist/
 .qwen/
+.claude/
 # Python compiled caches next to bundled hook scripts
 __pycache__/
 *.pyc
