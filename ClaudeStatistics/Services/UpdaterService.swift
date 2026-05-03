@@ -7,6 +7,17 @@ final class GentleReminderDelegate: NSObject, SPUStandardUserDriverDelegate {
     var supportsGentleScheduledUpdateReminders: Bool { true }
 
     func standardUserDriverWillHandleShowingUpdate(_ handleShowingUpdate: Bool, forUpdate update: SUAppcastItem, state: SPUUserUpdateState) {
+        // Only activate the app when Sparkle is about to actually show
+        // the update UI. For silent gentle reminders
+        // (`handleShowingUpdate == false`, gated by
+        // `supportsGentleScheduledUpdateReminders`) the delegate is
+        // responsible for the "reminder" — ours uses just the menu-bar
+        // badge (`UpdateCheckDelegate` sets `availableVersion`).
+        // Activating the app here without showing a window left Sparkle
+        // in a half-pending state that required the user to click
+        // "Check for Updates" twice before the update sheet appeared.
+        guard handleShowingUpdate else { return }
+
         // Close the status bar panel
         NSApp.windows.first { $0 is NSPanel && $0.level == .statusBar }?.orderOut(nil)
         NSApp.setActivationPolicy(.regular)
