@@ -28,11 +28,8 @@ struct UsageView: View {
     @ObservedObject var viewModel: UsageViewModel
     @ObservedObject var profileViewModel: ProfileViewModel
     @ObservedObject var store: SessionDataStore
-    @ObservedObject private var identityStore = IdentityStore.shared
-    @ObservedObject private var subscriptionRouter = SubscriptionAdapterRouter.shared
     @State private var selectedWindowTab: UsageWindowTab = .fiveHour
     @State private var selectedTrendWindowID: String = ""
-    @State private var isIdentityPickerPresented = false
 
     private var usagePresentation: ProviderUsagePresentation {
         store.provider.usagePresentation
@@ -173,10 +170,7 @@ extension UsageView {
             ProgressView()
                 .scaleEffect(0.6)
                 .frame(width: 24, height: 24)
-        } else if subscriptionManagersForCurrentProvider.isEmpty {
-            // No subscription adapters registered for this provider —
-            // fall back to the legacy OAuth-only account accessory
-            // (Codex / Gemini paths today).
+        } else {
             ProviderAccountUIResolver.makeAccountCardAccessory(
                 provider: store.provider,
                 pluginRegistry: appState.pluginRegistry,
@@ -187,33 +181,7 @@ extension UsageView {
                 ),
                 triggerStyle: accountSwitcherTriggerStyle
             )
-        } else {
-            // Provider has subscription adapters (GLM / future
-            // OpenRouter / …) — show the unified identity picker so
-            // OAuth and token-based identities live side by side.
-            Button {
-                isIdentityPickerPresented = true
-            } label: {
-                Image(systemName: "person.crop.circle")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .popover(isPresented: $isIdentityPickerPresented, arrowEdge: .bottom) {
-                IdentityPickerView(
-                    profileViewModel: profileViewModel,
-                    identityStore: identityStore,
-                    router: subscriptionRouter,
-                    isPresented: $isIdentityPickerPresented
-                )
-                .padding(.vertical, 6)
-            }
         }
-    }
-
-    private var subscriptionManagersForCurrentProvider: [SubscriptionAccountManager] {
-        subscriptionRouter.allAccountManagers()
-            .filter { $0.providerID == store.provider.providerId }
     }
 
     private var accountSwitcherTriggerStyle: AccountSwitcherTriggerStyle {

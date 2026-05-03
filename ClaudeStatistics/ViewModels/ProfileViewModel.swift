@@ -47,14 +47,12 @@ final class ProfileViewModel: ObservableObject {
         profileLoading = false
     }
 
-    /// Subscription adapter wins when it returns non-nil — the user
-    /// is on a third-party endpoint and the OAuth profile fetch
-    /// would 401 anyway. Otherwise fall back to the OAuth profile
-    /// loader (Anthropic official endpoint or no override).
+    /// Keep subscription quota data and the Anthropic OAuth profile
+    /// independent: GLM-style adapters can provide quotas while the
+    /// account switcher still needs the Claude account email.
     private func runLoad() async {
         if let subLoader = subscriptionLoader, let info = await subLoader() {
             subscriptionInfo = info
-            return
         }
         if let profLoader = profileLoader {
             userProfile = await profLoader()

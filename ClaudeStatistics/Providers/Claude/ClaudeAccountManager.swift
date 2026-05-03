@@ -174,6 +174,22 @@ enum ClaudeAuthStore {
         }
     }
 
+    /// Removes the OAuth-related fields written by `mergeAccountMetadata` from
+    /// `~/.claude.json` (or the supplied config path) while leaving the rest of
+    /// the file intact. If the file does not exist this is a no-op.
+    static func clearAccountMetadata(configPath: String = ambientConfigPath()) throws {
+        let metadataURL = URL(fileURLWithPath: accountMetadataPath(forConfigPath: configPath), isDirectory: false)
+        guard let data = FileManager.default.contents(atPath: metadataURL.path),
+              var current = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return
+        }
+        for key in ["oauthAccount", "userID", "claudeCodeFirstTokenDate"] {
+            current.removeValue(forKey: key)
+        }
+        let cleaned = try JSONSerialization.data(withJSONObject: current, options: [.prettyPrinted, .sortedKeys])
+        try cleaned.write(to: metadataURL, options: .atomic)
+    }
+
     static func readAmbientAccountMetadataIdentity() -> ClaudeAuthIdentity? {
         guard let data = FileManager.default.contents(atPath: accountMetadataPath()),
               let raw = String(data: data, encoding: .utf8) else {
@@ -450,8 +466,24 @@ final class ClaudeAccountManager: ObservableObject {
         do {
             let snapshot = try loadSnapshot()
             guard let account = snapshot.accounts.first(where: { $0.id == id }) else { return }
-            let updated = snapshot.accounts.filter { $0.id != id }
-            try storeSnapshot(ClaudeManagedAccountSet(version: ClaudeManagedAccountStore.storeVersion, accounts: updated))
+            let removingLive = isLiveAccount(account)
+            let remaining = snapshot.accounts.filter { $0.id != id }
+            try storeSnapshot(ClaudeManagedAccountSet(version: ClaudeManagedAccountStore.storeVersion, accounts: remaining))
+
+            if removingLive {
+                if let next = remaining.max(by: { $0.updatedAt < $1.updatedAt }) {
+                    try activateLiveAccount(next.authMaterial)
+                } else {
+                    // No remaining accounts — fully sign out by clearing the
+                    // keychain item, the .credentials.json fallback, and the
+                    // OAuth fields in ~/.claude.json so load() does not
+                    // re-import the credential on the next refresh.
+                    CredentialService.shared.clearLiveCredential()
+                    try? ClaudeAuthStore.clearAccountMetadata()
+                    UsageAPIService.shared.resetLocalState()
+                }
+            }
+
             load()
             noticeMessage = String(
                 format: NSLocalizedString("settings.claudeAccounts.removed %@", comment: ""),

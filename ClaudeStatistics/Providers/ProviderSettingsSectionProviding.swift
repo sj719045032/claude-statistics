@@ -30,9 +30,10 @@ struct ProviderSettingsContext: ProviderAccountUIContext {
     }
 }
 
-struct AccountSwitcherAccessory<Account: Identifiable>: View {
+struct AccountSwitcherAccessory<Account: Identifiable, ExtraContent: View>: View {
     let accounts: [Account]
     let fallbackCurrentEmail: String?
+    let isFallbackLive: Bool
     let isAddingAccount: Bool
     let isBusy: Bool
     let switchTitle: LocalizedStringKey
@@ -43,13 +44,55 @@ struct AccountSwitcherAccessory<Account: Identifiable>: View {
     let loadAccounts: () -> Void
     let beginAddAccount: () -> Void
     let cancelAddAccount: () -> Void
+    let switchFallbackAccount: (() -> Void)?
     let switchAccount: (Account) async -> Bool
     let removeAccount: (Account) -> Void
     let afterSwitch: () -> Void
+    let extraContent: (@escaping () -> Void) -> ExtraContent
 
     @State private var showingAccountsPopover = false
     @State private var pendingDeleteAccount: Account?
     @State private var pendingSignOutAccount: Account?
+
+    init(
+        accounts: [Account],
+        fallbackCurrentEmail: String?,
+        isFallbackLive: Bool = true,
+        isAddingAccount: Bool,
+        isBusy: Bool,
+        switchTitle: LocalizedStringKey,
+        addTitle: LocalizedStringKey,
+        triggerStyle: AccountSwitcherTriggerStyle,
+        accountLabel: @escaping (Account) -> String,
+        isLiveAccount: @escaping (Account) -> Bool,
+        loadAccounts: @escaping () -> Void,
+        beginAddAccount: @escaping () -> Void,
+        cancelAddAccount: @escaping () -> Void,
+        switchFallbackAccount: (() -> Void)? = nil,
+        switchAccount: @escaping (Account) async -> Bool,
+        removeAccount: @escaping (Account) -> Void,
+        afterSwitch: @escaping () -> Void,
+        @ViewBuilder extraContent: @escaping (@escaping () -> Void) -> ExtraContent
+    ) {
+        self.accounts = accounts
+        self.fallbackCurrentEmail = fallbackCurrentEmail
+        self.isFallbackLive = isFallbackLive
+        self.isAddingAccount = isAddingAccount
+        self.isBusy = isBusy
+        self.switchTitle = switchTitle
+        self.addTitle = addTitle
+        self.triggerStyle = triggerStyle
+        self.accountLabel = accountLabel
+        self.isLiveAccount = isLiveAccount
+        self.loadAccounts = loadAccounts
+        self.beginAddAccount = beginAddAccount
+        self.cancelAddAccount = cancelAddAccount
+        self.switchFallbackAccount = switchFallbackAccount
+        self.switchAccount = switchAccount
+        self.removeAccount = removeAccount
+        self.afterSwitch = afterSwitch
+        self.extraContent = extraContent
+    }
 
     var body: some View {
         Group {
@@ -114,6 +157,10 @@ struct AccountSwitcherAccessory<Account: Identifiable>: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
                 .disabled(isBusy)
+
+                extraContent {
+                    showingAccountsPopover = false
+                }
             }
             .frame(width: 300)
             .padding(.vertical, 5)
@@ -135,6 +182,7 @@ struct AccountSwitcherAccessory<Account: Identifiable>: View {
             }
             Button("session.delete", role: .destructive) {
                 removeAccount(account)
+                afterSwitch()
                 pendingDeleteAccount = nil
             }
         } message: { account in
@@ -149,6 +197,7 @@ struct AccountSwitcherAccessory<Account: Identifiable>: View {
             }
             Button("settings.accountSwitcher.signOut", role: .destructive) {
                 removeAccount(account)
+                afterSwitch()
                 pendingSignOutAccount = nil
             }
         } message: { account in
@@ -222,20 +271,38 @@ struct AccountSwitcherAccessory<Account: Identifiable>: View {
                     .stroke(Color.white.opacity(0.04), lineWidth: 1)
             }
             .help(label)
+        @unknown default:
+            Image(systemName: "person.crop.circle")
+                .font(.system(size: 12, weight: .semibold))
+                .frame(width: 28, height: 24)
+                .foregroundStyle(.secondary)
         }
     }
 
     private func fallbackAccountRow(email: String) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: "checkmark")
-                .foregroundStyle(.secondary)
-                .frame(width: 14)
-            Text(email)
-                .lineLimit(1)
-            Spacer(minLength: 0)
+            Button {
+                guard !isFallbackLive else { return }
+                switchFallbackAccount?()
+                afterSwitch()
+                showingAccountsPopover = false
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: isFallbackLive ? "checkmark" : "person.crop.circle")
+                        .foregroundStyle(isFallbackLive ? .secondary : .primary)
+                        .frame(width: 14)
+                    Text(email)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(isFallbackLive || switchFallbackAccount == nil)
+
             Spacer().frame(width: 14)
         }
-        .font(.system(size: 12, weight: .semibold))
+        .font(.system(size: 12, weight: isFallbackLive ? .semibold : .regular))
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
     }
@@ -269,6 +336,7 @@ struct AccountSwitcherAccessory<Account: Identifiable>: View {
                 action: { skipConfirm in
                     if skipConfirm {
                         removeAccount(account)
+                        afterSwitch()
                     } else if isLiveAccount(account) {
                         pendingSignOutAccount = account
                     } else {
@@ -289,5 +357,220 @@ struct AccountSwitcherAccessory<Account: Identifiable>: View {
         .font(.system(size: 12, weight: isLiveAccount(account) ? .semibold : .regular))
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
+    }
+}
+
+extension AccountSwitcherAccessory where ExtraContent == EmptyView {
+    init(
+        accounts: [Account],
+        fallbackCurrentEmail: String?,
+        isFallbackLive: Bool = true,
+        isAddingAccount: Bool,
+        isBusy: Bool,
+        switchTitle: LocalizedStringKey,
+        addTitle: LocalizedStringKey,
+        triggerStyle: AccountSwitcherTriggerStyle,
+        accountLabel: @escaping (Account) -> String,
+        isLiveAccount: @escaping (Account) -> Bool,
+        loadAccounts: @escaping () -> Void,
+        beginAddAccount: @escaping () -> Void,
+        cancelAddAccount: @escaping () -> Void,
+        switchFallbackAccount: (() -> Void)? = nil,
+        switchAccount: @escaping (Account) async -> Bool,
+        removeAccount: @escaping (Account) -> Void,
+        afterSwitch: @escaping () -> Void
+    ) {
+        self.init(
+            accounts: accounts,
+            fallbackCurrentEmail: fallbackCurrentEmail,
+            isFallbackLive: isFallbackLive,
+            isAddingAccount: isAddingAccount,
+            isBusy: isBusy,
+            switchTitle: switchTitle,
+            addTitle: addTitle,
+            triggerStyle: triggerStyle,
+            accountLabel: accountLabel,
+            isLiveAccount: isLiveAccount,
+            loadAccounts: loadAccounts,
+            beginAddAccount: beginAddAccount,
+            cancelAddAccount: cancelAddAccount,
+            switchFallbackAccount: switchFallbackAccount,
+            switchAccount: switchAccount,
+            removeAccount: removeAccount,
+            afterSwitch: afterSwitch,
+            extraContent: { _ in EmptyView() }
+        )
+    }
+}
+
+struct SubscriptionSectionsList: View {
+    let managers: [SubscriptionAccountManager]
+    let afterSwitch: () -> Void
+    let dismiss: () -> Void
+
+    @ObservedObject private var identityStore = IdentityStore.shared
+    @State private var addAccountManager: PendingSubscriptionAdd?
+    @State private var pendingDelete: PendingSubscriptionDelete?
+
+    var body: some View {
+        if !managers.isEmpty {
+            Divider()
+            ForEach(managers, id: \.adapterID) { manager in
+                subscriptionSection(manager)
+                if manager.adapterID != managers.last?.adapterID {
+                    Divider()
+                }
+            }
+        }
+    }
+
+    private func subscriptionSection(_ manager: SubscriptionAccountManager) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(manager.sourceDisplayName)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.tertiary)
+                .padding(.horizontal, 14)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+
+            if manager.accounts.isEmpty {
+                Text("identityPicker.noAccounts")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 6)
+            } else {
+                ForEach(manager.accounts) { account in
+                    subscriptionAccountRow(account, manager: manager)
+                }
+            }
+
+            Button {
+                addAccountManager = PendingSubscriptionAdd(manager: manager)
+            } label: {
+                Label("identityPicker.addAccount", systemImage: "plus")
+                    .font(.system(size: 11))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+
+            if let footer = manager.makeSectionFooterView() {
+                footer
+            }
+        }
+        .padding(.bottom, 4)
+        .sheet(item: $addAccountManager) { manager in
+            manager.manager.makeAddAccountView()
+        }
+        .alert("settings.accountSwitcher.deleteConfirmTitle", isPresented: Binding(
+            get: { pendingDelete != nil },
+            set: { if !$0 { pendingDelete = nil } }
+        ), presenting: pendingDelete) { pending in
+            Button("session.cancel", role: .cancel) {
+                pendingDelete = nil
+            }
+            Button("session.delete", role: .destructive) {
+                Task {
+                    try? await pending.manager.remove(accountID: pending.account.id)
+                    if identityStore.activeIdentity == .subscription(
+                        adapterID: pending.manager.adapterID,
+                        accountID: pending.account.id
+                    ) {
+                        identityStore.activate(.anthropicOAuth)
+                    }
+                    afterSwitch()
+                    pendingDelete = nil
+                }
+            }
+        } message: { pending in
+            Text(String(format: NSLocalizedString("settings.accountSwitcher.deleteConfirmMessage %@", comment: ""), pending.account.label))
+        }
+    }
+
+    private func subscriptionAccountRow(_ account: SubscriptionAccount, manager: SubscriptionAccountManager) -> some View {
+        let isActive = identityStore.activeIdentity == .subscription(
+            adapterID: manager.adapterID,
+            accountID: account.id
+        )
+
+        return HStack(spacing: 10) {
+            Button {
+                manager.activate(accountID: account.id)
+                identityStore.activate(.subscription(adapterID: manager.adapterID, accountID: account.id))
+                afterSwitch()
+                dismiss()
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: isActive ? "checkmark" : "key.fill")
+                        .foregroundStyle(isActive ? .secondary : .primary)
+                        .frame(width: 14)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(account.label)
+                            .lineLimit(1)
+                        if let detail = account.detailLine {
+                            Text(detail)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(isActive)
+
+            if account.isRemovable {
+                DestructiveIconButton(
+                    action: { skipConfirm in
+                        if skipConfirm {
+                            Task {
+                                try? await manager.remove(accountID: account.id)
+                                if isActive {
+                                    identityStore.activate(.anthropicOAuth)
+                                }
+                                afterSwitch()
+                            }
+                        } else {
+                            pendingDelete = PendingSubscriptionDelete(manager: manager, account: account)
+                        }
+                    },
+                    size: 12,
+                    helpKey: "session.delete.help",
+                    pressedHelpKey: "session.delete.immediate.help"
+                )
+                .buttonStyle(.plain)
+            } else {
+                Spacer().frame(width: 14)
+            }
+        }
+        .font(.system(size: 12, weight: isActive ? .semibold : .regular))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+    }
+}
+
+private struct PendingSubscriptionDelete: Identifiable {
+    let id: String
+    let manager: SubscriptionAccountManager
+    let account: SubscriptionAccount
+
+    init(manager: SubscriptionAccountManager, account: SubscriptionAccount) {
+        self.id = account.id
+        self.manager = manager
+        self.account = account
+    }
+}
+
+private struct PendingSubscriptionAdd: Identifiable {
+    let id: String
+    let manager: SubscriptionAccountManager
+
+    init(manager: SubscriptionAccountManager) {
+        self.id = UUID().uuidString
+        self.manager = manager
     }
 }

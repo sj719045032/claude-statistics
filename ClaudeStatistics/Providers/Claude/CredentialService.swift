@@ -83,6 +83,21 @@ final class CredentialService {
         DiagnosticLogger.shared.info("Claude live credentials written to keychain and fallback file")
     }
 
+    /// Removes the live OAuth credential from both the keychain item and the
+    /// `~/.claude/.credentials.json` fallback file. Used when signing out of
+    /// the last managed account so the CLI is no longer authenticated.
+    func clearLiveCredential() {
+        SecItemDelete(baseKeychainQuery() as CFDictionary)
+
+        let credPath = (claudeConfigDir() as NSString).appendingPathComponent(".credentials.json")
+        if FileManager.default.fileExists(atPath: credPath) {
+            try? FileManager.default.removeItem(atPath: credPath)
+        }
+
+        invalidate()
+        DiagnosticLogger.shared.info("Claude live credentials cleared from keychain and fallback file")
+    }
+
     // MARK: - Read pipeline
 
     private func readRawCredential() -> ClaudeCredentialRecord? {

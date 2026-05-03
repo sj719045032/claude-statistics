@@ -8,9 +8,6 @@ struct SettingsView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var usageViewModel: UsageViewModel
     @ObservedObject var profileViewModel: ProfileViewModel
-    @ObservedObject private var identityStore = IdentityStore.shared
-    @ObservedObject private var subscriptionRouter = SubscriptionAdapterRouter.shared
-    @State private var isIdentityPickerPresented = false
     @Binding var tabOrder: [AppTab]
     @ObservedObject var updaterService: UpdaterService
     let provider: any SessionProvider
@@ -364,45 +361,16 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var providerAccountCardAccessory: some View {
-        // When the active provider has subscription extension plugins
-        // registered (GLM Coding Plan, future OpenRouter / Kimi),
-        // route the Switch Account button to the unified identity
-        // picker — same UI Usage tab uses — so OAuth + token
-        // identities live side by side. Falls back to the legacy
-        // OAuth-only switcher for providers without any subscription
-        // contributors (Codex / Gemini today).
-        if !subscriptionRouter.allAccountManagers()
-            .filter({ $0.providerID == provider.providerId })
-            .isEmpty {
-            Button {
-                isIdentityPickerPresented = true
-            } label: {
-                Text("settings.identitySwitcher.button")
-                    .font(.system(size: 12))
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .popover(isPresented: $isIdentityPickerPresented, arrowEdge: .bottom) {
-                IdentityPickerView(
-                    profileViewModel: profileViewModel,
-                    identityStore: identityStore,
-                    router: subscriptionRouter,
-                    isPresented: $isIdentityPickerPresented
-                )
-                .padding(.vertical, 6)
-            }
-        } else {
-            ProviderAccountUIResolver.makeAccountCardAccessory(
-                provider: provider,
-                pluginRegistry: appState.pluginRegistry,
-                context: ProviderSettingsContext(
-                    appState: appState,
-                    profileViewModel: profileViewModel,
-                    providerKind: provider.kind
-                ),
-                triggerStyle: .text
-            )
-        }
+        ProviderAccountUIResolver.makeAccountCardAccessory(
+            provider: provider,
+            pluginRegistry: appState.pluginRegistry,
+            context: ProviderSettingsContext(
+                appState: appState,
+                profileViewModel: profileViewModel,
+                providerKind: provider.kind
+            ),
+            triggerStyle: .text
+        )
     }
 
     private var providerCard: some View {

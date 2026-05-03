@@ -16,6 +16,7 @@ extension ClaudeProvider: ProviderAccountUIProviding {
             accountManager: hostContext.appState.accounts.claude,
             independentManager: hostContext.appState.accounts.independentClaude,
             profileViewModel: hostContext.profileViewModel,
+            providerID: hostContext.providerKind.rawValue,
             triggerStyle: triggerStyle,
             onAfterSwitch: context.refreshAfterAccountChange
         ))
@@ -26,9 +27,12 @@ private struct ClaudeProviderAccountCardAccessory: View {
     @ObservedObject var accountManager: ClaudeAccountManager
     @ObservedObject var independentManager: IndependentClaudeAccountManager
     @ObservedObject var profileViewModel: ProfileViewModel
+    let providerID: String
     let triggerStyle: AccountSwitcherTriggerStyle
     let onAfterSwitch: () -> Void
 
+    @ObservedObject private var identityStore = IdentityStore.shared
+    @ObservedObject private var subscriptionRouter = SubscriptionAdapterRouter.shared
     @StateObject private var independentVM = IndependentClaudeAccountViewModel()
     @State private var mode: ClaudeAccountMode = ClaudeAccountModeController.shared.mode
     @State private var showingLoginSheet = false
@@ -39,6 +43,31 @@ private struct ClaudeProviderAccountCardAccessory: View {
         let normalized = email.lowercased()
         let hasMatchingManaged = accountManager.managedAccounts.contains { $0.normalizedEmail == normalized }
         return hasMatchingManaged ? nil : email
+    }
+
+    private var subscriptionManagers: [SubscriptionAccountManager] {
+        subscriptionRouter.allAccountManagers()
+            .filter { $0.providerID == providerID }
+    }
+
+    private var isAnthropicOAuthActive: Bool {
+        identityStore.activeIdentity == .anthropicOAuth
+    }
+
+    private var effectiveTriggerStyle: AccountSwitcherTriggerStyle {
+        guard case .chip = triggerStyle,
+              case let .subscription(adapterID, accountID) = identityStore.activeIdentity,
+              let manager = subscriptionManagers.first(where: { $0.adapterID == adapterID }),
+              let account = manager.accounts.first(where: { $0.id == accountID }) else {
+            return triggerStyle
+        }
+
+        let label = account.label.trimmingCharacters(in: .whitespacesAndNewlines)
+        let displayLabel = label.isEmpty ? manager.sourceDisplayName : label
+        return .chip(
+            label: displayLabel,
+            avatarInitial: Self.avatarInitial(for: displayLabel)
+        )
     }
 
     var body: some View {
@@ -72,6 +101,9 @@ private struct ClaudeProviderAccountCardAccessory: View {
                     independentVM.refresh()
                     independentManager.load()
                     independentManager.cancelAddAccount()
+                    if independentManager.activeAccountID != nil {
+                        identityStore.activate(.anthropicOAuth)
+                    }
                     onAfterSwitch()
                 }
         }
@@ -88,22 +120,39 @@ private struct ClaudeProviderAccountCardAccessory: View {
         AccountSwitcherAccessory(
             accounts: accountManager.managedAccounts,
             fallbackCurrentEmail: fallbackCurrentEmail,
+            isFallbackLive: isAnthropicOAuthActive,
             isAddingAccount: accountManager.isAddingAccount,
             isBusy: accountManager.isAddingAccount || accountManager.switchingAccountID != nil || accountManager.removingAccountID != nil,
             switchTitle: "settings.accountSwitcher.switchAccount",
             addTitle: "settings.accountSwitcher.addAccount",
-            triggerStyle: triggerStyle,
+            triggerStyle: effectiveTriggerStyle,
             accountLabel: { $0.email },
-            isLiveAccount: { accountManager.isLiveAccount($0) },
+            isLiveAccount: { isAnthropicOAuthActive && accountManager.isLiveAccount($0) },
             loadAccounts: { accountManager.load() },
             beginAddAccount: { accountManager.beginAddAccount() },
             cancelAddAccount: { accountManager.cancelAddAccount() },
-            switchAccount: { await accountManager.switchToManagedAccount(id: $0.id) },
+            switchFallbackAccount: {
+                identityStore.activate(.anthropicOAuth)
+            },
+            switchAccount: {
+                let switched = await accountManager.switchToManagedAccount(id: $0.id)
+                if switched {
+                    identityStore.activate(.anthropicOAuth)
+                }
+                return switched
+            },
             removeAccount: { accountManager.removeManagedAccount(id: $0.id) },
             afterSwitch: onAfterSwitch
-        )
+        ) { dismiss in
+            SubscriptionSectionsList(
+                managers: subscriptionManagers,
+                afterSwitch: onAfterSwitch,
+                dismiss: dismiss
+            )
+        }
         .onChange(of: accountManager.addedAccountID) { _, accountID in
             guard accountID != nil else { return }
+            identityStore.activate(.anthropicOAuth)
             onAfterSwitch()
         }
     }
@@ -117,43 +166,42 @@ private struct ClaudeProviderAccountCardAccessory: View {
 
     @ViewBuilder
     private var independentSwitcherControl: some View {
-        if independentManager.accounts.isEmpty {
-            Button {
+        AccountSwitcherAccessory(
+            accounts: independentManager.accounts,
+            fallbackCurrentEmail: nil,
+            isAddingAccount: independentManager.isAddingAccount,
+            isBusy: independentManager.isAddingAccount
+                || independentManager.switchingAccountID != nil
+                || independentManager.removingAccountID != nil,
+            switchTitle: "settings.accountSwitcher.switchAccount",
+            addTitle: "settings.accountSwitcher.addAccount",
+            triggerStyle: effectiveTriggerStyle,
+            accountLabel: { $0.email },
+            isLiveAccount: { isAnthropicOAuthActive && independentManager.isLiveAccount($0) },
+            loadAccounts: { independentManager.load() },
+            beginAddAccount: {
                 independentManager.beginAddAccount()
                 independentVM.resetToIdle()
                 showingLoginSheet = true
-            } label: {
-                Text("settings.accountSwitcher.addAccount")
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-            .disabled(independentManager.isAddingAccount)
-        } else {
-            AccountSwitcherAccessory(
-                accounts: independentManager.accounts,
-                fallbackCurrentEmail: nil,
-                isAddingAccount: independentManager.isAddingAccount,
-                isBusy: independentManager.isAddingAccount
-                    || independentManager.switchingAccountID != nil
-                    || independentManager.removingAccountID != nil,
-                switchTitle: "settings.accountSwitcher.switchAccount",
-                addTitle: "settings.accountSwitcher.addAccount",
-                triggerStyle: triggerStyle,
-                accountLabel: { $0.email },
-                isLiveAccount: { independentManager.isLiveAccount($0) },
-                loadAccounts: { independentManager.load() },
-                beginAddAccount: {
-                    independentManager.beginAddAccount()
-                    independentVM.resetToIdle()
-                    showingLoginSheet = true
-                },
-                cancelAddAccount: {
-                    independentManager.cancelAddAccount()
-                    independentVM.cancel()
-                },
-                switchAccount: { await independentManager.switchToAccount(id: $0.id) },
-                removeAccount: { independentManager.removeAccount(id: $0.id) },
-                afterSwitch: onAfterSwitch
+            },
+            cancelAddAccount: {
+                independentManager.cancelAddAccount()
+                independentVM.cancel()
+            },
+            switchAccount: {
+                let switched = await independentManager.switchToAccount(id: $0.id)
+                if switched {
+                    identityStore.activate(.anthropicOAuth)
+                }
+                return switched
+            },
+            removeAccount: { independentManager.removeAccount(id: $0.id) },
+            afterSwitch: onAfterSwitch
+        ) { dismiss in
+            SubscriptionSectionsList(
+                managers: subscriptionManagers,
+                afterSwitch: onAfterSwitch,
+                dismiss: dismiss
             )
         }
     }
@@ -168,5 +216,11 @@ private struct ClaudeProviderAccountCardAccessory: View {
         let minutes = Int((delta.truncatingRemainder(dividingBy: 3600)) / 60)
         if hours > 0 { return "\(hours)h \(minutes)m" }
         return "\(minutes)m"
+    }
+
+    private static func avatarInitial(for label: String) -> String {
+        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let first = trimmed.first else { return "?" }
+        return String(first).uppercased()
     }
 }
