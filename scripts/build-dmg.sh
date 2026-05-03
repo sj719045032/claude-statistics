@@ -111,12 +111,34 @@ NOTES_FILE="${CLAUDE_STATS_NOTES_FILE:-}"
 if [[ -n "${NOTES_FILE}" ]] && [[ -f "${NOTES_FILE}" ]]; then
     echo "==> Embedding release notes from ${NOTES_FILE}..."
     NOTES_HTML="${ARCHIVE_DIR}/${DMG_NAME}-${VERSION}.html"
+    # Heading rules are listed deepest-first so e.g. `### Foo` doesn't
+    # get matched by the `## ` rule. (Each pattern requires a literal
+    # space after the hashes, so they're already mutually exclusive,
+    # but keeping the order sorted by depth makes the intent obvious.)
     awk '
         BEGIN { in_list = 0 }
+        /^#### / {
+            if (in_list) { print "</ul>"; in_list = 0 }
+            sub(/^#### /, "")
+            print "<h4>" $0 "</h4>"
+            next
+        }
+        /^### / {
+            if (in_list) { print "</ul>"; in_list = 0 }
+            sub(/^### /, "")
+            print "<h3>" $0 "</h3>"
+            next
+        }
         /^## / {
             if (in_list) { print "</ul>"; in_list = 0 }
             sub(/^## /, "")
             print "<h2>" $0 "</h2>"
+            next
+        }
+        /^# / {
+            if (in_list) { print "</ul>"; in_list = 0 }
+            sub(/^# /, "")
+            print "<h1>" $0 "</h1>"
             next
         }
         /^- / {

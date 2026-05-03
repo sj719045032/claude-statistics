@@ -10,45 +10,45 @@
             <sparkle:shortVersionString>3.2.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <description><![CDATA[<h2>What's New</h2>
-<p>### GLM Coding Plan integration</p>
+<h3>GLM Coding Plan integration</h3>
 <ul>
 <li>Full Usage tab parity with Claude: 5h / 7d trend chart, "exhausts in …" badge, Tokens & Models card with cost figures.</li>
 <li>19 GLM models seeded with USD per-1M-token rates so cost rendering lights up for sessions tagged <code>glm-4.6</code>, <code>glm-4.5-air</code>, etc.</li>
 <li>Quota window titles aligned with Claude's wording (5 Hour / 7 Day / 30 Day); dashboard links now point at the coding-plan-specific pages on bigmodel.cn and z.ai.</li>
 <li>Compact quota row layout — same typography rhythm as Claude's 5h/7d windows, no more chunky cards.</li>
 </ul>
-<p>### Terminal identity</p>
+<h3>Terminal identity</h3>
 <ul>
 <li>Terminal detection (Kitty / WezTerm / iTerm / Ghostty / …) is now entirely plugin-driven. Adding a new terminal is a plugin-only change; the host no longer hardcodes env-var checks.</li>
 </ul>
-<p>### Plugin Discover / Settings</p>
+<h3>Plugin Discover / Settings</h3>
 <ul>
 <li>Each plugin row shows a finer subcategory label ("App", "Editor", "Provider", …) instead of collapsing under one "Integrations" bucket.</li>
 <li>Reorganized Settings → Plugins UI with cleaner enable/disable affordances and an immediate-reset option for trust prompts.</li>
 </ul>
-<p>### Under the hood</p>
+<h3>Under the hood</h3>
 <ul>
 <li>New <code>LinearExhaustEstimator</code> shared utility — Claude's 5h + 7d-fallback and the new GLM windows now run a single algorithm with matching ≥10% / ≥1d thresholds.</li>
 <li>SDK bumped to v0.3.0 with additive surface (<code>SubscriptionExtensionPlugin.builtinPricingModels</code>, <code>SubscriptionInfo.localTrendWindows</code>, <code>SubscriptionQuotaWindow.windowDuration</code>, <code>ProviderUsageTrendPresentation.subscriptionQuotaID</code>, <code>TerminalEnvIdentification</code>, <code>TerminalContextEnriching</code>). Existing 0.2.0 plugins continue to work.</li>
 </ul>
 <h2>中文</h2>
-<p>### GLM Coding Plan 集成</p>
+<h3>GLM Coding Plan 集成</h3>
 <ul>
 <li>Usage 页全面对齐 Claude：5h / 7d 趋势图、"还剩 …" 倒计时、Tokens & Models 卡片含成本估算。</li>
 <li>预置 19 个 GLM 模型的 USD 单价（来自 Z.ai 官方），<code>glm-4.6</code> / <code>glm-4.5-air</code> 等会话自动出成本数字。</li>
 <li>配额窗口标题与 Claude 风格对齐（"5 小时 / 7 天 / 30 天"），dashboard 链接跳转到 bigmodel.cn / z.ai 的 coding-plan 专属页。</li>
 <li>紧凑配额行排版——与 Claude 的 5h/7d 行同款字体节奏，去掉厚卡片样式。</li>
 </ul>
-<p>### 终端识别</p>
+<h3>终端识别</h3>
 <ul>
 <li>终端检测（Kitty / WezTerm / iTerm / Ghostty 等）改为完全由插件驱动。新增终端只需插件侧改动，host 不再硬编码 env 检查。</li>
 </ul>
-<p>### 插件 Discover / 设置</p>
+<h3>插件 Discover / 设置</h3>
 <ul>
 <li>每个插件行显示更细的子类别标签（"App"、"Editor"、"Provider" 等），不再统一塞进 "Integrations" 桶。</li>
 <li>设置 → 插件 UI 重组：更清晰的启用/禁用控件，新增"立即重置信任"快捷项。</li>
 </ul>
-<p>### 引擎改进</p>
+<h3>引擎改进</h3>
 <ul>
 <li>新增共享 <code>LinearExhaustEstimator</code> 工具——Claude 5h + 7d 兜底路径和新 GLM 窗口走同一个算法，门槛一致（≥10% / ≥1d）。</li>
 <li>SDK 升到 v0.3.0，新增字段全部加法（<code>SubscriptionExtensionPlugin.builtinPricingModels</code>、<code>SubscriptionInfo.localTrendWindows</code>、<code>SubscriptionQuotaWindow.windowDuration</code>、<code>ProviderUsageTrendPresentation.subscriptionQuotaID</code>、<code>TerminalEnvIdentification</code>、<code>TerminalContextEnriching</code>）。已有 0.2.0 插件无需改动继续可用。</li>
