@@ -29,6 +29,30 @@ parses the `CSPluginManifest` dictionary into a `PluginManifest`,
 then `dlopen`s the bundle and instantiates the
 `principalClass` via the Objective-C runtime.
 
+## Source of truth: project.yml → Info.plist
+
+The `CSPluginManifest` dictionary lives in **one place**: the
+plugin's `Info.plist`, generated from `project.yml`'s
+`info.properties.CSPluginManifest:` block on every xcodegen run.
+Hand-edits to `Info.plist` survive in `git diff` but get clobbered
+the next time xcodegen runs.
+
+The Swift side reads the same plist back via the SDK helper:
+
+```swift
+@objc(MyAwesomePlugin)
+public final class MyAwesomePlugin: NSObject, TerminalPlugin {
+    public static let manifest = PluginManifest(bundle: Bundle(for: MyAwesomePlugin.self))!
+    // …
+}
+```
+
+`PluginManifest(bundle:)` decodes `CSPluginManifest` from the
+plugin's bundle Info.plist at runtime. There's no Swift-side copy
+to keep in sync — id, version, minHostAPIVersion, permissions,
+category etc. all live in `project.yml` and propagate
+automatically.
+
 ## Required manifest fields
 
 The `Info.plist` must contain a top-level key `CSPluginManifest`
@@ -112,11 +136,12 @@ Critical pieces:
 - `MACH_O_TYPE: mh_bundle` — required for `Bundle.load()` to work.
 - `CODE_SIGN_IDENTITY: "-"` — ad-hoc signing. Notarization is not
   required for the marketplace path.
-- The `CSPluginManifest` block must mirror your Swift
-  `static let manifest = PluginManifest(...)` exactly. Mismatches
-  cause confusing failures: the on-disk plist drives loading, but
-  builtin plugins read the static field — divergence will hurt
-  later.
+- The `CSPluginManifest` block in `project.yml` is the **single
+  source of truth** for your plugin's manifest. Don't repeat the
+  same fields in Swift — use
+  `PluginManifest(bundle: Bundle(for: <YourClass>.self))!` so the
+  Swift side reads the plist back at runtime. Two-place
+  declarations are how parity drift creeps in.
 
 After editing `project.yml`, regenerate the Xcode project:
 

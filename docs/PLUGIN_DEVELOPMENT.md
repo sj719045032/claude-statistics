@@ -1,34 +1,60 @@
 # Claude Statistics Plugin Development Guide
 
-> v4.0-alpha · Last updated 2026-04-26
-> SDK package: `ClaudeStatisticsKit` (linked target inside this repo at
-> `Plugins/Sources/ClaudeStatisticsKit/`)
-> Companion docs: [`REWRITE_PLAN.md`](./REWRITE_PLAN.md) (architecture)
+> SDK: `ClaudeStatisticsKit` v0.3.0 (`SDKInfo.apiVersion`)
+> Source: `Plugins/Sources/ClaudeStatisticsKit/` (this repo) — also
+> shipped as a binary `.xcframework` on each `sdk-v<x.y.z>` release.
+> Companion docs: [`SUBSCRIPTION_EXTENSIONS.md`](./SUBSCRIPTION_EXTENSIONS.md),
+> [`PLUGIN_PACKAGING.md`](./PLUGIN_PACKAGING.md),
+> [`PLUGIN_ARCHITECTURE.md`](./PLUGIN_ARCHITECTURE.md).
 
 This guide describes how to write a plugin for Claude Statistics. The
 plugin model lets you contribute a new AI coding CLI provider, a new
-terminal-emulator adapter, a share-card role set, or a share-card
-visual theme — all without modifying the host app's source code.
+terminal-emulator adapter, a third-party subscription endpoint, a
+share-card role set, or a share-card visual theme — all without
+modifying the host app's source code.
 
-> **Status**: v4.0-alpha. The full SDK protocol surface is in place —
-> all 5 narrow capability protocols (`SessionDataProvider` /
-> `SessionLauncher` / `UsageProvider` / `HookProvider` /
-> `AccountProvider`) plus their support types (`HookInstalling` /
-> `ProviderUsageSource` / `ProviderPricingFetching` /
-> `ModelPricingRates` / etc.) and the `Session` struct ship in
-> `ClaudeStatisticsKit`. Terminal plugins also have a complete focus +
-> launch contract (`TerminalFocusStrategy` / `TerminalLauncher`).
->
-> Third-party plugins compile against `ClaudeStatisticsKit` only — no
-> host coupling. What's still missing for a shippable third-party
-> plugin is the loading mechanism: `.csplugin` bundle support lands in
-> M2, runtime permission gating in M3. See
-> [§"Current limitations"](#current-limitations) for the cleanup list.
+> **Status**: stable. All four plugin kinds ship in production builds
+> (`.provider` / `.terminal` / `.shareRole` / `.shareCardTheme`), plus
+> `.subscriptionExtension` since SDK 0.2.0. Third-party plugins load
+> from `~/Library/Application Support/Claude Statistics/Plugins/` as
+> `.csplugin` bundles — no host source modification needed. Bundle
+> packaging + catalog publishing is documented in
+> [`PLUGIN_PACKAGING.md`](./PLUGIN_PACKAGING.md) and the
+> [catalog repo's submitting guide](https://github.com/sj719045032/claude-statistics-plugins/blob/main/submitting.md).
+
+## Single source of truth: `project.yml` → Info.plist
+
+Each plugin's manifest fields (`id`, `kind`, `displayName`,
+`version`, `minHostAPIVersion`, `permissions`, `principalClass`,
+`category`) live **once**, inside the bundle's `Info.plist` under
+the `CSPluginManifest` key.
+
+The recommended packaging path uses [xcodegen](https://github.com/yonaskolb/XcodeGen)
+with `info.properties.CSPluginManifest:` declarations in
+`project.yml` — xcodegen rewrites the `Info.plist` from those
+properties on each build, so `project.yml` is the canonical place
+to edit. Hand-edits to `Info.plist` survive in `git diff` but are
+clobbered the next time xcodegen runs.
+
+The Swift side reads back from the same plist via the SDK helper:
+
+```swift
+public final class MyPlugin: NSObject, TerminalPlugin {
+    public static let manifest = PluginManifest(bundle: Bundle(for: MyPlugin.self))!
+    // …
+}
+```
+
+`PluginManifest(bundle:)` decodes `CSPluginManifest` from the
+plugin's bundle Info.plist at runtime, so the Swift code never
+duplicates id/version/etc. There's no parity check to maintain
+because there's only one place to write the values.
 
 ---
 
 ## Table of contents
 
+- [Single source of truth: project.yml → Info.plist](#single-source-of-truth-projectyml--infoplist)
 1. [Concepts](#1-concepts)
 2. [Project setup](#2-project-setup)
 3. [PluginManifest reference](#3-pluginmanifest-reference)
@@ -39,8 +65,8 @@ visual theme — all without modifying the host app's source code.
 8. [Share-card-theme plugin](#8-share-card-theme-plugin)
 9. [SDK type reference](#9-sdk-type-reference)
 10. [Registration & loading](#10-registration--loading)
-11. [Current limitations](#11-current-limitations)
-12. [Distribution (today vs M2 vs GA)](#12-distribution-today-vs-m2-vs-ga)
+11. [SDK surface area](#11-sdk-surface-area)
+12. [Distribution](#12-distribution)
 
 ---
 
@@ -105,20 +131,60 @@ To author a new plugin today:
 
 ## 3. PluginManifest reference
 
-Every plugin must publish a static `manifest`:
+Every plugin must publish a static `manifest`. In production the
+recommended path is to construct it from the bundle's Info.plist
+(see [Single source of truth](#single-source-of-truth-projectyml--infoplist)):
+
+```swift
+public final class MyPlugin: NSObject, TerminalPlugin {
+    public static let manifest = PluginManifest(bundle: Bundle(for: MyPlugin.self))!
+}
+```
+
+The plist's `CSPluginManifest` dict (driven by `project.yml`'s
+`info.properties.CSPluginManifest:`) carries every field:
+
+```yaml
+# project.yml fragment
+info:
+  path: Sources/MyPlugin/Info.plist
+  properties:
+    CFBundleIdentifier: com.example.MyPlugin
+    CFBundleName: MyPlugin
+    NSPrincipalClass: MyPlugin
+    CSPluginManifest:
+      id: com.example.myplugin
+      kind: terminal               # .provider / .terminal / .shareRole / .shareCardTheme / .subscriptionExtension
+      displayName: My Plugin
+      version: 1.0.0
+      minHostAPIVersion: 0.3.0
+      permissions: []
+      principalClass: MyPlugin
+      category: terminal           # optional; falls back to "utility" in the marketplace UI
+```
+
+The decoded value resolves to:
 
 ```swift
 public struct PluginManifest: Codable, Sendable, Equatable {
-    public let id: String                       // "com.example.myprovider"
-    public let kind: PluginKind                 // .provider / .terminal / .shareRole / .shareCardTheme / .both
-    public let displayName: String              // "My Provider"
-    public let version: SemVer                  // SemVer(major: 1, minor: 2, patch: 3)
+    public let id: String                       // "com.example.myplugin"
+    public let kind: PluginKind                 // .provider / .terminal / .shareRole / .shareCardTheme / .subscriptionExtension
+    public let displayName: String              // "My Plugin"
+    public let version: SemVer                  // SemVer(major: 1, minor: 0, patch: 0)
     public let minHostAPIVersion: SemVer        // your floor — host rejects loads below
     public let permissions: [PluginPermission]  // declarative coarse perms
-    public let principalClass: String           // "MyProviderPlugin" — host uses for Bundle.load() instantiation
+    public let principalClass: String           // "MyPlugin" — host uses for Bundle.load() instantiation
     public let iconAsset: String?               // optional bundle-relative resource (24x24 template PDF)
+    public let category: String?                // optional marketplace bucket
 }
 ```
+
+Builtin plugins shipped inside the host bundle (Claude provider,
+the bundled Apple Terminal capability) construct `PluginManifest`
+manually via the public initializer because they live in the host
+target's `Bundle.main`, which doesn't carry a `CSPluginManifest`
+dict. The `PluginManifest(bundle:)` path is for `.csplugin` bundles
+loaded via the runtime loader.
 
 ### `id` rules
 
@@ -400,18 +466,11 @@ public struct TerminalDescriptor: Sendable {
 Example:
 
 ```swift
-final class TabbyPlugin: TerminalPlugin {
-    static let manifest = PluginManifest(
-        id: "com.example.tabby",
-        kind: .terminal,
-        displayName: "Tabby",
-        version: SemVer(major: 1, minor: 0, patch: 0),
-        minHostAPIVersion: SDKInfo.apiVersion,
-        permissions: [.accessibility],
-        principalClass: "TabbyPlugin"
-    )
+@objc(TabbyPlugin)
+public final class TabbyPlugin: NSObject, TerminalPlugin {
+    public static let manifest = PluginManifest(bundle: Bundle(for: TabbyPlugin.self))!
 
-    let descriptor = TerminalDescriptor(
+    public let descriptor = TerminalDescriptor(
         id: "com.example.tabby",
         displayName: "Tabby",
         category: .terminal,
@@ -422,13 +481,61 @@ final class TabbyPlugin: TerminalPlugin {
         autoLaunchPriority: 80
     )
 
-    func detectInstalled() -> Bool {
+    public func detectInstalled() -> Bool {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: "org.eugeny.tabby") != nil
     }
 
-    init() {}
+    public override init() { super.init() }
 }
 ```
+
+### Identifying a terminal from hook env (SDK 0.3.0)
+
+Terminals that export a process-environment variable identifying the
+hosting tab/window can declare it through `TerminalEnvIdentifying` so
+the host's hook resolver picks them up without any host-side
+hardcoding:
+
+```swift
+extension TabbyPlugin: TerminalEnvIdentifying {
+    public var envIdentification: TerminalEnvIdentification {
+        TerminalEnvIdentification(
+            envVars: ["TABBY_SESSION_ID"],   // any one matching is sufficient
+            canonicalName: "tabby",
+            socketEnv: nil,
+            surfaceEnv: "TABBY_SESSION_ID"
+        )
+    }
+}
+```
+
+For terminals that don't export an env (Ghostty is the canonical
+example — it uses AppleScript to enumerate windows), conform to
+`TerminalContextEnriching` instead and add the IPC fields the env
+doesn't carry:
+
+```swift
+extension TabbyPlugin: TerminalContextEnriching {
+    public func enrichContext(
+        base: HookTerminalContext,
+        event: String,
+        cwd: String?,
+        env: [String: String]
+    ) -> HookTerminalContext {
+        // Lookup window/tab/surface IDs by other means (process tree,
+        // AppleScript, etc.) and return an enriched context. The host
+        // only calls this when the bundle id or env match has already
+        // attributed the hook to your terminal.
+        var ctx = base
+        ctx.windowID = lookupActiveWindowID(matchingCwd: cwd)
+        return ctx
+    }
+}
+```
+
+Both protocols are optional. If you implement neither, the host
+falls back to TERM_PROGRAM-style detection through the
+`TerminalRegistry` alias table built from `descriptor.terminalNameAliases`.
 
 ### Behaviour: focus + launch
 
@@ -660,10 +767,9 @@ for (id, plugin) in registry.terminals { ... }
 
 ---
 
-## 11. Current limitations
+## 11. SDK surface area
 
-**v4.0-alpha** ships the full behaviour-protocol surface for all five
-narrow capabilities. What's stable today:
+What ships in `ClaudeStatisticsKit` today:
 
 - ✅ `Plugin` / `PluginManifest` / `PluginRegistry` (full)
 - ✅ `ProviderDescriptor` / `TerminalDescriptor` / `ShareRoleDescriptor` /
@@ -678,40 +784,45 @@ narrow capabilities. What's stable today:
 - ✅ `ProviderUsageSource` (live API quota fetching)
 - ✅ `ProviderPricingFetching` (remote pricing refresh)
 - ✅ `ModelPricingRates` (per-million-token rate struct)
+- ✅ `SubscriptionExtensionPlugin` / `SubscriptionAdapter` /
+  `SubscriptionAccountManager` / `SubscriptionInfo` (third-party
+  endpoints piggy-backing on a host provider's CLI — see
+  [`SUBSCRIPTION_EXTENSIONS.md`](./SUBSCRIPTION_EXTENSIONS.md))
+- ✅ `TerminalEnvIdentifying` / `TerminalContextEnriching` (plugin-driven
+  terminal recognition from hook env)
+- ✅ `PluginManifest(bundle:)` (single-source-of-truth plist decoder)
 - ✅ All neutral data models (full)
 
-What's still host-side, last item on the cleanup list:
+Notes:
 
-- ⏳ `ProviderKind` enum demotion — the closed enum is no longer
-  required by any SDK protocol, but ~30 host call sites still
-  `switch` on it (HookCLI dispatch, Settings UI, several ViewModels).
-  Pure host cleanup; doesn't block third-party plugins.
-
-**Practical impact**: today you can author a fully self-contained
-provider plugin against `ClaudeStatisticsKit` end-to-end. Session
-scanning, parsing, launching (new / resume), hook installation,
-statusline integration, account profile fetching, quota window
-tracking, pricing — all SDK-resident.
-
-The **`PluginPermission` system itself isn't enforced yet**. Permissions
-declared in the manifest are recorded but the host doesn't gate
-filesystem / network access by them in v4.0-alpha. M3 introduces the
-trust prompt + runtime gate.
+- The **`PluginPermission` system records but doesn't actively gate
+  yet**. Permissions declared in the manifest surface in the trust
+  prompt on first load, but the host doesn't intercept filesystem /
+  network access by them at runtime. Declare honestly anyway — the
+  enforcement layer lands without changing the manifest schema.
 
 ---
 
-## 12. Distribution (today vs M2 vs GA)
+## 12. Distribution
 
-| Stage | How plugins ship | When |
-|---|---|---|
-| **v4.0-alpha (now)** | In-tree Xcode targets that statically link `ClaudeStatisticsKit` and ship inside the host app binary. Dogfood only. | **today** |
-| **v4.0-beta (M2)** | `.csplugin` Bundles (`example.csplugin/Contents/MacOS/example` dylib) loaded at launch via `Bundle.load()`. Builtin plugins move out of the host binary into `Plugins/builtins/`. The host app gains the `com.apple.security.cs.disable-library-validation` entitlement so signed third-party plugins can load. | stage 4 |
-| **v4.0 GA (M3)** | Third-party `.csplugin` distribution: drop into `~/Library/Application Support/Claude Statistics/Plugins/community/`. Trust prompt + signature check on first load. SDK ships as a standalone `ClaudeStatisticsKit.xcframework` repo. Optional `.cspluginx` subprocess mode for non-Swift plugins. | stage 5 |
+`.csplugin` bundles are the canonical distribution unit. The host
+loads them from `~/Library/Application Support/Claude Statistics/Plugins/`
+on each launch (or via Settings → Plugins → Discover for marketplace
+installs). Builds, packaging, and catalog publishing are documented
+in [`PLUGIN_PACKAGING.md`](./PLUGIN_PACKAGING.md).
 
-For now, contribute your plugin as a PR adding a target to this repo;
-it will be packaged automatically once stage-4 lands. The plugin id /
-manifest you author today is the same one M2 will load from a bundle —
-no rewrite required.
+A few high-level paths:
+
+- **Build out-of-tree, install locally** — `.csplugin` zip dropped
+  into the user plugins directory; first launch shows a trust prompt
+  with the declared permissions.
+- **Submit to the marketplace catalog** — open a PR against
+  [`claude-statistics-plugins`](https://github.com/sj719045032/claude-statistics-plugins)
+  per its `submitting.md`. After merge, users see your entry in
+  Discover within ≤ 5 min (raw CDN propagation).
+- **Ship inside an organization** — host an `index.json` of your own
+  on any HTTPS endpoint, point a custom marketplace at it via
+  Settings → Plugins → Discover → Add catalog source.
 
 ---
 

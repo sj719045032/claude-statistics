@@ -155,7 +155,7 @@ export const siteCopy: Record<Language, SiteCopy> = {
         {
           kicker: "Provider-aware design",
           title: "Providers and subscription endpoints can arrive through plugins.",
-          text: "Claude stays as the chassis provider; Codex, Gemini, GLM, and future integrations can ship through the marketplace."
+          text: "Claude is the built-in default provider; Codex, Gemini, third-party endpoints, and future integrations ship through the marketplace — bringing quota windows, exhaust estimates, trend charts, and per-model pricing along with them."
         },
         {
           kicker: "Account switching",
@@ -216,7 +216,7 @@ export const siteCopy: Record<Language, SiteCopy> = {
           items: [
             "Claude 5h and 7d tracking plus provider-aware menu bar status",
             "Codex plan context, Gemini grouped quota buckets, and local usage trends",
-            "Subscription plugins such as GLM Coding Plan can add token-based identities",
+            "Subscription plugins contribute their own quota windows, exhaust estimates, trend charts, and per-model pricing",
             "Auto-refresh, retry states, and clearer local usage visibility"
           ]
         }
@@ -393,7 +393,7 @@ export const siteCopy: Record<Language, SiteCopy> = {
         {
           kicker: "Provider 感知设计",
           title: "Provider 和订阅 endpoint 可以通过插件进入应用。",
-          text: "Claude 保持 chassis provider；Codex、Gemini、GLM 和未来集成都可以通过 marketplace 交付。"
+          text: "Claude 作为内置默认 provider；Codex、Gemini、第三方 endpoint 和未来集成都通过 marketplace 交付，配额窗口、剩余时间推断、趋势图、按模型定价一并接进来。"
         },
         {
           kicker: "账号切换",
@@ -454,7 +454,7 @@ export const siteCopy: Record<Language, SiteCopy> = {
           items: [
             "Claude 5 小时 / 7 天窗口与菜单栏动态状态",
             "Codex 套餐信息、Gemini 分组 quota 与本地趋势图",
-            "GLM Coding Plan 等订阅插件可加入 token-based 身份",
+            "订阅插件可贡献自己的配额窗口、剩余时间推断、趋势图和按模型成本估算",
             "自动刷新、重试状态与本地使用趋势"
           ]
         }
