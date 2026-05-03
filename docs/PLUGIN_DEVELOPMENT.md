@@ -13,14 +13,12 @@ terminal-emulator adapter, a third-party subscription endpoint, a
 share-card role set, or a share-card visual theme — all without
 modifying the host app's source code.
 
-> **Status**: stable. All four plugin kinds ship in production builds
-> (`.provider` / `.terminal` / `.shareRole` / `.shareCardTheme`), plus
-> `.subscriptionExtension` since SDK 0.2.0. Third-party plugins load
-> from `~/Library/Application Support/Claude Statistics/Plugins/` as
-> `.csplugin` bundles — no host source modification needed. Bundle
-> packaging + catalog publishing is documented in
-> [`PLUGIN_PACKAGING.md`](./PLUGIN_PACKAGING.md) and the
-> [catalog repo's submitting guide](https://github.com/sj719045032/claude-statistics-plugins/blob/main/submitting.md).
+Plugin kinds: `.provider` / `.terminal` / `.subscriptionExtension` /
+`.shareRole` / `.shareCardTheme`. Plugins load from
+`~/Library/Application Support/Claude Statistics/Plugins/` as
+`.csplugin` bundles. Bundle packaging + catalog publishing are
+documented in [`PLUGIN_PACKAGING.md`](./PLUGIN_PACKAGING.md) and the
+[catalog repo's submitting guide](https://github.com/sj719045032/claude-statistics-plugins/blob/main/submitting.md).
 
 ## Single source of truth: `project.yml` → Info.plist
 
@@ -191,8 +189,6 @@ loaded via the runtime loader.
 - Reverse-DNS: `com.<vendor>.<plugin-name>` (e.g. `com.anthropic.claude`,
   `net.kovidgoyal.kitty`, `com.example.aider`).
 - Globally unique. The host's loader rejects duplicate-id registration.
-- For builtin plugins, the `id` matches the legacy `ProviderKind.rawValue`
-  so on-disk caches keep loading.
 
 ### `permissions`
 
@@ -212,9 +208,10 @@ Declare only what you need — over-declaring scares users away.
 
 ### `minHostAPIVersion`
 
-Compare against `SDKInfo.apiVersion`. If your plugin uses APIs added in
-`0.2.0`, set `minHostAPIVersion = SemVer(major: 0, minor: 2, patch: 0)`.
-The host rejects loads where its `SDKInfo.apiVersion < manifest.minHostAPIVersion`.
+Smallest `SDKInfo.apiVersion` your plugin needs. The host rejects
+loads where `SDKInfo.apiVersion < manifest.minHostAPIVersion`.
+Default it to whichever SDK release ships the slots you actually
+use; declared in `project.yml`'s `CSPluginManifest:` block.
 
 ---
 
@@ -552,8 +549,8 @@ public protocol TerminalPlugin: Plugin {
 ```
 
 Both default to `nil`. A plugin that only declares the descriptor still
-slots into the menu / settings pickers; the host falls back to its
-legacy route registry for the matching `bundleIdentifiers`.
+slots into the menu / settings pickers; the host then routes by
+the descriptor's `bundleIdentifiers`.
 
 #### `TerminalFocusStrategy`
 
@@ -586,25 +583,15 @@ public protocol TerminalLauncher: Sendable {
 Fire-and-forget — log failures via `DiagnosticLogger`; the host has no
 fallback chain at the launch call site.
 
-#### Still scheduled for stage-4
-
-`TerminalSetupWizard` (Kitty's `kitty.conf` injection, etc.) and
-`TerminalContextProbe` (Ghostty's surface-id env probe) still live as
-host-internal protocols. Plugins that need either should expose the
-relevant logic through host-internal hooks until those protocols
-migrate.
-
 ---
 
 ## 7. Share-role plugin
 
 A Share-role plugin contributes one or more roles to the share-card
-dialog, each with its own scoring function.
-
-> **Status**: v4.0-alpha exposes the descriptor surface only. The
-> evaluate / score side (`func evaluate(metrics: ShareMetrics, baseline:
-> ShareMetrics?) -> [ShareRoleScore]`) ships in stage 4 once
-> `ShareMetrics` migrates to the SDK.
+dialog, each with its own scoring function. The descriptor surface
+is in the SDK; the evaluate/score side
+(`func evaluate(metrics: ShareMetrics, baseline: ShareMetrics?) -> [ShareRoleScore]`)
+runs host-side today.
 
 ```swift
 public protocol ShareRolePlugin: Plugin {
@@ -655,17 +642,16 @@ public struct ShareCardThemeDescriptor: Sendable, Hashable {
 }
 ```
 
-> **Status**: v4.0-alpha exposes descriptors only. The
-> `makeCardView(input: ShareCardInput) -> AnyView` factory lands in
-> stage 4 once the host's `SharePreviewWindow` exposes its
-> SwiftUI-based input contract.
+The descriptor surface is in the SDK; the `makeCardView(input:
+ShareCardInput) -> AnyView` factory runs host-side until the
+host's `SharePreviewWindow` exposes its SwiftUI-based input
+contract through the SDK.
 
 ---
 
 ## 9. SDK type reference
 
-All public types in `ClaudeStatisticsKit` (45 files / 2638 lines as
-of v4.0-alpha):
+Public types in `ClaudeStatisticsKit`:
 
 ### Plugin core
 
@@ -722,7 +708,8 @@ Other: `TranscriptDisplayMessage` · `SearchIndexMessage` ·
 
 ## 10. Registration & loading
 
-In v4.0-alpha, plugins register synchronously in `AppState.pluginRegistry`:
+Plugins register synchronously in `AppState.pluginRegistry` at
+launch:
 
 ```swift
 // ClaudeStatistics/App/ClaudeStatisticsApp.swift
@@ -828,8 +815,7 @@ A few high-level paths:
 
 ## Appendix: builtin plugin reference
 
-Look at the 11 dogfood plugins shipped with v4.0-alpha for working
-examples:
+Working examples ship in the host bundle and the catalog repo:
 
 - **3 Provider plugins**: `ClaudeStatistics/Providers/BuiltinProviderPlugins.swift`
   (`ClaudePluginDogfood` / `CodexPluginDogfood` / `GeminiPluginDogfood`)

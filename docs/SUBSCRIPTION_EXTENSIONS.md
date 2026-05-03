@@ -1,9 +1,9 @@
 # Subscription Extensions
 
-> SDK 0.2.0 引入的 plugin kind `subscriptionExtension`；0.3.0 进一步把
-> 用量趋势图、剩余时间推断、模型定价的 slot 也开放给扩展。让任意第三方
-> endpoint（同一 base-URL 上跑别家 token 的 coding plan）通过插件接入
-> 现有 provider — host 不持有任何 vendor-specific 代码。
+> Plugin kind `subscriptionExtension`：让任意第三方 endpoint（同一
+> base-URL 上跑别家 token 的 coding plan）通过插件接入现有 provider，
+> 同时贡献 token-based 身份、配额窗口、剩余时间推断、用量趋势图、
+> 按模型定价 — host 不持有任何 vendor-specific 代码。
 
 ## 1. 何时用 `SubscriptionExtensionPlugin` 而不是 `ProviderPlugin`
 
@@ -44,16 +44,16 @@ UI 协议是"挖坑位"：插件自己 ship `makeAddAccountView()` /
 `makeSectionFooterView()` 返回任意 SwiftUI view，host 的
 `IdentityPickerView` 直接渲染 — host 不知道插件内部 UI 长什么样。
 
-## 3. 0.3.0 新加的几个 slot
+## 3. 用量呈现的几个 slot
 
-让订阅扩展能贡献 host 原本只有 provider 才有的几样东西：
+订阅扩展能贡献 host 原本只有 provider 才有的几样东西：
 
 ### 3.1 模型定价 — `SubscriptionExtensionPlugin.builtinPricingModels`
 
 ```swift
 public protocol SubscriptionExtensionPlugin: Plugin {
     // …
-    var builtinPricingModels: [String: ModelPricingRates] { get }   // 0.3.0+
+    var builtinPricingModels: [String: ModelPricingRates] { get }
 }
 ```
 
@@ -71,17 +71,17 @@ Claude Pro/Max 的呈现方式一致。
 ```swift
 public struct SubscriptionInfo {
     // …
-    public let localTrendWindows: [ProviderUsageTrendPresentation]   // 0.3.0+
+    public let localTrendWindows: [ProviderUsageTrendPresentation]
 }
 
 public struct SubscriptionQuotaWindow {
     // …
-    public let windowDuration: TimeInterval?   // 0.3.0+
+    public let windowDuration: TimeInterval?
 }
 
 public struct ProviderUsageTrendPresentation {
     // …
-    public let subscriptionQuotaID: String?    // 0.3.0+
+    public let subscriptionQuotaID: String?
 }
 ```
 
@@ -95,13 +95,12 @@ public struct ProviderUsageTrendPresentation {
 - 任意一项不填，对应 UI 优雅退化（不画图 / 不显示 badge），不影响其他
   功能。
 
-### 3.3 通用化的 quota anchor
+### 3.3 Quota anchor
 
 `ProviderUsageTrendPresentation.subscriptionQuotaID` 让趋势图的窗口
-结束时间锚定到 `SubscriptionInfo.quotas[id]?.resetAt`，而不是原本只支持
-的 `UsageData.providerBuckets`（那是原生 provider 自己的数据形状）。这
-样订阅扩展的趋势图也能精确对齐 upstream reset 时间，不用 fallback 到
-`now`。
+结束时间锚定到 `SubscriptionInfo.quotas[id]?.resetAt`，与原生
+provider 共用 `UsageData.providerBuckets` 那条 anchor 路径并存。
+订阅扩展的趋势图能精确对齐 upstream reset 时间，不用 fallback 到 `now`。
 
 ## 4. 数据流（用户切到订阅 identity 的路径）
 
@@ -117,7 +116,7 @@ User picks subscription identity in IdentityPickerView
             → 插件调 vendor API，返 SubscriptionInfo
     → profileViewModel.subscriptionInfo published
     → SubscriptionAccountCard (Settings) + SubscriptionQuotasView (Usage tab) 渲染
-    → 0.3.0+: UsageView.effectiveLocalTrendWindows = info.localTrendWindows
+    → UsageView.effectiveLocalTrendWindows = info.localTrendWindows
        → 趋势图 + Tokens & Models 卡片 + exhaust badge 全部从订阅数据点亮
     → MenuBarUsageCell 用 subscriptionInfo.quotas 合成 status-bar segment
 ```
