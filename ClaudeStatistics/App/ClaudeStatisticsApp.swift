@@ -180,6 +180,14 @@ final class AppState: ObservableObject {
             }
         }
         TerminalRegistry.setDisabledOptionIDs(disabledOptionIDs)
+
+        // Mirror the plugin-claimed bundle id set to disk so HookCLI
+        // can short-circuit hook events at the source (before any
+        // socket I/O) when fired from a host no plugin claims —
+        // matches the host-side claim filter in AttentionBridge so
+        // both layers stay in sync. Best-effort: a write failure just
+        // means HookCLI falls through to the host-side filter.
+        AppRuntimePaths.writeInstalledTerminalBundles(pluginBundleIds)
     }
 
     /// Caches every `ProviderPlugin.makeProvider()` result into

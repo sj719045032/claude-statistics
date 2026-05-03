@@ -50,6 +50,24 @@ struct HookRunner: HookHelperContext {
     let provider: ProviderKind
 
     func run() -> Int32 {
+        // Source-side host-claim filter. When the hook fires from a
+        // GUI host whose bundle id isn't claimed by any installed
+        // terminal plugin (e.g. Claude.app / Codex.app sessions
+        // without their .csplugin), exit before doing any socket I/O —
+        // the host would drop these events anyway via the
+        // `HookTerminalResolver` claim check in AttentionBridge.
+        // Reading is best-effort: if the file is missing (host has
+        // never been launched, or pre-dates this feature), fall
+        // through so AttentionBridge enforces the same rule. File
+        // absence must NEVER cause a false drop on its own.
+        if let bundleId = ProcessInfo.processInfo.environment["__CFBundleIdentifier"],
+           !bundleId.isEmpty,
+           let installed = AppRuntimePaths.loadInstalledTerminalBundles(),
+           !installed.isEmpty,
+           !installed.contains(bundleId) {
+            return 0
+        }
+
         if ProcessInfo.processInfo.environment["CLAUDE_STATS_HOOK_PRINT_PATHS"] == "1" {
             let line = "root=\(AppRuntimePaths.rootDirectory) socket=\(AttentionBridgeAuth.socketPath)\n"
             FileHandle.standardError.write(Data(line.utf8))

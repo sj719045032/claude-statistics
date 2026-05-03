@@ -243,9 +243,15 @@ final class ActiveSessionsTracker: ObservableObject {
         // Run the filter chain. Any filter returning false drops the
         // session — pre-built runtime from earlier hooks (SessionStart
         // hits before UserPromptSubmit, so synthetic prompts are caught
-        // on the second event) is purged so the row vanishes.
+        // on the second event) is purged so the row vanishes. A pass
+        // evicts any prior blacklist entry: a row dropped earlier (e.g.
+        // a previous refresh saw nil terminalName because the host's
+        // plugin wasn't installed yet) regains visibility once a fresh
+        // event arrives with a now-valid plugin-resolved identity.
         let filterCtx = filterContext(forEvent: event)
-        if !sessionFilters.allSatisfy({ $0.shouldDisplay(filterCtx) }) {
+        if sessionFilters.allSatisfy({ $0.shouldDisplay(filterCtx) }) {
+            droppedSessionIds.remove(event.sessionId)
+        } else {
             droppedSessionIds.insert(event.sessionId)
         }
         if droppedSessionIds.contains(event.sessionId) {
@@ -618,12 +624,21 @@ final class ActiveSessionsTracker: ObservableObject {
         // Re-evaluate persisted runtimes against the filter chain. Catches
         // rows persisted before a filter existed (e.g. an upgraded plugin
         // adds a new synthetic-prompt rule) so a restart cleans them up
-        // rather than indefinitely carrying stale rows.
+        // rather than indefinitely carrying stale rows. We drop the
+        // current runtime but do NOT blacklist the sessionId here —
+        // refresh-time evaluation reflects moment-in-time runtime state
+        // (e.g. terminalName might be nil on a row created before its
+        // host's plugin was installed). The blacklist semantics are
+        // reserved for record-time: first-event filter rejection signals
+        // a genuinely synthetic prompt (Codex.app ambient prompts) that
+        // shouldn't resurrect on later events. Refresh just garbage-
+        // collects; if a future hook event arrives with valid identity
+        // for one of these sessionIds, record's filter pass will reinstate
+        // it.
         if !sessionFilters.isEmpty {
             for (key, runtime) in runtimeByKey {
                 let ctx = filterContext(forRuntime: runtime)
                 if !sessionFilters.allSatisfy({ $0.shouldDisplay(ctx) }) {
-                    droppedSessionIds.insert(runtime.sessionId)
                     runtimeByKey.removeValue(forKey: key)
                 }
             }

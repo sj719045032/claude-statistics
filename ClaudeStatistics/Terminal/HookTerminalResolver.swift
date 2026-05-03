@@ -16,8 +16,17 @@ enum HookTerminalResolver {
     struct Resolved: Sendable, Equatable {
         let canonicalName: String?
         let context: HookTerminalContext
+        /// True iff one of the three plugin-driven recognition paths
+        /// (bundle-id reverse, env-var identification, TERM_PROGRAM
+        /// alias→plugin) actually matched a loaded plugin. `false` for the
+        /// raw-fallback case at the bottom of `resolve(...)` where no
+        /// plugin recognised the host. AttentionBridge uses this to drop
+        /// hook events from hosts no installed plugin claims, instead of
+        /// surfacing a card whose source tag and focus button can't be
+        /// rendered.
+        let claimed: Bool
 
-        static let empty = Resolved(canonicalName: nil, context: HookTerminalContext())
+        static let empty = Resolved(canonicalName: nil, context: HookTerminalContext(), claimed: false)
     }
 
     /// Walks plugin contributions to derive the most specific
@@ -55,7 +64,7 @@ enum HookTerminalResolver {
            let plugin = terminals.first(where: { $0.descriptor.bundleIdentifiers.contains(hostAppBundleId) }) {
             let canonical = plugin.descriptor.terminalNameAliases.sorted().first
             let context = enrich(plugin: plugin, base: HookTerminalContext(), event: event, cwd: cwd, env: env)
-            return Resolved(canonicalName: canonical, context: context)
+            return Resolved(canonicalName: canonical, context: context, claimed: true)
         }
 
         // 2. Env-var identification — each plugin says which env
@@ -76,7 +85,7 @@ enum HookTerminalResolver {
             if let key = envIdent.tabEnv { context.tabID = env[key]?.nonEmpty }
 
             let enriched = enrich(plugin: plugin, base: context, event: event, cwd: cwd, env: env)
-            return Resolved(canonicalName: envIdent.canonicalName, context: enriched)
+            return Resolved(canonicalName: envIdent.canonicalName, context: enriched, claimed: true)
         }
 
         // 3. TERM_PROGRAM/TERM fallback — hand the raw alias to the
@@ -90,15 +99,17 @@ enum HookTerminalResolver {
            let plugin = terminals.first(where: { $0.descriptor.bundleIdentifiers.contains(bundleId) }) {
             let canonical = plugin.descriptor.terminalNameAliases.sorted().first ?? trimmed
             let context = enrich(plugin: plugin, base: HookTerminalContext(), event: event, cwd: cwd, env: env)
-            return Resolved(canonicalName: canonical, context: context)
+            return Resolved(canonicalName: canonical, context: context, claimed: true)
         }
 
-        // No plugin claims this row. Pass the raw alias through so the
-        // existing "row visible iff the name resolves to *some*
-        // capability" filter still works for any externally-registered
-        // terminal (`externalCapabilities`) that doesn't ship as a
-        // plugin yet.
-        return Resolved(canonicalName: trimmed?.nonEmpty, context: HookTerminalContext())
+        // No plugin claims this row. Pass the raw alias through (still
+        // useful for any externally-registered terminal in
+        // `TerminalRegistry.externalCapabilities` not yet shipped as a
+        // plugin) and tag `claimed: false` so AttentionBridge can drop
+        // the event for hosts that arrived with a non-empty bundle id —
+        // those are GUI hosts (Claude.app / Codex.app / …) that need
+        // their plugin installed to render meaningfully.
+        return Resolved(canonicalName: trimmed?.nonEmpty, context: HookTerminalContext(), claimed: false)
     }
 
     @MainActor

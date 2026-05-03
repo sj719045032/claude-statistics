@@ -75,6 +75,51 @@ public enum AppRuntimePaths {
         return runFile(named: name)
     }
 
+    // MARK: - Installed-terminal bundle list
+
+    /// Disk file the host overwrites after every PluginRegistry
+    /// mutation, listing the bundle ids of every currently-installed
+    /// terminal plugin (one per line). HookCLI reads this at startup
+    /// to short-circuit when the hook fires from a host whose plugin
+    /// isn't installed — avoids round-tripping a hook event through
+    /// the socket only for AttentionBridge to drop it. The host-side
+    /// drop in AttentionBridge stays in place as defense-in-depth.
+    public static let installedTerminalBundlesFile = (rootDirectory as NSString).appendingPathComponent("installed-terminal-bundles.txt")
+
+    /// Read the bundle id allow-list. Returns nil when the file is
+    /// missing or unreadable so callers can fall through to the
+    /// existing path (host-side AttentionBridge claim filter). File
+    /// absence MUST NEVER cause a false drop — only an explicit list
+    /// where the bundle id is missing does.
+    public static func loadInstalledTerminalBundles() -> Set<String>? {
+        guard let raw = try? String(contentsOfFile: installedTerminalBundlesFile, encoding: .utf8) else {
+            return nil
+        }
+        let ids = raw
+            .split(separator: "\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return Set(ids)
+    }
+
+    /// Atomically replace the bundle id allow-list. Sorted for stable
+    /// disk content so identical plugin sets don't churn the file's
+    /// mtime across unrelated lifecycle pings.
+    @discardableResult
+    public static func writeInstalledTerminalBundles(_ ids: Set<String>) -> Bool {
+        guard ensureRootDirectory() != nil else { return false }
+        let body = ids.sorted().joined(separator: "\n") + "\n"
+        do {
+            try body.write(toFile: installedTerminalBundlesFile, atomically: true, encoding: .utf8)
+            return true
+        } catch {
+            DiagnosticLogger.shared.warning(
+                "Installed-terminal-bundles write failed path=\(installedTerminalBundlesFile) error=\(error.localizedDescription)"
+            )
+            return false
+        }
+    }
+
     @discardableResult
     private static func ensureDirectory(_ path: String, permissions: Int) -> String? {
         let fm = FileManager.default

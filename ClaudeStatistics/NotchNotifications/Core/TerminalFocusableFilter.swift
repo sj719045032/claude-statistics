@@ -10,11 +10,26 @@ struct TerminalFocusableFilter: SessionEventFilter {
     let id = "terminal-focusable"
 
     func shouldDisplay(_ context: SessionFilterContext) -> Bool {
-        // Restore-warmed rows arrive from session metadata with no
-        // terminal_name yet — the next hook event fills it. Tolerate the
-        // unknown state so the row survives until then; only reject when
-        // a name *was* provided and didn't resolve.
-        guard let name = context.terminalName, !name.isEmpty else { return true }
+        // Reject rows with no `terminal_name`. Hook-driven events always
+        // arrive with a plugin-resolved name (`HookTerminalResolver`
+        // populates it before `WireEventTranslator.makeEvent`, and
+        // `AttentionBridge` drops events from hosts no plugin claims at
+        // source). A nil here therefore means one of:
+        //   (a) disk-persisted orphan from a session whose host had no
+        //       installed plugin (e.g. Claude.app / Codex.app sessions
+        //       captured before the plugin was installed, or before the
+        //       AttentionBridge drop guard existed)
+        //   (b) transcript-scanner restore line that no subsequent hook
+        //       claimed (cloud agent / ssh / SDK headless sessions)
+        //   (c) hook with no `__CFBundleIdentifier` AND no TERM_PROGRAM —
+        //       the rare path that previously relied on
+        //       `kickOffTerminalNameInference` backfilling. Inference
+        //       only succeeds when the resolved bundle id is registered
+        //       (i.e. its plugin is installed), in which case the next
+        //       refresh writes a non-nil name and the row reappears.
+        // None of (a)/(b)/(c) can render a source tag or focus button
+        // without a claiming plugin, so hide them.
+        guard let name = context.terminalName, !name.isEmpty else { return false }
         return TerminalRegistry.canFocusBackToTerminal(named: name)
     }
 }
