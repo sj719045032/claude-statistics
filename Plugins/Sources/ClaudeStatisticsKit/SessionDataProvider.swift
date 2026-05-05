@@ -35,6 +35,26 @@ public protocol SessionDataProvider: Sendable {
     func parseMessages(at path: String) -> [TranscriptDisplayMessage]
     func parseSearchIndexMessages(at path: String) -> [SearchIndexMessage]
     func parseTrendData(from filePath: String, granularity: TrendGranularity) -> [TrendDataPoint]
+
+    /// Optional combined parser for providers that can produce both
+    /// outputs from one file pass. The host's parse pipeline always
+    /// needs both stats and FTS messages for the same session, so a
+    /// single-pass implementation skips the second file load + decode.
+    /// Default implementation falls back to calling the two existing
+    /// methods, preserving compatibility with plugins built against
+    /// older SDK revisions.
+    func parseSessionAndSearchIndex(at path: String) -> SessionParseResult
+}
+
+/// Combined output of `SessionDataProvider.parseSessionAndSearchIndex`.
+public struct SessionParseResult: Sendable {
+    public let stats: SessionStats
+    public let searchMessages: [SearchIndexMessage]
+
+    public init(stats: SessionStats, searchMessages: [SearchIndexMessage]) {
+        self.stats = stats
+        self.searchMessages = searchMessages
+    }
 }
 
 extension SessionDataProvider {
@@ -59,5 +79,15 @@ extension SessionDataProvider {
     /// macOS apps.
     public var isInstalled: Bool {
         FileManager.default.fileExists(atPath: configDirectory)
+    }
+
+    /// Default combined parser: falls back to the two separate calls.
+    /// Plugins that share a file load between the two paths should
+    /// override this to skip the duplicate IO.
+    public func parseSessionAndSearchIndex(at path: String) -> SessionParseResult {
+        SessionParseResult(
+            stats: parseSession(at: path),
+            searchMessages: parseSearchIndexMessages(at: path)
+        )
     }
 }

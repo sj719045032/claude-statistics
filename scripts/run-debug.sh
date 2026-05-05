@@ -167,12 +167,14 @@ ${LSREGISTER} -u "${BUILT_APP_PATH}" 2>/dev/null || true
 ${LSREGISTER} -u "${APP_PATH}" 2>/dev/null || true
 ${LSREGISTER} -f -R "${STABLE_APP_PATH}"
 
-# 9. Reset the one-shot accessibility prompt flag. The app only shows the
+# 9. Keep the one-shot accessibility prompt one-shot. The app only shows the
 # AXIsProcessTrustedWithOptions dialog if this key is absent AND the app is
-# not yet trusted. Deleting it here means a fresh build always re-prompts
-# when needed; if already authorized AXIsProcessTrusted() is true and the
-# whole block is skipped — so this is safe to run unconditionally.
-defaults delete "${DEBUG_BUNDLE_ID}" "debug.accessibility.promptShown" 2>/dev/null || true
+# not yet trusted. Older versions of this script deleted the key on every run,
+# which made automated debug/test/perf loops repeatedly show the Accessibility
+# dialog. Force a fresh prompt only when explicitly requested.
+if [[ "${FORCE_DEBUG_ACCESSIBILITY_PROMPT:-0}" == "1" ]]; then
+  defaults delete "${DEBUG_BUNDLE_ID}" "debug.accessibility.promptShown" 2>/dev/null || true
+fi
 
 # 10. Final kill + launch of Debug only.
 killall "${DEBUG_APP_NAME}" 2>/dev/null || true

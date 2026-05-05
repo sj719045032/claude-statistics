@@ -911,6 +911,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private static func registerForAccessibilityVisibility() {
+        if ProcessInfo.processInfo.environment["CLAUDE_STATISTICS_SKIP_ACCESSIBILITY_REGISTRATION"] == "1" {
+            return
+        }
+
         // Silently register this bundle id with TCC. Without this, ad-hoc
         // signed debug builds never appear in System Settings → Privacy &
         // Security → Accessibility at all — TCC only learns about the app

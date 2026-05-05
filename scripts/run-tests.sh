@@ -24,6 +24,7 @@ echo "==> Running tests (bundle id: ${DEBUG_BUNDLE_ID})..."
 mkdir -p "${BUILD_DIR}"
 TEST_LOG="${BUILD_DIR}/xcodebuild-test.log"
 TEST_STATUS=0
+export CLAUDE_STATISTICS_SKIP_ACCESSIBILITY_REGISTRATION=1
 xcodebuild test \
     -project ClaudeStatistics.xcodeproj \
     -scheme ClaudeStatistics \

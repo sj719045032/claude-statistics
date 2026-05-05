@@ -6,16 +6,25 @@ extension TranscriptParser {
     /// parseMessages so startup indexing does not pay UI transcript costs.
     func parseSearchIndexMessages(at path: String) -> [SearchIndexMessage] {
         guard let data = FileManager.default.contents(atPath: path) else { return [] }
-        let content = String(decoding: data, as: UTF8.self)
-        let decoder = JSONDecoder()
+        return parseSearchIndexMessages(fromData: data)
+    }
 
+    /// Internal entry that takes pre-loaded `Data`, used by the combined
+    /// parse + FTS extract path (PR6) and by the public single-arg
+    /// wrapper. Iterates byte-level over the file to avoid the prior
+    /// full-`String(decoding:)` allocation, which on a 30 MB JSONL
+    /// peaked at several multiples of the on-disk size.
+    func parseSearchIndexMessages(fromData data: Data) -> [SearchIndexMessage] {
+        let decoder = JSONDecoder()
         var messages: [SearchIndexMessage] = []
 
-        for line in content.components(separatedBy: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty,
-                  let lineData = trimmed.data(using: .utf8),
-                  let entry = try? decoder.decode(TranscriptEntry.self, from: lineData) else { continue }
+        var lineStart = data.startIndex
+        while lineStart < data.endIndex {
+            let lineEnd = data[lineStart...].firstIndex(of: UInt8(ascii: "\n")) ?? data.endIndex
+            let lineSlice = data[lineStart..<lineEnd]
+            lineStart = lineEnd < data.endIndex ? data.index(after: lineEnd) : data.endIndex
+            guard !lineSlice.isEmpty,
+                  let entry = try? decoder.decode(TranscriptEntry.self, from: lineSlice) else { continue }
 
             switch entry.type {
             case "queue-operation":
@@ -57,6 +66,21 @@ extension TranscriptParser {
         }
 
         return messages
+    }
+
+    /// PR6: single-pass parse + FTS extract. Reads the file once, then
+    /// shares the `Data` between the two byte-level iterators. Saves
+    /// one full file IO and one full-`String(decoding:)` allocation
+    /// per call.
+    func parseSessionAndSearchIndex(at path: String) -> SessionParseResult {
+        let signpostState = PerformanceTracer.begin("Claude.parseSessionAndSearchIndex")
+        defer { PerformanceTracer.end("Claude.parseSessionAndSearchIndex", signpostState) }
+        guard let data = FileManager.default.contents(atPath: path) else {
+            return SessionParseResult(stats: SessionStats(), searchMessages: [])
+        }
+        let stats = parseSession(fromData: data, path: path)
+        let messages = parseSearchIndexMessages(fromData: data)
+        return SessionParseResult(stats: stats, searchMessages: messages)
     }
 
     fileprivate static func searchText(forToolUse tool: TranscriptContent.ToolUseContent) -> String? {

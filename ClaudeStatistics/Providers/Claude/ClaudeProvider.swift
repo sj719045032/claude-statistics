@@ -73,6 +73,10 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
         TranscriptParser.shared.parseSearchIndexMessages(at: path)
     }
 
+    func parseSessionAndSearchIndex(at path: String) -> SessionParseResult {
+        TranscriptParser.shared.parseSessionAndSearchIndex(at: path)
+    }
+
     func parseTrendData(from filePath: String, granularity: TrendGranularity) -> [TrendDataPoint] {
         TranscriptParser.shared.parseTrendData(from: filePath, granularity: granularity)
     }

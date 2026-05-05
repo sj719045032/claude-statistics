@@ -25,14 +25,16 @@ enum SessionParseValidator {
         quick: SessionQuickStats,
         cached: DatabaseService.CachedSession?
     ) async -> SessionParseOutcome {
-        let firstStats = provider.parseSession(at: session.filePath)
+        // PR6: combined parse + FTS extract — one file IO, one decode
+        // pass per pass through the validator.
+        let firstResult = provider.parseSessionAndSearchIndex(at: session.filePath)
+        let firstStats = firstResult.stats
         if suspiciousReason(stats: firstStats, quick: quick, session: session) == nil {
-            let searchMessages = provider.parseSearchIndexMessages(at: session.filePath)
             return SessionParseOutcome(
                 sessionId: session.id,
                 committedStats: firstStats,
                 displayStats: firstStats,
-                searchMessages: searchMessages,
+                searchMessages: firstResult.searchMessages,
                 shouldRetry: false
             )
         }
@@ -41,15 +43,15 @@ enum SessionParseValidator {
         DiagnosticLogger.shared.warning("Suspicious \(provider.kind.rawValue) parse for \(session.id); retrying once (\(firstReason))")
         try? await Task.sleep(nanoseconds: 300_000_000)
 
-        let retryStats = provider.parseSession(at: session.filePath)
+        let retryResult = provider.parseSessionAndSearchIndex(at: session.filePath)
+        let retryStats = retryResult.stats
         if suspiciousReason(stats: retryStats, quick: quick, session: session) == nil {
-            let searchMessages = provider.parseSearchIndexMessages(at: session.filePath)
             DiagnosticLogger.shared.info("Recovered \(provider.kind.rawValue) parse for \(session.id) after retry")
             return SessionParseOutcome(
                 sessionId: session.id,
                 committedStats: retryStats,
                 displayStats: retryStats,
-                searchMessages: searchMessages,
+                searchMessages: retryResult.searchMessages,
                 shouldRetry: false
             )
         }

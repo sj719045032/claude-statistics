@@ -15,13 +15,20 @@ private struct MessageAccum {
 
 extension TranscriptParser {
     func parseSession(at path: String) -> SessionStats {
+        guard let data = FileManager.default.contents(atPath: path) else {
+            return SessionStats()
+        }
+        return parseSession(fromData: data, path: path)
+    }
+
+    /// Internal entry that takes pre-loaded `Data`, used by the combined
+    /// parse + FTS extract path (PR6) so the file is read once instead
+    /// of twice. Top-level `parseSession(at:)` reads the file then
+    /// delegates here.
+    func parseSession(fromData data: Data, path: String) -> SessionStats {
         let signpostState = PerformanceTracer.begin("Claude.parseSession")
         defer { PerformanceTracer.end("Claude.parseSession", signpostState) }
         var stats = SessionStats()
-
-        guard let data = FileManager.default.contents(atPath: path) else {
-            return stats
-        }
 
         // Store per-message data; last entry wins (streaming sends partial then final usage)
         var messageData: [String: MessageAccum] = [:]
