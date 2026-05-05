@@ -7,35 +7,51 @@ import Foundation
 /// `~/.claude-statistics-debug/` for debug builds) without taking
 /// a host module dependency.
 public enum AppRuntimePaths {
+    public enum RuntimeChannel: String, Sendable {
+        case release
+        case debug
+
+        var rootFolderName: String {
+            switch self {
+            case .release: return ".claude-statistics"
+            case .debug: return ".claude-statistics-debug"
+            }
+        }
+
+        var hookBinaryName: String {
+            switch self {
+            case .release: return "claude-stats-hook"
+            case .debug: return "claude-stats-hook-debug"
+            }
+        }
+    }
+
+    public static let channel: RuntimeChannel = {
+        let bundleID = Bundle.main.bundleIdentifier ?? ""
+        let execPath = ProcessInfo.processInfo.arguments.first ?? ""
+        let execName = (execPath as NSString).lastPathComponent
+
+        let isDebug = bundleID.hasSuffix(".debug") ||
+                      execPath.contains("/Debug/") ||
+                      execPath.hasSuffix("-debug") ||
+                      execName.localizedCaseInsensitiveContains("debug")
+        return isDebug ? .debug : .release
+    }()
+
+    public static var isDebug: Bool { channel == .debug }
+
     /// Debug builds run out of `~/.claude-statistics-debug/` so they never
     /// share sockets, tokens, hook symlinks, pending buffers, or cached data
     /// with a release install. The whole subtree is per-build, which means
     /// flipping this one line cascades through everything below.
     public static let rootDirectory: String = {
-        let bundleID = Bundle.main.bundleIdentifier ?? ""
-        let execPath = ProcessInfo.processInfo.arguments.first ?? ""
-        let execName = (execPath as NSString).lastPathComponent
-
-        let isDebug = bundleID.hasSuffix(".debug") ||
-                      execPath.contains("/Debug/") ||
-                      execPath.hasSuffix("-debug") ||
-                      execName.localizedCaseInsensitiveContains("debug")
-
-        let folderName = isDebug ? ".claude-statistics-debug" : ".claude-statistics"
-        return (NSHomeDirectory() as NSString).appendingPathComponent(folderName)
+        (NSHomeDirectory() as NSString).appendingPathComponent(channel.rootFolderName)
     }()
     public static let binDirectory = (rootDirectory as NSString).appendingPathComponent("bin")
     public static let runDirectory = (rootDirectory as NSString).appendingPathComponent("run")
 
     public static var hookBinaryName: String {
-        let bundleID = Bundle.main.bundleIdentifier ?? ""
-        let execPath = ProcessInfo.processInfo.arguments.first ?? ""
-        let execName = (execPath as NSString).lastPathComponent
-        let isDebug = bundleID.hasSuffix(".debug") ||
-                      execPath.contains("/Debug/") ||
-                      execPath.hasSuffix("-debug") ||
-                      execName.localizedCaseInsensitiveContains("debug")
-        return isDebug ? "claude-stats-hook-debug" : "claude-stats-hook"
+        channel.hookBinaryName
     }
     /// Disk buffer for hook events that arrived while the app's socket wasn't
     /// listening (errno=ECONNREFUSED on connect). Drained by `AttentionBridge`

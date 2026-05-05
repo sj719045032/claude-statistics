@@ -161,6 +161,24 @@ public enum HookInstallerUtils {
         return "\(formattedPath) --claude-stats-hook-provider \(providerId)"
     }
 
+    /// Returns true only for hook commands owned by this running channel
+    /// (release or debug) and provider. This lets both apps install hooks into
+    /// the same provider config without pruning each other on sync.
+    public static func isCurrentRuntimeHookCommand(_ command: String, providerId: String) -> Bool {
+        let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              trimmed.contains("--claude-stats-hook-provider \(providerId)") else {
+            return false
+        }
+
+        let currentRoot = AppRuntimePaths.rootDirectory
+        if trimmed.contains("\(currentRoot)/") || trimmed.contains("\(shellQuoted(currentRoot))/") {
+            return true
+        }
+
+        return trimmed == currentHookCommand(providerId: providerId)
+    }
+
     public static func removeScript(at path: String) {
         try? FileManager.default.removeItem(atPath: path)
     }

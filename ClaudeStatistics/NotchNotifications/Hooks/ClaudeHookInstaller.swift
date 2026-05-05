@@ -5,7 +5,6 @@ struct ClaudeHookInstaller: HookInstalling {
     let providerId: String = ProviderKind.claude.rawValue
 
     private static let scriptName     = "claude-stats-claude-hook"
-    private static let managedMarkers = ["claude-stats-", "--claude-stats-hook-provider"]
 
     private var hooksDir: String {
         (NSHomeDirectory() as NSString).appendingPathComponent(".claude/hooks")
@@ -179,12 +178,16 @@ struct ClaudeHookInstaller: HookInstalling {
     // MARK: - Private
 
     private func pruneManagedHooks(from matchers: [[String: Any]]) -> [[String: Any]] {
-        matchers.filter { matcher in
-            guard let inner = matcher["hooks"] as? [[String: Any]] else { return true }
-            return !inner.contains { h in
+        matchers.compactMap { matcher in
+            guard let inner = matcher["hooks"] as? [[String: Any]] else { return matcher }
+            let retained = inner.filter { h in
                 let command = h["command"] as? String ?? ""
-                return Self.managedMarkers.contains { command.contains($0) }
+                return !HookInstallerUtils.isCurrentRuntimeHookCommand(command, providerId: providerId)
             }
+            guard !retained.isEmpty else { return nil }
+            var updated = matcher
+            updated["hooks"] = retained
+            return updated
         }
     }
 }
