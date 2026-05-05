@@ -319,7 +319,9 @@ struct MenuBarUsageStrip: View {
     /// usage-providing plugin is installed) the strip falls back to the
     /// app icon so the menu bar entry stays clickable.
     private var renderableKinds: [ProviderKind] {
-        visibleKinds.filter { appState.usageViewModel(for: $0) != nil }
+        let signpostState = PerformanceTracer.begin("StatusBar.renderableKinds")
+        defer { PerformanceTracer.end("StatusBar.renderableKinds", signpostState) }
+        return visibleKinds.filter { appState.usageViewModel(for: $0) != nil }
     }
 }
 
@@ -399,6 +401,8 @@ private struct MenuBarUsageCell: View {
     }
 
     private var segments: [MenuBarStripSegment] {
+        let signpostState = PerformanceTracer.begin("MenuBarCell.segments")
+        defer { PerformanceTracer.end("MenuBarCell.segments", signpostState) }
         let providerSegments = ProviderRegistry.provider(for: kind)
             .menuBarStripSegments(from: viewModel.usageData)
         if !providerSegments.isEmpty { return providerSegments }
