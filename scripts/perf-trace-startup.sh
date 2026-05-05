@@ -32,6 +32,8 @@ echo "==> Killing existing instance..."
 killall "Claude Statistics Debug" 2>/dev/null || true
 while pgrep -x "Claude Statistics Debug" >/dev/null 2>&1; do sleep 0.2; done
 
+defaults write com.tinystone.ClaudeStatistics.debug "debug.accessibility.promptShown" -bool true 2>/dev/null || true
+
 START_TS=$(date "+%Y-%m-%d %H:%M:%S")
 echo "==> Launching..."
 open "$APP_PATH"

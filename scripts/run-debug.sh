@@ -174,6 +174,8 @@ ${LSREGISTER} -f -R "${STABLE_APP_PATH}"
 # dialog. Force a fresh prompt only when explicitly requested.
 if [[ "${FORCE_DEBUG_ACCESSIBILITY_PROMPT:-0}" == "1" ]]; then
   defaults delete "${DEBUG_BUNDLE_ID}" "debug.accessibility.promptShown" 2>/dev/null || true
+else
+  defaults write "${DEBUG_BUNDLE_ID}" "debug.accessibility.promptShown" -bool true 2>/dev/null || true
 fi
 
 # 10. Final kill + launch of Debug only.

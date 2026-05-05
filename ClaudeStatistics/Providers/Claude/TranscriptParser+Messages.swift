@@ -13,12 +13,18 @@ extension TranscriptParser {
         options: []
     )
 
-    /// Parse all messages from a JSONL file for transcript display
+    /// Parse all messages from a JSONL file for transcript display.
+    ///
+    /// PR7: iterates the file byte-level instead of allocating the
+    /// whole content as a `String` and splitting on "\n". For a 30 MB
+    /// JSONL the prior path peaked at the file size in `Data` plus
+    /// several multiples in `String` + `[String]` overhead; this
+    /// version keeps just the source `Data` plus the produced
+    /// `[TranscriptDisplayMessage]`.
     func parseMessages(at path: String) -> [TranscriptDisplayMessage] {
         let signpostState = PerformanceTracer.begin("Claude.parseMessages")
         defer { PerformanceTracer.end("Claude.parseMessages", signpostState) }
         guard let data = FileManager.default.contents(atPath: path) else { return [] }
-        let content = String(decoding: data, as: UTF8.self)
         let decoder = JSONDecoder()
 
         var messages: [TranscriptDisplayMessage] = []
@@ -28,11 +34,13 @@ extension TranscriptParser {
         var toolMsgIndices: [String: Int] = [:]       // tool_use_id → index in messages
         var index = 0
 
-        for line in content.components(separatedBy: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty,
-                  let lineData = trimmed.data(using: .utf8),
-                  let entry = try? decoder.decode(TranscriptEntry.self, from: lineData) else { continue }
+        var lineStart = data.startIndex
+        while lineStart < data.endIndex {
+            let lineEnd = data[lineStart...].firstIndex(of: UInt8(ascii: "\n")) ?? data.endIndex
+            let lineSlice = data[lineStart..<lineEnd]
+            lineStart = lineEnd < data.endIndex ? data.index(after: lineEnd) : data.endIndex
+            guard !lineSlice.isEmpty,
+                  let entry = try? decoder.decode(TranscriptEntry.self, from: lineSlice) else { continue }
 
             switch entry.type {
             case "queue-operation":
