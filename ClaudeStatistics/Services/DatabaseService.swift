@@ -376,7 +376,20 @@ final class DatabaseService {
         sqlite3_step(stmt)
     }
 
-    /// Atomically replace full session stats, committed fingerprint, and FTS rows.
+    /// One session's slice of `saveSessionsStatsAndIndexes`. Public so
+    /// callers can build up a batch in their own scope (e.g. the parse
+    /// pipeline that emits N results from one task group).
+    struct SaveSessionStatsRequest {
+        let sessionId: String
+        let fileSize: Int64
+        let mtime: Date
+        let stats: SessionStats
+        let searchMessages: [SearchIndexMessage]
+    }
+
+    /// Atomically replace full session stats, committed fingerprint, and
+    /// FTS rows. Single-session convenience wrapper around the batch
+    /// API.
     func saveSessionStatsAndIndex(
         provider: ProviderKind,
         sessionId: String,
@@ -385,6 +398,27 @@ final class DatabaseService {
         stats: SessionStats,
         searchMessages: [SearchIndexMessage]
     ) {
+        saveSessionsStatsAndIndexes(
+            provider: provider,
+            requests: [SaveSessionStatsRequest(
+                sessionId: sessionId,
+                fileSize: fileSize,
+                mtime: mtime,
+                stats: stats,
+                searchMessages: searchMessages
+            )]
+        )
+    }
+
+    /// PR5: write N sessions' stats + FTS rows under a single
+    /// transaction with prepared statements reused across the loop.
+    /// Replaces the per-session `BEGIN / prepare / step / finalize /
+    /// COMMIT` cycle that dominated forced-rescan time.
+    func saveSessionsStatsAndIndexes(
+        provider: ProviderKind,
+        requests: [SaveSessionStatsRequest]
+    ) {
+        guard !requests.isEmpty else { return }
         let signpostState = PerformanceTracer.begin("DatabaseService.saveSessionStatsAndIndex")
         defer { PerformanceTracer.end("DatabaseService.saveSessionStatsAndIndex", signpostState) }
         lock.lock()
@@ -392,12 +426,13 @@ final class DatabaseService {
         guard let db else { return }
 
         let encoder = JSONEncoder()
-        guard let json = try? encoder.encode(stats),
-              let jsonStr = String(data: json, encoding: .utf8) else { return }
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 
         execute("BEGIN TRANSACTION")
+        var committed = false
         defer {
-            if sqlite3_get_autocommit(db) == 0 {
+            if !committed, sqlite3_get_autocommit(db) == 0 {
                 execute("ROLLBACK")
             }
         }
@@ -410,57 +445,61 @@ final class DatabaseService {
                 mtime = excluded.mtime,
                 stats_json = excluded.stats_json
         """
-        var upsertStmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, upsertSQL, -1, &upsertStmt, nil) == SQLITE_OK else { return }
-        sqlite3_bind_text(upsertStmt, 1, provider.rawValue, -1, sqliteTransient)
-        sqlite3_bind_text(upsertStmt, 2, sessionId, -1, sqliteTransient)
-        sqlite3_bind_int64(upsertStmt, 3, fileSize)
-        sqlite3_bind_double(upsertStmt, 4, mtime.timeIntervalSince1970)
-        sqlite3_bind_text(upsertStmt, 5, jsonStr, -1, sqliteTransient)
-        guard sqlite3_step(upsertStmt) == SQLITE_DONE else {
-            sqlite3_finalize(upsertStmt)
-            return
-        }
-        sqlite3_finalize(upsertStmt)
-
         let deleteSQL = "DELETE FROM messages WHERE provider = ? AND session_id = ?"
+        let insertSQL = "INSERT INTO messages(provider, session_id, role, content, timestamp) VALUES(?, ?, ?, ?, ?)"
+
+        var upsertStmt: OpaquePointer?
         var deleteStmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, deleteSQL, -1, &deleteStmt, nil) == SQLITE_OK else { return }
-        sqlite3_bind_text(deleteStmt, 1, provider.rawValue, -1, sqliteTransient)
-        sqlite3_bind_text(deleteStmt, 2, sessionId, -1, sqliteTransient)
-        guard sqlite3_step(deleteStmt) == SQLITE_DONE else {
+        var insertStmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, upsertSQL, -1, &upsertStmt, nil) == SQLITE_OK,
+              sqlite3_prepare_v2(db, deleteSQL, -1, &deleteStmt, nil) == SQLITE_OK,
+              sqlite3_prepare_v2(db, insertSQL, -1, &insertStmt, nil) == SQLITE_OK else {
+            sqlite3_finalize(upsertStmt)
             sqlite3_finalize(deleteStmt)
+            sqlite3_finalize(insertStmt)
             return
         }
-        sqlite3_finalize(deleteStmt)
+        defer {
+            sqlite3_finalize(upsertStmt)
+            sqlite3_finalize(deleteStmt)
+            sqlite3_finalize(insertStmt)
+        }
 
-        if !searchMessages.isEmpty {
-            let insertSQL = "INSERT INTO messages(provider, session_id, role, content, timestamp) VALUES(?, ?, ?, ?, ?)"
-            var stmt: OpaquePointer?
-            guard sqlite3_prepare_v2(db, insertSQL, -1, &stmt, nil) == SQLITE_OK else { return }
+        for request in requests {
+            guard let json = try? encoder.encode(request.stats),
+                  let jsonStr = String(data: json, encoding: .utf8) else { continue }
 
-            let isoFormatter = ISO8601DateFormatter()
-            isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            sqlite3_reset(upsertStmt)
+            sqlite3_clear_bindings(upsertStmt)
+            sqlite3_bind_text(upsertStmt, 1, provider.rawValue, -1, sqliteTransient)
+            sqlite3_bind_text(upsertStmt, 2, request.sessionId, -1, sqliteTransient)
+            sqlite3_bind_int64(upsertStmt, 3, request.fileSize)
+            sqlite3_bind_double(upsertStmt, 4, request.mtime.timeIntervalSince1970)
+            sqlite3_bind_text(upsertStmt, 5, jsonStr, -1, sqliteTransient)
+            guard sqlite3_step(upsertStmt) == SQLITE_DONE else { return }
 
-            for message in searchMessages {
-                sqlite3_reset(stmt)
-                sqlite3_clear_bindings(stmt)
-                sqlite3_bind_text(stmt, 1, provider.rawValue, -1, sqliteTransient)
-                sqlite3_bind_text(stmt, 2, sessionId, -1, sqliteTransient)
-                sqlite3_bind_text(stmt, 3, message.role, -1, sqliteTransient)
-                sqlite3_bind_text(stmt, 4, message.content, -1, sqliteTransient)
+            sqlite3_reset(deleteStmt)
+            sqlite3_clear_bindings(deleteStmt)
+            sqlite3_bind_text(deleteStmt, 1, provider.rawValue, -1, sqliteTransient)
+            sqlite3_bind_text(deleteStmt, 2, request.sessionId, -1, sqliteTransient)
+            guard sqlite3_step(deleteStmt) == SQLITE_DONE else { return }
+
+            for message in request.searchMessages {
+                sqlite3_reset(insertStmt)
+                sqlite3_clear_bindings(insertStmt)
+                sqlite3_bind_text(insertStmt, 1, provider.rawValue, -1, sqliteTransient)
+                sqlite3_bind_text(insertStmt, 2, request.sessionId, -1, sqliteTransient)
+                sqlite3_bind_text(insertStmt, 3, message.role, -1, sqliteTransient)
+                sqlite3_bind_text(insertStmt, 4, message.content, -1, sqliteTransient)
 
                 let timestamp = message.timestamp.map { isoFormatter.string(from: $0) } ?? ""
-                sqlite3_bind_text(stmt, 5, timestamp, -1, sqliteTransient)
-                guard sqlite3_step(stmt) == SQLITE_DONE else {
-                    sqlite3_finalize(stmt)
-                    return
-                }
+                sqlite3_bind_text(insertStmt, 5, timestamp, -1, sqliteTransient)
+                guard sqlite3_step(insertStmt) == SQLITE_DONE else { return }
             }
-            sqlite3_finalize(stmt)
         }
 
         execute("COMMIT")
+        committed = true
     }
 
     /// Remove cached data for deleted sessions

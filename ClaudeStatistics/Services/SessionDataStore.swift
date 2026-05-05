@@ -245,20 +245,24 @@ final class SessionDataStore: ObservableObject {
                     return batchResults
                 }
 
-                // DB write + UI update (serial)
+                // PR5: collect this batch's stats writes into one
+                // request list and commit under a single SQLite
+                // transaction (statements prepared once, reset per
+                // request) instead of per-session BEGIN/COMMIT.
                 let sessionsById = Dictionary(uniqueKeysWithValues: batch.map { ($0.id, $0) })
+                var saveRequests: [DatabaseService.SaveSessionStatsRequest] = []
                 for result in results {
                     guard let stats = result.committedStats else { continue }
                     guard let session = sessionsById[result.sessionId] else { continue }
-                    db.saveSessionStatsAndIndex(
-                        provider: providerKind,
+                    saveRequests.append(DatabaseService.SaveSessionStatsRequest(
                         sessionId: session.id,
                         fileSize: session.fileSize,
                         mtime: session.lastModified,
                         stats: stats,
                         searchMessages: result.searchMessages
-                    )
+                    ))
                 }
+                db.saveSessionsStatsAndIndexes(provider: providerKind, requests: saveRequests)
                 processed += results.count
 
                 let processedCount = processed
@@ -428,6 +432,13 @@ final class SessionDataStore: ObservableObject {
                 await MainActor.run { self.parseProgress = "Updating..." }
             }
 
+            // PR5: batch all dirty-refresh stats writes into one
+                    // transaction at end of loop. parsedStats / progress
+            // still update per-iteration so the UI reflects each
+            // parse completing; if the app crashes mid-loop the
+            // unsaved sessions are simply re-detected as dirty on
+            // next launch (file mtime > cached mtime).
+            var saveRequests: [DatabaseService.SaveSessionStatsRequest] = []
             for (i, session) in dirtySessions.enumerated() {
                 let quick = provider.parseQuickStats(at: session.filePath)
                 db.saveQuickStats(provider: providerKind, sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, stats: quick)
@@ -440,14 +451,13 @@ final class SessionDataStore: ObservableObject {
                     cached: cache[session.id]
                 )
                 if let stats = outcome.committedStats {
-                    db.saveSessionStatsAndIndex(
-                        provider: providerKind,
+                    saveRequests.append(DatabaseService.SaveSessionStatsRequest(
                         sessionId: session.id,
                         fileSize: session.fileSize,
                         mtime: session.lastModified,
                         stats: stats,
                         searchMessages: outcome.searchMessages
-                    )
+                    ))
                 }
                 await MainActor.run {
                     self.handleParseRetryState(for: session.id, shouldRetry: outcome.shouldRetry)
@@ -461,6 +471,7 @@ final class SessionDataStore: ObservableObject {
                     }
                 }
             }
+            db.saveSessionsStatsAndIndexes(provider: providerKind, requests: saveRequests)
 
             if showProgress {
                 await MainActor.run {
@@ -516,19 +527,21 @@ final class SessionDataStore: ObservableObject {
         guard !sessions.isEmpty else { return }
         DiagnosticLogger.shared.info("Repairing missing \(provider.kind.rawValue) search index for \(sessions.count) sessions")
 
+        // PR5: collect repair writes into one batched transaction.
+        var saveRequests: [DatabaseService.SaveSessionStatsRequest] = []
         for session in sessions {
             guard let cached = cache[session.id],
                   let stats = cached.sessionStats else { continue }
             let searchMessages = provider.parseSearchIndexMessages(at: session.filePath)
-            db.saveSessionStatsAndIndex(
-                provider: provider.kind,
+            saveRequests.append(DatabaseService.SaveSessionStatsRequest(
                 sessionId: session.id,
                 fileSize: session.fileSize,
                 mtime: session.lastModified,
                 stats: stats,
                 searchMessages: searchMessages
-            )
+            ))
         }
+        db.saveSessionsStatsAndIndexes(provider: provider.kind, requests: saveRequests)
     }
 
     nonisolated private static func needsSearchIndexRepair(
