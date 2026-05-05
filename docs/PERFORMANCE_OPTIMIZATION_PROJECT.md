@@ -213,6 +213,40 @@ sleep 60
 ps -o utime,stime -p "$PID"
 ```
 
+### Signpost Capture (PR1+)
+
+PR1 wires `OSSignposter` intervals into 14 hot paths under subsystem
+`com.tinystone.ClaudeStatistics`, category `performance`. The pair
+below captures a warm-startup window without Instruments and prints a
+duration table — repeat before / after each later PR for an apples-to-
+apples comparison.
+
+```bash
+# One-shot warm startup baseline. Kills the running Debug app, relaunches
+# it, waits 15s, pulls signposts via /usr/bin/log, and prints stats.
+bash scripts/perf-trace-startup.sh
+
+# Custom output path / wait time:
+bash scripts/perf-trace-startup.sh /tmp/baseline-pre-pr2.log
+WAIT_SECONDS=30 bash scripts/perf-trace-startup.sh
+```
+
+Under the hood:
+
+- Writes the raw log to the chosen file (default
+  `/tmp/perf-baseline-startup-<ts>.log`).
+- `scripts/perf-parse-signposts.py` reads that file, pairs `begin` /
+  `end` events by `(thread, name)` so concurrent same-name signposts
+  on different threads do not collide, and reports count / sum / avg
+  / min / max / p95 in ms per signpost.
+
+For arbitrary scenarios (e.g. open Usage tab, search session list)
+trigger the action manually after the script's `==> Launching...`
+line, then rerun the parser against the same log file. For deeper
+analysis (call stacks, CPU samples, allocations), capture an actual
+Instruments trace with `xctrace record --template 'Time Profiler'`
+or open Instruments.app and pick a template.
+
 ### Metrics to Record
 
 | Metric | Target |
