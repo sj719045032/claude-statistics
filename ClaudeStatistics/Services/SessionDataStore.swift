@@ -8,7 +8,14 @@ final class SessionDataStore: ObservableObject {
 
     @Published var sessions: [Session] = []
     @Published var quickStats: [String: SessionQuickStats] = [:]
-    @Published var parsedStats: [String: SessionStats] = [:]
+    @Published var parsedStats: [String: SessionStats] = [:] {
+        didSet { parsedStatsVersion &+= 1 }
+    }
+    /// Monotonic version bumped whenever `parsedStats` is reassigned or
+    /// mutated. Views memoize derived results (e.g. UsageView trend
+    /// folds) keyed by this so cache invalidates the moment new parse
+    /// data lands. PR4.
+    @Published private(set) var parsedStatsVersion: UInt64 = 0
     @Published var selectedPeriod: StatsPeriod = .all { didSet { rebucket() } }
     @Published var weeklyResetDate: Date? { didSet { if selectedPeriod == .weekly { rebucket() } } }
     @Published var periodStats: [PeriodStats] = []

@@ -31,6 +31,13 @@ struct UsageView: View {
     @State private var selectedWindowTab: UsageWindowTab = .fiveHour
     @State private var selectedTrendWindowID: String = ""
 
+    /// PR4: memoize `windowTrendInfo` / `localTrendInfo` results so
+    /// SwiftUI body re-evaluations (tab switches, hover, etc.) don't
+    /// rerun the parsedStats fold. Invalidated whenever `store.
+    /// parsedStatsVersion` bumps.
+    @State private var trendInfoCache: [String: WindowTrendInfo] = [:]
+    @State private var cachedSnapshotVersion: UInt64 = 0
+
     private var usagePresentation: ProviderUsagePresentation {
         store.provider.usagePresentation
     }
@@ -101,6 +108,15 @@ struct UsageView: View {
         }
         .onChange(of: viewModel.subscriptionInfo) { _, _ in
             ensureValidSelectedTrendWindow()
+        }
+        .onChange(of: store.parsedStatsVersion) { _, newVersion in
+            // PR4: invalidate trend cache the moment the underlying
+            // parsedStats changes (new dirty session parsed, force
+            // rescan, etc.).
+            if cachedSnapshotVersion != newVersion {
+                trendInfoCache.removeAll()
+                cachedSnapshotVersion = newVersion
+            }
         }
     }
 }
@@ -349,7 +365,8 @@ extension UsageView {
     private func windowTrendInfo(
         for window: UsageWindow?,
         descriptor: ProviderUsageWindowPresentation,
-        modelFilter: ((String) -> Bool)? = nil
+        modelFilter: ((String) -> Bool)? = nil,
+        modelFilterID: String = "all"
     ) -> WindowTrendInfo? {
         let signpostState = PerformanceTracer.begin("UsageView.windowTrendInfo")
         defer { PerformanceTracer.end("UsageView.windowTrendInfo", signpostState) }
@@ -363,6 +380,9 @@ extension UsageView {
         let snapshotTime = min(viewModel.lastFetchedAt ?? Date(), resetAt)
         guard start < snapshotTime else { return nil }
 
+        let key = "win|\(start.timeIntervalSince1970)|\(snapshotTime.timeIntervalSince1970)|\(resetAt.timeIntervalSince1970)|\(descriptor.granularity)|\(modelFilterID)"
+        if let cached = trendInfoCache[key] { return cached }
+
         let data = store.aggregateWindowTrendData(
             from: start,
             to: snapshotTime,
@@ -370,14 +390,17 @@ extension UsageView {
             cumulative: true,
             modelFilter: modelFilter
         )
+        guard !data.isEmpty else { return nil }
         let models = store.windowModelBreakdown(from: start, to: snapshotTime, modelFilter: modelFilter)
-        return data.isEmpty ? nil : WindowTrendInfo(
+        let info = WindowTrendInfo(
             dataPoints: data,
             granularity: descriptor.granularity,
             windowStart: start,
             windowEnd: resetAt,
             modelBreakdown: models
         )
+        trendInfoCache[key] = info
+        return info
     }
 
     private func localTrendInfo(for descriptor: ProviderUsageTrendPresentation, usage: UsageData?) -> WindowTrendInfo? {
@@ -389,6 +412,10 @@ extension UsageView {
               range.windowStart < dataEnd else {
             return nil
         }
+
+        let modelFamily = descriptor.modelFamily ?? "default"
+        let key = "local|\(range.windowStart.timeIntervalSince1970)|\(dataEnd.timeIntervalSince1970)|\(range.windowEnd.timeIntervalSince1970)|\(descriptor.granularity)|\(modelFamily)"
+        if let cached = trendInfoCache[key] { return cached }
 
         let filter: ((String) -> Bool)? = {
             if let family = descriptor.modelFamily {
@@ -414,13 +441,15 @@ extension UsageView {
             modelFilter: filter
         )
         let models = store.windowModelBreakdown(from: range.windowStart, to: dataEnd, modelFilter: filter)
-        return WindowTrendInfo(
+        let info = WindowTrendInfo(
             dataPoints: data,
             granularity: descriptor.granularity,
             windowStart: range.windowStart,
             windowEnd: range.windowEnd,
             modelBreakdown: models
         )
+        trendInfoCache[key] = info
+        return info
     }
 
     @ViewBuilder
