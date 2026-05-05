@@ -542,37 +542,98 @@ final class SessionDataStore: ObservableObject {
         return likelySearchable
     }
 
-    // MARK: - Rebucket
+    // MARK: - Rebucket (PR3 — runs off the main thread)
+
+    /// Inputs captured on the main actor so the heavy fold can run on a
+    /// background task. Sendable so the snapshot crosses the actor
+    /// boundary without copying main-actor state.
+    private struct RebucketSnapshot: Sendable {
+        let parsedStats: [String: SessionStats]
+        let sessions: [Session]
+        let selectedPeriod: StatsPeriod
+        let weeklyResetDate: Date?
+        let allTimeLabel: String
+    }
+
+    /// All published outputs of a rebucket pass, computed off-main and
+    /// applied atomically on the main actor under a generation guard.
+    private struct RebucketResult: Sendable {
+        let periodStats: [PeriodStats]
+        let allTimeCost: Double
+        let allTimeSessions: Int
+        let allTimeTokens: Int
+        let allTimeMessages: Int
+        let visibleStats: [PeriodStats]
+        let visibleModelBreakdown: [ModelUsage]
+        let dailyHeatmap: [Date: DailyHeatmapBucket]
+        let availableHeatmapYears: [Int]
+        let topProjects: [TopProject]
+    }
+
+    /// Monotonic generation token. Each `rebucket()` call bumps it
+    /// before dispatching the background compute; the background result
+    /// is discarded if a newer call has bumped it again. Prevents a
+    /// slow earlier compute (large parsedStats) from clobbering a faster
+    /// later one (e.g. user rapidly switching period).
+    private var rebucketGeneration: UInt64 = 0
 
     private func rebucket() {
         let signpostState = PerformanceTracer.begin("SessionDataStore.rebucket")
         defer { PerformanceTracer.end("SessionDataStore.rebucket", signpostState) }
         guard !parsedStats.isEmpty else { return }
 
-        // All-time scope: produce a single aggregated PeriodStats spanning all data
-        if selectedPeriod == .all {
-            rebucketAllTime()
-            return
+        rebucketGeneration &+= 1
+        let gen = rebucketGeneration
+        let snapshot = RebucketSnapshot(
+            parsedStats: parsedStats,
+            sessions: sessions,
+            selectedPeriod: selectedPeriod,
+            weeklyResetDate: weeklyResetDate,
+            allTimeLabel: LanguageManager.localizedString("period.all")
+        )
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let result = SessionDataStore.computeRebucket(snapshot: snapshot)
+            await MainActor.run { [weak self] in
+                guard let self, self.rebucketGeneration == gen else { return }
+                self.applyRebucketResult(result)
+            }
+        }
+    }
+
+    /// Pure aggregation. Picks the all-time fast path or the per-period
+    /// bucketing path based on the snapshot's `selectedPeriod`. Static +
+    /// nonisolated so it can run from `Task.detached` without main-actor
+    /// hops.
+    private nonisolated static func computeRebucket(snapshot: RebucketSnapshot) -> RebucketResult {
+        let allTimeSignpost = PerformanceTracer.begin("SessionDataStore.rebucketAllTime.compute")
+        let allTimeAgg = SessionAllTimeAggregator.allTimeAggregates(
+            parsedStats: snapshot.parsedStats,
+            sessions: snapshot.sessions
+        )
+        PerformanceTracer.end("SessionDataStore.rebucketAllTime.compute", allTimeSignpost)
+
+        if snapshot.selectedPeriod == .all {
+            return computeAllTimeRebucket(snapshot: snapshot, allTimeAgg: allTimeAgg)
         }
 
         var buckets: [Date: PeriodStats] = [:]
         var periodSessionIds: [Date: Set<String>] = [:]
         var periodModelSessionIds: [Date: [String: Set<String>]] = [:]
 
-        let resetDate = weeklyResetDate
+        let resetDate = snapshot.weeklyResetDate
         // Use fiveMinSlices when weekly period has non-midnight boundary for accurate attribution
-        let useFineSlices = selectedPeriod == .weekly && resetDate != nil
+        let useFineSlices = snapshot.selectedPeriod == .weekly && resetDate != nil
 
-        for (sessionId, stats) in parsedStats {
+        for (sessionId, stats) in snapshot.parsedStats {
             let slices = useFineSlices ? stats.fiveMinSlices : stats.daySlices
             if !slices.isEmpty {
                 for (sliceStart, slice) in slices {
-                    let periodStart = selectedPeriod.startOfPeriod(for: sliceStart, weeklyResetDate: resetDate)
+                    let periodStart = snapshot.selectedPeriod.startOfPeriod(for: sliceStart, weeklyResetDate: resetDate)
                     if buckets[periodStart] == nil {
                         buckets[periodStart] = PeriodStats(
                             period: periodStart,
-                            periodLabel: selectedPeriod.label(for: periodStart, weeklyResetDate: resetDate),
-                            chartLabel: selectedPeriod.chartLabel(for: periodStart, weeklyResetDate: resetDate)
+                            periodLabel: snapshot.selectedPeriod.label(for: periodStart, weeklyResetDate: resetDate),
+                            chartLabel: snapshot.selectedPeriod.chartLabel(for: periodStart, weeklyResetDate: resetDate)
                         )
                     }
                     buckets[periodStart]?.accumulate(daySlice: slice)
@@ -587,14 +648,14 @@ final class SessionDataStore: ObservableObject {
                 }
             } else {
                 // Fallback for sessions without day slices
-                let session = sessions.first { $0.id == sessionId }
+                let session = snapshot.sessions.first { $0.id == sessionId }
                 let date = stats.startTime ?? session?.lastModified ?? Date.distantPast
-                let periodStart = selectedPeriod.startOfPeriod(for: date, weeklyResetDate: resetDate)
+                let periodStart = snapshot.selectedPeriod.startOfPeriod(for: date, weeklyResetDate: resetDate)
                 if buckets[periodStart] == nil {
                     buckets[periodStart] = PeriodStats(
                         period: periodStart,
-                        periodLabel: selectedPeriod.label(for: periodStart, weeklyResetDate: resetDate),
-                        chartLabel: selectedPeriod.chartLabel(for: periodStart, weeklyResetDate: resetDate)
+                        periodLabel: snapshot.selectedPeriod.label(for: periodStart, weeklyResetDate: resetDate),
+                        chartLabel: snapshot.selectedPeriod.chartLabel(for: periodStart, weeklyResetDate: resetDate)
                     )
                 }
                 buckets[periodStart]?.accumulate(stats: stats)
@@ -629,35 +690,35 @@ final class SessionDataStore: ObservableObject {
             }
         }
 
-        periodStats = buckets.values.sorted { $0.period > $1.period }
+        let periodStats = buckets.values.sorted { $0.period > $1.period }
+        let visibleStats = Array(periodStats.prefix(snapshot.selectedPeriod.displayCount))
 
-        // Update cached aggregates
-        allTimeCost = parsedStats.values.reduce(0) { $0 + $1.estimatedCost }
-        allTimeSessions = parsedStats.count
-        allTimeTokens = parsedStats.values.reduce(0) { $0 + $1.totalTokens }
-        allTimeMessages = parsedStats.values.reduce(0) { $0 + $1.messageCount }
-        visibleStats = Array(periodStats.prefix(selectedPeriod.displayCount))
-        visibleModelBreakdown = modelBreakdown(for: visibleStats)
-        recomputeAllTimeAggregates()
+        return RebucketResult(
+            periodStats: periodStats,
+            allTimeCost: snapshot.parsedStats.values.reduce(0) { $0 + $1.estimatedCost },
+            allTimeSessions: snapshot.parsedStats.count,
+            allTimeTokens: snapshot.parsedStats.values.reduce(0) { $0 + $1.totalTokens },
+            allTimeMessages: snapshot.parsedStats.values.reduce(0) { $0 + $1.messageCount },
+            visibleStats: visibleStats,
+            visibleModelBreakdown: computeModelBreakdown(for: visibleStats),
+            dailyHeatmap: allTimeAgg.dailyHeatmap,
+            availableHeatmapYears: allTimeAgg.availableYears,
+            topProjects: allTimeAgg.topProjects
+        )
     }
 
-    /// Aggregate every session into a single "All Time" PeriodStats.
-    /// Matches the shape produced by `rebucket()` so downstream views (PeriodDetailView-like)
-    /// can consume it without branching on scope.
-    ///
-    /// `period.period` is intentionally set to `Date.distantPast` to line up with
-    /// `StatsPeriod.all.startOfPeriod(for:)` — `aggregateTrendData` compares the two
-    /// for equality when deciding which slices to include.
-    private func rebucketAllTime() {
-        let signpostState = PerformanceTracer.begin("SessionDataStore.rebucketAllTime")
-        defer { PerformanceTracer.end("SessionDataStore.rebucketAllTime", signpostState) }
-        let label = LanguageManager.localizedString("period.all")
+    /// All-Time scope produces a single aggregated `PeriodStats` spanning
+    /// all data. `period.period` is intentionally `Date.distantPast` to
+    /// line up with `StatsPeriod.all.startOfPeriod(for:)` —
+    /// `aggregateTrendData` compares the two for equality when deciding
+    /// which slices to include.
+    private nonisolated static func computeAllTimeRebucket(snapshot: RebucketSnapshot,
+                                                           allTimeAgg: AllTimeAggregates) -> RebucketResult {
+        let label = snapshot.allTimeLabel
         var agg = PeriodStats(period: Date.distantPast, periodLabel: label, chartLabel: label)
         var modelSessionIds: [String: Set<String>] = [:]
 
-        // Accumulate every five-minute slice from every session; fall back to session-level
-        // aggregation when a session has no slices (older cached data).
-        for (sessionId, stats) in parsedStats {
+        for (sessionId, stats) in snapshot.parsedStats {
             if stats.fiveMinSlices.isEmpty {
                 agg.accumulate(stats: stats)
                 for model in stats.modelBreakdown.keys {
@@ -675,7 +736,7 @@ final class SessionDataStore: ObservableObject {
                 }
             }
         }
-        agg.sessionCount = parsedStats.count
+        agg.sessionCount = snapshot.parsedStats.count
         for (model, ids) in modelSessionIds {
             if var usage = agg.modelBreakdown[model] {
                 usage.sessionCount = ids.count
@@ -683,16 +744,57 @@ final class SessionDataStore: ObservableObject {
             }
         }
 
-        periodStats = [agg]
+        let periodStats = [agg]
+        let visibleModels = computeModelBreakdown(for: periodStats)
 
-        // Cached aggregates — derivable from agg directly
-        allTimeCost = agg.totalCost
-        allTimeSessions = agg.sessionCount
-        allTimeTokens = agg.totalTokens
-        allTimeMessages = agg.messageCount
-        visibleStats = [agg]
-        visibleModelBreakdown = modelBreakdown(for: [agg])
-        recomputeAllTimeAggregates()
+        return RebucketResult(
+            periodStats: periodStats,
+            allTimeCost: agg.totalCost,
+            allTimeSessions: agg.sessionCount,
+            allTimeTokens: agg.totalTokens,
+            allTimeMessages: agg.messageCount,
+            visibleStats: periodStats,
+            visibleModelBreakdown: visibleModels,
+            dailyHeatmap: allTimeAgg.dailyHeatmap,
+            availableHeatmapYears: allTimeAgg.availableYears,
+            topProjects: allTimeAgg.topProjects
+        )
+    }
+
+    /// Pure model-usage rollup across periods; static so both
+    /// background compute and the main-actor `globalModelBreakdown`
+    /// helper can share it.
+    private nonisolated static func computeModelBreakdown(for periods: [PeriodStats]) -> [ModelUsage] {
+        var combined: [String: ModelUsage] = [:]
+        for period in periods {
+            for (model, usage) in period.modelBreakdown {
+                var existing = combined[model] ?? ModelUsage(model: model)
+                existing.inputTokens += usage.inputTokens
+                existing.outputTokens += usage.outputTokens
+                existing.cost += usage.cost
+                existing.sessionCount += usage.sessionCount
+                if usage.isEstimated { existing.isEstimated = true }
+                combined[model] = existing
+            }
+        }
+        return combined.values.sorted { $0.cost > $1.cost }
+    }
+
+    /// Atomic write-back of a rebucket result to all published
+    /// properties. Caller must check the generation token before
+    /// invoking this so a stale background result never overwrites a
+    /// newer one.
+    private func applyRebucketResult(_ result: RebucketResult) {
+        periodStats = result.periodStats
+        allTimeCost = result.allTimeCost
+        allTimeSessions = result.allTimeSessions
+        allTimeTokens = result.allTimeTokens
+        allTimeMessages = result.allTimeMessages
+        visibleStats = result.visibleStats
+        visibleModelBreakdown = result.visibleModelBreakdown
+        _dailyHeatmapCache = result.dailyHeatmap
+        _availableHeatmapYearsCache = result.availableHeatmapYears
+        _topProjectsCache = result.topProjects
     }
 
     // MARK: - Top projects (all-time aggregation by project path)
@@ -732,19 +834,10 @@ final class SessionDataStore: ObservableObject {
     var availableHeatmapYears: [Int] { _availableHeatmapYearsCache }
     @Published private var _availableHeatmapYearsCache: [Int] = []
 
-    /// Recompute `_dailyHeatmapCache` and `_topProjectsCache` via a single
-    /// O(sessions × slices) walk shared between heatmap and top-projects.
-    fileprivate func recomputeAllTimeAggregates() {
-        let signpostState = PerformanceTracer.begin("SessionDataStore.recomputeAllTimeAggregates")
-        defer { PerformanceTracer.end("SessionDataStore.recomputeAllTimeAggregates", signpostState) }
-        let result = SessionAllTimeAggregator.allTimeAggregates(
-            parsedStats: parsedStats,
-            sessions: sessions
-        )
-        _dailyHeatmapCache = result.dailyHeatmap
-        _availableHeatmapYearsCache = result.availableYears
-        _topProjectsCache = result.topProjects
-    }
+    // PR3: `recomputeAllTimeAggregates` was folded into `computeRebucket`
+    // so heatmap / top-projects / aggregate stats all land in one
+    // background pass instead of running a second main-thread sweep
+    // afterwards.
 
     // MARK: - Delete
 
@@ -895,7 +988,7 @@ final class SessionDataStore: ObservableObject {
     }
 
     var globalModelBreakdown: [ModelUsage] {
-        modelBreakdown(for: periodStats)
+        Self.computeModelBreakdown(for: periodStats)
     }
 
     func buildShareMetrics(for period: PeriodStats, periodType: StatsPeriod) -> ShareMetrics? {
@@ -1012,19 +1105,7 @@ final class SessionDataStore: ObservableObject {
         }
     }
 
-    private func modelBreakdown(for periods: [PeriodStats]) -> [ModelUsage] {
-        var combined: [String: ModelUsage] = [:]
-        for period in periods {
-            for (model, usage) in period.modelBreakdown {
-                var existing = combined[model] ?? ModelUsage(model: model)
-                existing.inputTokens += usage.inputTokens
-                existing.outputTokens += usage.outputTokens
-                existing.cost += usage.cost
-                existing.sessionCount += usage.sessionCount
-                if usage.isEstimated { existing.isEstimated = true }
-                combined[model] = existing
-            }
-        }
-        return combined.values.sorted { $0.cost > $1.cost }
-    }
+    // PR3: pure `modelBreakdown(for:)` lives as
+    // `Self.computeModelBreakdown` near the rebucket pipeline so
+    // off-main compute can call it directly.
 }
