@@ -837,7 +837,7 @@ final class PluginRegistryTests: XCTestCase {
     }
 
     func testHostAPIVersionExposed() {
-        XCTAssertEqual(SDKInfo.apiVersion, SemVer(major: 0, minor: 2, patch: 0))
+        XCTAssertEqual(SDKInfo.apiVersion, SemVer(major: 0, minor: 3, patch: 0))
     }
 
     private final class FakeProviderPluginImpl: NSObject, ProviderPlugin {

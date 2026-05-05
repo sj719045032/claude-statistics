@@ -346,6 +346,8 @@ final class WireEventTranslatorTests: XCTestCase {
             terminal_window_id: nil,
             terminal_tab_id: nil,
             terminal_surface_id: nil,
+            host_app_bundle_id: nil,
+            terminal_env: nil,
             tool_name: toolName,
             tool_input: toolInput,
             tool_use_id: toolUseId,
