@@ -247,6 +247,19 @@ analysis (call stacks, CPU samples, allocations), capture an actual
 Instruments trace with `xctrace record --template 'Time Profiler'`
 or open Instruments.app and pick a template.
 
+For a one-command before/after snapshot covering everything
+headless, run:
+
+```bash
+bash scripts/perf-summary.sh
+```
+
+That wraps `perf-trace-startup.sh` (S2 signposts) and
+`perf-trace-idle.sh` (steady-state CPU + RSS samples). UI-driven
+scenarios (S4–S10) still need manual triggering — record a
+signpost log during the action and pipe it through
+`scripts/perf-parse-signposts.py`.
+
 ### Metrics to Record
 
 | Metric | Target |
