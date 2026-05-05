@@ -385,6 +385,8 @@ final class DatabaseService {
         stats: SessionStats,
         searchMessages: [SearchIndexMessage]
     ) {
+        let signpostState = PerformanceTracer.begin("DatabaseService.saveSessionStatsAndIndex")
+        defer { PerformanceTracer.end("DatabaseService.saveSessionStatsAndIndex", signpostState) }
         lock.lock()
         defer { lock.unlock() }
         guard let db else { return }

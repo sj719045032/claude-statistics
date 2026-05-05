@@ -15,6 +15,8 @@ extension TranscriptParser {
 
     /// Parse all messages from a JSONL file for transcript display
     func parseMessages(at path: String) -> [TranscriptDisplayMessage] {
+        let signpostState = PerformanceTracer.begin("Claude.parseMessages")
+        defer { PerformanceTracer.end("Claude.parseMessages", signpostState) }
         guard let data = FileManager.default.contents(atPath: path) else { return [] }
         let content = String(decoding: data, as: UTF8.self)
         let decoder = JSONDecoder()

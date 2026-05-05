@@ -91,6 +91,7 @@
 		41999710D1F8EA21AFCA4FF7 /* TranscriptParser+Messages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A89E8CF6D1BD6D34016AE95 /* TranscriptParser+Messages.swift */; };
 		41F401FFCFB1915B416E410C /* TrendDataPoint+StatsPeriod.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7436B6045F6682BD8D483E81 /* TrendDataPoint+StatsPeriod.swift */; };
 		41F437133AA470C7C0627F58 /* SessionDetailComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968A3D03AB67BF96301BDEBC /* SessionDetailComponents.swift */; };
+		4240E761B7F8133A796C82CB /* PerformanceTracer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A813789C1EB3786DF379C58F /* PerformanceTracer.swift */; };
 		425E1709E0DB410412C38880 /* ShareRole.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E1858F23256C6FEBB750A08 /* ShareRole.swift */; };
 		435C5E5C30F6B2F28851BDDA /* HookCLI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027CDBE36D6D9439DB32C0AE /* HookCLI.swift */; };
 		437AC945F5CE5337ED23DF9A /* AllTimeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99EA37388B7B02AEDF9C7A78 /* AllTimeView.swift */; };
@@ -608,6 +609,7 @@
 		A7538BF07592B7D765AF1C22 /* ExternalTerminalCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalTerminalCapability.swift; sourceTree = "<group>"; };
 		A776ADBF033757E89353F9E2 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		A7C96479A32A5A1C4D1A624B /* ShareRoleEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRoleEngine.swift; sourceTree = "<group>"; };
+		A813789C1EB3786DF379C58F /* PerformanceTracer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceTracer.swift; sourceTree = "<group>"; };
 		A872F99484F4F48F8F878E49 /* ShareRoleEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRoleEngineTests.swift; sourceTree = "<group>"; };
 		A888011251B29752ABC4A00A /* CodexTestPlaceholder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexTestPlaceholder.swift; sourceTree = "<group>"; };
 		A8921BE3208B862105FFAF93 /* AppleScriptHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleScriptHelpers.swift; sourceTree = "<group>"; };
@@ -870,6 +872,7 @@
 				5B4066C394B5E23322D32189 /* GlobalHotKeyManager.swift */,
 				D1519B833F38D44123500B58 /* LanguageManager.swift */,
 				1B9E55433A8CD7846D2A3938 /* LinearExhaustEstimator.swift */,
+				A813789C1EB3786DF379C58F /* PerformanceTracer.swift */,
 				1EBE034854D1539811ED0D5F /* SearchUtils.swift */,
 				C220944581C7418B7B1797F3 /* ShareImageExporter.swift */,
 				24A2B4F377370E1969E00AD7 /* SharePreviewWindowController.swift */,
@@ -1593,6 +1596,7 @@
 				1C9EA99BDDFA0B81024BBB99 /* NotificationTimerStore.swift in Sources */,
 				6F7855449E33E79371EF1AB9 /* PanelContentView.swift in Sources */,
 				7CD9C8820D5C77BDC5DE0E35 /* PendingResponse.swift in Sources */,
+				4240E761B7F8133A796C82CB /* PerformanceTracer.swift in Sources */,
 				B5403E5E4A9523A1070B1A57 /* PeriodDetailView.swift in Sources */,
 				FE749A34D7A96E4D1A55CFD7 /* PeriodModelBreakdownCard.swift in Sources */,
 				3BED6D466169435AA6DCE604 /* PermissionRequestCard.swift in Sources */,

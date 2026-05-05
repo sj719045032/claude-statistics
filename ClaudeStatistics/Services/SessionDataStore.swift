@@ -61,15 +61,17 @@ final class SessionDataStore: ObservableObject {
     // MARK: - Lifecycle
 
     func start() {
-        db.open()
+        PerformanceTracer.measure("SessionDataStore.start") {
+            db.open()
 
-        watcher = provider.makeWatcher { [weak self] changedPaths in
-            Task { @MainActor [weak self] in
-                self?.handleFileChanges(changedPaths)
+            watcher = provider.makeWatcher { [weak self] changedPaths in
+                Task { @MainActor [weak self] in
+                    self?.handleFileChanges(changedPaths)
+                }
             }
+            watcher?.start()
+            initialLoad()
         }
-        watcher?.start()
-        initialLoad()
     }
 
     func stop() {
@@ -105,6 +107,8 @@ final class SessionDataStore: ObservableObject {
         let db = self.db
         Task.detached { [weak self] in
             guard let self else { return }
+            let initialLoadSignpost = PerformanceTracer.begin("SessionDataStore.initialLoad")
+            defer { PerformanceTracer.end("SessionDataStore.initialLoad", initialLoadSignpost) }
             let scannedSessions = SessionDeduplicator.deduplicate(provider.scanSessions(), provider: providerKind)
             DiagnosticLogger.shared.initialScanStarted(
                 provider: providerKind.rawValue,
@@ -532,6 +536,8 @@ final class SessionDataStore: ObservableObject {
     // MARK: - Rebucket
 
     private func rebucket() {
+        let signpostState = PerformanceTracer.begin("SessionDataStore.rebucket")
+        defer { PerformanceTracer.end("SessionDataStore.rebucket", signpostState) }
         guard !parsedStats.isEmpty else { return }
 
         // All-time scope: produce a single aggregated PeriodStats spanning all data
@@ -634,6 +640,8 @@ final class SessionDataStore: ObservableObject {
     /// `StatsPeriod.all.startOfPeriod(for:)` — `aggregateTrendData` compares the two
     /// for equality when deciding which slices to include.
     private func rebucketAllTime() {
+        let signpostState = PerformanceTracer.begin("SessionDataStore.rebucketAllTime")
+        defer { PerformanceTracer.end("SessionDataStore.rebucketAllTime", signpostState) }
         let label = LanguageManager.localizedString("period.all")
         var agg = PeriodStats(period: Date.distantPast, periodLabel: label, chartLabel: label)
         var modelSessionIds: [String: Set<String>] = [:]
@@ -718,6 +726,8 @@ final class SessionDataStore: ObservableObject {
     /// Recompute `_dailyHeatmapCache` and `_topProjectsCache` via a single
     /// O(sessions × slices) walk shared between heatmap and top-projects.
     fileprivate func recomputeAllTimeAggregates() {
+        let signpostState = PerformanceTracer.begin("SessionDataStore.recomputeAllTimeAggregates")
+        defer { PerformanceTracer.end("SessionDataStore.recomputeAllTimeAggregates", signpostState) }
         let result = SessionAllTimeAggregator.allTimeAggregates(
             parsedStats: parsedStats,
             sessions: sessions
@@ -772,9 +782,17 @@ final class SessionDataStore: ObservableObject {
         db.removeSessions(provider: provider.kind, staleIds)
     }
 
-    /// Search messages via FTS index
-    func searchMessages(query: String) -> [DatabaseService.SearchResult] {
-        db.search(query: query, provider: provider.kind)
+    /// Search messages via FTS index. Runs on a detached task so SQLite
+    /// FTS work never blocks the main thread; callers gate stale results
+    /// with their own generation token.
+    func searchMessages(query: String) async -> [DatabaseService.SearchResult] {
+        let db = self.db
+        let kind = self.kind
+        return await Task.detached(priority: .userInitiated) {
+            let signpostState = PerformanceTracer.begin("SessionDataStore.searchMessages")
+            defer { PerformanceTracer.end("SessionDataStore.searchMessages", signpostState) }
+            return db.search(query: query, provider: kind)
+        }.value
     }
 
     /// Returns the period-over-period comparison for `stat` vs the preceding period.

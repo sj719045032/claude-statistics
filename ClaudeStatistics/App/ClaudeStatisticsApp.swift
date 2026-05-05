@@ -328,6 +328,8 @@ final class AppState: ObservableObject {
     private var identityChangeSync: AnyCancellable?
 
     init() {
+        let signpostState = PerformanceTracer.begin("AppState.init")
+        defer { PerformanceTracer.end("AppState.init", signpostState) }
         DefaultSettings.register()
         // Wire the SDK terminal dispatcher before anything plugin-side
         // gets a chance to call it. Plugins (e.g. GeminiPlugin's

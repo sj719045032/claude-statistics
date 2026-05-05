@@ -15,6 +15,8 @@ private struct MessageAccum {
 
 extension TranscriptParser {
     func parseSession(at path: String) -> SessionStats {
+        let signpostState = PerformanceTracer.begin("Claude.parseSession")
+        defer { PerformanceTracer.end("Claude.parseSession", signpostState) }
         var stats = SessionStats()
 
         guard let data = FileManager.default.contents(atPath: path) else {

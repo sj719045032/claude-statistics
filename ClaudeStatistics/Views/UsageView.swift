@@ -351,6 +351,8 @@ extension UsageView {
         descriptor: ProviderUsageWindowPresentation,
         modelFilter: ((String) -> Bool)? = nil
     ) -> WindowTrendInfo? {
+        let signpostState = PerformanceTracer.begin("UsageView.windowTrendInfo")
+        defer { PerformanceTracer.end("UsageView.windowTrendInfo", signpostState) }
         guard store.isFullParseComplete,
               let window,
               let resetAt = window.resetsAtDate,
@@ -379,6 +381,8 @@ extension UsageView {
     }
 
     private func localTrendInfo(for descriptor: ProviderUsageTrendPresentation, usage: UsageData?) -> WindowTrendInfo? {
+        let signpostState = PerformanceTracer.begin("UsageView.localTrendInfo")
+        defer { PerformanceTracer.end("UsageView.localTrendInfo", signpostState) }
         let range = localTrendRange(for: descriptor, usage: usage)
         let dataEnd = min(Date(), range.windowEnd)
         guard store.isFullParseComplete,

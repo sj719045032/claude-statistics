@@ -56,6 +56,12 @@ final class SessionViewModel: ObservableObject {
     /// Snippets from FTS content search, keyed by session ID
     @Published var searchSnippets: [String: String] = [:]
 
+    /// Monotonic generation token for the FTS search task. Bumped on
+    /// every keystroke that triggers a new query; in-flight tasks check
+    /// the value before writing back so a slow earlier query can't
+    /// overwrite a faster later one.
+    private var searchGeneration: UInt64 = 0
+
     /// Cached computed results — only recalculated when inputs change
     @Published private(set) var recentSessions: [Session] = []
     @Published private(set) var filteredSessions: [Session] = []
@@ -70,22 +76,31 @@ final class SessionViewModel: ObservableObject {
     init(store: SessionDataStore) {
         self.store = store
 
-        // Debounced FTS content search — updates searchSnippets reactively
+        // Debounced FTS content search — runs off-main, gated by a
+        // generation token so a slow earlier query can't clobber a
+        // faster later one.
         $searchText
             .removeDuplicates()
             .debounce(for: .milliseconds(150), scheduler: RunLoop.main)
             .sink { [weak self] text in
                 guard let self else { return }
-                if text.count >= 2 {
-                    let results = self.store.searchMessages(query: text)
+                guard text.count >= 2 else {
+                    self.searchGeneration &+= 1
+                    if !self.searchSnippets.isEmpty {
+                        self.searchSnippets = [:]
+                    }
+                    return
+                }
+                self.searchGeneration &+= 1
+                let generation = self.searchGeneration
+                let store = self.store
+                Task { @MainActor [weak self] in
+                    let results = await store.searchMessages(query: text)
+                    guard let self, self.searchGeneration == generation else { return }
                     self.searchSnippets = Dictionary(
                         results.map { ($0.sessionId, $0.snippet) },
                         uniquingKeysWith: { first, _ in first }
                     )
-                } else {
-                    if !self.searchSnippets.isEmpty {
-                        self.searchSnippets = [:]
-                    }
                 }
             }
             .store(in: &cancellables)

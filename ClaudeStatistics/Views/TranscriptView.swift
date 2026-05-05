@@ -10,6 +10,10 @@ struct TranscriptView: View {
     @ObservedObject var viewModel: SessionViewModel
 
     @State private var messages: [TranscriptDisplayMessage] = []
+    /// Per-message joined searchable text, built once after `loadMessages`.
+    /// Replaces a 6-field `joined(" ")` rebuild per filtered message per
+    /// keystroke. Keyed by `TranscriptDisplayMessage.id`.
+    @State private var searchableTexts: [String: String] = [:]
     @State private var isLoading = true
     @State private var searchText = ""
     @State private var matchedIds: [String] = []
@@ -350,32 +354,40 @@ struct TranscriptView: View {
     }
 
     private func loadMessages() async {
-        messages = await viewModel.loadMessages(for: session)
+        let loaded = await PerformanceTracer.measureAsync("TranscriptView.loadMessages") {
+            await viewModel.loadMessages(for: session)
+        }
+        // Build the searchable-text lookup once so updateMatches and
+        // locateSnippetMatch don't rebuild the 6-field join per message
+        // per keystroke.
+        var lookup: [String: String] = [:]
+        lookup.reserveCapacity(loaded.count)
+        for msg in loaded {
+            lookup[msg.id] = SearchUtils.transcriptSearchableText(for: msg)
+        }
+        messages = loaded
+        searchableTexts = lookup
         // NOTE: isLoading is set in .task AFTER scroll target is determined
     }
 
     private func updateMatches(query: String, autoScroll: Bool = true) {
-        let trimmed = query.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else {
-            matchedIds = []
-            currentMatchIndex = 0
-            return
-        }
+        PerformanceTracer.measure("TranscriptView.updateMatches") {
+            let trimmed = query.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else {
+                matchedIds = []
+                currentMatchIndex = 0
+                return
+            }
 
-        matchedIds = filteredMessages.filter { msg in
-            let allFields = [
-                SearchUtils.stripMarkdown(msg.text),
-                msg.text,
-                msg.toolName ?? "",
-                msg.toolDetail ?? "",
-                msg.editOldString ?? "",
-                msg.editNewString ?? ""
-            ].joined(separator: " ")
-            return SearchUtils.textMatches(query: trimmed, in: allFields)
-        }.map(\.id)
-        currentMatchIndex = 0
-        if autoScroll, let first = matchedIds.first {
-            scrollPosition = first
+            matchedIds = filteredMessages.filter { msg in
+                let cached = searchableTexts[msg.id]
+                    ?? SearchUtils.transcriptSearchableText(for: msg)
+                return SearchUtils.textMatches(query: trimmed, in: cached)
+            }.map(\.id)
+            currentMatchIndex = 0
+            if autoScroll, let first = matchedIds.first {
+                scrollPosition = first
+            }
         }
     }
 
@@ -389,24 +401,15 @@ struct TranscriptView: View {
         guard !contextPhrase.isEmpty else { return }
 
         let phraseLower = contextPhrase.lowercased()
-        let msgLookup = Dictionary(uniqueKeysWithValues: messages.map { ($0.id, $0) })
 
         for (i, matchId) in matchedIds.enumerated() {
-            if let msg = msgLookup[matchId] {
-                // Search in all text fields — must match what updateMatches checks
-                let allText = [
-                    SearchUtils.stripMarkdown(msg.text),
-                    msg.text,
-                    msg.toolName ?? "",
-                    msg.toolDetail ?? "",
-                    msg.editOldString ?? "",
-                    msg.editNewString ?? ""
-                ].joined(separator: " ").lowercased()
-                if allText.contains(phraseLower) {
-                    currentMatchIndex = i
-                    scrollPosition = matchId
-                    return
-                }
+            // Same fields as updateMatches — both routes consume the
+            // shared cache built in loadMessages.
+            guard let cached = searchableTexts[matchId] else { continue }
+            if cached.lowercased().contains(phraseLower) {
+                currentMatchIndex = i
+                scrollPosition = matchId
+                return
             }
         }
     }

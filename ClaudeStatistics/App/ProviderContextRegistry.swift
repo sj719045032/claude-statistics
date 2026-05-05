@@ -28,13 +28,15 @@ final class ProviderContextRegistry {
     /// menu-bar usage and notch state are warm without waiting for a
     /// user-driven switch.
     func bootstrap(_ kinds: [ProviderKind]) {
-        for kind in kinds where stores[kind] == nil {
-            let store = SessionDataStore(kind: kind)
-            let viewModel = SessionViewModel(store: store)
-            stores[kind] = store
-            sessionViewModels[kind] = viewModel
-            store.start()
-            bindRuntimeBridge(for: kind, store: store)
+        PerformanceTracer.measure("ProviderContextRegistry.bootstrap") {
+            for kind in kinds where stores[kind] == nil {
+                let store = SessionDataStore(kind: kind)
+                let viewModel = SessionViewModel(store: store)
+                stores[kind] = store
+                sessionViewModels[kind] = viewModel
+                store.start()
+                bindRuntimeBridge(for: kind, store: store)
+            }
         }
     }
 

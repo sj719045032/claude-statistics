@@ -187,4 +187,22 @@ enum SearchUtils {
     static func stripMarkdown(_ text: String) -> String {
         TranscriptParserCommons.stripMarkdown(text)
     }
+
+    // MARK: - Transcript searchable text
+
+    /// Canonical joined-field text used by transcript search and the
+    /// FTS-snippet locator. Both call sites must hit the same fields,
+    /// so they go through this helper. Caller caches the result keyed
+    /// by message id so per-keystroke filtering doesn't rebuild the
+    /// 6-field join for every visible message.
+    static func transcriptSearchableText(for message: TranscriptDisplayMessage) -> String {
+        [
+            stripMarkdown(message.text),
+            message.text,
+            message.toolName ?? "",
+            message.toolDetail ?? "",
+            message.editOldString ?? "",
+            message.editNewString ?? ""
+        ].joined(separator: " ")
+    }
 }
