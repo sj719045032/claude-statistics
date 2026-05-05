@@ -27,14 +27,28 @@ final class ProviderContextRegistry {
     /// launch to spin up every provider that has stored sessions, so
     /// menu-bar usage and notch state are warm without waiting for a
     /// user-driven switch.
-    func bootstrap(_ kinds: [ProviderKind]) {
+    /// Create stores + view models for `kinds`. Only call `start()` on
+    /// stores whose kind is in `startNow` — the rest sit cold (no scan,
+    /// parse, aggregation, or watcher) until `ensureContext(for:)` is
+    /// called by a consumer that actually needs the data. When
+    /// `startNow` is nil every kind starts immediately, preserving the
+    /// pre-PR2 behaviour for callers that do not pass it.
+    ///
+    /// Bridge subscriptions are wired for every kind — they are a no-op
+    /// for non-syncsTranscript providers, and for a cold
+    /// syncsTranscript provider (e.g. Codex with notch off) the publishers
+    /// emit empty initial values harmlessly until `start()` runs later.
+    func bootstrap(_ kinds: [ProviderKind], startNow: Set<ProviderKind>? = nil) {
         PerformanceTracer.measure("ProviderContextRegistry.bootstrap") {
+            let toStart = startNow ?? Set(kinds)
             for kind in kinds where stores[kind] == nil {
                 let store = SessionDataStore(kind: kind)
                 let viewModel = SessionViewModel(store: store)
                 stores[kind] = store
                 sessionViewModels[kind] = viewModel
-                store.start()
+                if toStart.contains(kind) {
+                    store.start()
+                }
                 bindRuntimeBridge(for: kind, store: store)
             }
         }
@@ -44,6 +58,17 @@ final class ProviderContextRegistry {
 
     /// Return existing context or create one on demand. Always succeeds;
     /// callers can rely on `.start()` having been invoked.
+    /// Returns an existing context, or builds + starts one for a kind
+    /// not yet bootstrapped (e.g. a freshly hot-loaded plugin).
+    ///
+    /// PR2 note: this does NOT call `start()` on a store that already
+    /// exists — `bootstrap(_:startNow:)` may have created it cold on
+    /// purpose (a menu-bar-visible-but-not-selected provider). Callers
+    /// that actually need parsed data must call `store.start()`
+    /// themselves afterwards (it is idempotent). The lookupStore path
+    /// used by `UsageVMRegistry` and the menu bar deliberately skips
+    /// that step so the strip can render from the UsageViewModel disk
+    /// cache without paying the parse cost.
     @discardableResult
     func ensureContext(for kind: ProviderKind) -> (store: SessionDataStore, viewModel: SessionViewModel) {
         if let store = stores[kind], let viewModel = sessionViewModels[kind] {

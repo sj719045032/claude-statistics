@@ -399,7 +399,19 @@ final class AppState: ObservableObject {
         self.activeSessionsTracker = tracker
         let contexts = ProviderContextRegistry(activeSessionsTracker: tracker)
         self.providerContexts = contexts
-        contexts.bootstrap(startupKinds)
+        // PR2: only the selected provider and any
+        // syncsTranscriptToActiveSessions provider with notch enabled
+        // (today: Codex) need their SessionDataStore started at boot.
+        // Other enabled providers get a cold store created so the menu
+        // bar's UsageViewModel still works (it reads UsageViewModel's
+        // own disk cache, not parsedStats), but skip the file scan +
+        // dirty parse + aggregation until `ensureContext` is called by
+        // a popover tab switch or other consumer.
+        let eagerStartKinds: Set<ProviderKind> = Set(startupKinds.filter { kind in
+            kind == selectedKind ||
+                (kind.descriptor.syncsTranscriptToActiveSessions && NotchPreferences.isEnabled(kind))
+        })
+        contexts.bootstrap(startupKinds, startNow: eagerStartKinds)
         // `ensureContext` (not `store(for:)`) so a hot-loaded
         // provider's session store is materialized the first time
         // any consumer (e.g. `UsageVMRegistry.viewModel`) asks for
@@ -542,6 +554,9 @@ final class AppState: ObservableObject {
         providerKind = kind
 
         let context = providerContexts.ensureContext(for: kind)
+        // PR2: bootstrap may have left this store cold; switching to it
+        // is the moment its data is needed. start() is idempotent.
+        context.store.start()
         let nextStore = context.store
         nextStore.weeklyResetDate = usageViewModel.usageData?.sevenDay?.resetsAtDate
 
@@ -619,6 +634,8 @@ final class AppState: ObservableObject {
 
     func rebuildSessionCache(for kind: ProviderKind) {
         let context = providerContexts.ensureContext(for: kind)
+        // PR2: force rescan needs db open + watcher up; idempotent if already started.
+        context.store.start()
         context.viewModel.selectedSession = nil
         context.viewModel.selectedSessionStats = nil
         context.viewModel.showTranscript = false
@@ -632,7 +649,16 @@ final class AppState: ObservableObject {
 
     func buildAllProvidersShareRoleResult() -> ShareRoleResult? {
         let availableKinds = ProviderRegistry.availableProviders()
-        let stores = availableKinds.map { providerContexts.ensureContext(for: $0).store }
+        // PR2: cross-provider share image needs every store warm; start
+        // each one (idempotent). Synchronous start kicks off detached
+        // initialLoad — share builder consumes parsedStats which may be
+        // empty if the user invokes share before init completes; that's
+        // the same condition as today.
+        let stores = availableKinds.map { kind -> SessionDataStore in
+            let store = providerContexts.ensureContext(for: kind).store
+            store.start()
+            return store
+        }
         let scopeLabel = LanguageManager.localizedString("share.scope.allProviders")
         let metrics = stores.compactMap { store in
             store.buildAllTimeShareMetrics(scopeLabel: scopeLabel)

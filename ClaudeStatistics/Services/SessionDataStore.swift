@@ -31,6 +31,12 @@ final class SessionDataStore: ObservableObject {
     private var isProcessingDirtyBatch = false
     private var isPopoverVisible = false
     private var watcher: (any SessionWatcher)?
+    /// Idempotency flag for `start()`. Set on first start, cleared on
+    /// `stop()`. PR2 (provider startup staging) calls `start()` lazily
+    /// from `ProviderContextRegistry.ensureContext` after a previously
+    /// cold store is first accessed, so start() must tolerate being
+    /// invoked twice.
+    private var isStarted = false
 
     /// The store binds to a `ProviderKind`, not to a specific
     /// `SessionProvider` instance. Every read of `provider` resolves
@@ -61,6 +67,8 @@ final class SessionDataStore: ObservableObject {
     // MARK: - Lifecycle
 
     func start() {
+        guard !isStarted else { return }
+        isStarted = true
         PerformanceTracer.measure("SessionDataStore.start") {
             db.open()
 
@@ -80,6 +88,7 @@ final class SessionDataStore: ObservableObject {
         retryTask = nil
         parseQueue.cancelAllOperations()
         db.close()
+        isStarted = false
     }
 
     // MARK: - Popover visibility
