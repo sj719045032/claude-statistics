@@ -202,9 +202,10 @@ extension AttentionEvent {
     var livePreview: String? {
         switch kind {
         case .waitingInput(let message),
-             .taskDone(let message),
              .taskFailed(let message):
             return Self.normalizePreview(message)
+        case .taskDone(let message):
+            return Self.normalizePreview(message) ?? Self.normalizePreview(commentaryText)
         case .permissionRequest, .sessionStart, .activityPulse, .sessionEnd:
             return nil
         }

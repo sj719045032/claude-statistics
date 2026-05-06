@@ -761,6 +761,73 @@ final class ActiveSessionsTracker: ObservableObject {
         return nil
     }
 
+    /// Completion cards should show the final assistant reply, not the last
+    /// status preview. Stop hooks can fire before the transcript fully
+    /// flushes, so let later transcript syncs replace the card body with the
+    /// newest current-turn commentary.
+    func lastCompletionPreview(provider: ProviderKind, sessionId: String) -> String? {
+        let key = Self.key(provider: provider, sessionId: sessionId)
+        if let runtime = runtimeByKey[key],
+           let preview = completionPreview(
+                progressNote: runtime.latestProgressNote,
+                progressNoteAt: runtime.latestProgressNoteAt,
+                promptAt: runtime.latestPromptAt,
+                preview: runtime.latestPreview,
+                previewAt: runtime.latestPreviewAt
+           ) {
+            return preview
+        }
+        if let session = sessions.first(where: { $0.focusKey == key }) {
+            return completionPreview(
+                progressNote: session.latestProgressNote,
+                progressNoteAt: session.latestProgressNoteAt,
+                promptAt: session.latestPromptAt,
+                preview: session.latestPreview,
+                previewAt: session.latestPreviewAt
+            )
+        }
+        return nil
+    }
+
+    private func completionPreview(
+        progressNote: String?,
+        progressNoteAt: Date?,
+        promptAt: Date?,
+        preview: String?,
+        previewAt: Date?
+    ) -> String? {
+        let currentTurnProgress: (text: String, at: Date?)? = {
+            guard let text = progressNote?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !text.isEmpty,
+                  let progressNoteAt,
+                  promptAt.map({ progressNoteAt >= $0 }) ?? true else {
+                return nil
+            }
+            return (text, progressNoteAt)
+        }()
+        let previewCandidate: (text: String, at: Date?)? = {
+            guard let text = preview?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !text.isEmpty else {
+                return nil
+            }
+            return (text, previewAt)
+        }()
+
+        switch (currentTurnProgress, previewCandidate) {
+        case let (progress?, preview?):
+            if let progressAt = progress.at, let previewAt = preview.at {
+                return progressAt >= previewAt ? progress.text : preview.text
+            }
+            return progress.at != nil ? progress.text : preview.text
+        case let (progress?, nil):
+            return progress.text
+        case let (nil, preview?):
+            return preview.text
+        case (nil, nil):
+            return nil
+        }
+    }
+
     func approvalToolUseId(provider: ProviderKind, sessionId: String) -> String? {
         let key = Self.key(provider: provider, sessionId: sessionId)
         return runtimeByKey[key]?.approvalToolUseId?.nilIfEmpty

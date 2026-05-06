@@ -1442,7 +1442,7 @@ struct NotchContainerView: View {
                 projectPath: stableProjectPath,
                 selectedAction: selectedEventAction,
                 lastActivity: activeTracker.lastActivity(provider: event.provider, sessionId: event.sessionId),
-                lastPreview: activeTracker.lastPreview(provider: event.provider, sessionId: event.sessionId),
+                lastPreview: eventCardPreview(for: event),
                 onFocusTerminal: eventHasFocusHint(event) ? { focusTerminal(for: event) } : nil
             ) {
                 closeIslandAfterAction()
@@ -1455,6 +1455,13 @@ struct NotchContainerView: View {
 
     private func eventHasFocusHint(_ event: AttentionEvent) -> Bool {
         activeTracker.focusContext(for: event).hasFocusHint
+    }
+
+    private func eventCardPreview(for event: AttentionEvent) -> String? {
+        if case .taskDone = event.kind {
+            return activeTracker.lastCompletionPreview(provider: event.provider, sessionId: event.sessionId)
+        }
+        return activeTracker.lastPreview(provider: event.provider, sessionId: event.sessionId)
     }
 
     private var shouldCaptureKeyboard: Bool {

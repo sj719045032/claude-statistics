@@ -191,7 +191,12 @@ struct WaitingInputCard: View {
         if case .permissionRequest(let tool, let input, _, _) = event.kind {
             return PermissionInputFormatter.summary(tool: tool, input: input)
         }
-        let preferredPreview = event.livePreview ?? lastPreview
+        let preferredPreview: String?
+        if case .taskDone = event.kind {
+            preferredPreview = lastPreview ?? event.livePreview
+        } else {
+            preferredPreview = event.livePreview ?? lastPreview
+        }
         guard let preview = preferredPreview?.trimmingCharacters(in: .whitespacesAndNewlines),
               !preview.isEmpty,
               preview.caseInsensitiveCompare(title) != .orderedSame,
