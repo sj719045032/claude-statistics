@@ -212,6 +212,7 @@
 		958399C6649B42239B5909AE /* TerminalDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ECBB3BD210EF8857D8C47D5 /* TerminalDescriptor.swift */; };
 		959A2084C81A5FE36AFCC670 /* NotchSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EF6E6F221BAB61E42710F8B /* NotchSoundPlayer.swift */; };
 		95C9B1EF669A91B5F178BA20 /* WireEventTranslator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F813A6B005F1C5B011C3A98 /* WireEventTranslator.swift */; };
+		95D774049F91DF8E4F6EB41B /* AttentionEventTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D7522CCD44945B6B3FEFBC1 /* AttentionEventTests.swift */; };
 		96D2B9CEB77BDF55C7714A50 /* ProviderSessionDisplayFormatter+Candidates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92645B8FEE030EB0D65F618C /* ProviderSessionDisplayFormatter+Candidates.swift */; };
 		9903B18A767F040AC0460163 /* NotchShape.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC9BD5962BFEFCCDDF29DF3 /* NotchShape.swift */; };
 		9AFE3E47D4CFC2E7914785E6 /* NotchWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 794FE41C25EE65B8F23019F7 /* NotchWindow.swift */; };
@@ -514,6 +515,7 @@
 		5B4066C394B5E23322D32189 /* GlobalHotKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotKeyManager.swift; sourceTree = "<group>"; };
 		5CD1ED6FFA7F2E34B7D30B11 /* SessionWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionWatcher.swift; sourceTree = "<group>"; };
 		5CE65D192C24051486ABF875 /* DaySlice+Pricing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DaySlice+Pricing.swift"; sourceTree = "<group>"; };
+		5D7522CCD44945B6B3FEFBC1 /* AttentionEventTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionEventTests.swift; sourceTree = "<group>"; };
 		5F47A68BFE8D7D3CD5C94825 /* TrendSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendSection.swift; sourceTree = "<group>"; };
 		6038163267F751B4F45C74FA /* ProviderUsageSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderUsageSource.swift; sourceTree = "<group>"; };
 		609271D9D2750E6DBBCFFAC5 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
@@ -761,6 +763,7 @@
 			isa = PBXGroup;
 			children = (
 				947363ADD9A5EBADB39651B2 /* ActiveToolsAggregatorTests.swift */,
+				5D7522CCD44945B6B3FEFBC1 /* AttentionEventTests.swift */,
 				E10F402C2998B35DE30CF5E5 /* ClaudeHookNormalizerTests.swift */,
 				4B25F37B9C36D1D2F5361123 /* ClaudeStatisticsKitTests.swift */,
 				A888011251B29752ABC4A00A /* CodexTestPlaceholder.swift */,
@@ -1482,6 +1485,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E0DB60E0DF083742C57F76C8 /* ActiveToolsAggregatorTests.swift in Sources */,
+				95D774049F91DF8E4F6EB41B /* AttentionEventTests.swift in Sources */,
 				88F2EFD1B9C27DA8F671021C /* ClaudeHookNormalizerTests.swift in Sources */,
 				9E3796619AF97F841CB57663 /* ClaudeStatisticsKitTests.swift in Sources */,
 				BE1EBA0171487D89532D73E2 /* CodexTestPlaceholder.swift in Sources */,
@@ -1884,7 +1888,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3.3.1;
+				CURRENT_PROJECT_VERSION = 3.3.2;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
@@ -1895,7 +1899,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 3.3.1;
+				MARKETING_VERSION = 3.3.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.ClaudeStatisticsKit;
 				PRODUCT_NAME = ClaudeStatisticsKit;
 				SDKROOT = macosx;
@@ -1912,7 +1916,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3.3.1;
+				CURRENT_PROJECT_VERSION = 3.3.2;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
@@ -1923,7 +1927,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 3.3.1;
+				MARKETING_VERSION = 3.3.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.ClaudeStatisticsKit;
 				PRODUCT_NAME = ClaudeStatisticsKit;
 				SDKROOT = macosx;
@@ -1941,11 +1945,11 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3.3.1;
+				CURRENT_PROJECT_VERSION = 3.3.2;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = ClaudeStatistics/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 3.3.1;
+				MARKETING_VERSION = 3.3.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.ClaudeStatistics;
 				PRODUCT_NAME = "Claude Statistics";
 				SDKROOT = macosx;
@@ -2038,11 +2042,11 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3.3.1;
+				CURRENT_PROJECT_VERSION = 3.3.2;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = ClaudeStatistics/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 3.3.1;
+				MARKETING_VERSION = 3.3.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.ClaudeStatistics;
 				PRODUCT_NAME = "Claude Statistics";
 				SDKROOT = macosx;
