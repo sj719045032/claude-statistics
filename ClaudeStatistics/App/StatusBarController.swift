@@ -256,6 +256,16 @@ struct MenuBarUsageStrip: View {
     /// before cells finish their first measurement pass.
     @State private var visibleCellCount: Int? = nil
     private static let rotationInterval: TimeInterval = 3
+    /// One process-wide timer publisher, shared across body evaluations.
+    /// Re-creating it inside `body` (the prior code) caused SwiftUI to
+    /// resubscribe each time `body` re-ran, and any state churn faster
+    /// than `rotationInterval` (UserDefaults writes feeding
+    /// `preferenceRevision`) reset the countdown — the timer would
+    /// effectively never fire and the strip would freeze on the first
+    /// segment.
+    private static let rotationTimer = Timer
+        .publish(every: rotationInterval, on: .main, in: .common)
+        .autoconnect()
 
     var body: some View {
         HStack(spacing: 4) {
@@ -278,7 +288,7 @@ struct MenuBarUsageStrip: View {
         .onPreferenceChange(MenuBarVisibleCellCountKey.self) { count in
             visibleCellCount = count
         }
-        .onReceive(Timer.publish(every: Self.rotationInterval, on: .main, in: .common).autoconnect()) { _ in
+        .onReceive(Self.rotationTimer) { _ in
             tick &+= 1
         }
         .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
