@@ -72,12 +72,16 @@ extension HookRunner {
             terminalName: terminalName,
             terminalContext: terminalContext
         )
-        // Claude Code's hook payload does NOT include `last_assistant_message`
-        // (we checked — every Bridge rx Bash log shows msgLen=0). The live
-        // commentary lives in the transcript_path jsonl, so when the payload
-        // keys come up empty, read the tail of that file to pull the most
-        // recent assistant text block. This is what lets the supporting line
-        // show "Claude said X" instead of being stuck on time-ago fallback.
+        // Claude Code's Stop / StopFailure hooks DO carry the final assistant
+        // text in `last_assistant_message` (verified by dumping the live
+        // payload). For those events, prefer the payload field — the
+        // transcript jsonl can lag a few hundred ms behind the hook fire,
+        // and tail-scanning a not-yet-flushed transcript produces the LAST
+        // intermediate text block (the one before the final tool calls)
+        // instead of the actual final reply. Other events (PreToolUse /
+        // PostToolUse / SubagentStart / etc.) do NOT include this field,
+        // so they keep using the transcript tail-scan to surface
+        // "Claude said X" in the supporting line.
         // Per-event, per-semantic-lane routing. Each event writes EXACTLY
         // ONE lane so downstream consumers (livePrompt / liveProgressNote /
         // livePreview) can't accidentally pick up the wrong payload:
@@ -105,16 +109,27 @@ extension HookRunner {
             }
         case "SessionEnd":
             break
+        case "Stop", "StopFailure":
+            // Use the payload's `last_assistant_message` (Claude Code provides
+            // the actual final reply here). Fall back to transcript tail-scan
+            // only when the field is absent (defensive — older Claude Code
+            // versions, edge cases). No timestamp from the payload, so leave
+            // commentary_timestamp unset; downstream code defaults to receivedAt.
+            if let preview = claudePreview(payload: payload) {
+                set(&message, "commentary_text", preview)
+            } else if let extracted = lastAssistantTextFromTranscript(payload: payload) {
+                set(&message, "commentary_text", extracted.text)
+                set(&message, "commentary_timestamp", extracted.timestamp)
+            }
         default:
-            // Stop / StopFailure / PreToolUse / PostToolUse / PostToolUseFailure /
-            // SessionStart / PreCompact / PostCompact / SubagentStart / SubagentStop.
+            // PreToolUse / PostToolUse / PostToolUseFailure / SessionStart /
+            // PreCompact / PostCompact / SubagentStart / SubagentStop. These
+            // don't carry `last_assistant_message`, so tail-scan the
+            // transcript_path jsonl to pull the most recent assistant text.
             if let extracted = lastAssistantTextFromTranscript(payload: payload) {
                 set(&message, "commentary_text", extracted.text)
                 set(&message, "commentary_timestamp", extracted.timestamp)
             } else if let preview = claudePreview(payload: payload) {
-                // Fallback for sessions without a transcript yet (e.g. the very
-                // first hook on a fresh session): use whatever the payload
-                // gave us as commentary.
                 set(&message, "commentary_text", preview)
             }
         }
@@ -132,6 +147,16 @@ extension HookRunner {
         }
 
         if event == "PermissionRequest" {
+            // AskUserQuestion fires its OWN PermissionRequest a few seconds
+            // after the PreToolUse intercept already showed our card. Don't
+            // double-up — exit silently so the CLI's native picker takes
+            // over. The PreToolUse intercept already gave the user the
+            // notch (with an Answer button); if they chose "Return to
+            // terminal" there, we want the CLI to handle this second
+            // event natively.
+            if ToolActivityFormatter.canonicalToolName(stringValue(payload["tool_name"])) == "askuserquestion" {
+                return nil
+            }
             set(&message, "expects_response", true)
             set(&message, "timeout_ms", HookDefaults.approvalTimeoutMs)
             return HookAction(
@@ -139,6 +164,18 @@ extension HookRunner {
                 expectsResponse: true,
                 responseTimeoutSeconds: HookDefaults.approvalResponseTimeoutSeconds,
                 printDecision: printClaudePermissionDecision
+            )
+        }
+
+        if event == "PreToolUse",
+           ToolActivityFormatter.canonicalToolName(stringValue(payload["tool_name"])) == "askuserquestion" {
+            set(&message, "expects_response", true)
+            set(&message, "timeout_ms", HookDefaults.approvalTimeoutMs)
+            return HookAction(
+                message: message,
+                expectsResponse: true,
+                responseTimeoutSeconds: HookDefaults.approvalResponseTimeoutSeconds,
+                printResponse: printClaudePreToolUseDecision
             )
         }
 

@@ -36,6 +36,7 @@ final class NotchKeyboardState: ObservableObject {
 
 enum NotchIslandCommand {
     case toggleIdlePeekFromShortcut
+    case collapseCurrentEventForBlur
 }
 
 @MainActor
@@ -63,6 +64,8 @@ final class NotchWindowController {
     private let screenTracker = NotchScreenTracker()
     private var targetScreen: NSScreen?
     private var screenObservers: [NSObjectProtocol] = []
+    private var outsideClickMonitor: Any?
+    private var localOutsideClickMonitor: Any?
     private var lastRequestedSize: CGSize = .zero
     private var pendingResize: DispatchWorkItem?
     private var pendingResizeRequest: ResizeRequest?
@@ -90,6 +93,8 @@ final class NotchWindowController {
 
         let rootView = NotchContainerView(notchCenter: notchCenter, machine: machine, activeTracker: activeTracker, hoverState: hoverState, keyboardState: keyboardState, islandCommandState: islandCommandState, screenTracker: screenTracker, onKeyboardCaptureChange: { [weak self] active in
             self?.setKeyboardCapture(active)
+        }, onInteractiveHitSizeChange: { [weak self] size in
+            self?.updateHitRect(for: size)
         }) { [weak self] size in
             self?.resizeWindow(to: size)
         }
@@ -125,11 +130,21 @@ final class NotchWindowController {
         window.orderFrontRegardless()
         window.makeFirstResponder(hostingView)
         startScreenTracking()
+        observeAppDeactivation()
+        startOutsideClickMonitoring()
     }
 
     func close() {
         screenObservers.forEach { NotificationCenter.default.removeObserver($0) }
         screenObservers.removeAll()
+        if let outsideClickMonitor {
+            NSEvent.removeMonitor(outsideClickMonitor)
+            self.outsideClickMonitor = nil
+        }
+        if let localOutsideClickMonitor {
+            NSEvent.removeMonitor(localOutsideClickMonitor)
+            self.localOutsideClickMonitor = nil
+        }
         keyboardInterceptor.close()
         localKeyboardMonitor.close()
         pendingResize?.cancel()
@@ -214,6 +229,48 @@ final class NotchWindowController {
             }
         }
         screenObservers.append(displayObserver)
+    }
+
+    private func observeAppDeactivation() {
+        let observer = NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.islandCommandState.send(.collapseCurrentEventForBlur)
+            }
+        }
+        screenObservers.append(observer)
+    }
+
+    private func startOutsideClickMonitoring() {
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                let location = NSEvent.mouseLocation
+                guard !self.containsInteractiveHitPoint(screenPoint: location) else { return }
+                self.islandCommandState.send(.collapseCurrentEventForBlur)
+            }
+        }
+
+        localOutsideClickMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        ) { [weak self] event in
+            guard let self else { return event }
+            let location = NSEvent.mouseLocation
+            guard !self.containsInteractiveHitPoint(screenPoint: location) else { return event }
+            self.hostingView.forceHoverFalse()
+            self.islandCommandState.send(.collapseCurrentEventForBlur)
+            return event
+        }
+    }
+
+    private func containsInteractiveHitPoint(screenPoint: CGPoint) -> Bool {
+        guard let hostingView else { return false }
+        return hostingView.containsInteractiveHitPoint(screenPoint: screenPoint)
     }
 
     private func refreshTargetScreenFromPreference() {
@@ -501,6 +558,21 @@ final class NotchHostingView<Content: View>: NSHostingView<Content> {
         return nil
     }
 
+    override func mouseDown(with event: NSEvent) {
+        guard handleMouseDownHitTest(event) else { return }
+        super.mouseDown(with: event)
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        guard handleMouseDownHitTest(event) else { return }
+        super.rightMouseDown(with: event)
+    }
+
+    override func otherMouseDown(with event: NSEvent) {
+        guard handleMouseDownHitTest(event) else { return }
+        super.otherMouseDown(with: event)
+    }
+
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
 
@@ -560,6 +632,26 @@ final class NotchHostingView<Content: View>: NSHostingView<Content> {
         let pointInWindow = window.convertPoint(fromScreen: NSEvent.mouseLocation)
         let point = convert(pointInWindow, from: nil)
         publishHover(hitRect.contains(point))
+    }
+
+    func containsInteractiveHitPoint(screenPoint: CGPoint) -> Bool {
+        guard let window else { return false }
+        let pointInWindow = window.convertPoint(fromScreen: screenPoint)
+        let point = convert(pointInWindow, from: nil)
+        return hitRect.contains(point)
+    }
+
+    func forceHoverFalse() {
+        publishHover(false)
+    }
+
+    private func handleMouseDownHitTest(_ event: NSEvent) -> Bool {
+        let point = convert(event.locationInWindow, from: nil)
+        if hitRect.contains(point) {
+            return true
+        }
+        publishHover(false)
+        return false
     }
 
     private func publishHover(for event: NSEvent) {

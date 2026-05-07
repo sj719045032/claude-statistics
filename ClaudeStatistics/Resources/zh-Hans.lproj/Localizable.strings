@@ -644,9 +644,12 @@
 "notch.triptych.waitingForReply" = "等待回复";
 "notch.permission.title" = "允许 %@ 吗？";
 "notch.permission.externalTitle" = "%@ 需要确认";
+"notch.question.title" = "回答问题";
+"notch.question.manual.placeholder" = "手动输入…";
 "notch.waiting.title" = "%@ 在等你回复";
 "notch.done.title" = "任务完成";
 "notch.common.dismiss" = "知道了";
+"notch.common.answer" = "回答";
 "notch.common.allow" = "允许";
 "notch.common.allowAlways" = "总是允许";
 "notch.common.allowAlways.tooltip" = "本次会话总是允许 %@";
@@ -738,4 +741,3 @@
 
 /* Account source — subscription scope note */
 "claude.accountSource.help.subscriptionNote" = "此设置只影响 Anthropic OAuth 凭证的来源。GLM Coding Plan / 其他第三方订阅有自己的账号管理,在身份选择器内切换。";
-

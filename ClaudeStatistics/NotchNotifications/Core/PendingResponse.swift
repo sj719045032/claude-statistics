@@ -18,30 +18,41 @@ final class PendingResponse: Equatable {
     }
 
     func resolve(_ decision: Decision) {
+        resolve(payload: PendingResponsePayload(decision: decision.rawValue, updatedInput: nil))
+    }
+
+    func answerAskUserQuestion(updatedInput: [String: JSONValue]) {
+        resolve(payload: PendingResponsePayload(decision: Decision.allow.rawValue, updatedInput: updatedInput))
+    }
+
+    private func resolve(payload: PendingResponsePayload) {
         lock.lock()
         guard !resolved else { lock.unlock(); return }
         resolved = true
         let capturedFd = fd
         lock.unlock()
 
-        let payload = "{\"v\":1,\"decision\":\"\(decision.rawValue)\"}\n"
         writeQueue.async {
-            guard let data = payload.data(using: .utf8) else { close(capturedFd); return }
-            let wroteAllBytes = data.withUnsafeBytes { ptr -> Bool in
+            guard let data = try? JSONEncoder().encode(payload) else {
+                close(capturedFd)
+                return
+            }
+            let framedData = data + Data([0x0A])
+            let wroteAllBytes = framedData.withUnsafeBytes { ptr -> Bool in
                 guard let baseAddress = ptr.baseAddress else { return false }
                 let written = write(capturedFd, baseAddress, ptr.count)
                 if written < 0 {
                     let code = errno
                     DiagnosticLogger.shared.warning(
-                        "PendingResponse write failed fd=\(capturedFd) errno=\(code) decision=\(decision.rawValue)"
+                        "PendingResponse write failed fd=\(capturedFd) errno=\(code) decision=\(payload.decision)"
                     )
                     return false
                 }
-                return written == ptr.count
+                return written == framedData.count
             }
             if !wroteAllBytes {
                 DiagnosticLogger.shared.warning(
-                    "PendingResponse write incomplete fd=\(capturedFd) decision=\(decision.rawValue)"
+                    "PendingResponse write incomplete fd=\(capturedFd) decision=\(payload.decision)"
                 )
             }
             close(capturedFd)
@@ -60,4 +71,10 @@ final class PendingResponse: Equatable {
     static func == (lhs: PendingResponse, rhs: PendingResponse) -> Bool {
         lhs === rhs
     }
+}
+
+private struct PendingResponsePayload: Encodable {
+    let v = 1
+    let decision: String
+    let updatedInput: [String: JSONValue]?
 }

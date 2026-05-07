@@ -17,11 +17,24 @@ extension ToolActivityFormatter {
     /// options like `glob` or `subagent_type` don't have to pretend to be
     /// part of the command.
     struct PermissionPreviewContent {
+        struct QuestionOption: Equatable {
+            let label: String
+            let description: String?
+        }
+
+        struct QuestionPrompt: Equatable {
+            let header: String?
+            let question: String
+            let options: [QuestionOption]
+            let multiSelect: Bool
+        }
+
         enum Primary: Equatable {
             case code(String)                          // multi-line / long payload (command, prompt, notebook source)
             case inline(String)                        // single-line identifier (path, url, pattern, query)
             case diff(old: String, new: String)        // edit tool
             case list([String])                        // todo items
+            case questions([QuestionPrompt])
         }
         let primary: Primary?
         let metadata: [(label: String, value: String)]
@@ -199,6 +212,14 @@ extension ToolActivityFormatter {
                 descriptions: []
             )
 
+        case "askuserquestion", "ask_user_question":
+            let questions = questionPrompts(from: input)
+            return PermissionPreviewContent(
+                primary: questions.isEmpty ? nil : .questions(questions),
+                metadata: [],
+                descriptions: []
+            )
+
         case "notebookedit":
             let newSource = rawStringValue(in: input, keys: ["new_source"])
             var meta: [(String, String)] = []
@@ -306,6 +327,17 @@ extension ToolActivityFormatter {
                 return lines.map { truncate($0, limit: 280) }
             }
 
+        case "askuserquestion", "ask_user_question":
+            var lines: [String] = []
+            if let question = preferredText(in: input, keys: ["question", "prompt", "message"]) {
+                lines.append(question)
+            }
+            let labels = questionOptions(from: input["options"]).map(\.label)
+            lines.append(contentsOf: labels)
+            if !lines.isEmpty {
+                return lines.map { truncate($0, limit: 280) }
+            }
+
         default:
             break
         }
@@ -327,5 +359,49 @@ extension ToolActivityFormatter {
             if !trimmed.isEmpty { return trimmed }
         }
         return nil
+    }
+
+    static func questionPrompts(from input: [String: JSONValue]) -> [PermissionPreviewContent.QuestionPrompt] {
+        if case .array(let items) = input["questions"] {
+            return items.compactMap { item -> PermissionPreviewContent.QuestionPrompt? in
+                guard case .object(let object) = item else { return nil }
+                return questionPrompt(from: object)
+            }
+        }
+        return questionPrompt(from: input).map { [$0] } ?? []
+    }
+
+    private static func questionOptions(from value: JSONValue?) -> [PermissionPreviewContent.QuestionOption] {
+        guard case .array(let items) = value else { return [] }
+        return items.compactMap { item -> PermissionPreviewContent.QuestionOption? in
+            guard case .object(let object) = item else { return nil }
+            let label = preferredText(in: object, keys: ["label", "title", "value", "id"])
+            let description = preferredText(in: object, keys: ["description", "detail", "subtitle"])
+            guard let label, !label.isEmpty else { return nil }
+            return PermissionPreviewContent.QuestionOption(
+                label: truncate(label, limit: 140),
+                description: description.map { truncate($0, limit: 320) }
+            )
+        }
+    }
+
+    private static func questionPrompt(from object: [String: JSONValue]) -> PermissionPreviewContent.QuestionPrompt? {
+        guard let question = preferredText(in: object, keys: ["question", "prompt", "message"]),
+              !question.isEmpty else {
+            return nil
+        }
+        let header = preferredText(in: object, keys: ["header", "title"])
+        let multiSelect: Bool
+        if case .bool(let value) = object["multiSelect"] ?? object["multi_select"] {
+            multiSelect = value
+        } else {
+            multiSelect = false
+        }
+        return PermissionPreviewContent.QuestionPrompt(
+            header: header.map { truncate($0, limit: 80) },
+            question: truncate(question, limit: 420),
+            options: questionOptions(from: object["options"]),
+            multiSelect: multiSelect
+        )
     }
 }

@@ -32,17 +32,20 @@ struct HookAction {
     let expectsResponse: Bool
     let responseTimeoutSeconds: Int
     let printDecision: ((String?) -> Void)?
+    let printResponse: (([String: Any]?) -> Void)?
 
     init(
         message: [String: Any],
         expectsResponse: Bool = false,
         responseTimeoutSeconds: Int = HookDefaults.shortIOTimeoutSeconds,
-        printDecision: ((String?) -> Void)? = nil
+        printDecision: ((String?) -> Void)? = nil,
+        printResponse: (([String: Any]?) -> Void)? = nil
     ) {
         self.message = message
         self.expectsResponse = expectsResponse
         self.responseTimeoutSeconds = responseTimeoutSeconds
         self.printDecision = printDecision
+        self.printResponse = printResponse
     }
 }
 
@@ -93,12 +96,16 @@ struct HookRunner: HookHelperContext {
 
         guard let action else { return 0 }
         logHookDispatch(for: action.message, expectsResponse: action.expectsResponse)
-        let decision = socketDecision(
+        let response = socketResponse(
             for: action.message,
             expectsResponse: action.expectsResponse,
             responseTimeoutSeconds: action.responseTimeoutSeconds
         )
-        action.printDecision?(decision)
+        if let printResponse = action.printResponse {
+            printResponse(response)
+        } else {
+            action.printDecision?(stringValue(response?["decision"]))
+        }
         return 0
     }
 
@@ -194,11 +201,11 @@ struct HookRunner: HookHelperContext {
         return raw
     }
 
-    private func socketDecision(
+    private func socketResponse(
         for message: [String: Any],
         expectsResponse: Bool,
         responseTimeoutSeconds: Int
-    ) -> String? {
+    ) -> [String: Any]? {
         guard let data = try? JSONSerialization.data(withJSONObject: message, options: []) else {
             return nil
         }
@@ -234,7 +241,7 @@ struct HookRunner: HookHelperContext {
                 )
                 continue
             }
-            return stringValue(object["decision"])
+            return object
         }
 
         let joinedPaths = socketPathCandidates.joined(separator: ",")
@@ -360,6 +367,21 @@ func printClaudePermissionDecision(_ decision: String?) {
     default:
         printJSON([:])
     }
+}
+
+func printClaudePreToolUseDecision(_ response: [String: Any]?) {
+    guard stringValue(response?["decision"]) == "allow",
+          let updatedInput = response?["updatedInput"] as? [String: Any] else {
+        printJSON([:])
+        return
+    }
+    printJSON([
+        "hookSpecificOutput": [
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "allow",
+            "updatedInput": updatedInput,
+        ],
+    ])
 }
 
 // MARK: - Payload normalizer — moved to HookPayloadNormalizer.swift

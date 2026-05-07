@@ -384,8 +384,31 @@ final class ActiveSessionsTracker: ObservableObject {
             hadActiveOperation: hadActiveOperation
         )
         if let livePreview = event.livePreview {
-            runtime.latestPreview = livePreview
-            runtime.latestPreviewAt = event.receivedAt
+            // taskDone / taskFailed derive livePreview from the assistant
+            // transcript text, so mirror the progressNote logic above:
+            // prefer commentaryAt (the entry's transcript-native timestamp)
+            // over receivedAt (hook fire time), and reject staler values so
+            // a hook snapshot taken before the final assistant text was
+            // flushed can't clobber the fresher text a later transcript
+            // sync just merged. waitingInput keeps receivedAt because its
+            // preview is a hook-generated status string, not transcript text.
+            let isTranscriptPreview: Bool = {
+                switch event.kind {
+                case .taskDone, .taskFailed: return true
+                default: return false
+                }
+            }()
+            let incomingAt = isTranscriptPreview
+                ? (event.commentaryAt ?? event.receivedAt)
+                : event.receivedAt
+            let shouldOverwrite: Bool = {
+                guard isTranscriptPreview, let existingAt = runtime.latestPreviewAt else { return true }
+                return incomingAt >= existingAt
+            }()
+            if shouldOverwrite {
+                runtime.latestPreview = livePreview
+                runtime.latestPreviewAt = incomingAt
+            }
         }
         let incomingTTY = event.tty?.nilIfEmpty
         let incomingTerminalName = event.terminalName?.nilIfEmpty ?? runtime.terminalName

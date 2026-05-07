@@ -15,6 +15,7 @@ final class NotchWindow: NSPanel {
         hasShadow = false
         ignoresMouseEvents = false
         collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
+        hidesOnDeactivate = false
         isReleasedWhenClosed = false
         animationBehavior = .none
     }

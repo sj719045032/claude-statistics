@@ -7,6 +7,8 @@ final class NotchNotificationCenter: ObservableObject {
     @Published private(set) var currentEvent: AttentionEvent?
     @Published private(set) var queuedCount: Int = 0
     @Published private(set) var currentAutoDismissDeadline: Date?
+    @Published private(set) var switchableEventCount: Int = 0
+    @Published private(set) var currentSwitchableEventIndex: Int = 0
 
     weak var activeSessionsTracker: ActiveSessionsTracker?
 
@@ -15,6 +17,7 @@ final class NotchNotificationCenter: ObservableObject {
     private var permissionRegistry = PermissionRequestRegistry()
     private var informationalGate = InformationalEventGate()
     private var autoAllowRules = NotchAutoAllowRules()
+    private var currentSwitchableOrdinal = 1
     func enqueue(_ event: AttentionEvent) {
         var event = event
         DiagnosticLogger.shared.verbose(
@@ -163,6 +166,71 @@ final class NotchNotificationCenter: ObservableObject {
         decide(id: id, decision: .ask)
     }
 
+    func showNextSwitchableEvent() {
+        switchCurrentEvent(direction: .next)
+    }
+
+    func showPreviousSwitchableEvent() {
+        switchCurrentEvent(direction: .previous)
+    }
+
+    func answerAskUserQuestion(id: UUID, answers: [String: String]) {
+        DiagnosticLogger.shared.info("Notch answer AskUserQuestion id=\(id.uuidString.prefix(8)) answers=\(answers.count)")
+        let target: AttentionEvent?
+        let queuedIndex: Int?
+        if currentEvent?.id == id {
+            target = currentEvent
+            queuedIndex = nil
+        } else if let idx = queue.firstIndex(where: { $0.id == id }) {
+            target = queue[idx]
+            queuedIndex = idx
+        } else {
+            return
+        }
+
+        guard let target,
+              target.rawEventName == "PreToolUse",
+              case .permissionRequest(let tool, let input, _, _) = target.kind,
+              ToolActivityFormatter.canonicalToolName(tool) == "askuserquestion" else {
+            return
+        }
+
+        // When answers is empty (e.g. "Return to terminal" hand-off), keep
+        // the original `input` intact — adding `answers: {}` would tell
+        // Claude Code "the user picked nothing" and AskUserQuestion would
+        // immediately return an empty selection to the model. Without an
+        // `answers` field the CLI runs the tool natively and surfaces its
+        // built-in TUI picker for the user instead.
+        var updatedInput = input
+        if !answers.isEmpty {
+            updatedInput["answers"] = .object(answers.mapValues { .string($0) })
+        }
+
+        if currentEvent?.id == id {
+            noteDismissed(currentEvent)
+            activeSessionsTracker?.resolveApproval(
+                provider: target.provider,
+                sessionId: target.sessionId,
+                decision: .allow
+            )
+            currentEvent?.pending?.answerAskUserQuestion(updatedInput: updatedInput)
+            clearTimer(id)
+            currentEvent = nil
+            advance()
+        } else if let queuedIndex {
+            noteDismissed(queue[queuedIndex])
+            activeSessionsTracker?.resolveApproval(
+                provider: target.provider,
+                sessionId: target.sessionId,
+                decision: .allow
+            )
+            queue[queuedIndex].pending?.answerAskUserQuestion(updatedInput: updatedInput)
+            clearTimer(id)
+            queue.remove(at: queuedIndex)
+            updateCount()
+        }
+    }
+
     /// Drop the currently-shown event and the queued ones that match the given
     /// provider. Pending hook responses are resolved with `.ask` so the CLI
     /// falls through to its native flow. Called when the user disables a
@@ -256,6 +324,7 @@ final class NotchNotificationCenter: ObservableObject {
     private func advance() {
         guard currentEvent == nil, !queue.isEmpty else { updateCount(); return }
         currentEvent = queue.removeFirst()
+        currentSwitchableOrdinal = 1
         currentAutoDismissDeadline = nil
         if let currentEvent, let after = currentEvent.kind.autoDismissAfter {
             scheduleAutoDismiss(for: currentEvent, after: after)
@@ -263,7 +332,55 @@ final class NotchNotificationCenter: ObservableObject {
         updateCount()
     }
 
-    private func updateCount() { queuedCount = queue.count }
+    private func updateCount() {
+        queuedCount = queue.count
+        guard let currentEvent, currentEvent.kind.isSwitchableManualEvent else {
+            switchableEventCount = 0
+            currentSwitchableEventIndex = 0
+            currentSwitchableOrdinal = 1
+            return
+        }
+        switchableEventCount = 1 + queue.filter { $0.kind.isSwitchableManualEvent }.count
+        currentSwitchableOrdinal = min(max(1, currentSwitchableOrdinal), switchableEventCount)
+        currentSwitchableEventIndex = currentSwitchableOrdinal
+    }
+
+    private enum SwitchDirection {
+        case next
+        case previous
+    }
+
+    private func switchCurrentEvent(direction: SwitchDirection) {
+        guard let currentEvent, currentEvent.kind.isSwitchableManualEvent else { return }
+        let candidateIndex: Int?
+        switch direction {
+        case .next:
+            candidateIndex = queue.firstIndex { $0.kind.isSwitchableManualEvent }
+        case .previous:
+            candidateIndex = queue.lastIndex { $0.kind.isSwitchableManualEvent }
+        }
+        guard let candidateIndex else { return }
+
+        let nextEvent = queue.remove(at: candidateIndex)
+        switch direction {
+        case .next:
+            queue.append(currentEvent)
+        case .previous:
+            queue.insert(currentEvent, at: 0)
+        }
+        self.currentEvent = nextEvent
+        currentAutoDismissDeadline = nil
+        let count = 1 + queue.filter { $0.kind.isSwitchableManualEvent }.count
+        if count > 0 {
+            switch direction {
+            case .next:
+                currentSwitchableOrdinal = currentSwitchableOrdinal % count + 1
+            case .previous:
+                currentSwitchableOrdinal = (currentSwitchableOrdinal + count - 2) % count + 1
+            }
+        }
+        updateCount()
+    }
 
     private func removeDuplicateEvent(_ id: UUID, resolution: Decision) {
         if currentEvent?.id == id {
@@ -409,6 +526,15 @@ final class NotchNotificationCenter: ObservableObject {
 }
 
 private extension AttentionKind {
+    var isSwitchableManualEvent: Bool {
+        switch self {
+        case .permissionRequest, .waitingInput:
+            return true
+        case .taskDone, .taskFailed, .sessionStart, .activityPulse, .sessionEnd:
+            return false
+        }
+    }
+
     var isWaitingInput: Bool {
         if case .waitingInput = self { return true }
         return false

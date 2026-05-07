@@ -162,11 +162,22 @@ final class AttentionBridge {
         // transcript 的事件 (Stop/Notification/SessionStart) 优先用 Claude
         // 真实最后一段 text,退化到 WireMessage.message(C 语义的状态串)。
         let kindSummary = msg.commentary_text ?? msg.message
-        let kindBase = WireEventTranslator.translateKind(
-            event: msg.event,
-            notificationType: msg.notification_type,
-            summary: kindSummary
-        )
+        let kindBase: AttentionKind
+        if msg.event == "PreToolUse",
+           ToolActivityFormatter.canonicalToolName(msg.tool_name) == "askuserquestion" {
+            kindBase = .permissionRequest(
+                tool: "",
+                input: [:],
+                toolUseId: "",
+                interaction: .actionable
+            )
+        } else {
+            kindBase = WireEventTranslator.translateKind(
+                event: msg.event,
+                notificationType: msg.notification_type,
+                summary: kindSummary
+            )
+        }
         let kind = WireEventTranslator.resolvePermissionFields(kindBase, in: msg)
         let provider = WireEventTranslator.translateProvider(msg.provider)
 

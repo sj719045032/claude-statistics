@@ -631,9 +631,12 @@
 "notch.triptych.waitingForReply" = "Waiting for reply";
 "notch.permission.title" = "Approve %@?";
 "notch.permission.externalTitle" = "%@ needs confirmation";
+"notch.question.title" = "Answer question";
+"notch.question.manual.placeholder" = "Type something…";
 "notch.waiting.title" = "%@ is waiting";
 "notch.done.title" = "Task completed";
 "notch.common.dismiss" = "Dismiss";
+"notch.common.answer" = "Answer";
 "notch.common.allow" = "Allow";
 "notch.common.allowAlways" = "Always";
 "notch.common.allowAlways.tooltip" = "Always allow %@ for this session";
@@ -725,4 +728,3 @@
 
 /* Account source — subscription scope note */
 "claude.accountSource.help.subscriptionNote" = "This setting only affects Anthropic OAuth credential routing. Token-based subscription plans (GLM Coding Plan / 第三方) keep their own per-account state in the identity picker.";
-

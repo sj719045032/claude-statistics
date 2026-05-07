@@ -253,6 +253,7 @@ enum EventCardAction: Hashable {
     case returnToTerminal
     case dismiss
     case deny
+    case answer
     case allow
     case allowAlways
 }

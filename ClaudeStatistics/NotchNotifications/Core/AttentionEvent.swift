@@ -175,6 +175,15 @@ extension AttentionEvent {
 
     var isActionableApproval: Bool { approvalInteraction == .actionable }
 
+    var isAskUserQuestionApproval: Bool {
+        guard rawEventName == "PreToolUse",
+              case .permissionRequest(let tool, _, _, let interaction) = kind,
+              interaction == .actionable else {
+            return false
+        }
+        return ToolActivityFormatter.canonicalToolName(tool) == "askuserquestion"
+    }
+
     var isPassiveApproval: Bool { approvalInteraction == .passive }
 
     var livePrompt: String? {

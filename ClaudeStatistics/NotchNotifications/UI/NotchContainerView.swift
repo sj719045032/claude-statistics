@@ -13,6 +13,7 @@ struct NotchContainerView: View {
     @ObservedObject var islandCommandState: NotchIslandCommandState
     @ObservedObject var screenTracker: NotchScreenTracker
     var onKeyboardCaptureChange: (Bool) -> Void = { _ in }
+    var onInteractiveHitSizeChange: (CGSize) -> Void = { _ in }
     var onInteractiveSizeChange: (CGSize) -> Void = { _ in }
 
     // Binds to the same UserDefaults key as ActiveSessionRow's @AppStorage.
@@ -71,6 +72,7 @@ struct NotchContainerView: View {
     @State private var closingEventRevealSize: CGSize?
     @State private var closingEventFading = false
     @State private var pendingClosingEventClear: DispatchWorkItem?
+    @State private var pendingBlurEventCollapse: DispatchWorkItem?
     @State private var revealExpandedIsland = false
     @State private var idlePeekShowingAllSessions = false
     @State private var closingIdlePeek = false
@@ -224,6 +226,8 @@ struct NotchContainerView: View {
                 pendingIdlePeekOpen = nil
                 pendingClosingEventClear?.cancel()
                 pendingClosingEventClear = nil
+                pendingBlurEventCollapse?.cancel()
+                pendingBlurEventCollapse = nil
                 closingEvent = nil
                 closingEventRevealSize = nil
                 closingEventFading = false
@@ -330,9 +334,7 @@ struct NotchContainerView: View {
 
         let isRevealClosing = expanded && isClosingReveal
         let size = resolvedIslandSize(for: event, expanded: expanded, hasNotch: hasNotch)
-        let isContentFading = isRevealClosing
-            && closingEventFading
-            && notchCenter.currentEvent == nil
+        let isContentFading = isRevealClosing && closingEventFading
         let botR = isRevealClosing
             ? NotchStateMachine.closedBottomCornerRadius
             : (expanded ? NotchStateMachine.openedBottomCornerRadius : NotchStateMachine.closedBottomCornerRadius)
@@ -437,6 +439,9 @@ struct NotchContainerView: View {
                 if let event {
                     expandedContent(for: event)
                         .transition(expandedCardTransition)
+                    switchableEventControls()
+                        .padding(.top, 4)
+                        .padding(.trailing, 4)
                 } else {
                     IdlePeekCard(
                         activeTracker: activeTracker,
@@ -471,6 +476,47 @@ struct NotchContainerView: View {
                 .transition(.opacity.animation(.easeOut(duration: 0.18)))
         }
         // Idle + no hover → empty (shell matches physical notch)
+    }
+
+    @ViewBuilder
+    private func switchableEventControls() -> some View {
+        if notchCenter.switchableEventCount > 1 {
+            HStack(spacing: 5) {
+                Button {
+                    holdHoverForInternalInteraction()
+                    notchCenter.showPreviousSwitchableEvent()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 9, weight: .bold))
+                        .frame(width: 18, height: 18)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white.opacity(0.78))
+                .background(Color.white.opacity(0.08), in: Circle())
+
+                Text("\(notchCenter.currentSwitchableEventIndex)/\(notchCenter.switchableEventCount)")
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.62))
+                    .frame(minWidth: 26)
+
+                Button {
+                    holdHoverForInternalInteraction()
+                    notchCenter.showNextSwitchableEvent()
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .frame(width: 18, height: 18)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white.opacity(0.78))
+                .background(Color.white.opacity(0.08), in: Circle())
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .background(Color.black.opacity(0.34), in: Capsule())
+            .frame(maxWidth: .infinity, alignment: .topTrailing)
+            .accessibilityLabel("Switch pending event")
+        }
     }
 
     // MARK: - Sizes
@@ -666,14 +712,13 @@ struct NotchContainerView: View {
         max(0, expandedContentTopPadding - 14)
     }
 
-    private func reportInteractiveSize(expandedOverride: Bool? = nil) {
+    private func reportInteractiveSize(expandedOverride: Bool? = nil, hitSizeOverride: CGSize? = nil) {
         let event = notchCenter.currentEvent ?? closingEvent
         let expanded = expandedOverride ?? isExpandedPresentation(for: event)
         let hasNotch = screenHasNotch()
         let size: CGSize
         if expandedOverride != false,
            isClosingReveal,
-           closingEvent != nil,
            let closingEventRevealSize {
             size = closingEventRevealSize
         } else {
@@ -690,10 +735,29 @@ struct NotchContainerView: View {
         )
 
         let callback = onInteractiveSizeChange
+        let hitCallback = onInteractiveHitSizeChange
+        let hitSize = hitSizeOverride ?? normalized
         // Avoid mutating the NSPanel frame in the same SwiftUI/AppKit
         // constraint pass that produced the measurement.
         DispatchQueue.main.async {
             callback(normalized)
+            hitCallback(hitSize)
+        }
+    }
+
+    private func collapsedHoverHitSize() -> CGSize {
+        if screenHasNotch() {
+            let notch = physicalNotchSize()
+            return CGSize(width: notch.width + 20, height: notch.height)
+        }
+        return CGSize(width: flatScreenHoverWidth, height: flatScreenHoverHeight)
+    }
+
+    private func reportCollapsedEventHitArea() {
+        let hitSize = collapsedHoverHitSize()
+        let hitCallback = onInteractiveHitSizeChange
+        DispatchQueue.main.async {
+            hitCallback(hitSize)
         }
     }
 
@@ -813,6 +877,16 @@ struct NotchContainerView: View {
         )
         let focusKey = "\(event.provider.rawValue):\(event.sessionId)"
         let sessionId = event.sessionId
+        // For "return to terminal", resolve the PreToolUse hook with `.ask`
+        // (printClaudePreToolUseDecision emits `{}`). Claude Code then falls
+        // through to its native permission flow — for AskUserQuestion that
+        // means firing a follow-up PermissionRequest hook. Our normalizer
+        // suppresses PermissionRequest:askuserquestion (returns nil), so the
+        // CLI sees no hook opinion and defaults to its built-in TUI picker.
+        // (Sending `decision=allow + updatedInput=<original>` here instead
+        // makes Claude Code skip PermissionRequest entirely and run the tool
+        // with no `answers` field — the tool returns immediately with an
+        // empty selection and the picker never appears.)
         closeIslandBeforeFocus(eventId: event.id)
         Task(priority: .userInitiated) {
             _ = await TerminalFocusCoordinator.shared.focus(
@@ -838,6 +912,8 @@ struct NotchContainerView: View {
         resetIdlePeekRevealOverride()
         pendingClosingEventClear?.cancel()
         pendingClosingEventClear = nil
+        pendingBlurEventCollapse?.cancel()
+        pendingBlurEventCollapse = nil
         closingEvent = nil
         closingEventFading = false
         pendingHoverReentryReset?.cancel()
@@ -845,7 +921,7 @@ struct NotchContainerView: View {
         hoveringIsland = false
         hoveringNotchZone = false
         if let eventId {
-            flushHoverLeave()
+            suppressHoverReentry()
             // `dismiss` drives `onChange(currentEvent)` → `machine.hide()`, so
             // state and event clear together without the intermediate one-frame
             // mismatch that produced the flicker on dismissal.
@@ -861,6 +937,11 @@ struct NotchContainerView: View {
         )
         if hovering {
             guard !isIdleCloseCommitted else { return }
+            guard !isBlurClosingCurrentEvent else {
+                hoveringNotchZone = false
+                reportCollapsedEventHitArea()
+                return
+            }
             guard !hoverReentrySuppressed else { return }
             // Real pointer entered: hand control back to the mouse so a later
             // pointer-leave collapses the peek normally instead of being held
@@ -870,7 +951,7 @@ struct NotchContainerView: View {
             }
             resumeIdlePeekCloseIfNeeded()
             hoveringNotchZone = true
-            if notchCenter.currentEvent != nil || closingEvent != nil {
+            if reopenCurrentEventOnHoverIfNeeded() || notchCenter.currentEvent != nil || closingEvent != nil {
                 return
             }
             scheduleIdlePeekOpenIfNeeded()
@@ -892,10 +973,15 @@ struct NotchContainerView: View {
         )
         if hovering {
             guard !isIdleCloseCommitted else { return }
+            guard !isBlurClosingCurrentEvent else {
+                hoveringIsland = false
+                reportCollapsedEventHitArea()
+                return
+            }
             guard !hoverReentrySuppressed else { return }
             resumeIdlePeekCloseIfNeeded()
             hoveringIsland = true
-            if notchCenter.currentEvent != nil || closingEvent != nil {
+            if reopenCurrentEventOnHoverIfNeeded() || notchCenter.currentEvent != nil || closingEvent != nil {
                 return
             }
             scheduleIdlePeekOpenIfNeeded()
@@ -936,6 +1022,36 @@ struct NotchContainerView: View {
         }
         pendingIdlePeekOpen = work
         DispatchQueue.main.asyncAfter(deadline: .now() + idlePeekOpenIntentDelay, execute: work)
+    }
+
+    @discardableResult
+    private func reopenCurrentEventOnHoverIfNeeded() -> Bool {
+        guard notchCenter.currentEvent != nil else { return false }
+        guard !isBlurClosingCurrentEvent else {
+            reportCollapsedEventHitArea()
+            return true
+        }
+        guard machine.state != .expanded || !revealExpandedIsland else { return true }
+
+        pendingOpenWork?.cancel()
+        pendingOpenWork = nil
+        pendingIdlePeekOpen?.cancel()
+        pendingIdlePeekOpen = nil
+        pendingClosingEventClear?.cancel()
+        pendingClosingEventClear = nil
+        pendingBlurEventCollapse?.cancel()
+        pendingBlurEventCollapse = nil
+        closingEvent = nil
+        closingEventRevealSize = nil
+        closingEventFading = false
+        idlePeekActive = false
+        closingIdlePeek = false
+        isClosingReveal = false
+
+        schedulePanelExpansion {
+            machine.show(expanded: true)
+        }
+        return true
     }
 
     private func applyHoverChange(to hovering: Bool) {
@@ -1121,6 +1237,8 @@ struct NotchContainerView: View {
 
     private func schedulePanelExpansion(_ expand: @escaping () -> Void) {
         pendingOpenWork?.cancel()
+        pendingBlurEventCollapse?.cancel()
+        pendingBlurEventCollapse = nil
         pendingIdlePeekClose?.cancel()
         pendingIdlePeekClose = nil
         pendingIdlePeekCloseStart?.cancel()
@@ -1353,15 +1471,9 @@ struct NotchContainerView: View {
         DiagnosticLogger.shared.info(
             "Island close after action queuedCount=\(notchCenter.queuedCount) hovering=\(effectiveHovering) state=\(String(describing: machine.state)) wasPeeking=\(wasPeekingOnEventArrival)"
         )
-        // Event card and list card are decoupled:
-        //   • If user was NOT peeking when the event arrived → suppress hover
-        //     so the list card doesn't pop up after the event closes.
-        //   • If user WAS peeking → don't suppress; `onChange(currentEvent→nil)`
-        //     will call `machine.restoreHoverPeek()` and the list card comes
-        //     back as it was before the event interrupted.
-        if !wasPeekingOnEventArrival {
-            suppressHoverReentry()
-        }
+        // A button/key action means the user explicitly handled the event.
+        // Keep the pointer from immediately reopening the just-closed card.
+        suppressHoverReentry()
         // Don't hide the state machine here. `notchCenter.dismiss(id:)` clears
         // `currentEvent`, which fires `onChange(currentEvent)` and drives the
         // appropriate transition (hide vs restore peek) in one place.
@@ -1425,6 +1537,10 @@ struct NotchContainerView: View {
                     closeIslandAfterAction()
                     notchCenter.decide(id: event.id, decision: decision)
                 },
+                onAnswerQuestion: { answers in
+                    closeIslandAfterAction()
+                    notchCenter.answerAskUserQuestion(id: event.id, answers: answers)
+                },
                 onAllowAlways: {
                     closeIslandAfterAction()
                     notchCenter.allowAlways(id: event.id)
@@ -1465,10 +1581,23 @@ struct NotchContainerView: View {
     }
 
     private var shouldCaptureKeyboard: Bool {
-        if notchCenter.currentEvent != nil {
+        if currentEventCapturesKeyboard {
             return true
         }
         return idlePeekActive && (effectiveHovering || rawHovering || revealExpandedIsland)
+    }
+
+    private var currentEventCapturesKeyboard: Bool {
+        notchCenter.currentEvent != nil
+            && machine.state == .expanded
+            && revealExpandedIsland
+            && !isClosingReveal
+            && pendingBlurEventCollapse == nil
+    }
+
+    private var isBlurClosingCurrentEvent: Bool {
+        notchCenter.currentEvent != nil
+            && (pendingBlurEventCollapse != nil || isClosingReveal)
     }
 
     private var visibleIdleSessions: [ActiveSession] {
@@ -1490,7 +1619,11 @@ struct NotchContainerView: View {
                 actions.append(.returnToTerminal)
             }
             if event.isActionableApproval {
-                actions.append(contentsOf: [.deny, .allow, .allowAlways])
+                if event.isAskUserQuestionApproval {
+                    actions.append(contentsOf: [.deny, .answer])
+                } else {
+                    actions.append(contentsOf: [.deny, .allow, .allowAlways])
+                }
             } else {
                 actions.append(.dismiss)
             }
@@ -1510,7 +1643,9 @@ struct NotchContainerView: View {
     private func defaultEventAction(for event: AttentionEvent) -> EventCardAction? {
         switch event.kind {
         case .permissionRequest:
-            return availableEventActions(for: event).contains(.allow) ? .allow : availableEventActions(for: event).first
+            let actions = availableEventActions(for: event)
+            if actions.contains(.answer) { return .answer }
+            return actions.contains(.allow) ? .allow : actions.first
         case .waitingInput, .taskDone, .taskFailed, .sessionStart:
             return availableEventActions(for: event).contains(.returnToTerminal) ? .returnToTerminal : .dismiss
         case .activityPulse, .sessionEnd:
@@ -1566,7 +1701,7 @@ struct NotchContainerView: View {
 
     private func handleKeyboardAction(_ action: NotchKeyboardAction) {
         guard NotchPreferences.keyboardControlsEnabled else { return }
-        if let event = notchCenter.currentEvent {
+        if let event = notchCenter.currentEvent, currentEventCapturesKeyboard {
             handleEventKeyboardAction(action, event: event)
             return
         }
@@ -1586,7 +1721,82 @@ struct NotchContainerView: View {
             } else {
                 openIdlePeekFromShortcut()
             }
+        case .collapseCurrentEventForBlur:
+            collapseCurrentEventForBlur()
         }
+    }
+
+    private func collapseCurrentEventForBlur() {
+        guard notchCenter.currentEvent != nil else { return }
+        let alreadyCollapsed = machine.state == .idle && !revealExpandedIsland && !isClosingReveal
+        if alreadyCollapsed || pendingBlurEventCollapse != nil {
+            pendingOpenWork?.cancel()
+            pendingOpenWork = nil
+            pendingIdlePeekOpen?.cancel()
+            pendingIdlePeekOpen = nil
+            pendingHoverLeave?.cancel()
+            pendingHoverLeave = nil
+            pendingInternalHoverGuardCheck?.cancel()
+            pendingInternalHoverGuardCheck = nil
+            pendingNearbyHoverGuardCheck?.cancel()
+            pendingNearbyHoverGuardCheck = nil
+            internalInteractionHoverGuardSize = nil
+            idlePeekActive = false
+            closingIdlePeek = false
+            hoveringIsland = false
+            hoveringNotchZone = false
+            effectiveHovering = false
+            notchCenter.resumeAutoDismissAfterHover()
+            hoverReentrySuppressed = false
+            reportCollapsedEventHitArea()
+            onKeyboardCaptureChange(shouldCaptureKeyboard)
+            return
+        }
+
+        pendingOpenWork?.cancel()
+        pendingOpenWork = nil
+        pendingBlurEventCollapse?.cancel()
+        pendingBlurEventCollapse = nil
+        pendingIdlePeekOpen?.cancel()
+        pendingIdlePeekOpen = nil
+        pendingHoverLeave?.cancel()
+        pendingHoverLeave = nil
+        pendingInternalHoverGuardCheck?.cancel()
+        pendingInternalHoverGuardCheck = nil
+        pendingNearbyHoverGuardCheck?.cancel()
+        pendingNearbyHoverGuardCheck = nil
+        internalInteractionHoverGuardSize = nil
+        idlePeekActive = false
+        closingIdlePeek = false
+        closingEvent = nil
+        closingEventRevealSize = nil
+        hoveringIsland = false
+        hoveringNotchZone = false
+        effectiveHovering = false
+        notchCenter.resumeAutoDismissAfterHover()
+        hoverReentrySuppressed = true
+        closingEventRevealSize = resolvedIslandSize(
+            for: notchCenter.currentEvent,
+            expanded: true,
+            hasNotch: screenHasNotch()
+        )
+
+        reportInteractiveSize(expandedOverride: true, hitSizeOverride: collapsedHoverHitSize())
+        startRevealCloseAnimation()
+        onKeyboardCaptureChange(shouldCaptureKeyboard)
+
+        let collapseWork = DispatchWorkItem {
+            pendingBlurEventCollapse = nil
+            machine.hide()
+            isClosingReveal = false
+            closingEventFading = false
+            hoverReentrySuppressed = false
+            measuredCardHeight = 0
+            reportInteractiveSize(expandedOverride: false, hitSizeOverride: collapsedHoverHitSize())
+            onKeyboardCaptureChange(shouldCaptureKeyboard)
+        }
+        pendingBlurEventCollapse = collapseWork
+        DispatchQueue.main.asyncAfter(deadline: .now() + revealCloseDuration, execute: collapseWork)
     }
 
     private func openIdlePeekFromShortcut() {
@@ -1651,6 +1861,8 @@ struct NotchContainerView: View {
         case .deny:
             closeIslandAfterAction()
             notchCenter.decide(id: event.id, decision: .deny)
+        case .answer:
+            break
         case .allow:
             closeIslandAfterAction()
             notchCenter.decide(id: event.id, decision: .allow)

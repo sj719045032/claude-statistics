@@ -5,11 +5,14 @@ struct PermissionRequestCard: View {
     let projectPath: String?
     let selectedAction: EventCardAction?
     let onDecide: (Decision) -> Void
+    let onAnswerQuestion: ([String: String]) -> Void
     let onAllowAlways: () -> Void
     let onFocusTerminal: (() -> Void)?
 
     @State private var now = Date()
     @State private var hoveredAction: EventCardAction?
+    @State private var selectedQuestionOptions: [Int: Set<Int>] = [:]
+    @State private var manualQuestionAnswers: [Int: String] = [:]
     private let tick = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -102,25 +105,48 @@ struct PermissionRequestCard: View {
                         hoverSelectionActive: hoveredAction != nil,
                         onHoverChange: { updateHover(.deny, hovering: $0) }
                     ) { onDecide(.deny) }
-                    NotchPillButton(
-                        titleKey: "notch.common.allow",
-                        style: .secondary,
-                        isKeyboardSelected: selectedAction == .allow,
-                        keyboardSelectionActive: selectedAction != nil,
-                        isHoverSelected: hoveredAction == .allow,
-                        hoverSelectionActive: hoveredAction != nil,
-                        onHoverChange: { updateHover(.allow, hovering: $0) }
-                    ) { onDecide(.allow) }
-                    NotchPillButton(
-                        titleKey: "notch.common.allowAlways",
-                        style: .primary,
-                        isKeyboardSelected: selectedAction == .allowAlways,
-                        keyboardSelectionActive: selectedAction != nil,
-                        isHoverSelected: hoveredAction == .allowAlways,
-                        hoverSelectionActive: hoveredAction != nil,
-                        onHoverChange: { updateHover(.allowAlways, hovering: $0) }
-                    ) { onAllowAlways() }
-                        .help(alwaysAllowTooltip)
+                    if isAskUserQuestion {
+                        // Always render as `.primary` so the action is
+                        // legible in the button row. The inner closure
+                        // already guards on `selectedQuestionAnswers`, so
+                        // clicking with nothing chosen is a safe no-op —
+                        // we don't need `.disabled` (which SwiftUI fades
+                        // on top of our existing styling and made the
+                        // button hard to read against the dark notch).
+                        NotchPillButton(
+                            titleKey: "notch.common.answer",
+                            style: .primary,
+                            isKeyboardSelected: selectedAction == .answer,
+                            keyboardSelectionActive: selectedAction != nil,
+                            isHoverSelected: hoveredAction == .answer,
+                            hoverSelectionActive: hoveredAction != nil,
+                            onHoverChange: { updateHover(.answer, hovering: $0) }
+                        ) {
+                            if let answers = selectedQuestionAnswers {
+                                onAnswerQuestion(answers)
+                            }
+                        }
+                    } else {
+                        NotchPillButton(
+                            titleKey: "notch.common.allow",
+                            style: .secondary,
+                            isKeyboardSelected: selectedAction == .allow,
+                            keyboardSelectionActive: selectedAction != nil,
+                            isHoverSelected: hoveredAction == .allow,
+                            hoverSelectionActive: hoveredAction != nil,
+                            onHoverChange: { updateHover(.allow, hovering: $0) }
+                        ) { onDecide(.allow) }
+                        NotchPillButton(
+                            titleKey: "notch.common.allowAlways",
+                            style: .primary,
+                            isKeyboardSelected: selectedAction == .allowAlways,
+                            keyboardSelectionActive: selectedAction != nil,
+                            isHoverSelected: hoveredAction == .allowAlways,
+                            hoverSelectionActive: hoveredAction != nil,
+                            onHoverChange: { updateHover(.allowAlways, hovering: $0) }
+                        ) { onAllowAlways() }
+                            .help(alwaysAllowTooltip)
+                    }
                 } else {
                     NotchPillButton(
                         titleKey: "notch.common.dismiss",
@@ -149,6 +175,9 @@ struct PermissionRequestCard: View {
 
     private var title: String {
         if case .permissionRequest(let tool, _, _, let interaction) = event.kind {
+            if event.isAskUserQuestionApproval {
+                return LanguageManager.localizedString("notch.question.title")
+            }
             if interaction == .passive {
                 return String(format: LanguageManager.localizedString("notch.permission.externalTitle"), tool)
             }
@@ -175,6 +204,45 @@ struct PermissionRequestCard: View {
             return ToolActivityFormatter.PermissionPreviewContent(primary: nil, metadata: [], descriptions: [])
         }
         return ToolActivityFormatter.permissionPreview(tool: tool, input: input)
+    }
+
+    private var isAskUserQuestion: Bool {
+        event.isAskUserQuestionApproval
+    }
+
+    private var questionPrompts: [ToolActivityFormatter.PermissionPreviewContent.QuestionPrompt] {
+        guard case .questions(let prompts) = previewContent.primary else { return [] }
+        return prompts
+    }
+
+    private var canSubmitQuestionAnswer: Bool {
+        selectedQuestionAnswers != nil
+    }
+
+    private var selectedQuestionAnswers: [String: String]? {
+        let prompts = questionPrompts
+        guard !prompts.isEmpty else { return nil }
+        var answers: [String: String] = [:]
+        for (questionIndex, prompt) in prompts.enumerated() {
+            let manualAnswer = (manualQuestionAnswers[questionIndex] ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !manualAnswer.isEmpty {
+                answers[prompt.question] = manualAnswer
+                continue
+            }
+
+            let selected = selectedQuestionOptions[questionIndex] ?? []
+            guard !selected.isEmpty else { return nil }
+            let labels = selected
+                .sorted()
+                .compactMap { optionIndex -> String? in
+                    guard prompt.options.indices.contains(optionIndex) else { return nil }
+                    return prompt.options[optionIndex].label
+                }
+            guard !labels.isEmpty else { return nil }
+            answers[prompt.question] = labels.joined(separator: ",")
+        }
+        return answers
     }
 
     @ViewBuilder
@@ -214,6 +282,132 @@ struct PermissionRequestCard: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
+        case .questions(let prompts):
+            questionPromptsView(prompts)
+        }
+    }
+
+    private func questionPromptsView(_ prompts: [ToolActivityFormatter.PermissionPreviewContent.QuestionPrompt]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(prompts.enumerated()), id: \.offset) { questionIndex, prompt in
+                VStack(alignment: .leading, spacing: 7) {
+                    if let header = prompt.header, !header.isEmpty {
+                        Text(header)
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.48))
+                    }
+                    Text(prompt.question)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(prompt.options.enumerated()), id: \.offset) { optionIndex, option in
+                            questionOptionButton(
+                                option,
+                                questionIndex: questionIndex,
+                                optionIndex: optionIndex,
+                                multiSelect: prompt.multiSelect
+                            )
+                        }
+                        questionManualInputField(questionIndex: questionIndex)
+                    }
+                }
+            }
+        }
+    }
+
+    private func questionOptionButton(
+        _ option: ToolActivityFormatter.PermissionPreviewContent.QuestionOption,
+        questionIndex: Int,
+        optionIndex: Int,
+        multiSelect: Bool
+    ) -> some View {
+        let isSelected = selectedQuestionOptions[questionIndex]?.contains(optionIndex) == true
+        return Button {
+            manualQuestionAnswers[questionIndex] = ""
+            toggleQuestionOption(questionIndex: questionIndex, optionIndex: optionIndex, multiSelect: multiSelect)
+        } label: {
+            HStack(alignment: .top, spacing: 7) {
+                Image(systemName: multiSelect
+                    ? (isSelected ? "checkmark.square.fill" : "square")
+                    : (isSelected ? "largecircle.fill.circle" : "circle"))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(isSelected ? .white.opacity(0.9) : .white.opacity(0.4))
+                    .frame(width: 13, height: 16)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(option.label)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.84))
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if let description = option.description, !description.isEmpty {
+                        Text(description)
+                            .font(.system(size: 10, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.58))
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.white.opacity(isSelected ? 0.10 : 0.045), in: RoundedRectangle(cornerRadius: 6))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(Color.white.opacity(isSelected ? 0.22 : 0), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func questionManualInputField(questionIndex: Int) -> some View {
+        TextField(
+            LanguageManager.localizedString("notch.question.manual.placeholder"),
+            text: Binding(
+                get: { manualQuestionAnswers[questionIndex] ?? "" },
+                set: { value in
+                    manualQuestionAnswers[questionIndex] = value
+                    if !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        selectedQuestionOptions[questionIndex] = []
+                    }
+                }
+            )
+        )
+        .textFieldStyle(.plain)
+        .font(.system(size: 11, weight: .medium))
+        .foregroundStyle(.white.opacity(0.88))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .background(Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 6))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
+        )
+        .onSubmit {
+            if let answers = selectedQuestionAnswers {
+                onAnswerQuestion(answers)
+            }
+        }
+    }
+
+    private func toggleQuestionOption(questionIndex: Int, optionIndex: Int, multiSelect: Bool) {
+        if multiSelect {
+            var selected = selectedQuestionOptions[questionIndex] ?? []
+            if selected.contains(optionIndex) {
+                selected.remove(optionIndex)
+            } else {
+                selected.insert(optionIndex)
+            }
+            selectedQuestionOptions[questionIndex] = selected
+        } else {
+            selectedQuestionOptions[questionIndex] = [optionIndex]
         }
     }
 
