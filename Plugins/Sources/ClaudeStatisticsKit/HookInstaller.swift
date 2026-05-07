@@ -161,9 +161,10 @@ public enum HookInstallerUtils {
         return "\(formattedPath) --claude-stats-hook-provider \(providerId)"
     }
 
-    /// Returns true only for hook commands owned by this running channel
-    /// (release or debug) and provider. This lets both apps install hooks into
-    /// the same provider config without pruning each other on sync.
+    /// Returns true for any Claude Statistics-managed hook command for the
+    /// given provider, across both release and debug runtime channels. The
+    /// latest app launch now takes ownership of hook config by pruning stale
+    /// sibling-channel commands before writing its own current command.
     public static func isCurrentRuntimeHookCommand(_ command: String, providerId: String) -> Bool {
         let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty,
@@ -171,12 +172,24 @@ public enum HookInstallerUtils {
             return false
         }
 
-        let currentRoot = AppRuntimePaths.rootDirectory
-        if trimmed.contains("\(currentRoot)/") || trimmed.contains("\(shellQuoted(currentRoot))/") {
+        if trimmed == currentHookCommand(providerId: providerId) {
             return true
         }
 
-        return trimmed == currentHookCommand(providerId: providerId)
+        for channel in AppRuntimePaths.RuntimeChannel.allCases {
+            let root = (NSHomeDirectory() as NSString).appendingPathComponent(channel.rootFolderName)
+            if trimmed.contains("\(root)/") || trimmed.contains("\(shellQuoted(root))/") {
+                return true
+            }
+
+            let wrapperPath = ((root as NSString).appendingPathComponent("bin") as NSString)
+                .appendingPathComponent(channel.hookBinaryName)
+            if trimmed == "\(wrapperPath) --claude-stats-hook-provider \(providerId)" {
+                return true
+            }
+        }
+
+        return false
     }
 
     public static func removeScript(at path: String) {

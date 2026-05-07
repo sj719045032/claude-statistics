@@ -7,7 +7,7 @@ import Foundation
 /// `~/.claude-statistics-debug/` for debug builds) without taking
 /// a host module dependency.
 public enum AppRuntimePaths {
-    public enum RuntimeChannel: String, Sendable {
+    public enum RuntimeChannel: String, Sendable, CaseIterable {
         case release
         case debug
 
@@ -57,6 +57,14 @@ public enum AppRuntimePaths {
     /// listening (errno=ECONNREFUSED on connect). Drained by `AttentionBridge`
     /// at startup so a hook fired during a brief restart window isn't lost.
     public static let pendingDirectory = (rootDirectory as NSString).appendingPathComponent("pending")
+    /// Pending hook payloads are only a short restart bridge, not a durable
+    /// queue. Keep the newest few and discard the rest to avoid large startup
+    /// replays or unbounded disk growth when one runtime channel is inactive.
+    public static let maxPendingPayloads = 5
+    public static let allPendingDirectories: [String] = RuntimeChannel.allCases.map { channel in
+        let root = (NSHomeDirectory() as NSString).appendingPathComponent(channel.rootFolderName)
+        return (root as NSString).appendingPathComponent("pending")
+    }
 
     @discardableResult
     public static func ensureRootDirectory() -> String? {

@@ -217,7 +217,7 @@ struct NotchContainerView: View {
             }
         }
         .onChange(of: notchCenter.currentEvent) { oldEvent, event in
-            DiagnosticLogger.shared.info(
+            DiagnosticLogger.shared.verbose(
                 "Island currentEvent changed event=\(event.map { $0.rawEventName } ?? "nil") hovering=\(effectiveHovering) notchHover=\(hoveringNotchZone) islandHover=\(hoveringIsland) state=\(String(describing: machine.state)) wasPeeking=\(wasPeekingOnEventArrival)"
             )
             if event != nil {
@@ -390,7 +390,7 @@ struct NotchContainerView: View {
             ))
             .animation(revealExpandedIsland ? revealOpenAnimation : revealCloseAnimation, value: revealExpandedIsland)
 
-            islandContent(event: event, expanded: expanded)
+            islandContent(event: event, expanded: expanded, suppressExpandedContent: isContentFading)
                 .frame(width: size.width, height: size.height, alignment: .top)
                 .clipped()
                 .mask(topRevealMask(
@@ -433,10 +433,16 @@ struct NotchContainerView: View {
     }
 
     @ViewBuilder
-    private func islandContent(event: AttentionEvent?, expanded: Bool) -> some View {
+    private func islandContent(
+        event: AttentionEvent?,
+        expanded: Bool,
+        suppressExpandedContent: Bool = false
+    ) -> some View {
         if expanded {
             ZStack(alignment: .top) {
-                if let event {
+                if suppressExpandedContent {
+                    Color.clear
+                } else if let event {
                     expandedContent(for: event)
                         .transition(expandedCardTransition)
                     switchableEventControls()
@@ -1468,7 +1474,7 @@ struct NotchContainerView: View {
     }
 
     private func closeIslandAfterAction() {
-        DiagnosticLogger.shared.info(
+        DiagnosticLogger.shared.verbose(
             "Island close after action queuedCount=\(notchCenter.queuedCount) hovering=\(effectiveHovering) state=\(String(describing: machine.state)) wasPeeking=\(wasPeekingOnEventArrival)"
         )
         // A button/key action means the user explicitly handled the event.

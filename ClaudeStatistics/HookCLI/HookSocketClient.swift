@@ -156,10 +156,41 @@ private func bufferPendingHookPayload(payload: Data, context: HookSocketDiagnost
         DiagnosticLogger.shared.warning(
             "HookCLI buffered to disk provider=\(context.provider.rawValue) event=\(context.event) session=\(context.sessionId) toolUseId=\(context.toolUseId) file=\(filename)"
         )
+        trimPendingHookPayloads(in: pendingDir, context: context)
     } catch {
         try? fm.removeItem(atPath: tmpPath)
         DiagnosticLogger.shared.warning(
             "HookCLI buffer write failed event=\(context.event) toolUseId=\(context.toolUseId) error=\(error.localizedDescription)"
+        )
+    }
+}
+
+private func trimPendingHookPayloads(in pendingDir: String, context: HookSocketDiagnosticContext) {
+    let fm = FileManager.default
+    guard let entries = try? fm.contentsOfDirectory(atPath: pendingDir) else { return }
+
+    let jsonFiles = entries
+        .filter { $0.hasSuffix(".json") }
+        .sorted()
+    let overflow = jsonFiles.count - AppRuntimePaths.maxPendingPayloads
+    guard overflow > 0 else { return }
+
+    var removed = 0
+    for filename in jsonFiles.prefix(overflow) {
+        let path = (pendingDir as NSString).appendingPathComponent(filename)
+        do {
+            try fm.removeItem(atPath: path)
+            removed += 1
+        } catch {
+            DiagnosticLogger.shared.warning(
+                "HookCLI buffer trim failed provider=\(context.provider.rawValue) event=\(context.event) file=\(filename) error=\(error.localizedDescription)"
+            )
+        }
+    }
+
+    if removed > 0 {
+        DiagnosticLogger.shared.verbose(
+            "HookCLI buffer trimmed provider=\(context.provider.rawValue) removed=\(removed) kept=\(AppRuntimePaths.maxPendingPayloads)"
         )
     }
 }

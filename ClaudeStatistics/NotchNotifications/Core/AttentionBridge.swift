@@ -281,7 +281,19 @@ final class AttentionBridge {
     private func drainPendingMessages() {
         let fm = FileManager.default
         let dir = AppRuntimePaths.pendingDirectory
+
+        for siblingDir in AppRuntimePaths.allPendingDirectories where siblingDir != dir {
+            let siblingTrim = prunePendingOverflow(in: siblingDir)
+            if siblingTrim.removed > 0 || siblingTrim.failed > 0 {
+                DiagnosticLogger.shared.verbose(
+                    "Bridge pruned sibling pending dir path=\(siblingDir) dropped(overflow)=\(siblingTrim.removed) failed=\(siblingTrim.failed)"
+                )
+            }
+        }
+
         guard fm.fileExists(atPath: dir) else { return }
+
+        let currentTrim = prunePendingOverflow(in: dir)
 
         let entries: [String]
         do {
@@ -298,8 +310,9 @@ final class AttentionBridge {
 
         let cutoff = Date().addingTimeInterval(-Self.pendingMaxAgeSeconds)
         var replayed = 0
-        var dropped = 0
-        var failed = 0
+        var droppedStale = 0
+        let droppedOverflow = currentTrim.removed
+        var failed = currentTrim.failed
 
         for filename in jsonFiles {
             let path = (dir as NSString).appendingPathComponent(filename)
@@ -314,7 +327,7 @@ final class AttentionBridge {
                 return Date(timeIntervalSince1970: TimeInterval(ms) / 1000)
             }()
             if let ts = timestamp, ts < cutoff {
-                dropped += 1
+                droppedStale += 1
                 continue
             }
 
@@ -332,11 +345,37 @@ final class AttentionBridge {
             replayed += 1
         }
 
-        if replayed > 0 || dropped > 0 || failed > 0 {
+        if replayed > 0 || droppedStale > 0 || droppedOverflow > 0 || failed > 0 {
             DiagnosticLogger.shared.info(
-                "Bridge drained pending payloads replayed=\(replayed) dropped(stale)=\(dropped) failed=\(failed)"
+                "Bridge drained pending payloads replayed=\(replayed) dropped(stale)=\(droppedStale) dropped(overflow)=\(droppedOverflow) failed=\(failed)"
             )
         }
+    }
+
+    private func prunePendingOverflow(in dir: String) -> (removed: Int, failed: Int) {
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(atPath: dir) else {
+            return (0, 0)
+        }
+
+        let jsonFiles = entries
+            .filter { $0.hasSuffix(".json") }
+            .sorted()
+        let overflow = jsonFiles.count - AppRuntimePaths.maxPendingPayloads
+        guard overflow > 0 else { return (0, 0) }
+
+        var removed = 0
+        var failed = 0
+        for filename in jsonFiles.prefix(overflow) {
+            let path = (dir as NSString).appendingPathComponent(filename)
+            do {
+                try fm.removeItem(atPath: path)
+                removed += 1
+            } catch {
+                failed += 1
+            }
+        }
+        return (removed, failed)
     }
 
     /// Discard pending payloads older than this. Keeps the long-offline
