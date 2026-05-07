@@ -29,7 +29,9 @@ struct TerminalFocusableFilter: SessionEventFilter {
         //       refresh writes a non-nil name and the row reappears.
         // None of (a)/(b)/(c) can render a source tag or focus button
         // without a claiming plugin, so hide them.
-        guard let name = context.terminalName, !name.isEmpty else { return false }
+        guard let name = context.terminalName, !name.isEmpty else {
+            return context.pid != nil || context.tty?.isEmpty == false
+        }
         return TerminalRegistry.canFocusBackToTerminal(named: name)
     }
 }

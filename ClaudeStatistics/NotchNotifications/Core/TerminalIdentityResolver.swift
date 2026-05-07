@@ -93,7 +93,7 @@ enum TerminalIdentityResolver {
             }
         }
 
-        return result
+        return sanitizedSameProcessCollisions(result)
     }
 
     // MARK: - Tab-level displacement
@@ -115,9 +115,12 @@ enum TerminalIdentityResolver {
         let tabID = event.terminalTabID?.nilIfEmpty
         let stableID = event.terminalStableID?.nilIfEmpty
         let surfaceIDsTransient = hasTransientSurfaceIDs(name: event.terminalName)
-        // Need at least one terminal identity to match on, otherwise we'd
-        // evict unrelated sessions across different tabs.
-        guard tty != nil || tabID != nil || stableID != nil else { return [] }
+        // Need at least one terminal identity to match on. Some app-hosted
+        // CLIs (Codex.app) have no tty/tab surface; for those, same provider
+        // + same pid is the only stable host identity, and a new SessionStart
+        // should replace the older session in that app process.
+        let pid = event.pid
+        let canMatchSamePid = pid != nil && tty == nil && tabID == nil && stableID == nil
 
         return runtimes.compactMap { key, runtime -> DisplacedSession? in
             guard key != newKey else { return nil }
@@ -131,6 +134,16 @@ enum TerminalIdentityResolver {
                 return DisplacedSession(key: key, sessionId: runtime.sessionId)
             }
             if !surfaceIDsTransient, let tabID, runtime.terminalTabID == tabID {
+                return DisplacedSession(key: key, sessionId: runtime.sessionId)
+            }
+            if canMatchSamePid,
+               runtime.provider == event.provider,
+               runtime.pid == pid,
+               runtime.tty?.nilIfEmpty == nil,
+               runtime.terminalTabID?.nilIfEmpty == nil,
+               runtime.terminalStableID?.nilIfEmpty == nil,
+               runtime.terminalSocket?.nilIfEmpty == nil,
+               runtime.terminalName?.nilIfEmpty == event.terminalName?.nilIfEmpty {
                 return DisplacedSession(key: key, sessionId: runtime.sessionId)
             }
             return nil
@@ -192,6 +205,44 @@ enum TerminalIdentityResolver {
             || normalized.contains("is waiting for your input")
             || normalized == "awaiting your input"
             || normalized == "waiting for input"
+    }
+
+    private static func sanitizedSameProcessCollisions(
+        _ runtimes: [String: RuntimeSession]
+    ) -> [String: RuntimeSession] {
+        var result = runtimes
+        let candidates = runtimes.compactMap { key, runtime -> (key: String, runtime: RuntimeSession)? in
+            guard runtime.pid != nil,
+                  runtime.tty?.nilIfEmpty == nil,
+                  runtime.terminalTabID?.nilIfEmpty == nil,
+                  runtime.terminalStableID?.nilIfEmpty == nil,
+                  runtime.terminalSocket?.nilIfEmpty == nil else {
+                return nil
+            }
+            return (key, runtime)
+        }
+
+        let grouped = Dictionary(grouping: candidates) { entry in
+            [
+                entry.runtime.provider.rawValue,
+                String(entry.runtime.pid ?? 0),
+                entry.runtime.terminalName?.nilIfEmpty ?? ""
+            ].joined(separator: ":")
+        }
+
+        for (_, entries) in grouped where entries.count > 1 {
+            let keepKey = entries
+                .max { $0.runtime.lastActivityAt < $1.runtime.lastActivityAt }?
+                .key
+            for entry in entries where entry.key != keepKey {
+                result.removeValue(forKey: entry.key)
+                DiagnosticLogger.shared.info(
+                    "Dropped stale same-process runtime key=\(entry.key) provider=\(entry.runtime.provider.rawValue) pid=\(entry.runtime.pid ?? 0)"
+                )
+            }
+        }
+
+        return result
     }
 }
 
