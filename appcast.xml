@@ -3,6 +3,44 @@
     <channel>
         <title>Claude Statistics</title>
         <item>
+            <title>3.4.0</title>
+            <pubDate>Thu, 07 May 2026 13:37:26 +0800</pubDate>
+            <link>https://github.com/sj719045032/claude-statistics</link>
+            <sparkle:version>3.4.0</sparkle:version>
+            <sparkle:shortVersionString>3.4.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[## What's New
+
+- **AskUserQuestion shows up in the notch.** When Claude calls the AskUserQuestion tool, the notch now surfaces an actionable card with the question, options, and an optional manual textbox. Pick an answer inline, deny the call, or hand off to the terminal so the CLI's native picker takes over.
+
+## Bug fixes
+
+- **Status bar icon clicks register again.** The notch's outside-click watcher used `NSEvent.addLocalMonitorForEvents` and returned `nil` for any in-app mouse-down outside the hit rect, which silently swallowed clicks on the menu-bar status item and other app windows (Settings, Marketplace, etc.). Pass the event through and just drive the collapse signal.
+- **Completion notch shows the actual final reply, not an intermediate text block.** Claude Code's Stop hook payload carries the final assistant text in `last_assistant_message`, but the Stop normalizer was tail-scanning the transcript jsonl instead — and the jsonl can lag a few hundred ms behind hook fire, so the scan picked up the last *intermediate* text (the one before the final tool calls). Stop / StopFailure now read the payload field directly; transcript scan stays as a fallback.
+- **"Return to terminal" on AskUserQuestion lets the CLI take over cleanly.** Claude Code fires both PreToolUse and a follow-up PermissionRequest for AskUserQuestion, so the same question used to pop a second card right after dismissal — and clicking Answer on the second card never reached the CLI (different printer for the PermissionRequest decision lane). The normalizer now skips PermissionRequest:askuserquestion silently, and the Return-to-terminal path resolves PreToolUse with `.ask` so the CLI's native picker surfaces.
+- **Answer button is legible against the dark notch.** Three layers of dimming (`.disabled` + `.opacity(0.48)` + `.secondary`) made it nearly invisible. Render as `.primary`; the inner closure already guards the no-op when nothing is selected.
+
+## 中文
+
+## 新功能
+
+- **AskUserQuestion 显示在刘海里。** 当 Claude 调用 AskUserQuestion 工具时，刘海会弹出一张可操作卡片，展示问题、选项和可选的手动输入框。可以直接在卡片里选答案、拒绝，或交给终端让 CLI 原生 picker 接管。
+
+## Bug 修复
+
+- **状态栏图标点击恢复响应。** 刘海里那个 `NSEvent.addLocalMonitorForEvents` 外部点击监听对所有 app 内非命中区的鼠标按下都 `return nil`，把状态栏图标点击和其他窗口（Settings、Marketplace 等）的点击全吞了。改成放行事件，只触发折叠信号。
+- **完成卡片显示真正的最终回复，不是中间文本块。** Claude Code 的 Stop hook payload 在 `last_assistant_message` 字段里直接带着最终文本，但原代码偏要去扒 transcript jsonl —— 而 jsonl 落盘比 hook 触发延迟几百毫秒，扒到的是最后一个*中间*文本（最终工具调用之前那段）。现在 Stop / StopFailure 直接读 payload 字段，transcript 扒只作 fallback。
+- **AskUserQuestion 的 "Return to terminal" 正确移交给 CLI。** Claude Code 对 AskUserQuestion 会先后发 PreToolUse 和 PermissionRequest 两个 hook，之前关掉第一张卡之后会再弹一张同样的卡 —— 而第二张卡点 Answer 也送不到 CLI（PermissionRequest 走的另一条 printer，扔掉了 updatedInput）。现在 normalizer 静默拦掉 PermissionRequest:askuserquestion，Return-to-terminal 路径用 `.ask` 决议让 CLI 走默认流程，原生 picker 正常出现。
+- **Answer 按钮在深色刘海里看得清了。** `.disabled` + `.opacity(0.48)` + `.secondary` 三层叠加，按钮几乎隐形。统一改用 `.primary` 样式，点击安全由内部闭包的 guard 保护。
+]]></description>
+            <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.4.0/ClaudeStatistics-3.4.0.zip" length="19769837" type="application/octet-stream" sparkle:edSignature="d4bhTDVB4pFZi4tFa/485M+Ju0Smzug54rQYfwBnWZPh9znSvWNG06tQK2HReYbnfFyPEYxi8l/ZGh7/nyCkCg=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.4.0/Claude.Statistics3.4.0-3.3.2.delta" sparkle:deltaFrom="3.3.2" length="1963830" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977616" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="YrxxChhst/QkGF8PUWQ6IV5fGlCm3PB4FRvsI2suvJAwNCirg/pfdjLwFGJr48yznLh6KHQMX6VXS0cMEeB8Dg=="/>
+                <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.4.0/Claude.Statistics3.4.0-3.3.1.delta" sparkle:deltaFrom="3.3.1" length="2013382" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977616" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="vRpX4T7rREYsS2qmYlK/d3H8IuGUvVl7M3mFyGFVXPbfSeHJ6dmZFbBBfYLJjkCq4k07HXoZqXqD0fs8E5ppCw=="/>
+                <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.4.0/Claude.Statistics3.4.0-3.3.0.delta" sparkle:deltaFrom="3.3.0" length="2029550" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977616" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="qUIyA+/CETTqHS88kEdyNOtS5cpsyDJyyNsjRV0qNZPeuye3rvkOO1YzQP8dnQZLENJmDWzV/LMF6KX4EeUmAA=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>3.3.2</title>
             <pubDate>Wed, 06 May 2026 17:52:19 +0800</pubDate>
             <link>https://github.com/sj719045032/claude-statistics</link>
@@ -15,7 +53,7 @@
 ## 中文
 - 修复完成弹窗有时显示倒数第二条内容，而不是最终返回的问题。
 ]]></description>
-            <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.3.2/ClaudeStatistics-3.3.2.zip" length="19631470" type="application/octet-stream" sparkle:edSignature="Ak8eBojsGYfKx5GsAeZwt1vQrHx5RVVAPrYxHP7BwFeNntn8Uu5U1dxEWss1ZNzhgTeJ+VJPm2m010Flit+qAQ=="/>
+            <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.4.0/ClaudeStatistics-3.3.2.zip" length="19631470" type="application/octet-stream" sparkle:edSignature="Ak8eBojsGYfKx5GsAeZwt1vQrHx5RVVAPrYxHP7BwFeNntn8Uu5U1dxEWss1ZNzhgTeJ+VJPm2m010Flit+qAQ=="/>
             <sparkle:deltas>
                 <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.3.2/Claude.Statistics3.3.2-3.3.1.delta" sparkle:deltaFrom="3.3.1" length="1219626" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977616" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="vZ7y+nGXtKKd75IJIE3FwLfM7EduFhMdWb2YOtRdZWhnBvUYIPDQyPNiGBqGnZ63aWNCPsRAvIdAV6U34OkiCw=="/>
                 <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.3.2/Claude.Statistics3.3.2-3.3.0.delta" sparkle:deltaFrom="3.3.0" length="1279906" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977616" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="CrW2CvFzDHXQE4zNHj0x0L0WElEFFJRhvGDuOjd3QXtsPwBB9bA0azoPirOoYbV5irMtBf8SO+6vJRNB61qkCw=="/>
@@ -37,75 +75,11 @@
 
 - **修复：菜单栏用量条卡在第一段不轮换。** v3.1.1 – v3.3.0 期间 5h / 7d（以及 Gemini 的 Pro / Flash / Flash Lite）轮转显示失效，每个 cell 永远只显示第一个窗口。原因是 SwiftUI 里 `Timer.publish(...).autoconnect()` 写在了 `body` 内部，每次 `body` 重算都会新建 publisher、取消订阅、重置 3 秒倒计时；而 `UserDefaults.didChangeNotification`（主要来自 AppKit `NSStatusItem` 自身的位置自动保存）触发 body 重算的频率高于 1Hz，定时器永远等不到一次 fire。改为进程级单例后修复。
 ]]></description>
-            <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.3.2/ClaudeStatistics-3.3.1.zip" length="19623840" type="application/octet-stream" sparkle:edSignature="iGh/sBGrn/UguPhagu0xleHG1LBqFMYYNfXRGNQ53REJA0ZS4Ju5S10fl5vqPtKAjkGx1mOc50GTxlGhutCACQ=="/>
+            <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.4.0/ClaudeStatistics-3.3.1.zip" length="19623840" type="application/octet-stream" sparkle:edSignature="iGh/sBGrn/UguPhagu0xleHG1LBqFMYYNfXRGNQ53REJA0ZS4Ju5S10fl5vqPtKAjkGx1mOc50GTxlGhutCACQ=="/>
             <sparkle:deltas>
                 <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.3.1/Claude.Statistics3.3.1-3.3.0.delta" sparkle:deltaFrom="3.3.0" length="876186" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977616" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="HPOTEsXwVebi22M2esOG1H15jJMtHoWHvDbf4stSw9Ht6hgheBTPgwymECrbcM9DyxN/3GXFoSDDwUGyMb1HBQ=="/>
                 <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.3.1/Claude.Statistics3.3.1-3.2.3.delta" sparkle:deltaFrom="3.2.3" length="1911530" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977616" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="dAZV2gkM8ULaE64m+YmVTmPHDd0gTRPjlHoOYog3hjvljgQqXyHqcWRMyN6HqTXtnXaRmc46tRT7oxmE7lEGAQ=="/>
                 <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.3.1/Claude.Statistics3.3.1-3.2.2.delta" sparkle:deltaFrom="3.2.2" length="1985514" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977616" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="HNQwNDPh9E27UeENlAgNt9H8E1hvyasrTGUPkkPbry8eCZ9ZcP7vZos13SPsg/cM5hKbKqOo2imy2LumO7cfAw=="/>
-            </sparkle:deltas>
-        </item>
-        <item>
-            <title>3.3.0</title>
-            <pubDate>Tue, 05 May 2026 16:14:54 +0800</pubDate>
-            <link>https://github.com/sj719045032/claude-statistics</link>
-            <sparkle:version>3.3.0</sparkle:version>
-            <sparkle:shortVersionString>3.3.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[## What's New
-
-- **Snappier menu bar and popover.** Aggregation work moved off the
-  main thread — Stats / All Time / Usage tabs no longer hitch on
-  first open.
-- **Faster startup.** Only the selected provider (plus Codex when
-  notch is enabled) does the full session scan at boot. Other
-  providers stay cold until you open their tab.
-- **Smoother search.** Session list FTS search runs in the
-  background with stale-result discarding; transcript search reads
-  precomputed indexes instead of rebuilding the matched fields per
-  keystroke.
-- **Lower memory peak for large transcripts.** Parsers iterate file
-  bytes directly; the whole-file `String` allocation is gone.
-- **Faster cache rebuild.** Per-batch SQLite transactions with
-  reused prepared statements replace the per-session BEGIN/COMMIT
-  cycle.
-
-## Under the Hood
-
-- Seven-PR performance pass with `OSSignposter` instrumentation
-  throughout; baseline measurement scripts at `scripts/perf-*`.
-- Combined Claude parse + FTS extract path saves one file IO per
-  dirty session.
-- Status bar and notch behavior unchanged — every PR enforced this
-  as a hard constraint.
-
-## 中文
-
-### 更新内容
-
-- **菜单栏和 popover 更跟手。** 聚合计算移到后台线程,
-  Stats / All Time / Usage 标签首次打开不再卡顿。
-- **启动更快。** 只有当前选中的 provider（以及灵动岛启用时的
-  Codex）会在启动时做完整扫描; 其他 provider 保持冷启动,
-  切过去时再加载。
-- **搜索更顺滑。** 会话列表的 FTS 搜索改异步并丢弃过期结果;
-  转录页内搜索改读预计算索引, 不再每次按键重建字符串。
-- **大转录峰值内存降低。** parser 直接按字节遍历文件,
-  整文件 `String` 分配被消除。
-- **缓存重建更快。** 批量 SQLite 事务 + 复用 prepared statement
-  替代每会话一个 BEGIN/COMMIT。
-
-### 内部细节
-
-- 7 个 PR 的性能优化, 全程 `OSSignposter` 埋点;
-  `scripts/perf-*` 提供 baseline 测量脚本。
-- 合并 Claude parse + FTS 提取路径, 每个脏会话省一次文件 IO。
-- 状态栏 / 灵动岛行为完全不变 —— 每个 PR 都把这点作为硬约束验证。
-]]></description>
-            <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.3.2/ClaudeStatistics-3.3.0.zip" length="19623951" type="application/octet-stream" sparkle:edSignature="XnY1s7wssSDTf0Y60l/nxeZ1Dwr/p7UbnkPoV5l9eBU1en0wg+hSn/U2LiYOZrR5W16lZpEiWak0gi478mz0Bw=="/>
-            <sparkle:deltas>
-                <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.3.0/Claude.Statistics3.3.0-3.2.3.delta" sparkle:deltaFrom="3.2.3" length="1917814" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977616" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="zUyodYdZ/o4zbA6XoAvT3yltPujOIVDR97KDBGHxc9nURrfr7pBcpPTtamnJTgD9lz5eqdph1zbAZtemJN8IBA=="/>
-                <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.3.0/Claude.Statistics3.3.0-3.2.2.delta" sparkle:deltaFrom="3.2.2" length="1967338" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977616" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="1MxiKHYCGyyiBCB4qiktg6GeHAEudGTNAOineN8FtDMdyB6dNqLregRIKGBNXCYO/HfwqX7VjFxMevlLCeiwAQ=="/>
-                <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.3.0/Claude.Statistics3.3.0-3.2.1.delta" sparkle:deltaFrom="3.2.1" length="1966442" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977616" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="K194TVCguymzSnrvnGwH821CtuFNtqx3PoCnadPR6vYgl8wrcyuMro0vHWpGuBGvFowoSjYCBY8mFlUDVxJKDA=="/>
             </sparkle:deltas>
         </item>
         <item>
@@ -116,10 +90,10 @@
             <sparkle:shortVersionString>3.1.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.3.2/ClaudeStatistics-3.1.0.zip" length="12471656" type="application/octet-stream" sparkle:edSignature="hCKqFWj93daTbLQ/e0uW56z6km5cCFkazh89PwdEJ1dwgtWS1B9KuExZ70uaD7Z+6KoI7rwZOE6CTkFjtKkDAg=="/>
+            <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.4.0/ClaudeStatistics-3.1.0.zip" length="12471656" type="application/octet-stream" sparkle:edSignature="hCKqFWj93daTbLQ/e0uW56z6km5cCFkazh89PwdEJ1dwgtWS1B9KuExZ70uaD7Z+6KoI7rwZOE6CTkFjtKkDAg=="/>
             <sparkle:deltas>
-                <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.3.2/Claude.Statistics3.1.0-3.0.0.delta" sparkle:deltaFrom="3.0.0" length="1212338" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977616" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="n88vpygiv0QCV9WXLvzNja9hOYTJ5SIZRBlHgkVJ1jWzRPddVj95nfBE/DDkAEArrE7I6osj/GCfytDXhD7TDw=="/>
-                <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.3.2/Claude.Statistics3.1.0-2.9.0.delta" sparkle:deltaFrom="2.9.0" length="1675382" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977616" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="B2UT1ffzOKZOgiJio6OmJsiyi/zTpxLmhcz3R4APDpnDFRQIQ0PWcCR4EduyjGav6SZ7F4cvBvssTEz9HKG4BA=="/>
+                <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.4.0/Claude.Statistics3.1.0-3.0.0.delta" sparkle:deltaFrom="3.0.0" length="1212338" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977616" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="n88vpygiv0QCV9WXLvzNja9hOYTJ5SIZRBlHgkVJ1jWzRPddVj95nfBE/DDkAEArrE7I6osj/GCfytDXhD7TDw=="/>
+                <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.4.0/Claude.Statistics3.1.0-2.9.0.delta" sparkle:deltaFrom="2.9.0" length="1675382" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977616" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="B2UT1ffzOKZOgiJio6OmJsiyi/zTpxLmhcz3R4APDpnDFRQIQ0PWcCR4EduyjGav6SZ7F4cvBvssTEz9HKG4BA=="/>
             </sparkle:deltas>
         </item>
         <item>
@@ -130,7 +104,7 @@
             <sparkle:shortVersionString>3.0.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.3.2/ClaudeStatistics-3.0.0.zip" length="12281117" type="application/octet-stream" sparkle:edSignature="4ZdKikHv41gEp36n0G7AMWx7N84PCynWza83TEHmFWIcuRlT4sBOoYmnqP5QAoyoQ+WhYsvKVT5oq5L2XSQ/CA=="/>
+            <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.4.0/ClaudeStatistics-3.0.0.zip" length="12281117" type="application/octet-stream" sparkle:edSignature="4ZdKikHv41gEp36n0G7AMWx7N84PCynWza83TEHmFWIcuRlT4sBOoYmnqP5QAoyoQ+WhYsvKVT5oq5L2XSQ/CA=="/>
             <sparkle:deltas>
                 <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.0.0/Claude.Statistics3.0.0-2.9.0.delta" sparkle:deltaFrom="2.9.0" length="1426758" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977616" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="QVLlSNk+RJ8klfkjaVwG94arwR1i9B/AzWbyXSJHfHEHmYLNtxjLfDNtUDHK6KvpUQCYByYi1M2vFgs2tAhICw=="/>
             </sparkle:deltas>
@@ -143,7 +117,7 @@
             <sparkle:shortVersionString>2.9.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.3.2/ClaudeStatistics-2.9.0.zip" length="11690975" type="application/octet-stream" sparkle:edSignature="x70vPy6OWTnmakcORWtg/sTMxemcidkDV09G2qmBtRWB9LtmRtKECcW+YxJ/sR81J7BpdNw1TYySLJ98cdS4Bg=="/>
+            <enclosure url="https://github.com/sj719045032/claude-statistics/releases/download/v3.4.0/ClaudeStatistics-2.9.0.zip" length="11690975" type="application/octet-stream" sparkle:edSignature="x70vPy6OWTnmakcORWtg/sTMxemcidkDV09G2qmBtRWB9LtmRtKECcW+YxJ/sR81J7BpdNw1TYySLJ98cdS4Bg=="/>
         </item>
     </channel>
 </rss>
