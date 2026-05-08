@@ -43,6 +43,8 @@ final class SessionViewModel: ObservableObject {
     @Published var isSelecting = false
     @Published var selectedIds: Set<String> = []
     @Published var collapsedProjects: Set<String> = []
+    private var selectionAnchorId: String?
+    private var selectionAnchorProjectPath: String?
 
     /// Transcript view state
     @Published var showTranscript = false
@@ -287,21 +289,72 @@ final class SessionViewModel: ObservableObject {
 
     // MARK: - Selection & Delete
 
-    func toggleSelect(_ session: Session) {
+    func toggleSelect(_ session: Session, extendingRange: Bool = false) {
+        if extendingRange,
+           let anchorId = selectionAnchorId,
+           let rangeIds = selectionRangeIds(from: anchorId, to: session.id)
+        {
+            selectedIds.formUnion(rangeIds)
+            return
+        }
+
         if selectedIds.contains(session.id) {
             selectedIds.remove(session.id)
         } else {
             selectedIds.insert(session.id)
         }
+        selectionAnchorId = session.id
+        selectionAnchorProjectPath = nil
+    }
+
+    func toggleSelectProject(_ group: ProjectGroup, extendingRange: Bool = false) {
+        if extendingRange,
+           let anchorPath = selectionAnchorProjectPath,
+           let rangeIds = projectSelectionRangeIds(from: anchorPath, to: group.projectPath)
+        {
+            selectedIds.formUnion(rangeIds)
+            return
+        }
+
+        let ids = Set(group.sessions.map(\.id))
+        if ids.isSubset(of: selectedIds) {
+            selectedIds.subtract(ids)
+        } else {
+            selectedIds.formUnion(ids)
+        }
+        selectionAnchorId = group.sessions.first?.id ?? selectionAnchorId
+        selectionAnchorProjectPath = group.projectPath
     }
 
     func selectAll() {
         selectedIds = Set(filteredSessions.map(\.id))
+        selectionAnchorId = filteredSessions.first?.id
+        selectionAnchorProjectPath = projectGroups.first?.projectPath
     }
 
     func exitSelecting() {
         isSelecting = false
         selectedIds.removeAll()
+        selectionAnchorId = nil
+        selectionAnchorProjectPath = nil
+    }
+
+    func projectSelectionState(for group: ProjectGroup) -> ProjectSelectionState {
+        let ids = Set(group.sessions.map(\.id))
+        guard !ids.isEmpty else { return .none }
+        if ids.isSubset(of: selectedIds) { return .all }
+        if ids.isDisjoint(with: selectedIds) { return .none }
+        return .partial
+    }
+
+    func projectSelectionRangePaths(to projectPath: String) -> Set<String> {
+        guard let anchorPath = selectionAnchorProjectPath else { return [] }
+        return projectSelectionRangePaths(from: anchorPath, to: projectPath) ?? []
+    }
+
+    func sessionSelectionRangeIds(to sessionId: String) -> Set<String> {
+        guard let anchorId = selectionAnchorId else { return [] }
+        return selectionRangeIds(from: anchorId, to: sessionId) ?? []
     }
 
     func deleteSessions(_ ids: Set<String>) {
@@ -309,6 +362,8 @@ final class SessionViewModel: ObservableObject {
         selectedIds.subtract(ids)
         if selectedIds.isEmpty {
             isSelecting = false
+            selectionAnchorId = nil
+            selectionAnchorProjectPath = nil
         }
     }
 
@@ -319,4 +374,52 @@ final class SessionViewModel: ObservableObject {
     // MARK: - Aggregate stats
 
     var totalSessions: Int { store.sessions.count }
+
+    private func selectionRangeIds(from anchorId: String, to sessionId: String) -> Set<String>? {
+        let orderedIds = displayedSelectableSessionIds()
+        guard
+            let anchorIndex = orderedIds.firstIndex(of: anchorId),
+            let sessionIndex = orderedIds.firstIndex(of: sessionId)
+        else {
+            return nil
+        }
+
+        let bounds = min(anchorIndex, sessionIndex)...max(anchorIndex, sessionIndex)
+        return Set(orderedIds[bounds])
+    }
+
+    private func projectSelectionRangeIds(from anchorPath: String, to projectPath: String) -> Set<String>? {
+        guard let paths = projectSelectionRangePaths(from: anchorPath, to: projectPath) else {
+            return nil
+        }
+
+        return Set(projectGroups
+            .filter { paths.contains($0.projectPath) }
+            .flatMap { $0.sessions.map(\.id) })
+    }
+
+    private func projectSelectionRangePaths(from anchorPath: String, to projectPath: String) -> Set<String>? {
+        guard
+            let anchorIndex = projectGroups.firstIndex(where: { $0.projectPath == anchorPath }),
+            let projectIndex = projectGroups.firstIndex(where: { $0.projectPath == projectPath })
+        else {
+            return nil
+        }
+
+        let bounds = min(anchorIndex, projectIndex)...max(anchorIndex, projectIndex)
+        return Set(projectGroups[bounds].map(\.projectPath))
+    }
+
+    private func displayedSelectableSessionIds() -> [String] {
+        projectGroups.flatMap { group -> [String] in
+            guard isProjectExpanded(group.projectPath) else { return [] }
+            return group.sessions.map(\.id)
+        }
+    }
+}
+
+enum ProjectSelectionState {
+    case none
+    case partial
+    case all
 }

@@ -9,11 +9,13 @@ struct SessionRow: View {
     let isSelected: Bool
     let isSelecting: Bool
     let isChecked: Bool
+    var isRangePreviewed: Bool = false
     var grouped: Bool = false
     var searchSnippet: String? = nil
     var searchQuery: String = ""
     var onSnippetTap: (() -> Void)? = nil
     var onViewTranscript: (() -> Void)? = nil
+    var onSelectionHover: ((Bool) -> Void)? = nil
     let onTap: () -> Void
     let onNewSession: () -> Void
     let onResume: () -> Void
@@ -164,11 +166,7 @@ struct SessionRow: View {
         .padding(.leading, grouped ? 20 : 12)
         .padding(.trailing, 12)
         .padding(.vertical, 6)
-        .background(
-            isSelecting && isChecked ? Color.blue.opacity(0.1) :
-            isSelected ? Color.blue.opacity(0.12) :
-            isHovered ? Color.primary.opacity(0.04) : Color.clear
-        )
+        .background(backgroundColor)
         .overlay(alignment: .leading) {
             if isHovered && !isSelecting {
                 RoundedRectangle(cornerRadius: 1.5)
@@ -183,7 +181,24 @@ struct SessionRow: View {
         .onTapGesture(perform: onTap)
         .onHover { hovering in
             withAnimation(Theme.quickSpring) { isHovered = hovering }
+            onSelectionHover?(hovering)
         }
+    }
+
+    private var backgroundColor: Color {
+        if isRangePreviewed {
+            return Color.blue.opacity(0.12)
+        }
+        if isSelecting && isChecked {
+            return Color.blue.opacity(0.1)
+        }
+        if isSelected {
+            return Color.blue.opacity(0.12)
+        }
+        if isHovered {
+            return Color.primary.opacity(0.04)
+        }
+        return .clear
     }
 
     private func contextBadge(_ stats: SessionStats) -> some View {

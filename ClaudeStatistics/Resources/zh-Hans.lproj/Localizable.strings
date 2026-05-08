@@ -23,6 +23,8 @@
 "session.resume.help" = "恢复会话";
 "session.delete.help" = "删除会话";
 "session.delete.immediate.help" = "立即删除（跳过弹窗确认）";
+"session.projectSelect.help" = "选择此项目的全部会话";
+"session.projectDeselect.help" = "取消选择此项目的全部会话";
 "settings.accountSwitcher.signOutConfirmTitle" = "退出登录";
 "settings.accountSwitcher.signOutConfirmMessage %@" = "退出 %@ 的登录？之后可重新登录。";
 "settings.accountSwitcher.signOut" = "退出登录";

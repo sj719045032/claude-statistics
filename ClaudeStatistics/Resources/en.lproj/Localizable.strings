@@ -23,6 +23,8 @@
 "session.resume.help" = "Resume session";
 "session.delete.help" = "Delete session";
 "session.delete.immediate.help" = "Delete now (skip confirmation)";
+"session.projectSelect.help" = "Select all sessions in this project";
+"session.projectDeselect.help" = "Deselect all sessions in this project";
 "settings.accountSwitcher.signOutConfirmTitle" = "Sign Out";
 "settings.accountSwitcher.signOutConfirmMessage %@" = "Sign out of %@? You can sign back in later.";
 "settings.accountSwitcher.signOut" = "Sign Out";

@@ -10,6 +10,10 @@ struct SessionListView: View {
     @State private var showDeleteConfirm = false
     @State private var deleteTarget: Set<String> = []
     @State private var selectedProjectForAnalytics: ProjectGroup?
+    @State private var isShiftPressed = NSEvent.modifierFlags.contains(.shift)
+    @State private var hoveredShiftProjectPath: String?
+    @State private var hoveredShiftSessionId: String?
+    @State private var modifierMonitor: Any?
 
     @FocusState private var isSearchFocused: Bool
 
@@ -45,6 +49,9 @@ struct SessionListView: View {
 
     @ViewBuilder
     private var sessionListContent: some View {
+        let previewProjectPaths = shiftPreviewProjectPaths
+        let previewSessionIds = shiftPreviewSessionIds
+
         VStack(alignment: .leading, spacing: 0) {
             // Search bar
             HStack {
@@ -191,10 +198,23 @@ struct SessionListView: View {
                         ProjectGroupHeader(
                             group: group,
                             isExpanded: viewModel.isProjectExpanded(group.projectPath),
+                            isSelecting: viewModel.isSelecting,
+                            selectionState: viewModel.projectSelectionState(for: group),
+                            isShiftSelecting: isShiftPressed,
+                            isRangePreviewed: previewProjectPaths.contains(group.projectPath),
                             onToggle: {
                                 withAnimation(Theme.quickSpring) {
                                     viewModel.toggleProjectExpanded(group.projectPath)
                                 }
+                            },
+                            onToggleSelection: { extendingRange in
+                                viewModel.toggleSelectProject(
+                                    group,
+                                    extendingRange: extendingRange
+                                )
+                            },
+                            onSelectionHover: { hovering in
+                                hoveredShiftProjectPath = hovering ? group.projectPath : nil
                             },
                             onNewSession: {
                                 viewModel.openNewSession(inDirectory: group.cwdPath)
@@ -215,6 +235,7 @@ struct SessionListView: View {
                                     isSelected: viewModel.selectedSession?.id == session.id,
                                     isSelecting: viewModel.isSelecting,
                                     isChecked: viewModel.selectedIds.contains(session.id),
+                                    isRangePreviewed: previewSessionIds.contains(session.id),
                                     grouped: true,
                                     searchSnippet: viewModel.searchSnippets[session.id],
                                     searchQuery: viewModel.searchText,
@@ -228,9 +249,15 @@ struct SessionListView: View {
                                     onViewTranscript: {
                                         viewModel.openTranscript(for: session)
                                     },
+                                    onSelectionHover: { hovering in
+                                        hoveredShiftSessionId = hovering ? session.id : nil
+                                    },
                                     onTap: {
                                         if viewModel.isSelecting {
-                                            viewModel.toggleSelect(session)
+                                            viewModel.toggleSelect(
+                                                session,
+                                                extendingRange: NSEvent.modifierFlags.contains(.shift)
+                                            )
                                         } else {
                                             viewModel.selectSession(session)
                                         }
@@ -267,5 +294,59 @@ struct SessionListView: View {
             viewModel.deleteSessions(deleteTarget)
             deleteTarget = []
         }
+        .onAppear(perform: installModifierMonitor)
+        .onDisappear(perform: removeModifierMonitor)
+        .onChange(of: viewModel.isSelecting) { selecting in
+            if !selecting {
+                hoveredShiftProjectPath = nil
+                hoveredShiftSessionId = nil
+            }
+        }
+        .onChange(of: isShiftPressed) { pressed in
+            if !pressed {
+                hoveredShiftProjectPath = nil
+                hoveredShiftSessionId = nil
+            }
+        }
+    }
+
+    private var shiftPreviewProjectPaths: Set<String> {
+        guard
+            viewModel.isSelecting,
+            isShiftPressed,
+            let hoveredShiftProjectPath
+        else {
+            return []
+        }
+        return viewModel.projectSelectionRangePaths(to: hoveredShiftProjectPath)
+    }
+
+    private var shiftPreviewSessionIds: Set<String> {
+        guard
+            viewModel.isSelecting,
+            isShiftPressed,
+            let hoveredShiftSessionId
+        else {
+            return []
+        }
+        return viewModel.sessionSelectionRangeIds(to: hoveredShiftSessionId)
+    }
+
+    private func installModifierMonitor() {
+        guard modifierMonitor == nil else { return }
+        modifierMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
+            isShiftPressed = event.modifierFlags.contains(.shift)
+            return event
+        }
+    }
+
+    private func removeModifierMonitor() {
+        if let modifierMonitor {
+            NSEvent.removeMonitor(modifierMonitor)
+            self.modifierMonitor = nil
+        }
+        isShiftPressed = NSEvent.modifierFlags.contains(.shift)
+        hoveredShiftProjectPath = nil
+        hoveredShiftSessionId = nil
     }
 }
