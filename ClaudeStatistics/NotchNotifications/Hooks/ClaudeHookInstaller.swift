@@ -30,6 +30,7 @@ struct ClaudeHookInstaller: HookInstalling {
             "PreToolUse",         // silent tracking — tool starting
             "PostToolUse",        // silent tracking — tool finished
             "PostToolUseFailure", // silent tracking — tool failed/interrupted
+            "TaskCreated",        // task list created via TaskCreate
             "SessionStart",       // new session
             "SessionEnd",         // silent tracking — session closed
             "Notification",       // Claude is waiting for input

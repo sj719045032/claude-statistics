@@ -32,6 +32,10 @@ struct RuntimeSession: Codable, Equatable {
     var latestToolOutputSummary: ToolOutputSummary? = nil
     var latestToolOutputAt: Date? = nil
     var latestToolOutputTool: String? = nil
+    var currentTask: CurrentTaskSummary? = nil
+    var runtimeTasks: [String: RuntimeTaskEntry]? = nil
+    var taskTranscriptPath: String? = nil
+    var taskTranscriptOffset: UInt64? = nil
     var currentToolName: String? = nil
     var currentToolDetail: String? = nil
     var currentToolStartedAt: Date? = nil
@@ -76,6 +80,7 @@ struct RuntimeSession: Codable, Equatable {
             latestToolOutputSummary: latestToolOutputSummary,
             latestToolOutputAt: latestToolOutputAt,
             latestToolOutputTool: latestToolOutputTool,
+            currentTask: currentTask,
             currentToolName: currentToolName,
             currentToolDetail: currentToolDetail,
             currentToolStartedAt: currentToolStartedAt,

@@ -56,6 +56,32 @@ struct ToolOutputSummary: Codable, Equatable {
     var semanticKey: String? = nil
 }
 
+struct CurrentTaskSummary: Codable, Equatable {
+    let text: String
+    let status: String
+    let completedCount: Int
+    let totalCount: Int
+    let updatedAt: Date
+
+    var progressText: String? {
+        guard totalCount > 0 else { return nil }
+        return "\(completedCount)/\(totalCount)"
+    }
+}
+
+struct RuntimeTaskEntry: Codable, Equatable {
+    let id: String
+    let subject: String
+    let activeForm: String?
+    var status: String
+
+    var displayText: String {
+        subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? (activeForm ?? "")
+            : subject
+    }
+}
+
 /// One tool call in flight, keyed by toolUseId in `activeTools`. Lets the row
 /// aggregate "Reading 3 files · Searching 2 patterns" across parent + subagent
 /// activity instead of flipping between whichever `currentToolName` happened
@@ -118,6 +144,10 @@ struct ActiveSession: Identifiable, Equatable {
     /// Tool name that produced `latestToolOutput`, used to pick the right
     /// SF Symbol icon when rendering.
     var latestToolOutputTool: String? = nil
+    /// Latest Claude TodoWrite item for the current turn. This lets the notch
+    /// surface the task Claude says it is actively working on, instead of only
+    /// saying "Updating todos".
+    var currentTask: CurrentTaskSummary? = nil
     /// Tool currently mid-execution (set on PreToolUse, cleared on PostToolUse
     /// for the matching toolUseId). nil when the session is just thinking.
     var currentToolName: String? = nil

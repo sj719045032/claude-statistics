@@ -54,7 +54,7 @@ enum WireEventTranslator {
                 return .activityPulse
             }
         case "UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure",
-             "SubagentStart", "PreCompact", "PostCompact":
+             "TaskCreated", "SubagentStart", "PreCompact", "PostCompact":
             return .activityPulse
         default:
             return .activityPulse

@@ -22,6 +22,23 @@ STABLE_APP_PATH="${STABLE_APP_DIR}/${DEBUG_APP_NAME}.app"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENSURE_DEBUG_CODE_SIGN_SCRIPT="${SCRIPT_DIR}/ensure-debug-codesign.sh"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+SDK_MODE_RESTORE_AFTER_RUN="${SDK_MODE_RESTORE_AFTER_RUN:-1}"
+SDK_MODE_RESTORE_DIR=""
+
+restore_sdk_mode_files() {
+  local status=$?
+  if [[ "${SDK_MODE_RESTORE_AFTER_RUN}" == "1" && -n "${SDK_MODE_RESTORE_DIR}" && -d "${SDK_MODE_RESTORE_DIR}" ]]; then
+    if [[ -f "${SDK_MODE_RESTORE_DIR}/Package.swift" ]]; then
+      cp "${SDK_MODE_RESTORE_DIR}/Package.swift" "${REPO_ROOT}/Package.swift"
+    fi
+    if [[ -f "${SDK_MODE_RESTORE_DIR}/catalog-project.yml" && -d "${REPO_ROOT}/build/catalog-repo" ]]; then
+      cp "${SDK_MODE_RESTORE_DIR}/catalog-project.yml" "${REPO_ROOT}/build/catalog-repo/project.yml"
+    fi
+    rm -rf "${SDK_MODE_RESTORE_DIR}"
+  fi
+  exit "${status}"
+}
 
 # 0. Pin SDK references at the locally-built xcframework so any
 # catalog plugin you `dev-install.sh` afterwards links the in-progress
@@ -30,6 +47,14 @@ ENSURE_DEBUG_CODE_SIGN_SCRIPT="${SCRIPT_DIR}/ensure-debug-codesign.sh"
 # so this stays a no-op for `bash run-debug.sh` runs that follow another
 # `bash run-debug.sh`. The `release.sh` flow flips the modes back to
 # published before its commit step.
+if [[ "${SDK_MODE_RESTORE_AFTER_RUN}" == "1" ]]; then
+  SDK_MODE_RESTORE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/claude-stats-sdk-mode.XXXXXX")"
+  cp "${REPO_ROOT}/Package.swift" "${SDK_MODE_RESTORE_DIR}/Package.swift"
+  if [[ -f "${REPO_ROOT}/build/catalog-repo/project.yml" ]]; then
+    cp "${REPO_ROOT}/build/catalog-repo/project.yml" "${SDK_MODE_RESTORE_DIR}/catalog-project.yml"
+  fi
+  trap restore_sdk_mode_files EXIT
+fi
 bash "${SCRIPT_DIR}/sdk-mode.sh" local >/dev/null
 
 # 1. Kill both the previous Debug instance and the Release instance. lsregister

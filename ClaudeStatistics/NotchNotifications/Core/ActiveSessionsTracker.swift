@@ -193,6 +193,7 @@ final class ActiveSessionsTracker: ObservableObject {
                     existing.projectPath = launchDir
                 }
                 RuntimeSessionEventApplier.merge(runtime: &existing, signals: signals)
+                mergeLatestTaskIfAvailable(from: session, into: &existing)
                 recoverClaudeProcessContextIfNeeded(for: &existing)
                 if existing != before {
                     runtimeByKey[key] = TerminalIdentityResolver.sanitized(existing)
@@ -223,6 +224,7 @@ final class ActiveSessionsTracker: ObservableObject {
                 currentToolDetail: nil
             )
             RuntimeSessionEventApplier.merge(runtime: &fresh, signals: signals)
+            mergeLatestTaskIfAvailable(from: session, into: &fresh)
             recoverClaudeProcessContextIfNeeded(for: &fresh)
             runtimeByKey[key] = TerminalIdentityResolver.sanitized(fresh)
             DiagnosticLogger.shared.verbose(
@@ -374,6 +376,7 @@ final class ActiveSessionsTracker: ObservableObject {
             }
         }
         RuntimeSessionEventApplier.apply(event: event, to: &runtime)
+        mergeLatestTaskIfAvailable(at: event.transcriptPath, into: &runtime)
         let hadActiveOperation = runtime.currentToolName != nil
             || runtime.currentToolStartedAt != nil
             || runtime.currentOperation?.keepsSessionRunning == true
@@ -481,7 +484,6 @@ final class ActiveSessionsTracker: ObservableObject {
             let quick = quickStats[session.id]
             let stats = parsedStats[session.id]
             let signals = RuntimeSessionEventApplier.signals(from: quick, stats: stats)
-            guard !signals.isEmpty else { continue }
             signalCount += signals.count
             progressNoteCount += signals.filter { $0.kind == .progressNote }.count
 
@@ -495,6 +497,7 @@ final class ActiveSessionsTracker: ObservableObject {
                 runtime.projectPath = session.projectPath.nilIfEmpty
             }
             RuntimeSessionEventApplier.merge(runtime: &runtime, signals: signals)
+            mergeLatestTaskIfAvailable(from: session, into: &runtime)
             recoverClaudeProcessContextIfNeeded(for: &runtime)
 
             if runtime != before {
@@ -565,6 +568,42 @@ final class ActiveSessionsTracker: ObservableObject {
                 kickOffTerminalNameInference(forPid: recovered.pid)
             }
         }
+    }
+
+    private func mergeLatestTaskIfAvailable(from session: Session, into runtime: inout RuntimeSession) {
+        mergeLatestTaskIfAvailable(at: session.filePath, into: &runtime, incremental: false)
+    }
+
+    private func mergeLatestTaskIfAvailable(
+        at transcriptPath: String?,
+        into runtime: inout RuntimeSession,
+        incremental: Bool = true
+    ) {
+        guard runtime.provider == .claude,
+              let transcriptPath = transcriptPath?.nilIfEmpty else {
+            return
+        }
+
+        let canIncrement = incremental && runtime.taskTranscriptPath == transcriptPath
+        let scan = RuntimeSessionEventApplier.taskScanResult(
+            at: transcriptPath,
+            baseTasks: canIncrement ? runtime.runtimeTasks : nil,
+            fromOffset: canIncrement ? runtime.taskTranscriptOffset : nil
+        )
+        guard let scan else { return }
+        runtime.taskTranscriptPath = transcriptPath
+        runtime.taskTranscriptOffset = scan.nextOffset
+
+        if scan.clearsCurrentTask {
+            runtime.runtimeTasks = nil
+            runtime.currentTask = nil
+            return
+        }
+
+        guard let snapshot = scan.snapshot else { return }
+        runtime.runtimeTasks = snapshot.tasks
+        runtime.currentTask = snapshot.summary
+        runtime.lastActivityAt = max(runtime.lastActivityAt, snapshot.summary.updatedAt)
     }
 
     private func filterContext(forEvent event: AttentionEvent) -> SessionFilterContext {
@@ -669,6 +708,7 @@ final class ActiveSessionsTracker: ObservableObject {
         runtimeByKey = TerminalIdentityResolver.sanitizedTransientSurfaceCollisions(runtimeByKey
             .filter { shouldKeep(runtime: $0.value, cutoff: cutoff, now: now) }
             .mapValues { TerminalIdentityResolver.sanitized($0) })
+        repairIdleClaudeTaskSnapshots()
         persistRuntime()
 
         displacedSessionIds = displacedSessionIds.filter { now.timeIntervalSince($0.value) < activeWindow }
@@ -689,6 +729,22 @@ final class ActiveSessionsTracker: ObservableObject {
             }
         totalCount = fresh.count
         sessions = Array(fresh.prefix(maxItems))
+    }
+
+    private func repairIdleClaudeTaskSnapshots() {
+        for (key, runtime) in runtimeByKey {
+            guard runtime.provider == .claude,
+                  runtime.currentTask != nil,
+                  runtime.status != .running,
+                  runtime.taskTranscriptPath?.nilIfEmpty != nil else {
+                continue
+            }
+            var updated = runtime
+            mergeLatestTaskIfAvailable(at: updated.taskTranscriptPath, into: &updated, incremental: false)
+            if updated != runtime {
+                runtimeByKey[key] = TerminalIdentityResolver.sanitized(updated)
+            }
+        }
     }
 
     private func shouldKeep(runtime: RuntimeSession, cutoff: Date, now: Date) -> Bool {

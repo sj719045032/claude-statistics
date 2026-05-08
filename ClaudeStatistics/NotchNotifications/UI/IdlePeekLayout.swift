@@ -6,6 +6,12 @@ import SwiftUI
 /// to agree — no estimate/actual mismatch, no inner empty gap below the last
 /// row, no overflow clipping. Rows are forced to this deterministic height.
 enum IdlePeekLayout {
+    /// Rendered height for the dedicated current-task line in
+    /// `ActiveSessionRow`.
+    static let taskLineHeight: CGFloat = 13
+    /// Adding the current-task line opens one more outer `VStack(spacing: 3)`
+    /// gap between row children.
+    static let taskLineExtraGap: CGFloat = 3
     /// Rendered height per tool row inside `detailedToolsSection`. Tool rows
     /// are size-10/9 SF Pro / mono / rounded inside an HStack — empirically
     /// ~13pt at the system default leading.
@@ -24,7 +30,12 @@ enum IdlePeekLayout {
         baseHeight: CGFloat,
         detailedMode: Bool
     ) -> CGFloat {
-        guard detailedMode else { return baseHeight }
+        var height = baseHeight
+        if session.currentTask != nil {
+            height += taskLineHeight + taskLineExtraGap
+        }
+
+        guard detailedMode else { return height }
         // Matches `activeToolsToShowInDetail`: all in-flight tools render in
         // the detail section now that MIDDLE is a count-only aggregate. Also
         // counts fresh recently-completed entries (afterglow window) so
@@ -35,10 +46,10 @@ enum IdlePeekLayout {
             .filter { $0.completedAt >= cutoff }
             .count
         let total = active + recent
-        guard total > 0 else { return baseHeight }
+        guard total > 0 else { return height }
         // Section height = N rows × rowH + (N-1) × rowSpacing + lead.
         // Plus one extra 3pt gap from the outer VStack opening up.
-        return baseHeight
+        return height
             + CGFloat(total) * toolLineHeight
             + CGFloat(max(0, total - 1)) * toolRowSpacing
             + toolSectionLead

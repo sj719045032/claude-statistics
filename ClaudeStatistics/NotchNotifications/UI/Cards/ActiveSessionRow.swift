@@ -99,11 +99,12 @@ struct ActiveSessionRow: View {
                             HStack(spacing: 3) {
                                 Image(systemName: "terminal")
                                     .font(.system(size: 7, weight: .semibold))
+                                    .foregroundStyle(Color.gray.opacity(0.82))
                                 Text(terminalSourceName)
                                     .font(.system(size: 8, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(.white.opacity(0.62))
                                     .lineLimit(1)
                             }
-                            .foregroundStyle(.white.opacity(0.62))
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
                             .background(Color.white.opacity(0.09), in: Capsule())
@@ -139,7 +140,7 @@ struct ActiveSessionRow: View {
                         }
                         Image(systemName: session.hasFocusHint ? "arrow.up.forward.square" : "questionmark.square")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(session.hasFocusHint ? 0.72 : 0.32))
+                            .foregroundStyle((session.hasFocusHint ? Color.cyan : Color.yellow).opacity(session.hasFocusHint ? 0.72 : 0.34))
                             .frame(width: 14, height: 14)
                     }
                     // Triptych (top-to-bottom, chronological):
@@ -148,6 +149,10 @@ struct ActiveSessionRow: View {
                     //     is always the earlier event and BOTTOM the later
                     //     one. `detailedToolsSection` tracks action since it
                     //     is action's expansion (in-flight + recent tools).
+                    if let currentTask = session.currentTask {
+                        currentTaskLine(currentTask)
+                            .frame(height: rowSlotHeight, alignment: .topLeading)
+                    }
                     promptLine
                         .frame(height: rowSlotHeight, alignment: .topLeading)
                     if triptych.isChronologicallyReversed {
@@ -181,6 +186,27 @@ struct ActiveSessionRow: View {
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func currentTaskLine(_ task: CurrentTaskSummary) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 5) {
+            Image(systemName: "checklist")
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.mint.opacity(0.9))
+                .frame(width: 11)
+            Text(task.text)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.white.opacity(0.82))
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 4)
+            if let progress = task.progressText {
+                Text(progress)
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.mint.opacity(0.72))
+            }
+        }
     }
 
     @ViewBuilder
@@ -226,10 +252,11 @@ struct ActiveSessionRow: View {
         let baseOpacity: Double = faded ? 0.42 : 0.78
         let detailOpacity: Double = faded ? 0.34 : 0.58
         let trailingOpacity: Double = faded ? 0.30 : 0.40
+        let iconColor = failed ? Color.red : (faded ? Color.green : Self.toolTint(for: toolName))
         HStack(alignment: .firstTextBaseline, spacing: 5) {
             Image(systemName: failed ? "xmark.circle" : (faded ? "checkmark" : ActiveSession.toolSymbol(toolName)))
                 .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.white.opacity(baseOpacity - 0.08))
+                .foregroundStyle(iconColor.opacity(baseOpacity))
                 .frame(width: 11)
             Text(toolName)
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
@@ -271,6 +298,7 @@ struct ActiveSessionRow: View {
         triptychRow(
             symbol: triptych.promptSymbol,
             text: triptych.promptText,
+            symbolColor: .cyan,
             textOpacity: 0.62,
             symbolOpacity: 0.58,
             truncation: .tail
@@ -282,6 +310,7 @@ struct ActiveSessionRow: View {
         triptychRow(
             symbol: triptych.commentarySymbol,
             text: triptych.commentaryText,
+            symbolColor: Self.semanticTint(for: triptych.commentarySymbol),
             textOpacity: 0.62,
             symbolOpacity: 0.58,
             truncation: .tail
@@ -292,6 +321,7 @@ struct ActiveSessionRow: View {
     private func triptychRow(
         symbol: String,
         text: String,
+        symbolColor: Color,
         textOpacity: Double,
         symbolOpacity: Double,
         truncation: Text.TruncationMode
@@ -299,7 +329,7 @@ struct ActiveSessionRow: View {
         HStack(alignment: .top, spacing: 5) {
             Image(systemName: symbol)
                 .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.white.opacity(symbolOpacity))
+                .foregroundStyle(symbolColor.opacity(symbolOpacity))
                 .frame(width: 11)
                 .padding(.top, 2)
             Text(text)
@@ -317,7 +347,7 @@ struct ActiveSessionRow: View {
                 HStack(spacing: 4) {
                     Image(systemName: triptych.actionSymbol)
                         .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.82))
+                        .foregroundStyle(Self.semanticTint(for: triptych.actionSymbol).opacity(0.82))
                         .frame(width: 11)
                     Text(triptych.actionText)
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
@@ -331,6 +361,46 @@ struct ActiveSessionRow: View {
                     }
                 }
             }
+        }
+    }
+
+    private static func semanticTint(for symbol: String) -> Color {
+        switch symbol {
+        case "hourglass", "brain.head.profile":
+            return .yellow
+        case "checkmark.circle", "checkmark.circle.fill":
+            return .green
+        case "xmark.circle", "exclamationmark.triangle", "exclamationmark.triangle.fill":
+            return .red
+        case "person.fill":
+            return .cyan
+        case "quote.bubble", "text.bubble", "bubble.left.and.text.bubble.right":
+            return .indigo
+        case "sparkles":
+            return .purple
+        default:
+            return .teal
+        }
+    }
+
+    private static func toolTint(for toolName: String) -> Color {
+        switch ToolActivityFormatter.canonicalToolName(toolName) {
+        case "read", "ls", "glob":
+            return .cyan
+        case "grep", "search", "websearch", "webfetch":
+            return .teal
+        case "write", "edit", "multiedit", "notebookedit":
+            return .orange
+        case "bash", "shell", "killshell":
+            return .purple
+        case "todowrite", "taskcreate", "taskupdate", "tasklist":
+            return .mint
+        case "askuserquestion":
+            return .pink
+        case "task", "agent":
+            return .indigo
+        default:
+            return .blue
         }
     }
 }

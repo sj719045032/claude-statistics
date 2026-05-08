@@ -12,6 +12,7 @@ extension HookRunner {
             "PermissionRequest",
             "Notification",
             "Stop",
+            "TaskCreated",
             "SessionEnd",
             "SubagentStart",
             "SubagentStop",
@@ -58,6 +59,8 @@ extension HookRunner {
             status = "compacting"
         case "PreToolUse":
             status = "running_tool"
+        case "TaskCreated":
+            status = "processing"
         default:
             status = "processing"
         }
@@ -139,6 +142,11 @@ extension HookRunner {
             let toolInput = dictionaryValue(payload["tool_input"])
             set(&message, "tool_input", toolInput)
             set(&message, "tool_use_id", normalizedToolUseId(payload: payload, toolInput: toolInput))
+        } else if event == "TaskCreated" {
+            let taskInput = claudeTaskCreatedInput(payload: payload)
+            set(&message, "tool_name", "TaskCreate")
+            set(&message, "tool_input", taskInput)
+            set(&message, "tool_use_id", normalizedToolUseId(payload: payload, toolInput: taskInput))
         }
 
         if ["PostToolUse", "PostToolUseFailure"].contains(event),
@@ -200,6 +208,22 @@ private func claudePreview(payload: [String: Any]) -> String? {
         }
     }
     return nil
+}
+
+private func claudeTaskCreatedInput(payload: [String: Any]) -> [String: Any]? {
+    for key in ["tool_input", "task", "task_data", "taskData"] {
+        if let object = dictionaryValue(payload[key]) {
+            return object
+        }
+    }
+
+    var task: [String: Any] = [:]
+    for key in ["id", "taskId", "task_id", "subject", "description", "activeForm", "active_form", "status"] {
+        if let value = payload[key] {
+            task[key] = value
+        }
+    }
+    return task.isEmpty ? nil : task
 }
 
 /// Tail-read the transcript jsonl and return the most recent assistant text
