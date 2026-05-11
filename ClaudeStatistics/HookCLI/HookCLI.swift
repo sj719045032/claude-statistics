@@ -68,9 +68,15 @@ struct HookRunner: HookHelperContext {
            let installed = AppRuntimePaths.loadInstalledTerminalBundles(),
            !installed.isEmpty,
            !installed.contains(bundleId) {
-            return 0
+            guard Self.marketplaceHasTerminalPlugin(bundleID: bundleId) else {
+                return 0
+            }
         }
 
+        return sendToHost()
+    }
+
+    private func sendToHost() -> Int32 {
         if ProcessInfo.processInfo.environment["CLAUDE_STATS_HOOK_PRINT_PATHS"] == "1" {
             let line = "root=\(AppRuntimePaths.rootDirectory) socket=\(AttentionBridgeAuth.socketPath)\n"
             FileHandle.standardError.write(Data(line.utf8))
@@ -107,6 +113,19 @@ struct HookRunner: HookHelperContext {
             action.printDecision?(stringValue(response?["decision"]))
         }
         return 0
+    }
+
+    private static func marketplaceHasTerminalPlugin(bundleID: String) -> Bool {
+        let normalizedBundleID = bundleID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalizedBundleID.isEmpty,
+              let data = try? Data(contentsOf: PluginCatalog.defaultCacheURL),
+              let index = try? PluginCatalog.decode(data) else {
+            return false
+        }
+        return index.entries.contains {
+            $0.id.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == normalizedBundleID
+                && PluginCatalogCategory.canonicalize($0.category) == PluginCatalogCategory.terminal
+        }
     }
 
     func baseMessage(

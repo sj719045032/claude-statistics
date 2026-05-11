@@ -111,7 +111,9 @@ final class UsageViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var lastFetchedAt: Date?
     @Published var autoRefreshInterval: TimeInterval = 300
-    @Published private(set) var dashboardURL: URL?
+    var dashboardURL: URL? {
+        subscriptionInfo?.dashboardURL ?? usageSource?.dashboardURL
+    }
 
     private var autoRefresh: AutoRefreshCoordinator?
     private var usageSource: (any ProviderUsageSource)?
@@ -135,7 +137,6 @@ final class UsageViewModel: ObservableObject {
         stopWatchingCache()
         usageSource = source
         self.usagePresentation = usagePresentation
-        dashboardURL = source?.dashboardURL
         usageData = nil
         errorMessage = nil
         lastFetchedAt = nil
@@ -435,4 +436,5 @@ final class UsageViewModel: ObservableObject {
         }
         return String(format: "%.1f", value)
     }
+
 }

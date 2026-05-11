@@ -225,6 +225,7 @@
 "settings.accountSwitcher.switchAccount" = "切换账号";
 "settings.accountSwitcher.signingIn" = "登录中...";
 "settings.accountSwitcher.addAccount" = "添加账号";
+"settings.accountSwitcher.addAnthropicAccount" = "添加 Anthropic 账号";
 "settings.accountSwitcher.waiting" = "等待登录…";
 "settings.accountSwitcher.cancelPending" = "取消等待登录";
 "settings.accountSwitcher.deleteConfirmTitle" = "删除已保存账号";
@@ -260,6 +261,12 @@
 "settings.plugins.empty" = "未加载任何插件。";
 "settings.plugins.empty.filter" = "该分类下暂无插件。";
 "settings.plugins.loaded.count %lld" = "已加载插件（%lld）";
+"settings.plugins.loaded.summary %lld" = "已安装 %lld 个插件";
+"settings.plugins.updates.available %lld" = "%lld 个更新";
+"settings.plugins.recommendation.title %@" = "推荐安装 %@ 插件";
+"settings.plugins.recommendation.notch %@" = "来自 %@ 的 Notch 事件已被忽略，因为缺少对应插件。";
+"settings.plugins.recommendation.install" = "安装";
+"settings.plugins.recommendation.enable" = "启用";
 "settings.plugins.trust" = "信任";
 "settings.plugins.resetTrust" = "重置所有插件信任决定";
 "settings.plugins.resetTrust.immediate.help" = "立即重置（跳过确认）";
@@ -324,10 +331,12 @@
 "settings.identitySwitcher.button" = "切换账号";
 
 /* 身份选择器 */
+"identityPicker.anthropicSection" = "Anthropic 账号";
 "identityPicker.anthropicOAuth" = "Anthropic OAuth";
 "identityPicker.signInHint" = "请在设置中登录";
 "identityPicker.noAccounts" = "暂无账号";
 "identityPicker.addAccount" = "添加账号";
+"identityPicker.addSubscriptionAccount %@" = "添加 %@ 账号";
 
 /* 订阅账号卡片 */
 "subscription.card.active" = "已激活";

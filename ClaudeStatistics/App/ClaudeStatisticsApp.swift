@@ -702,6 +702,9 @@ final class AppState: ObservableObject {
     private func configureUsageState(for provider: any SessionProvider) {
         usageViewModel.configure(source: provider.usageSource, usagePresentation: provider.usagePresentation)
         configureProfileLoader(for: provider)
+        Task { @MainActor [weak self] in
+            await self?.refreshClaudeCLIStatusLineSubscriptionCache()
+        }
         if provider.capabilities.supportsUsage {
             usageViewModel.loadCache()
             if UserDefaults.standard.bool(forKey: AppPreferences.autoRefreshEnabled) {
@@ -769,6 +772,12 @@ final class AppState: ObservableObject {
                     DiagnosticLogger.shared.info("subscriptionLoader[\(providerId)]: identity-based lookup found no live adapter for id=\(adapterID)")
                     return nil
                 }
+                guard adapter.providerID == providerId else {
+                    DiagnosticLogger.shared.info(
+                        "subscriptionLoader[\(providerId)]: skipping adapter=\(adapterID) ownedBy=\(adapter.providerID)"
+                    )
+                    return nil
+                }
                 do {
                     return try await adapter.fetchSubscription(
                         context: SubscriptionContext(
@@ -825,10 +834,104 @@ final class AppState: ObservableObject {
             .sink { [weak self] _ in
                 guard let self else { return }
                 Task { @MainActor in
+                    await self.refreshClaudeCLIStatusLineSubscriptionCache()
                     await self.profileViewModel.forceRefresh()
                     await self.usageViewModel.forceRefresh()
                 }
             }
+    }
+
+    /// Claude Code's `statusLine` runs inside the CLI and should follow
+    /// the CLI's actual endpoint/token (`~/.claude/settings.json`), not
+    /// the app-selected account. This cache is intentionally separate
+    /// from `UsageViewModel.subscriptionInfo`, which powers the app UI.
+    private func refreshClaudeCLIStatusLineSubscriptionCache() async {
+        let endpoint = ClaudeEndpointDetector.detectFromCLISettings()
+        guard let baseURL = endpoint.baseURL,
+              let adapter = SubscriptionAdapterRouter.shared.adapter(forProviderID: "claude", baseURL: baseURL),
+              !adapter.matchingHosts.contains("default"),
+              endpoint.apiKey != nil else {
+            clearStatusLineSubscriptionCache()
+            return
+        }
+
+        do {
+            let info = try await adapter.fetchSubscription(
+                context: SubscriptionContext(
+                    providerID: "claude",
+                    baseURL: baseURL,
+                    apiKey: endpoint.apiKey
+                )
+            )
+            writeStatusLineSubscriptionCache(info)
+        } catch {
+            clearStatusLineSubscriptionCache()
+            DiagnosticLogger.shared.warning("statusLine subscription cache refresh failed: \(error.localizedDescription)")
+        }
+    }
+
+    private func clearStatusLineSubscriptionCache() {
+        try? FileManager.default.removeItem(atPath: Self.statusLineSubscriptionCachePath)
+    }
+
+    private func writeStatusLineSubscriptionCache(_ info: SubscriptionInfo) {
+        guard !info.quotas.isEmpty else {
+            clearStatusLineSubscriptionCache()
+            return
+        }
+        guard AppRuntimePaths.ensureRootDirectory() != nil else { return }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let payload = StatusLineSubscriptionCache(
+            fetchedAt: formatter.string(from: Date()),
+            planName: info.planName,
+            quotas: info.quotas.map { quota in
+                StatusLineSubscriptionQuota(
+                    id: quota.id,
+                    title: quota.title,
+                    percentage: quota.percentage,
+                    resetAt: quota.resetAt.map { formatter.string(from: $0) }
+                )
+            }
+        )
+
+        do {
+            let data = try JSONEncoder().encode(payload)
+            try data.write(to: URL(fileURLWithPath: Self.statusLineSubscriptionCachePath), options: .atomic)
+        } catch {
+            DiagnosticLogger.shared.warning("Failed to write statusLine subscription cache: \(error.localizedDescription)")
+        }
+    }
+
+    private static var statusLineSubscriptionCachePath: String {
+        (AppRuntimePaths.rootDirectory as NSString).appendingPathComponent("subscription-cache.json")
+    }
+
+    private struct StatusLineSubscriptionCache: Encodable {
+        let fetchedAt: String
+        let planName: String
+        let quotas: [StatusLineSubscriptionQuota]
+
+        enum CodingKeys: String, CodingKey {
+            case fetchedAt = "fetched_at"
+            case planName = "plan_name"
+            case quotas
+        }
+    }
+
+    private struct StatusLineSubscriptionQuota: Encodable {
+        let id: String
+        let title: String
+        let percentage: Double
+        let resetAt: String?
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case title
+            case percentage
+            case resetAt = "reset_at"
+        }
     }
 
 }

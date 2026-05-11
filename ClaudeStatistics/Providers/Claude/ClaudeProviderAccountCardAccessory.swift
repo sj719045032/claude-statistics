@@ -124,7 +124,7 @@ private struct ClaudeProviderAccountCardAccessory: View {
             isAddingAccount: accountManager.isAddingAccount,
             isBusy: accountManager.isAddingAccount || accountManager.switchingAccountID != nil || accountManager.removingAccountID != nil,
             switchTitle: "settings.accountSwitcher.switchAccount",
-            addTitle: "settings.accountSwitcher.addAccount",
+            addTitle: "settings.accountSwitcher.addAnthropicAccount",
             triggerStyle: effectiveTriggerStyle,
             accountLabel: { $0.email },
             isLiveAccount: { isAnthropicOAuthActive && accountManager.isLiveAccount($0) },
@@ -174,7 +174,7 @@ private struct ClaudeProviderAccountCardAccessory: View {
                 || independentManager.switchingAccountID != nil
                 || independentManager.removingAccountID != nil,
             switchTitle: "settings.accountSwitcher.switchAccount",
-            addTitle: "settings.accountSwitcher.addAccount",
+            addTitle: "settings.accountSwitcher.addAnthropicAccount",
             triggerStyle: effectiveTriggerStyle,
             accountLabel: { $0.email },
             isLiveAccount: { isAnthropicOAuthActive && independentManager.isLiveAccount($0) },

@@ -41,41 +41,56 @@ struct IdentityPickerView: View {
         let isActive = identityStore.activeIdentity == .anthropicOAuth
         let email = profileViewModel.userProfile?.account?.email
             ?? profileViewModel.userProfile?.account?.displayName
-        return Button {
-            identityStore.activate(.anthropicOAuth)
-            isPresented = false
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.blue)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("identityPicker.anthropicOAuth")
-                        .font(.system(size: 12, weight: .medium))
-                    if let email {
-                        Text(email)
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    } else {
-                        Text("identityPicker.signInHint")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "person.crop.circle")
+                    .font(.system(size: 10, weight: .semibold))
+                Text("identityPicker.anthropicSection")
+                    .font(.system(size: 10, weight: .semibold))
+                Spacer()
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 5)
+            .background(Color.primary.opacity(0.035))
+
+            Button {
+                identityStore.activate(.anthropicOAuth)
+                isPresented = false
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.blue)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("identityPicker.anthropicOAuth")
+                            .font(.system(size: 12, weight: .medium))
+                        if let email {
+                            Text(email)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        } else {
+                            Text("identityPicker.signInHint")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer()
+                    if isActive {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.blue)
                     }
                 }
-                Spacer()
-                if isActive {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.blue)
-                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
     }
 }
 
@@ -88,12 +103,18 @@ private struct SubscriptionSourceSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(manager.sourceDisplayName)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.tertiary)
-                .padding(.horizontal, 12)
-                .padding(.top, 8)
-                .padding(.bottom, 4)
+            HStack(spacing: 6) {
+                Image(systemName: "creditcard")
+                    .font(.system(size: 10, weight: .semibold))
+                Text(manager.sourceDisplayName)
+                    .font(.system(size: 10, weight: .semibold))
+                Spacer()
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
+            .background(Color.primary.opacity(0.035))
 
             if manager.accounts.isEmpty {
                 Text("identityPicker.noAccounts")
@@ -113,8 +134,8 @@ private struct SubscriptionSourceSection: View {
                 HStack(spacing: 6) {
                     Image(systemName: "plus")
                         .font(.system(size: 10, weight: .semibold))
-                    Text("identityPicker.addAccount")
-                        .font(.system(size: 11))
+                    Text(String(format: NSLocalizedString("identityPicker.addSubscriptionAccount %@", comment: ""), manager.sourceDisplayName))
+                        .font(.system(size: 11, weight: .medium))
                 }
                 .foregroundStyle(.blue)
                 .padding(.horizontal, 12)

@@ -2,14 +2,31 @@ import SwiftUI
 import ClaudeStatisticsKit
 
 struct PricingManageView: View {
-    enum ModelScope: String, CaseIterable, Identifiable {
+    enum ModelScope: Hashable, Identifiable {
         case provider
+        case subscriptionPlugin(String)
         case all
 
-        var id: String { rawValue }
+        var id: String {
+            switch self {
+            case .provider:
+                return "provider"
+            case .subscriptionPlugin(let id):
+                return "subscriptionPlugin:\(id)"
+            case .all:
+                return "all"
+            }
+        }
+    }
+
+    private struct SubscriptionPricingGroup: Identifiable {
+        let id: String
+        let displayName: String
+        let models: [String: ModelPricing.Pricing]
     }
 
     let provider: any SessionProvider
+    let pluginRegistry: PluginRegistry
     let onBack: () -> Void
 
     @State private var models: [(id: String, pricing: ModelPricing.Pricing)] = []
@@ -111,6 +128,9 @@ struct PricingManageView: View {
 
             Picker("", selection: $modelScope) {
                 Text("pricing.scope.provider").tag(ModelScope.provider)
+                ForEach(subscriptionPricingGroups) { group in
+                    Text(group.displayName).tag(ModelScope.subscriptionPlugin(group.id))
+                }
                 Text("pricing.scope.all").tag(ModelScope.all)
             }
             .pickerStyle(.segmented)
@@ -300,12 +320,32 @@ struct PricingManageView: View {
 
     private func loadModels() {
         let preferred = Set(provider.builtinPricingModels.keys)
+        let groups = subscriptionPricingGroups
+        let selectedSubscriptionModelIDs: Set<String>
+        switch modelScope {
+        case .subscriptionPlugin(let id):
+            selectedSubscriptionModelIDs = Set(groups.first { $0.id == id }.map { Array($0.models.keys) } ?? [])
+        case .provider, .all:
+            selectedSubscriptionModelIDs = []
+        }
+        let allSubscriptionModelIDs = Set(groups.flatMap { $0.models.keys })
+
         models = ModelPricing.shared.models
             .sorted {
                 let lhsPreferred = preferred.contains($0.key)
                 let rhsPreferred = preferred.contains($1.key)
+                let lhsSelectedSubscription = selectedSubscriptionModelIDs.contains($0.key)
+                let rhsSelectedSubscription = selectedSubscriptionModelIDs.contains($1.key)
+                let lhsSubscription = allSubscriptionModelIDs.contains($0.key)
+                let rhsSubscription = allSubscriptionModelIDs.contains($1.key)
                 if lhsPreferred != rhsPreferred {
                     return lhsPreferred && !rhsPreferred
+                }
+                if lhsSelectedSubscription != rhsSelectedSubscription {
+                    return lhsSelectedSubscription && !rhsSelectedSubscription
+                }
+                if lhsSubscription != rhsSubscription {
+                    return lhsSubscription && !rhsSubscription
                 }
                 return $0.key < $1.key
             }
@@ -313,11 +353,28 @@ struct PricingManageView: View {
                 switch modelScope {
                 case .provider:
                     return preferred.contains(item.key)
+                case .subscriptionPlugin:
+                    return selectedSubscriptionModelIDs.contains(item.key)
                 case .all:
                     return true
                 }
             }
             .map { (id: $0.key, pricing: $0.value) }
+    }
+
+    private var subscriptionPricingGroups: [SubscriptionPricingGroup] {
+        pluginRegistry.subscriptionExtensions.values.compactMap { plugin in
+            guard let extensionPlugin = plugin as? any SubscriptionExtensionPlugin else { return nil }
+            let models = extensionPlugin.builtinPricingModels
+            guard !models.isEmpty else { return nil }
+            let manifest = type(of: plugin).manifest
+            return SubscriptionPricingGroup(
+                id: manifest.id,
+                displayName: manifest.displayName,
+                models: models
+            )
+        }
+        .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
     }
 
     private func startEditing(_ item: (id: String, pricing: ModelPricing.Pricing)) {

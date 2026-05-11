@@ -219,6 +219,15 @@ final class AttentionBridge {
                 )
             }
 
+            if !resolved.claimed {
+                if let bundleId = msg.host_app_bundle_id, !bundleId.isEmpty {
+                    MissingPluginRecommendationStore.shared.recordUnclaimedHost(
+                        bundleID: bundleId,
+                        provider: provider
+                    )
+                }
+            }
+
             // Hook fired from a GUI host (non-empty `__CFBundleIdentifier`)
             // that no installed terminal plugin claims — typically
             // Claude.app / Codex.app sessions when their plugins aren't

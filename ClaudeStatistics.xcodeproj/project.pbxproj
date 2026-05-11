@@ -116,6 +116,7 @@
 		4A69484840B48CDE187957E0 /* AutoRefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAAFBA5B9EEDC2BB22BAF700 /* AutoRefreshCoordinator.swift */; };
 		4B427B261423763F796DE5DD /* TranscriptParserCommons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84C6E039B436786047A1D605 /* TranscriptParserCommons.swift */; };
 		4C27C5DD7022DEE994CAA840 /* WireEventTranslatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17CEC3E9B44025FEE0E05C89 /* WireEventTranslatorTests.swift */; };
+		4D43D757754CC66D95986FA2 /* MissingPluginRecommendationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBBBF4BC180317B171751BFF /* MissingPluginRecommendationStore.swift */; };
 		4E4BEF51FB660CE04D41338F /* IndependentClaudeAccountViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEEBABA82636376B36824D8 /* IndependentClaudeAccountViewModel.swift */; };
 		4F1FBB58C850CD3E947CA886 /* NotchStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3B518873560CAC7DE5DE5B /* NotchStateMachine.swift */; };
 		52769FCFB499502D23765EFB /* ToolActivityFormatterPermissionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F06F5996862455AE5ED7AD2B /* ToolActivityFormatterPermissionsTests.swift */; };
@@ -726,6 +727,7 @@
 		F9514A40AA4DF7561C0D5C8B /* ProviderHookNormalizing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderHookNormalizing.swift; sourceTree = "<group>"; };
 		FA8B62A57C9E8AD16345458A /* ShareMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareMetrics.swift; sourceTree = "<group>"; };
 		FAAFBA5B9EEDC2BB22BAF700 /* AutoRefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoRefreshCoordinator.swift; sourceTree = "<group>"; };
+		FBBBF4BC180317B171751BFF /* MissingPluginRecommendationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MissingPluginRecommendationStore.swift; sourceTree = "<group>"; };
 		FDD81B5645107DB493B28671 /* ProviderSessionDisplayFormatter+Filters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProviderSessionDisplayFormatter+Filters.swift"; sourceTree = "<group>"; };
 		FE48286336B9D3C392E19DB4 /* NotchNotificationsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchNotificationsSection.swift; sourceTree = "<group>"; };
 		FE636182FF6DD94E82DAB93B /* ProviderAccountUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderAccountUI.swift; sourceTree = "<group>"; };
@@ -890,6 +892,7 @@
 			isa = PBXGroup;
 			children = (
 				6749A9BF125AC2A04C7043D5 /* DatabaseService.swift */,
+				FBBBF4BC180317B171751BFF /* MissingPluginRecommendationStore.swift */,
 				8C99C5F837066C3D1E5A2C0B /* SessionAllTimeAggregator.swift */,
 				3D5BA98DFF322E54A1E5B1F2 /* SessionDataStore.swift */,
 				0B6B0E05647AAB784A323B00 /* SessionDeduplicator.swift */,
@@ -1584,6 +1587,7 @@
 				F9A2EB368C20702F1D6E2FD4 /* MenuBarFooter.swift in Sources */,
 				F3272760285AF18F519D8E80 /* MenuBarView.swift in Sources */,
 				6381FDCEA8C711F7353696CE /* MessageRow.swift in Sources */,
+				4D43D757754CC66D95986FA2 /* MissingPluginRecommendationStore.swift in Sources */,
 				FA780917FC578D52FC305583 /* ModifierRecorderRow.swift in Sources */,
 				C4EEDE0F0236FE4680A1B5CC /* NotchAutoAllowRules.swift in Sources */,
 				6CB9AC028D3C2D548F717E01 /* NotchContainerView.swift in Sources */,

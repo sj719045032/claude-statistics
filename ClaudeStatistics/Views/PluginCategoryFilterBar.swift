@@ -18,6 +18,7 @@ struct PluginCategoryFilterBar: View {
     let categories: [(id: String, count: Int)]
     /// `nil` ⇒ show every category (the "All" chip is selected).
     @Binding var selection: String?
+    var totalCountOverride: Int?
 
     var body: some View {
         // Keep the bar terse when the data set is empty — no chips, no
@@ -30,7 +31,7 @@ struct PluginCategoryFilterBar: View {
                 HStack(spacing: 6) {
                     chip(
                         titleKey: "settings.plugins.category.all",
-                        count: totalCount,
+                        count: totalCountOverride ?? totalCount,
                         isSelected: selection == nil
                     ) {
                         selection = nil
@@ -89,6 +90,12 @@ struct PluginCategoryFilterBar: View {
     /// Mirror of the same string keys both Installed and Discover use
     /// so the chip label matches the section header label exactly.
     private func localizationKey(for category: String) -> LocalizedStringKey {
+        if category == PluginDiscoverView.recommendedFilterID {
+            return "settings.recommended"
+        }
+        if category == PluginDiscoverView.installedFilterID {
+            return "settings.plugins.tab.installed"
+        }
         switch PluginCatalogCategory.canonicalize(category) {
         case PluginCatalogCategory.provider: return "settings.plugins.category.provider"
         case PluginCatalogCategory.terminal: return "settings.plugins.category.terminal"

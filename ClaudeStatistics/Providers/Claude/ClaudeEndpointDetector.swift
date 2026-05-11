@@ -30,4 +30,27 @@ struct ClaudeEndpointDetector: EndpointDetector {
         }
     }
 
+    /// Raw Claude CLI settings, ignoring the app's selected identity.
+    /// Used by integrations that run *inside* Claude Code (status line)
+    /// and therefore must follow the CLI's current endpoint/token, not
+    /// whichever account the app is currently inspecting.
+    static func detectFromCLISettings() -> EndpointInfo {
+        let settingsPath = (NSHomeDirectory() as NSString)
+            .appendingPathComponent(".claude/settings.json")
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: settingsPath)),
+              let parsed = try? JSONDecoder().decode(EnvelopeShape.self, from: data) else {
+            return .empty
+        }
+        let env = parsed.env ?? [:]
+        let baseURLString = env["ANTHROPIC_BASE_URL"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let baseURL = baseURLString.flatMap { $0.isEmpty ? nil : URL(string: $0) }
+        let apiKey = (env["ANTHROPIC_AUTH_TOKEN"] ?? env["ANTHROPIC_API_KEY"])?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return EndpointInfo(baseURL: baseURL, apiKey: (apiKey?.isEmpty ?? true) ? nil : apiKey)
+    }
+
+    private struct EnvelopeShape: Decodable {
+        let env: [String: String]?
+    }
 }

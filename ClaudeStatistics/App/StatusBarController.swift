@@ -413,14 +413,10 @@ private struct MenuBarUsageCell: View {
     private var segments: [MenuBarStripSegment] {
         let signpostState = PerformanceTracer.begin("MenuBarCell.segments")
         defer { PerformanceTracer.end("MenuBarCell.segments", signpostState) }
-        let providerSegments = ProviderRegistry.provider(for: kind)
-            .menuBarStripSegments(from: viewModel.usageData)
-        if !providerSegments.isEmpty { return providerSegments }
-        // Subscription fallback: when the user is on a third-party
-        // endpoint (e.g. GLM) the provider's usage source returns
-        // nothing, so we synthesize segments from the subscription
-        // adapter's quota windows. One segment per window, rotating
-        // through them with the same tick the provider segments use.
+        // Subscription override: when the user is on a third-party
+        // endpoint (e.g. GLM), stale native-provider usage cache may
+        // still exist. The selected subscription identity is the live
+        // account, so its quota windows must win over provider data.
         if let info = viewModel.subscriptionInfo, !info.quotas.isEmpty {
             return info.quotas.map { quota in
                 MenuBarStripSegment(
@@ -430,6 +426,9 @@ private struct MenuBarUsageCell: View {
                 )
             }
         }
+        let providerSegments = ProviderRegistry.provider(for: kind)
+            .menuBarStripSegments(from: viewModel.usageData)
+        if !providerSegments.isEmpty { return providerSegments }
         return []
     }
 

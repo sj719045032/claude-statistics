@@ -9,14 +9,10 @@ import ClaudeStatisticsKit
 /// are unaffected by the reset because they're implicitly trusted.
 struct PluginsSettingsView: View {
     let pluginRegistry: PluginRegistry
+    let recommendedPluginID: String?
     let onBack: () -> Void
 
-    private enum Tab: Hashable {
-        case installed
-        case discover
-    }
-
-    @State private var tab: Tab = .installed
+    @State private var selectedPluginFilter: String?
     /// Active chip in the Installed-tab filter bar; `nil` means "All".
     @State private var selectedInstalledCategory: String?
     @State private var showResetConfirmation = false
@@ -48,6 +44,13 @@ struct PluginsSettingsView: View {
     /// `SettingsRowButton` (not `DestructiveActionButton`), so the
     /// monitor has to be observed at the parent view.
     @ObservedObject private var skipConfirmMonitor = SkipConfirmKeyMonitor.shared
+
+    init(pluginRegistry: PluginRegistry, recommendedPluginID: String? = nil, onBack: @escaping () -> Void) {
+        self.pluginRegistry = pluginRegistry
+        self.recommendedPluginID = recommendedPluginID
+        self.onBack = onBack
+        _selectedPluginFilter = State(initialValue: recommendedPluginID == nil ? nil : PluginDiscoverView.recommendedFilterID)
+    }
 
     private struct Row: Identifiable {
         let manifest: PluginManifest
@@ -103,6 +106,38 @@ struct PluginsSettingsView: View {
         }
     }
 
+    private var availableUpdateCount: Int {
+        rows.filter { row in
+            guard let catalog = catalogEntriesByID[row.manifest.id] else { return false }
+            return catalog.version > installedVersion(for: row)
+        }.count
+    }
+
+    private var pluginFilterCounts: [(id: String, count: Int)] {
+        var counts: [String: Int] = [:]
+        if let recommendedPluginID,
+           liveCatalogEntries.contains(where: { $0.id == recommendedPluginID }) {
+            counts[PluginDiscoverView.recommendedFilterID] = 1
+        }
+        let installedCount = rows.count + disabledRows.count
+        if installedCount > 0 {
+            counts[PluginDiscoverView.installedFilterID] = installedCount
+        }
+        for entry in liveCatalogEntries {
+            let key = PluginCatalogCategory.canonicalize(entry.category)
+            counts[key, default: 0] += 1
+        }
+        return [PluginDiscoverView.recommendedFilterID, PluginDiscoverView.installedFilterID]
+            .compactMap { id in
+                guard let count = counts[id], count > 0 else { return nil }
+                return (id: id, count: count)
+            }
+            + PluginCatalogCategory.known.compactMap { id in
+                guard let count = counts[id], count > 0 else { return nil }
+                return (id: id, count: count)
+            }
+    }
+
     /// Optional `UserDefaults` override pointing at a local
     /// `index.json` (file://… for dev/QA, or a self-hosted https URL
     /// for staged catalogs). Empty / unset → fall back to
@@ -153,8 +188,19 @@ struct PluginsSettingsView: View {
                 }
                 .buttonStyle(.plain)
                 Spacer()
-                Text("settings.plugins")
-                    .font(.system(size: 13, weight: .semibold))
+                HStack(spacing: 6) {
+                    Text("settings.plugins")
+                        .font(.system(size: 13, weight: .semibold))
+                    if availableUpdateCount > 0 {
+                        Text("settings.plugins.updates.available \(availableUpdateCount)")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Color.red)
+                            .clipShape(Capsule())
+                    }
+                }
                 Spacer()
                 // Symmetric spacer to keep the title centered.
                 Color.clear.frame(width: 60, height: 1)
@@ -162,25 +208,28 @@ struct PluginsSettingsView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
 
-            Picker("", selection: $tab) {
-                Text("settings.plugins.tab.installed").tag(Tab.installed)
-                Text("settings.plugins.tab.discover").tag(Tab.discover)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .padding(.horizontal, 12)
-            .padding(.bottom, 8)
-
             Divider()
 
-            switch tab {
-            case .installed:
+            if !pluginFilterCounts.isEmpty {
+                PluginCategoryFilterBar(
+                    categories: pluginFilterCounts,
+                    selection: $selectedPluginFilter,
+                    totalCountOverride: liveCatalogEntries.count
+                )
+                Divider()
+            }
+
+            if selectedPluginFilter == PluginDiscoverView.installedFilterID {
                 installedTab
-            case .discover:
+            } else {
                 PluginDiscoverView(
                     pluginRegistry: pluginRegistry,
-                    catalogURL: developerCatalogOverrideURL
+                    catalogURL: developerCatalogOverrideURL,
+                    recommendedPluginID: recommendedPluginID,
+                    initialCategory: selectedPluginFilter,
+                    hideCategoryFilter: true
                 )
+                .id(selectedPluginFilter ?? "all")
             }
         }
         .alert("settings.plugins.resetTrust.confirmTitle", isPresented: $showResetConfirmation) {
@@ -252,12 +301,9 @@ struct PluginsSettingsView: View {
         } message: {
             Text(uninstallError ?? "")
         }
-        .task(id: tab) {
-            // Always pull a fresh catalog when the panel opens (or
-            // when the user flips between Installed / Discover) so
-            // the Installed tab's display name / category / Update
-            // button reflect the current marketplace, not whatever
-            // was last cached.
+        .task {
+            // Pull a fresh catalog when the panel opens so the title
+            // update badge reflects the current marketplace.
             await refreshLiveCatalog()
         }
     }

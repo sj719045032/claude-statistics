@@ -13,6 +13,8 @@ import ClaudeStatisticsKit
 /// "who am I subscribed as?", not "how much have I used?"
 struct SubscriptionAccountCard: View {
     let info: SubscriptionInfo
+    let accountName: String?
+    let accountDetail: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -33,17 +35,10 @@ struct SubscriptionAccountCard: View {
                 Text(note)
                     .font(.system(size: 11))
                     .foregroundStyle(.orange)
-            } else if let dashboardURL = info.dashboardURL {
-                Link(destination: dashboardURL) {
-                    HStack(spacing: 3) {
-                        Text("subscription.card.openDashboard")
-                        Image(systemName: "arrow.up.right.square")
-                            .font(.system(size: 9))
-                    }
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+            } else if let accountName {
+                Text(accountDetail.map { "\(accountName) · \($0)" } ?? accountName)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
             }
         }
     }

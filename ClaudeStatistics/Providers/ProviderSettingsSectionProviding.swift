@@ -426,12 +426,18 @@ struct SubscriptionSectionsList: View {
 
     private func subscriptionSection(_ manager: SubscriptionAccountManager) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(manager.sourceDisplayName)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.tertiary)
-                .padding(.horizontal, 14)
-                .padding(.top, 8)
-                .padding(.bottom, 4)
+            HStack(spacing: 6) {
+                Image(systemName: "creditcard")
+                    .font(.system(size: 10, weight: .semibold))
+                Text(manager.sourceDisplayName)
+                    .font(.system(size: 10, weight: .semibold))
+                Spacer()
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
+            .background(Color.primary.opacity(0.035))
 
             if manager.accounts.isEmpty {
                 Text("identityPicker.noAccounts")
@@ -448,8 +454,13 @@ struct SubscriptionSectionsList: View {
             Button {
                 addAccountManager = PendingSubscriptionAdd(manager: manager)
             } label: {
-                Label("identityPicker.addAccount", systemImage: "plus")
-                    .font(.system(size: 11))
+                HStack(spacing: 6) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(String(format: NSLocalizedString("identityPicker.addSubscriptionAccount %@", comment: ""), manager.sourceDisplayName))
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .foregroundStyle(.blue)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)

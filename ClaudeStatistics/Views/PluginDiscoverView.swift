@@ -10,10 +10,16 @@ import ClaudeStatisticsKit
 /// `Picker` at the top of `PluginsSettingsView`; this view assumes
 /// it's rendered inside that frame.
 struct PluginDiscoverView: View {
+    static let recommendedFilterID = "__recommended"
+    static let installedFilterID = "__installed"
+
     let pluginRegistry: PluginRegistry
     /// Catalog source — `nil` ⇒ `PluginCatalog.defaultRemoteURL`.
     /// Tests / dev mode override.
     var catalogURL: URL?
+    var recommendedPluginID: String?
+    var initialCategory: String?
+    var hideCategoryFilter: Bool
 
     @State private var entries: [PluginCatalogEntry] = []
     @State private var lastFetchKind: PluginCatalog.Outcome.Kind?
@@ -37,6 +43,21 @@ struct PluginDiscoverView: View {
     @State private var pendingRestartIds: Set<String> = []
     /// Active chip in the category filter bar. `nil` ⇒ "All".
     @State private var selectedCategory: String?
+
+    init(
+        pluginRegistry: PluginRegistry,
+        catalogURL: URL? = nil,
+        recommendedPluginID: String? = nil,
+        initialCategory: String? = nil,
+        hideCategoryFilter: Bool = false
+    ) {
+        self.pluginRegistry = pluginRegistry
+        self.catalogURL = catalogURL
+        self.recommendedPluginID = recommendedPluginID
+        self.initialCategory = initialCategory
+        self.hideCategoryFilter = hideCategoryFilter
+        _selectedCategory = State(initialValue: initialCategory)
+    }
 
     private enum LoadingState: Equatable {
         case idle
@@ -76,10 +97,11 @@ struct PluginDiscoverView: View {
         VStack(spacing: 0) {
             statusBar
             Divider()
-            if !categoryCounts.isEmpty {
+            if !hideCategoryFilter && !categoryCounts.isEmpty {
                 PluginCategoryFilterBar(
                     categories: categoryCounts,
-                    selection: $selectedCategory
+                    selection: $selectedCategory,
+                    totalCountOverride: entries.count
                 )
                 Divider()
             }
@@ -97,11 +119,22 @@ struct PluginDiscoverView: View {
     private var categoryCounts: [(id: String, count: Int)] {
         _ = refreshTick
         var byCategory: [String: Int] = [:]
+        if let recommendedPluginID,
+           entries.contains(where: { $0.id == recommendedPluginID }) {
+            byCategory[Self.recommendedFilterID] = 1
+        }
+        let installedCount = entries.filter { installedManifest(id: $0.id) != nil }.count
+        if installedCount > 0 {
+            byCategory[Self.installedFilterID] = installedCount
+        }
         for entry in entries {
             let key = PluginCatalogCategory.canonicalize(entry.category)
             byCategory[key, default: 0] += 1
         }
-        return PluginCatalogCategory.known.compactMap { cat in
+        return [Self.recommendedFilterID, Self.installedFilterID].compactMap { cat in
+            guard let count = byCategory[cat], count > 0 else { return nil }
+            return (id: cat, count: count)
+        } + PluginCatalogCategory.known.compactMap { cat in
             guard let count = byCategory[cat], count > 0 else { return nil }
             return (id: cat, count: count)
         }
@@ -109,15 +142,26 @@ struct PluginDiscoverView: View {
 
     private var filteredEntries: [PluginCatalogEntry] {
         _ = refreshTick
-        guard let selectedCategory else {
-            return entries.sorted { $0.name < $1.name }
+        let visibleEntries: [PluginCatalogEntry]
+        if selectedCategory == Self.recommendedFilterID {
+            visibleEntries = entries.filter { $0.id == recommendedPluginID }
+        } else if selectedCategory == Self.installedFilterID {
+            visibleEntries = entries.filter { installedManifest(id: $0.id) != nil }
+        } else if let selectedCategory {
+            visibleEntries = entries
+                .filter { entry in
+                    let key = PluginCatalogCategory.canonicalize(entry.category)
+                    return key == selectedCategory
+                }
+        } else {
+            visibleEntries = entries
         }
-        return entries
-            .filter { entry in
-                let key = PluginCatalogCategory.canonicalize(entry.category)
-                return key == selectedCategory
+        return visibleEntries
+            .sorted { lhs, rhs in
+                if lhs.id == recommendedPluginID { return true }
+                if rhs.id == recommendedPluginID { return false }
+                return lhs.name < rhs.name
             }
-            .sorted { $0.name < $1.name }
     }
 
     @ViewBuilder
@@ -219,6 +263,16 @@ struct PluginDiscoverView: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .layoutPriority(1)
+                    if entry.id == recommendedPluginID {
+                        Text("settings.recommended")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Color.orange)
+                            .clipShape(Capsule())
+                            .fixedSize()
+                    }
                     Spacer(minLength: 8)
                     Text("v\(entry.version)")
                         .font(.system(size: 10, design: .monospaced))

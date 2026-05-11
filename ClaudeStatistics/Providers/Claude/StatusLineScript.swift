@@ -11,6 +11,7 @@ extension StatusLineInstaller {
         let appRoot = AppRuntimePaths.rootDirectory
         let pricingPath = "\(appRoot)/pricing.json"
         let usageCachePath = "\(appRoot)/usage-cache.json"
+        let subscriptionCachePath = "\(appRoot)/subscription-cache.json"
         let transcriptCacheDir = "\(appRoot)/statusline-cache"
         let historyPath = "\(appRoot)/usage-history.jsonl"
 
@@ -394,6 +395,15 @@ extension StatusLineInstaller {
           fi
         }
 
+        subscription_prefix() {
+          case "$1" in
+            5h) printf "5h" ;;
+            weekly) printf "7d" ;;
+            monthly) printf "1M" ;;
+            *) printf "%s" "$1" | cut -c1-3 ;;
+          esac
+        }
+
         format_remaining() {
           python3 -c "
         from datetime import datetime, timezone
@@ -574,8 +584,29 @@ extension StatusLineInstaller {
         # Subscription usage — read from Claude Statistics app cache
         # ---------------------------------------------------------------------------
         quota_section=""
+        APP_SUBSCRIPTION_CACHE="\(subscriptionCachePath)"
 
-        if [ -f "$APP_USAGE_CACHE" ]; then
+        if [ -f "$APP_SUBSCRIPTION_CACHE" ]; then
+          while IFS=$'\\t' read -r quota_id quota_pct quota_reset; do
+            [ -z "$quota_id" ] && continue
+            quota_prefix=$(subscription_prefix "$quota_id")
+            if [ -z "$quota_section" ]; then
+              quota_section="${lgray}${quota_prefix} $(color_pct "$quota_pct")"
+            else
+              quota_section="${quota_section} ${lgray}${quota_prefix} $(color_pct "$quota_pct")"
+            fi
+
+            if [ -n "$quota_reset" ]; then
+              case "$quota_id" in
+                5h) quota_remaining=$(format_remaining "$quota_reset") ;;
+                *)  quota_remaining=$(format_remaining_days "$quota_reset") ;;
+              esac
+              [ -n "$quota_remaining" ] && quota_section="${quota_section}${gray}(${lgray}${quota_remaining}${gray})${reset}"
+            fi
+          done < <(jq -r '.quotas[]? | [.id, (.percentage // 0 | tostring), (.reset_at // "")] | @tsv' "$APP_SUBSCRIPTION_CACHE" 2>/dev/null)
+        fi
+
+        if [ -z "$quota_section" ] && [ -f "$APP_USAGE_CACHE" ]; then
           usage_data=$(jq -r '.data' "$APP_USAGE_CACHE" 2>/dev/null)
 
           five_h_util=$(echo "$usage_data" | jq -r '.five_hour.utilization // empty' 2>/dev/null)

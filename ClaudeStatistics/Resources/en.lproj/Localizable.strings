@@ -212,6 +212,7 @@
 "settings.accountSwitcher.switchAccount" = "Switch Account";
 "settings.accountSwitcher.signingIn" = "Signing in...";
 "settings.accountSwitcher.addAccount" = "Add Account";
+"settings.accountSwitcher.addAnthropicAccount" = "Add Anthropic account";
 "settings.accountSwitcher.waiting" = "Waiting for sign-in…";
 "settings.accountSwitcher.cancelPending" = "Cancel Pending Login";
 "settings.accountSwitcher.deleteConfirmTitle" = "Remove Saved Account";
@@ -247,6 +248,12 @@
 "settings.plugins.empty" = "No plugins loaded.";
 "settings.plugins.empty.filter" = "No plugins match the selected category.";
 "settings.plugins.loaded.count %lld" = "Loaded plugins (%lld)";
+"settings.plugins.loaded.summary %lld" = "%lld plugins installed";
+"settings.plugins.updates.available %lld" = "%lld updates";
+"settings.plugins.recommendation.title %@" = "%@ plugin recommended";
+"settings.plugins.recommendation.notch %@" = "Notch events from %@ were ignored because its plugin is missing.";
+"settings.plugins.recommendation.install" = "Install";
+"settings.plugins.recommendation.enable" = "Enable";
 "settings.plugins.trust" = "Trust";
 "settings.plugins.resetTrust" = "Reset all plugin trust decisions";
 "settings.plugins.resetTrust.immediate.help" = "Reset now (skip confirmation)";
@@ -311,10 +318,12 @@
 "settings.identitySwitcher.button" = "Switch Account";
 
 /* Identity picker */
+"identityPicker.anthropicSection" = "Anthropic accounts";
 "identityPicker.anthropicOAuth" = "Anthropic OAuth";
 "identityPicker.signInHint" = "Sign in via Settings";
 "identityPicker.noAccounts" = "No accounts yet";
 "identityPicker.addAccount" = "Add account";
+"identityPicker.addSubscriptionAccount %@" = "Add %@ account";
 
 /* Subscription account card */
 "subscription.card.active" = "Active";

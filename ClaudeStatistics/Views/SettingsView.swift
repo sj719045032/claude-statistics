@@ -43,6 +43,8 @@ struct SettingsView: View {
     @State private var showDeveloperSettings = false
     @State private var showPluginSettings = false
     @State private var hasToken: Bool?
+    @State private var pluginUpdateCount: Int?
+    @State private var missingPluginRecommendation: MissingPluginRecommendation?
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var isTabOrderExpanded = false
     @State private var isRefreshIntervalExpanded = false
@@ -52,7 +54,11 @@ struct SettingsView: View {
     var body: some View {
         VStack(spacing: 0) {
             if showPricing {
-                PricingManageView(provider: provider, onBack: { showPricing = false })
+                PricingManageView(
+                    provider: provider,
+                    pluginRegistry: appState.pluginRegistry,
+                    onBack: { showPricing = false }
+                )
             } else if showNotchSettings {
                 NotchNotificationsDetailView(provider: provider.kind, onBack: { showNotchSettings = false })
             } else if showKeyboardShortcuts {
@@ -73,11 +79,24 @@ struct SettingsView: View {
             } else if showPluginSettings {
                 PluginsSettingsView(
                     pluginRegistry: appState.pluginRegistry,
+                    recommendedPluginID: missingPluginRecommendation?.pluginID,
                     onBack: { showPluginSettings = false }
                 )
             } else {
                 settingsContent
             }
+        }
+        .task(id: showPluginSettings) {
+            if !showPluginSettings {
+                await refreshPluginUpdateCount()
+                refreshMissingPluginRecommendation()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: MissingPluginRecommendationStore.didChange)) { _ in
+            refreshMissingPluginRecommendation()
+        }
+        .onChange(of: provider.kind) { _, _ in
+            refreshMissingPluginRecommendation()
         }
     }
 
@@ -112,6 +131,7 @@ struct SettingsView: View {
                 NotchNotificationsSection(provider: provider.kind) {
                     showNotchSettings = true
                 }
+                pluginSettingsRow
             }
 
             generalSection
@@ -221,20 +241,6 @@ struct SettingsView: View {
                     }
                 }
 
-                SettingsRowButton(action: { showPluginSettings = true }) {
-                    HStack {
-                        Label("settings.plugins", systemImage: "puzzlepiece.extension")
-                            .labelStyle(SettingsRowLabelStyle())
-                        Spacer()
-                        Text("\(appState.pluginRegistry.loadedManifests().count)")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-
                 if showDeveloperTools {
                     SettingsRowButton(action: { showDeveloperSettings = true }) {
                         HStack {
@@ -292,7 +298,11 @@ struct SettingsView: View {
                 }
 
                 if let info = profileViewModel.subscriptionInfo {
-                    SubscriptionAccountCard(info: info)
+                    SubscriptionAccountCard(
+                        info: info,
+                        accountName: activeSubscriptionAccount?.label,
+                        accountDetail: activeSubscriptionAccount?.detailLine
+                    )
                     Spacer()
                     // Identity picker now works in both modes —
                     // subscription users want to switch back to OAuth
@@ -415,6 +425,127 @@ struct SettingsView: View {
 
     private var credentialHintKey: LocalizedStringKey {
         LocalizedStringKey(provider.credentialHintLocalizationKey ?? "settings.credentialHint")
+    }
+
+    private var activeSubscriptionAccount: SubscriptionAccount? {
+        guard case .subscription(let adapterID, let accountID) = IdentityStore.shared.activeIdentity,
+              let manager = SubscriptionAdapterRouter.shared.accountManager(adapterID: adapterID),
+              manager.providerID == provider.providerId else {
+            return nil
+        }
+        let resolvedID = accountID ?? manager.activeAccountID
+        guard let resolvedID else { return nil }
+        return manager.accounts.first { $0.id == resolvedID }
+    }
+
+    private var pluginSettingsRow: some View {
+        SettingsRowButton(action: { showPluginSettings = true }) {
+            HStack(alignment: .center, spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(pluginIconColor.opacity(hasPluginAttention ? 0.18 : 0.16))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: hasPluginAttention ? "puzzlepiece.extension.fill" : "shippingbox.fill")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(pluginIconColor)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("settings.plugins")
+                        .font(.system(size: 13, weight: .medium))
+                    Text(pluginSettingsSummary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                if let missingPluginRecommendation {
+                    Text(missingPluginRecommendation.action == .enable
+                         ? "settings.plugins.recommendation.enable"
+                         : "settings.plugins.recommendation.install")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.orange)
+                        .clipShape(Capsule())
+                } else if let pluginUpdateCount, pluginUpdateCount > 0 {
+                    Text("settings.plugins.updates.available \(pluginUpdateCount)")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.red)
+                        .clipShape(Capsule())
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.secondary.opacity(0.55))
+                    .frame(width: 12, height: 20)
+            }
+        }
+    }
+
+    private var pluginSettingsSummary: LocalizedStringKey {
+        if let missingPluginRecommendation {
+            return "settings.plugins.recommendation.title \(missingPluginRecommendation.appName)"
+        }
+        if let pluginUpdateCount, pluginUpdateCount > 0 {
+            return "settings.plugins.updates.available \(pluginUpdateCount)"
+        }
+        return "settings.plugins.loaded.summary \(appState.pluginRegistry.loadedManifests().count)"
+    }
+
+    private var hasPluginAttention: Bool {
+        missingPluginRecommendation != nil || hasPluginUpdates
+    }
+
+    private var hasPluginUpdates: Bool {
+        (pluginUpdateCount ?? 0) > 0
+    }
+
+    private var pluginIconColor: Color {
+        hasPluginAttention ? .orange : .purple
+    }
+
+    private var developerCatalogOverrideURL: URL? {
+        guard let raw = UserDefaults.standard.string(forKey: "dev.pluginCatalog.remoteURL")?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else { return nil }
+        return URL(string: raw)
+    }
+
+    @MainActor
+    private func refreshPluginUpdateCount() async {
+        let catalog = PluginCatalog(remoteURL: developerCatalogOverrideURL ?? PluginCatalog.defaultRemoteURL)
+        guard let outcome = try? await catalog.fetch() else { return }
+        let catalogEntries = Dictionary(uniqueKeysWithValues: outcome.index.entries.map { ($0.id, $0) })
+        let count = appState.pluginRegistry.loadedManifests().filter { manifest in
+            guard let entry = catalogEntries[manifest.id] else { return false }
+            let installed = installedPluginVersion(manifest: manifest, source: appState.pluginRegistry.source(for: manifest.id))
+            return entry.version > installed
+        }.count
+        pluginUpdateCount = count
+    }
+
+    @MainActor
+    private func refreshMissingPluginRecommendation() {
+        missingPluginRecommendation = MissingPluginRecommendationStore.shared.recommendation(
+            for: provider.kind,
+            pluginRegistry: appState.pluginRegistry
+        )
+    }
+
+    private func installedPluginVersion(manifest: PluginManifest, source: PluginSource?) -> SemVer {
+        if let url = source?.bundleURL,
+           let diskManifest = try? PluginManifest(contentsOfBundleAt: url),
+           diskManifest.id == manifest.id {
+            return diskManifest.version
+        }
+        return manifest.version
     }
 
     @ViewBuilder
