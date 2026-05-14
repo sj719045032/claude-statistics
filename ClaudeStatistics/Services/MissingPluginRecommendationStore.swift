@@ -77,6 +77,9 @@ final class MissingPluginRecommendationStore {
             if pluginRegistry.terminalPlugin(id: signal.pluginID) != nil {
                 continue
             }
+            if installedApplicationURL(bundleID: signal.bundleID) == nil {
+                continue
+            }
             let isDisabled = pluginRegistry.disabledRecords().contains { $0.manifest.id == signal.pluginID }
             return MissingPluginRecommendation(
                 pluginID: signal.pluginID,
@@ -115,12 +118,32 @@ final class MissingPluginRecommendationStore {
     }
 
     private func appDisplayName(bundleID: String) -> String? {
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID),
+        guard let url = installedApplicationURL(bundleID: bundleID),
               let bundle = Bundle(url: url) else {
             return nil
         }
         return bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
             ?? bundle.object(forInfoDictionaryKey: "CFBundleName") as? String
+    }
+
+    private func installedApplicationURL(bundleID: String) -> URL? {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+            return nil
+        }
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
+              isDirectory.boolValue,
+              url.pathExtension == "app",
+              !isMountedVolumeApplication(url),
+              let bundle = Bundle(url: url),
+              normalized(bundle.bundleIdentifier) == normalized(bundleID) else {
+            return nil
+        }
+        return url
+    }
+
+    private func isMountedVolumeApplication(_ url: URL) -> Bool {
+        url.standardizedFileURL.path.hasPrefix("/Volumes/")
     }
 
     private func normalized(_ value: String?) -> String? {

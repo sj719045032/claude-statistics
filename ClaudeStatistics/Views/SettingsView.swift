@@ -11,6 +11,8 @@ struct SettingsView: View {
     @Binding var tabOrder: [AppTab]
     @ObservedObject var updaterService: UpdaterService
     let provider: any SessionProvider
+    var pluginSettingsRequest: Int = 0
+    var pluginSettingsRecommendedPluginID: String?
     @AppStorage(AppPreferences.autoRefreshEnabled) private var autoRefreshEnabled = true
     @AppStorage(AppPreferences.refreshInterval) private var refreshInterval = 300.0
     /// Bumped on terminal preference changes to invalidate the
@@ -45,6 +47,8 @@ struct SettingsView: View {
     @State private var hasToken: Bool?
     @State private var pluginUpdateCount: Int?
     @State private var missingPluginRecommendation: MissingPluginRecommendation?
+    @State private var handledPluginSettingsRequest = 0
+    @State private var activePluginSettingsRecommendedPluginID: String?
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var isTabOrderExpanded = false
     @State private var isRefreshIntervalExpanded = false
@@ -79,7 +83,10 @@ struct SettingsView: View {
             } else if showPluginSettings {
                 PluginsSettingsView(
                     pluginRegistry: appState.pluginRegistry,
-                    recommendedPluginID: missingPluginRecommendation?.pluginID,
+                    recommendedPluginID: activePluginSettingsRecommendedPluginID ?? missingPluginRecommendation?.pluginID,
+                    onScanWorkflowIntegrations: {
+                        NotificationCenter.default.post(name: .pluginOnboardingRequested, object: nil)
+                    },
                     onBack: { showPluginSettings = false }
                 )
             } else {
@@ -97,6 +104,12 @@ struct SettingsView: View {
         }
         .onChange(of: provider.kind) { _, _ in
             refreshMissingPluginRecommendation()
+        }
+        .onChange(of: pluginSettingsRequest) { _, request in
+            handlePluginSettingsRequest(request)
+        }
+        .onAppear {
+            handlePluginSettingsRequest(pluginSettingsRequest)
         }
     }
 
@@ -439,7 +452,10 @@ struct SettingsView: View {
     }
 
     private var pluginSettingsRow: some View {
-        SettingsRowButton(action: { showPluginSettings = true }) {
+        SettingsRowButton(action: {
+            activePluginSettingsRecommendedPluginID = nil
+            showPluginSettings = true
+        }) {
             HStack(alignment: .center, spacing: 10) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -487,6 +503,13 @@ struct SettingsView: View {
                     .frame(width: 12, height: 20)
             }
         }
+    }
+
+    private func handlePluginSettingsRequest(_ request: Int) {
+        guard request > 0, request != handledPluginSettingsRequest else { return }
+        handledPluginSettingsRequest = request
+        activePluginSettingsRecommendedPluginID = pluginSettingsRecommendedPluginID
+        showPluginSettings = true
     }
 
     private var pluginSettingsSummary: LocalizedStringKey {

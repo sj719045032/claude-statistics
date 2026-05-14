@@ -64,8 +64,6 @@ final class NotchWindowController {
     private let screenTracker = NotchScreenTracker()
     private var targetScreen: NSScreen?
     private var screenObservers: [NSObjectProtocol] = []
-    private var outsideClickMonitor: Any?
-    private var localOutsideClickMonitor: Any?
     private var lastRequestedSize: CGSize = .zero
     private var pendingResize: DispatchWorkItem?
     private var pendingResizeRequest: ResizeRequest?
@@ -131,20 +129,11 @@ final class NotchWindowController {
         window.makeFirstResponder(hostingView)
         startScreenTracking()
         observeAppDeactivation()
-        startOutsideClickMonitoring()
     }
 
     func close() {
         screenObservers.forEach { NotificationCenter.default.removeObserver($0) }
         screenObservers.removeAll()
-        if let outsideClickMonitor {
-            NSEvent.removeMonitor(outsideClickMonitor)
-            self.outsideClickMonitor = nil
-        }
-        if let localOutsideClickMonitor {
-            NSEvent.removeMonitor(localOutsideClickMonitor)
-            self.localOutsideClickMonitor = nil
-        }
         keyboardInterceptor.close()
         localKeyboardMonitor.close()
         pendingResize?.cancel()
@@ -242,35 +231,6 @@ final class NotchWindowController {
             }
         }
         screenObservers.append(observer)
-    }
-
-    private func startOutsideClickMonitoring() {
-        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(
-            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
-        ) { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                let location = NSEvent.mouseLocation
-                guard !self.containsInteractiveHitPoint(screenPoint: location) else { return }
-                self.islandCommandState.send(.collapseCurrentEventForBlur)
-            }
-        }
-
-        localOutsideClickMonitor = NSEvent.addLocalMonitorForEvents(
-            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
-        ) { [weak self] event in
-            guard let self else { return event }
-            let location = NSEvent.mouseLocation
-            guard !self.containsInteractiveHitPoint(screenPoint: location) else { return event }
-            self.hostingView.forceHoverFalse()
-            self.islandCommandState.send(.collapseCurrentEventForBlur)
-            return event
-        }
-    }
-
-    private func containsInteractiveHitPoint(screenPoint: CGPoint) -> Bool {
-        guard let hostingView else { return false }
-        return hostingView.containsInteractiveHitPoint(screenPoint: screenPoint)
     }
 
     private func refreshTargetScreenFromPreference() {

@@ -158,10 +158,26 @@ struct PluginDiscoverView: View {
         }
         return visibleEntries
             .sorted { lhs, rhs in
+                let lhsRank = sortRank(for: lhs)
+                let rhsRank = sortRank(for: rhs)
+                if lhsRank != rhsRank {
+                    return lhsRank < rhsRank
+                }
                 if lhs.id == recommendedPluginID { return true }
                 if rhs.id == recommendedPluginID { return false }
                 return lhs.name < rhs.name
             }
+    }
+
+    private func sortRank(for entry: PluginCatalogEntry) -> Int {
+        switch state(for: entry) {
+        case .updateAvailable:
+            return 0
+        case .canInstall, .installing, .incompatible:
+            return 1
+        case .installed, .restartRequired:
+            return 2
+        }
     }
 
     @ViewBuilder

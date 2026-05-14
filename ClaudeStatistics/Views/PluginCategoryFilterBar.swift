@@ -19,6 +19,7 @@ struct PluginCategoryFilterBar: View {
     /// `nil` ⇒ show every category (the "All" chip is selected).
     @Binding var selection: String?
     var totalCountOverride: Int?
+    var allTitleKey: LocalizedStringKey = "settings.plugins.category.all"
 
     var body: some View {
         // Keep the bar terse when the data set is empty — no chips, no
@@ -30,7 +31,7 @@ struct PluginCategoryFilterBar: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     chip(
-                        titleKey: "settings.plugins.category.all",
+                        titleKey: allTitleKey,
                         count: totalCountOverride ?? totalCount,
                         isSelected: selection == nil
                     ) {

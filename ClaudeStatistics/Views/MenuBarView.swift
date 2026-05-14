@@ -16,6 +16,12 @@ struct MenuBarView: View {
     @Namespace private var tabNamespace
     @StateObject private var toastCenter = ToastCenter()
     @StateObject private var terminalSetupCoordinator = TerminalSetupCoordinator.shared
+    @State private var missingPluginRecommendation: MissingPluginRecommendation?
+    @State private var pluginSettingsRequest = 0
+    @State private var pluginSettingsRecommendedPluginID: String?
+    @State private var showPluginOnboarding = false
+    @AppStorage(AppPreferences.pluginOnboardingCompletedAt) private var pluginOnboardingCompletedAt = 0.0
+    @AppStorage(AppPreferences.pluginOnboardingSkippedAt) private var pluginOnboardingSkippedAt = 0.0
 
     private var visibleTabs: [AppTab] {
         tabOrder.filter { $0.isAvailable(for: appState.providerCapabilities) }
@@ -52,14 +58,24 @@ struct MenuBarView: View {
                     .allowsHitTesting(false)
             }
         }
-        .onAppear { ensureSelectedTabIsAvailable() }
+        .onAppear {
+            ensureSelectedTabIsAvailable()
+            refreshMissingPluginRecommendation()
+        }
         .onAppear { terminalSetupCoordinator.evaluateStartupHint() }
         .onReceive(NotificationCenter.default.publisher(for: .terminalLaunchNotice)) { notification in
             guard let message = notification.userInfo?["message"] as? String else { return }
             toastCenter.show(message, duration: 2.5)
         }
+        .onReceive(NotificationCenter.default.publisher(for: MissingPluginRecommendationStore.didChange)) { _ in
+            refreshMissingPluginRecommendation()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .pluginOnboardingRequested)) { _ in
+            showPluginOnboarding = true
+        }
         .onChange(of: appState.providerKind) { _, _ in
             ensureSelectedTabIsAvailable()
+            refreshMissingPluginRecommendation()
         }
         .destructiveConfirmation(
             isPresented: $showQuitConfirm,
@@ -77,6 +93,24 @@ struct MenuBarView: View {
                 onDismiss: { terminalSetupCoordinator.dismissSheet() }
             )
         }
+        .sheet(isPresented: $showPluginOnboarding) {
+            PluginOnboardingView(
+                provider: appState.providerKind,
+                pluginRegistry: appState.pluginRegistry,
+                onReview: { recommendation in
+                    completePluginOnboarding()
+                    showPluginOnboarding = false
+                    openPluginSettings(recommendedPluginID: recommendation?.pluginID)
+                },
+                onComplete: {
+                    completePluginOnboarding()
+                },
+                onSkip: {
+                    skipPluginOnboarding()
+                    showPluginOnboarding = false
+                }
+            )
+        }
     }
 
     // MARK: - Sub-regions
@@ -88,7 +122,7 @@ struct MenuBarView: View {
                     title: tab.localizedName,
                     icon: tab.icon,
                     isSelected: selectedTab == tab,
-                    showBadge: tab == .settings && updaterService.hasUpdate,
+                    showBadge: tab == .settings && (updaterService.hasUpdate || missingPluginRecommendation != nil),
                     fontScale: fontScale,
                     action: {
                         withAnimation(Theme.tabAnimation) {
@@ -105,21 +139,47 @@ struct MenuBarView: View {
 
     @ViewBuilder
     private var banners: some View {
+        MenuBarBannerStack(banners: attentionBanners)
+    }
+
+    private var attentionBanners: [MenuBarAttentionBanner] {
+        var banners: [MenuBarAttentionBanner] = []
+
+        if shouldShowPluginOnboardingBanner {
+            banners.append(.pluginOnboarding(
+                onScan: { showPluginOnboarding = true },
+                onDismiss: { skipPluginOnboarding() }
+            ))
+        }
+
         if let version = updaterService.availableVersion, version != ignoredUpdateVersion {
-            UpdateBanner(
+            banners.append(.update(
                 version: version,
                 onInstall: { updaterService.checkForUpdates() },
                 onDismiss: { ignoredUpdateVersion = version }
-            )
+            ))
+        }
+
+        if let recommendation = missingPluginRecommendation {
+            banners.append(.pluginRecommendation(
+                recommendation,
+                onOpen: { openRecommendedPlugin() }
+            ))
         }
 
         if let issue = terminalSetupCoordinator.bannerIssue {
-            TerminalSetupBanner(
-                issue: issue,
+            banners.append(.terminalSetup(
+                issue,
                 onSetup: { terminalSetupCoordinator.presentBannerIssue() },
                 onDismiss: { terminalSetupCoordinator.dismissBanner() }
-            )
+            ))
         }
+
+        return banners
+    }
+
+    private var shouldShowPluginOnboardingBanner: Bool {
+        pluginOnboardingCompletedAt <= 0 && pluginOnboardingSkippedAt <= 0
     }
 
     private var tabContent: some View {
@@ -152,7 +212,9 @@ struct MenuBarView: View {
                         profileViewModel: profileViewModel,
                         tabOrder: $tabOrder,
                         updaterService: updaterService,
-                        provider: appState.provider
+                        provider: appState.provider,
+                        pluginSettingsRequest: pluginSettingsRequest,
+                        pluginSettingsRecommendedPluginID: pluginSettingsRecommendedPluginID
                     )
                 }
             }
@@ -161,6 +223,34 @@ struct MenuBarView: View {
             .transition(.opacity.animation(Theme.quickSpring))
         }
         .id(selectedTab)
+    }
+
+    private func openRecommendedPlugin() {
+        openPluginSettings(recommendedPluginID: missingPluginRecommendation?.pluginID)
+    }
+
+    private func openPluginSettings(recommendedPluginID: String?) {
+        pluginSettingsRecommendedPluginID = recommendedPluginID
+        withAnimation(Theme.tabAnimation) {
+            selectedTab = .settings
+        }
+        pluginSettingsRequest &+= 1
+    }
+
+    private func completePluginOnboarding() {
+        pluginOnboardingCompletedAt = Date().timeIntervalSince1970
+    }
+
+    private func skipPluginOnboarding() {
+        pluginOnboardingSkippedAt = Date().timeIntervalSince1970
+    }
+
+    @MainActor
+    private func refreshMissingPluginRecommendation() {
+        missingPluginRecommendation = MissingPluginRecommendationStore.shared.recommendation(
+            for: appState.providerKind,
+            pluginRegistry: appState.pluginRegistry
+        )
     }
 
     private var footer: some View {

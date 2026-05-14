@@ -30,6 +30,10 @@ enum AppPreferences {
     static let ignoredUpdateVersion = "ignoredUpdateVersion"
     /// Persisted ordering of the four panel tabs (encoded JSON of `[String]`).
     static let tabOrder = "tabOrder"
+    /// Unix timestamp when the first-run plugin onboarding was completed.
+    static let pluginOnboardingCompletedAt = "pluginOnboarding.completedAt"
+    /// Unix timestamp when the first-run plugin onboarding was skipped.
+    static let pluginOnboardingSkippedAt = "pluginOnboarding.skippedAt"
 
     // MARK: Notch
 

@@ -10,6 +10,7 @@ import ClaudeStatisticsKit
 struct PluginsSettingsView: View {
     let pluginRegistry: PluginRegistry
     let recommendedPluginID: String?
+    let onScanWorkflowIntegrations: () -> Void
     let onBack: () -> Void
 
     @State private var selectedPluginFilter: String?
@@ -45,9 +46,15 @@ struct PluginsSettingsView: View {
     /// monitor has to be observed at the parent view.
     @ObservedObject private var skipConfirmMonitor = SkipConfirmKeyMonitor.shared
 
-    init(pluginRegistry: PluginRegistry, recommendedPluginID: String? = nil, onBack: @escaping () -> Void) {
+    init(
+        pluginRegistry: PluginRegistry,
+        recommendedPluginID: String? = nil,
+        onScanWorkflowIntegrations: @escaping () -> Void,
+        onBack: @escaping () -> Void
+    ) {
         self.pluginRegistry = pluginRegistry
         self.recommendedPluginID = recommendedPluginID
+        self.onScanWorkflowIntegrations = onScanWorkflowIntegrations
         self.onBack = onBack
         _selectedPluginFilter = State(initialValue: recommendedPluginID == nil ? nil : PluginDiscoverView.recommendedFilterID)
     }
@@ -96,14 +103,31 @@ struct PluginsSettingsView: View {
     /// Rows matching the active chip selection. `nil` ⇒ no filter,
     /// return everything.
     private var filteredRows: [Row] {
-        guard let selectedInstalledCategory else { return rows }
-        return rows.filter { row in
-            let raw = catalogEntriesByID[row.manifest.id]?.category
-                ?? row.manifest.category
-                ?? PluginCatalogCategory.utility
-            let key = PluginCatalogCategory.canonicalize(raw)
-            return key == selectedInstalledCategory
+        let visibleRows: [Row]
+        if let selectedInstalledCategory {
+            visibleRows = rows.filter { row in
+                let raw = catalogEntriesByID[row.manifest.id]?.category
+                    ?? row.manifest.category
+                    ?? PluginCatalogCategory.utility
+                let key = PluginCatalogCategory.canonicalize(raw)
+                return key == selectedInstalledCategory
+            }
+        } else {
+            visibleRows = rows
         }
+        return visibleRows.sorted { lhs, rhs in
+            let lhsRank = installedSortRank(for: lhs)
+            let rhsRank = installedSortRank(for: rhs)
+            if lhsRank != rhsRank {
+                return lhsRank < rhsRank
+            }
+            return lhs.manifest.displayName < rhs.manifest.displayName
+        }
+    }
+
+    private func installedSortRank(for row: Row) -> Int {
+        guard let catalog = catalogEntriesByID[row.manifest.id] else { return 1 }
+        return catalog.version > installedVersion(for: row) ? 0 : 1
     }
 
     private var availableUpdateCount: Int {
@@ -214,10 +238,14 @@ struct PluginsSettingsView: View {
                 PluginCategoryFilterBar(
                     categories: pluginFilterCounts,
                     selection: $selectedPluginFilter,
-                    totalCountOverride: liveCatalogEntries.count
+                    totalCountOverride: liveCatalogEntries.count,
+                    allTitleKey: "settings.plugins.category.browse"
                 )
                 Divider()
             }
+
+            workflowScanRow
+            Divider()
 
             if selectedPluginFilter == PluginDiscoverView.installedFilterID {
                 installedTab
@@ -306,6 +334,28 @@ struct PluginsSettingsView: View {
             // update badge reflects the current marketplace.
             await refreshLiveCatalog()
         }
+    }
+
+    private var workflowScanRow: some View {
+        Button(action: onScanWorkflowIntegrations) {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18)
+                Text("onboarding.settings.entry")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .contentShape(Rectangle())
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+        .buttonStyle(.plain)
     }
 
     private func refreshLiveCatalog() async {
