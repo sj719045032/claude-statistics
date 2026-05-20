@@ -93,7 +93,9 @@ enum WireEventTranslator {
         kind: AttentionKind,
         pending: PendingResponse?,
         resolvedTerminalName: String? = nil,
-        resolvedTerminalContext: HookTerminalContext? = nil
+        resolvedTerminalContext: HookTerminalContext? = nil,
+        prepared: PreparedAttentionEvent? = nil,
+        commentaryAt: Date? = nil
     ) -> AttentionEvent {
         AttentionEvent(
             id: UUID(),
@@ -118,9 +120,10 @@ enum WireEventTranslator {
             receivedAt: Date(),
             promptText: msg.prompt_text,
             commentaryText: msg.commentary_text,
-            commentaryAt: msg.commentary_timestamp.flatMap(parseIsoTimestamp),
+            commentaryAt: commentaryAt ?? msg.commentary_timestamp.flatMap(parseIsoTimestamp),
             kind: kind,
-            pending: pending
+            pending: pending,
+            prepared: prepared
         )
     }
 

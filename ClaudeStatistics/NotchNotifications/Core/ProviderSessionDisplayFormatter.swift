@@ -1,7 +1,7 @@
 import ClaudeStatisticsKit
 import Foundation
 
-struct ProviderSessionDisplayContent {
+struct ProviderSessionDisplayContent: Equatable {
     // Triptych: top = user's last prompt. Middle and bottom are action and
     // commentary in chronological order — the UI swaps them when commentary
     // happened before action (e.g. "Let me check…" → Read foo.swift). Each

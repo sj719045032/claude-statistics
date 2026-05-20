@@ -54,6 +54,22 @@ final class ActiveSessionsTracker: ObservableObject {
     private var inferredTerminalNameByPid: [pid_t: String] = [:]
     private var pidInferenceInFlight: Set<pid_t> = []
 
+    // `mergeLatestTaskIfAvailable` (TodoWrite task list extraction from the
+    // Claude transcript) opens, seeks, and reads JSONL on the main thread.
+    // Instruments traced 396 ms of main-thread block to a single record() +
+    // taskScanResult chain when a transcript got large. These three members
+    // let us schedule the scan on a dedicated background queue with per-
+    // session debounce: short hook bursts collapse to one scan; the result
+    // is merged back to runtimeByKey on the main actor and triggers a single
+    // SwiftUI refresh.
+    private static let taskScanQueue = DispatchQueue(
+        label: "com.claude-statistics.task-scan",
+        qos: .userInitiated,
+        attributes: .concurrent
+    )
+    private var pendingTaskScans: [String: DispatchWorkItem] = [:]
+    private let taskScanDebounce: TimeInterval = 0.05
+
     /// Filter chain run against every incoming hook and persisted
     /// runtime. Built at startup from host-internal filters plus every
     /// `ProviderPlugin.makeSessionFilters()`. Logical-AND: row is shown
@@ -584,26 +600,94 @@ final class ActiveSessionsTracker: ObservableObject {
             return
         }
 
+        // Capture inputs from the current runtime snapshot and schedule the
+        // actual file IO + JSON parsing on a background queue. The 50 ms
+        // per-session debounce coalesces hook-burst scans. `runtime` is
+        // not mutated here; the async path writes results back via
+        // `runtimeByKey[key]` directly and triggers `refresh()` if the
+        // scan produced a change. Until that lands, the session keeps its
+        // previously known `currentTask`, which is acceptable: the field
+        // is a display-only summary that catches up within ~50 ms.
+        let sessionKey = Self.key(provider: runtime.provider, sessionId: runtime.sessionId)
         let canIncrement = incremental && runtime.taskTranscriptPath == transcriptPath
-        let scan = RuntimeSessionEventApplier.taskScanResult(
-            at: transcriptPath,
+        scheduleAsyncTaskScan(
+            sessionKey: sessionKey,
+            transcriptPath: transcriptPath,
             baseTasks: canIncrement ? runtime.runtimeTasks : nil,
             fromOffset: canIncrement ? runtime.taskTranscriptOffset : nil
         )
+    }
+
+    private func scheduleAsyncTaskScan(
+        sessionKey: String,
+        transcriptPath: String,
+        baseTasks: [String: RuntimeTaskEntry]?,
+        fromOffset: UInt64?
+    ) {
+        pendingTaskScans[sessionKey]?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            let scan = RuntimeSessionEventApplier.taskScanResult(
+                at: transcriptPath,
+                baseTasks: baseTasks,
+                fromOffset: fromOffset
+            )
+            DispatchQueue.main.async {
+                guard let self else { return }
+                MainActor.assumeIsolated {
+                    self.applyTaskScanResult(
+                        sessionKey: sessionKey,
+                        transcriptPath: transcriptPath,
+                        scan: scan
+                    )
+                }
+            }
+        }
+        pendingTaskScans[sessionKey] = work
+        Self.taskScanQueue.asyncAfter(deadline: .now() + taskScanDebounce, execute: work)
+    }
+
+    private func applyTaskScanResult(
+        sessionKey: String,
+        transcriptPath: String,
+        scan: RuntimeTaskScanResult?
+    ) {
+        pendingTaskScans.removeValue(forKey: sessionKey)
+        guard var runtime = runtimeByKey[sessionKey] else { return }
         guard let scan else { return }
+
+        // Always update internal bookkeeping (transcript path + next offset).
+        // These don't drive any UI, so changes here must NOT trigger
+        // `refresh()` — doing so caused an infinite loop when `refresh`
+        // → `repairIdleClaudeTaskSnapshots` → `mergeLatestTaskIfAvailable`
+        // → scheduled another scan whose only delta was a fresh `nextOffset`.
         runtime.taskTranscriptPath = transcriptPath
         runtime.taskTranscriptOffset = scan.nextOffset
 
+        // Only the display-visible fields (`runtimeTasks` + `currentTask`)
+        // gate a `refresh()` so SwiftUI re-publishes the sessions array.
+        var displayChanged = false
         if scan.clearsCurrentTask {
-            runtime.runtimeTasks = nil
-            runtime.currentTask = nil
-            return
+            if runtime.runtimeTasks != nil || runtime.currentTask != nil {
+                runtime.runtimeTasks = nil
+                runtime.currentTask = nil
+                displayChanged = true
+            }
+        } else if let snapshot = scan.snapshot {
+            if runtime.runtimeTasks != snapshot.tasks {
+                runtime.runtimeTasks = snapshot.tasks
+                displayChanged = true
+            }
+            if runtime.currentTask != snapshot.summary {
+                runtime.currentTask = snapshot.summary
+                runtime.lastActivityAt = max(runtime.lastActivityAt, snapshot.summary.updatedAt)
+                displayChanged = true
+            }
         }
 
-        guard let snapshot = scan.snapshot else { return }
-        runtime.runtimeTasks = snapshot.tasks
-        runtime.currentTask = snapshot.summary
-        runtime.lastActivityAt = max(runtime.lastActivityAt, snapshot.summary.updatedAt)
+        runtimeByKey[sessionKey] = runtime
+        if displayChanged {
+            refresh()
+        }
     }
 
     private func filterContext(forEvent event: AttentionEvent) -> SessionFilterContext {
@@ -728,7 +812,18 @@ final class ActiveSessionsTracker: ObservableObject {
                 return $0.lastActivityAt > $1.lastActivityAt
             }
         totalCount = fresh.count
-        sessions = Array(fresh.prefix(maxItems))
+        // Pre-populate `cachedTriptychContent` for every session that ends up
+        // in the @Published `sessions` array. The formatter's candidate chain
+        // (activeToolsSummary / currentOperation / currentActivity / etc.)
+        // is non-trivial and was a hot getter in Instruments — moving the
+        // work here means SwiftUI's row body reads it as an O(1) struct
+        // access, and we only pay the formatting cost on actual state
+        // transitions instead of every re-render.
+        sessions = fresh.prefix(maxItems).map { session in
+            var copy = session
+            copy.cachedTriptychContent = ProviderSessionDisplayFormatter(session: copy).content
+            return copy
+        }
     }
 
     private func repairIdleClaudeTaskSnapshots() {

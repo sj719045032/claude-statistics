@@ -37,6 +37,18 @@ struct NotchContainerView: View {
     // Markdown measurement passes — don't flicker the island closed.
     @State private var effectiveHovering = false
     @State private var pendingHoverLeave: DispatchWorkItem?
+    /// Coalesces `NotchCardIntrinsicHeightKey` preference updates to at most
+    /// one application per display frame. SwiftUI fires `onPreferenceChange`
+    /// for every layout pass that produces a different reduced value — when
+    /// card content settles (markdown layout, latest tool output appending,
+    /// timeline tick), several intermediate measurements can land within one
+    /// frame, each pulling the whole `currentIslandSize → reportInteractiveSize
+    /// → setFrame` chain through. Holding the work item lets subsequent
+    /// updates supersede the last by cancel-and-reschedule before it runs,
+    /// so only the final measurement applies. Same one-frame trick we use on
+    /// `NotchWindowController.resizeCoalesceDelay`.
+    @State private var pendingCardHeightWork: DispatchWorkItem?
+    private let preferenceCoalesceDelay: TimeInterval = 0.016
     private let hoverLeaveDebounce: TimeInterval = 0.12
     /// When the card's measured height last changed. While this is recent the
     /// card is mid-animation (toggle, session churn, Markdown relayout), and
@@ -275,7 +287,7 @@ struct NotchContainerView: View {
                 if wasPeekingOnEventArrival && effectiveHovering {
                     // User was peeking before the event and is still hovering —
                     // bring the list card back instead of collapsing to idle.
-                    measuredCardHeight = 0
+                    resetMeasuredCardHeight()
                     idlePeekActive = true
                     isClosingReveal = false
                     pendingIdlePeekCloseStart?.cancel()
@@ -294,7 +306,7 @@ struct NotchContainerView: View {
             }
         }
         .onPreferenceChange(NotchCardIntrinsicHeightKey.self) { h in
-            handleCardIntrinsicHeightChange(h)
+            schedulePreferenceCardHeight(h)
         }
         .onChange(of: idlePeekShowingAllSessions) { oldValue, newValue in
             handleIdlePeekRowsVisibilityChange(from: oldValue, to: newValue)
@@ -467,6 +479,13 @@ struct NotchContainerView: View {
                         transaction.animation = nil
                     }
                     .transition(idlePeekCardTransition)
+                    // Pause the 30Hz pulse TimelineView in each ActiveSessionRow
+                    // whenever the shell is collapsed or closing. Without this
+                    // the pulse keeps redrawing through the reveal-close
+                    // animation and even after the panel is fully idle — that
+                    // 30Hz tick was hot in Instruments (AG::Graph +
+                    // DisplayList.ViewUpdater + NSPerformVisuallyAtomicChange).
+                    .environment(\.notchPulseActive, revealExpandedIsland && !isClosingReveal)
                 }
             }
             .padding(.horizontal, 18)
@@ -765,6 +784,29 @@ struct NotchContainerView: View {
         DispatchQueue.main.async {
             hitCallback(hitSize)
         }
+    }
+
+    /// Entry point for `NotchCardIntrinsicHeightKey` preference updates.
+    /// Cancels any pending application and reschedules a one-frame deferred
+    /// commit. See `pendingCardHeightWork` doc.
+    private func schedulePreferenceCardHeight(_ height: CGFloat) {
+        pendingCardHeightWork?.cancel()
+        let work = DispatchWorkItem {
+            pendingCardHeightWork = nil
+            handleCardIntrinsicHeightChange(height)
+        }
+        pendingCardHeightWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + preferenceCoalesceDelay, execute: work)
+    }
+
+    /// Forces `measuredCardHeight` back to 0 on state transitions (new event
+    /// arrives, close cleanup, etc.). Must cancel any pending preference
+    /// work first — without this, a stale 16 ms-delayed apply would overwrite
+    /// the reset and leave the panel sized for the previous card.
+    private func resetMeasuredCardHeight() {
+        pendingCardHeightWork?.cancel()
+        pendingCardHeightWork = nil
+        measuredCardHeight = 0
     }
 
     private func handleCardIntrinsicHeightChange(_ height: CGFloat) {
@@ -1360,7 +1402,7 @@ struct NotchContainerView: View {
                 closingEventFading = false
                 hoverReentrySuppressed = false
                 idlePeekKeyboardMode = false
-                measuredCardHeight = 0
+                resetMeasuredCardHeight()
                 reportInteractiveSize(expandedOverride: false)
             }
             pendingIdlePeekClose = cleanupWork
@@ -1439,7 +1481,7 @@ struct NotchContainerView: View {
             machine.hide()
             isClosingReveal = false
             closingEventRevealSize = nil
-            measuredCardHeight = 0
+            resetMeasuredCardHeight()
             scheduleHoverReentryReset()
             return
         }
@@ -1452,7 +1494,7 @@ struct NotchContainerView: View {
             closingEventFading = false
             revealExpandedIsland = false
             isClosingReveal = false
-            measuredCardHeight = 0
+            resetMeasuredCardHeight()
             reportInteractiveSize(expandedOverride: false)
         }
         pendingClosingEventClear = clearWork
@@ -1797,7 +1839,7 @@ struct NotchContainerView: View {
             isClosingReveal = false
             closingEventFading = false
             hoverReentrySuppressed = false
-            measuredCardHeight = 0
+            resetMeasuredCardHeight()
             reportInteractiveSize(expandedOverride: false, hitSizeOverride: collapsedHoverHitSize())
             onKeyboardCaptureChange(shouldCaptureKeyboard)
         }

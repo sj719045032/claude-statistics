@@ -199,6 +199,16 @@ struct ActiveSession: Identifiable, Equatable {
     /// Optional so old persisted state without the field decodes cleanly.
     var recentlyCompletedTools: [CompletedToolEntry]? = nil
     static let recentToolsMaxCount = 5
+    /// Cached triptych view payload, populated by `ActiveSessionsTracker`
+    /// right before the `@Published var sessions` write so SwiftUI's
+    /// `ActiveSessionRow.body` reads it as an O(1) struct access rather
+    /// than rerunning `ProviderSessionDisplayFormatter`'s candidate chain
+    /// every time the row redraws. Instruments traced ~3 reentrant
+    /// `triptychContent.getter` calls inside the 304 ms SwiftUI hang.
+    /// When nil (e.g. event paths that construct an `ActiveSession`
+    /// directly without going through the tracker), `triptychContent`
+    /// falls back to live computation so behavior is unchanged.
+    var cachedTriptychContent: ProviderSessionDisplayContent? = nil
     static let recentToolsWindow: TimeInterval = 10
     /// An active tool entry whose PreToolUse fired more than this long ago
     /// without a matching PostToolUse is treated as stale. Covers the case
@@ -318,7 +328,8 @@ struct ActiveSession: Identifiable, Equatable {
     /// to guard for optionals. Simple and detailed modes share this content;
     /// detailed mode just renders an additional tool-list section beneath.
     var triptychContent: ProviderSessionDisplayContent {
-        ProviderSessionDisplayFormatter(session: self).content
+        if let cached = cachedTriptychContent { return cached }
+        return ProviderSessionDisplayFormatter(session: self).content
     }
 
     var displayStatus: ActiveSessionStatus {

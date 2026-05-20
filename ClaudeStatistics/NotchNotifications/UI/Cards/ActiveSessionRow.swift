@@ -1,11 +1,28 @@
 import SwiftUI
 
+// Gates the 30Hz pulse TimelineView in `ActiveSessionRow` so it pauses
+// while the shell is collapsed or in its close animation. With pulse always
+// running, the 30Hz redraw chain shows up as a hot path in Instruments
+// (NSPerformVisuallyAtomicChange / AG::Graph updates) even when the notch
+// is invisible. Injected by NotchContainerView.islandContent.
+private struct NotchPulseActiveKey: EnvironmentKey {
+    static let defaultValue: Bool = true
+}
+
+extension EnvironmentValues {
+    var notchPulseActive: Bool {
+        get { self[NotchPulseActiveKey.self] }
+        set { self[NotchPulseActiveKey.self] = newValue }
+    }
+}
+
 struct ActiveSessionRow: View {
     let session: ActiveSession
     let isKeyboardSelected: Bool
     let onClick: () -> Void
 
     @AppStorage(NotchPreferences.idlePeekDetailedRowsKey) private var detailedMode: Bool = false
+    @Environment(\.notchPulseActive) private var pulseActive: Bool
 
     private let rowSlotHeight: CGFloat = 13
     /// Seconds per pulse cycle for the running-status dot ring.
@@ -70,7 +87,7 @@ struct ActiveSessionRow: View {
                         // updates (ticking "2m ago" timestamp, latest tool
                         // output, etc.). `.repeatForever` implicit animations
                         // were getting cancelled by those redraws.
-                        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: false)) { ctx in
+                        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !pulseActive)) { ctx in
                             let t = ctx.date.timeIntervalSinceReferenceDate
                             let phase = (t.truncatingRemainder(dividingBy: pulseCycle)) / pulseCycle
                             Circle()

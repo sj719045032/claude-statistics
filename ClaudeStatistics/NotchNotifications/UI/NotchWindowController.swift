@@ -69,7 +69,13 @@ final class NotchWindowController {
     private var pendingResizeRequest: ResizeRequest?
     private var pendingShrink: DispatchWorkItem?
     private var resizeGeneration = 0
-    private let resizeCoalesceDelay: TimeInterval = 0.01
+    // One display frame at 60Hz. Coalescing inside a single frame collapses
+    // bursts of `reportInteractiveSize` calls (16 onChange + onPreference
+    // listeners can fire in the same tick) into one `setFrame` instead of
+    // 2–4 in succession, which Instruments tied to repeated
+    // `-[NSWindow layoutIfNeeded]` + `-[NSView _layoutSubtreeWithOldSize:]`
+    // during reveal/close transitions.
+    private let resizeCoalesceDelay: TimeInterval = 0.016
     private let shrinkDelay: TimeInterval = 0.32
     private let finalCollapseShrinkDelay: TimeInterval = 0.12
     /// Frontmost app at the moment we started capturing keyboard for the

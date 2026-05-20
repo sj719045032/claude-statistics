@@ -86,6 +86,25 @@ enum Decision: String, Sendable {
     case allow, deny, ask
 }
 
+/// Precomputed view-layer strings cached on `AttentionEvent` so the
+/// expensive normalizers and tool-activity formatters (`normalizePreview`,
+/// `ToolActivityFormatter.liveSummary`, `ToolActivityFormatter.operationSummary`)
+/// don't have to run on the main queue every time SwiftUI reads a `live*`
+/// accessor or `ActiveSessionsTracker.record` applies the event.
+///
+/// Filled by `AttentionEvent.prepare(...)` on a background queue inside
+/// `AttentionBridge.processWireMessage` before the event is dispatched to
+/// the main actor. When nil (legacy construction paths such as
+/// `withResolvedPermissionToolUseId`), accessors fall back to live
+/// computation so behavior remains identical.
+struct PreparedAttentionEvent: Equatable, Sendable {
+    let liveProgressNote: String?
+    let livePrompt: String?
+    let livePreview: String?
+    let liveActivitySummary: String?
+    let operationSummary: String?
+}
+
 struct AttentionEvent: Identifiable, Equatable {
     let id: UUID
     let provider: ProviderKind
@@ -125,6 +144,8 @@ struct AttentionEvent: Identifiable, Equatable {
     let commentaryAt: Date?
     let kind: AttentionKind
     var pending: PendingResponse?
+    /// Background-precomputed view strings; see `PreparedAttentionEvent`.
+    let prepared: PreparedAttentionEvent?
 
     static func == (lhs: AttentionEvent, rhs: AttentionEvent) -> Bool {
         lhs.id == rhs.id
@@ -164,7 +185,8 @@ extension AttentionEvent {
             commentaryText: commentaryText,
             commentaryAt: commentaryAt,
             kind: .permissionRequest(tool: tool, input: input, toolUseId: resolvedToolUseId, interaction: interaction),
-            pending: pending
+            pending: pending,
+            prepared: prepared
         )
     }
 
@@ -189,7 +211,8 @@ extension AttentionEvent {
     var livePrompt: String? {
         // Single source: `promptText`. The normalizer writes it ONLY on
         // UserPromptSubmit, so we don't need a rawEventName guard here.
-        Self.normalizePreview(promptText)
+        if let prepared { return prepared.livePrompt }
+        return Self.normalizePreview(promptText)
     }
 
     var liveProgressNote: String? {
@@ -197,7 +220,8 @@ extension AttentionEvent {
         // every event that can carry an assistant text block, and NOT on
         // UserPromptSubmit (so a fresh user turn can't accidentally carry
         // the previous turn's commentary). No rawEventName branching here.
-        Self.normalizePreview(commentaryText)
+        if let prepared { return prepared.liveProgressNote }
+        return Self.normalizePreview(commentaryText)
     }
 
     /// Transcript-native timestamp for `liveProgressNote`. nil when either
@@ -209,25 +233,70 @@ extension AttentionEvent {
     }
 
     var livePreview: String? {
-        switch kind {
-        case .waitingInput(let message),
-             .taskFailed(let message):
-            return Self.normalizePreview(message)
-        case .taskDone(let message):
-            return Self.normalizePreview(message) ?? Self.normalizePreview(commentaryText)
-        case .permissionRequest, .sessionStart, .activityPulse, .sessionEnd:
-            return nil
-        }
+        if let prepared { return prepared.livePreview }
+        return Self.computeLivePreview(kind: kind, commentaryText: commentaryText)
     }
 
     var liveActivitySummary: String? {
-        ToolActivityFormatter.liveSummary(
+        if let prepared { return prepared.liveActivitySummary }
+        return ToolActivityFormatter.liveSummary(
             rawEventName: rawEventName,
             notificationType: notificationType,
             toolName: toolName,
             input: toolInput,
             provider: provider
         )
+    }
+
+    /// Background-side factory: invoked by `AttentionBridge` on a
+    /// userInitiated queue, so each Foundation/regex call (normalizePreview,
+    /// ToolActivityFormatter.*) doesn't run on the main dispatch queue when
+    /// the event finally hops over. See `PreparedAttentionEvent` doc.
+    static func prepare(
+        commentaryText: String?,
+        promptText: String?,
+        kind: AttentionKind,
+        rawEventName: String,
+        notificationType: String?,
+        toolName: String?,
+        toolInput: [String: JSONValue]?,
+        provider: ProviderKind
+    ) -> PreparedAttentionEvent {
+        let progress = normalizePreview(commentaryText)
+        let prompt = normalizePreview(promptText)
+        let preview = computeLivePreview(kind: kind, commentaryText: commentaryText)
+        let activity = ToolActivityFormatter.liveSummary(
+            rawEventName: rawEventName,
+            notificationType: notificationType,
+            toolName: toolName,
+            input: toolInput,
+            provider: provider
+        )
+        let opSummary: String?
+        if let tool = toolName, let input = toolInput {
+            opSummary = ToolActivityFormatter.operationSummary(tool: tool, input: input)
+        } else {
+            opSummary = nil
+        }
+        return PreparedAttentionEvent(
+            liveProgressNote: progress,
+            livePrompt: prompt,
+            livePreview: preview,
+            liveActivitySummary: activity,
+            operationSummary: opSummary
+        )
+    }
+
+    private static func computeLivePreview(kind: AttentionKind, commentaryText: String?) -> String? {
+        switch kind {
+        case .waitingInput(let message),
+             .taskFailed(let message):
+            return normalizePreview(message)
+        case .taskDone(let message):
+            return normalizePreview(message) ?? normalizePreview(commentaryText)
+        case .permissionRequest, .sessionStart, .activityPulse, .sessionEnd:
+            return nil
+        }
     }
 
     var clearsCurrentActivity: Bool {

@@ -198,86 +198,147 @@ final class AttentionBridge {
             pending = nil
         }
 
-        // Resolver + event creation hop to the main actor: the plugin
-        // registry is `@MainActor` and Ghostty's enricher invokes
-        // osascript, so we batch resolver + makeEvent + enqueue
-        // together to avoid bouncing the message between queues.
+        // Precompute everything that doesn't need the main actor *here* on
+        // the caller's background queue (live socket: userInitiated;
+        // pending-replay: caller's queue). Instruments traced a 465 ms
+        // main-thread hang to 43 events stacking up on the main dispatch
+        // queue, with `parseIsoTimestamp` (ICU formatter create/destroy),
+        // `ToolActivityFormatter.shellCommandSummary` (character scan), and
+        // `normalizePreview` (lowercased + line splits) as the dominant
+        // costs. Doing them now means the main-queue closure only has to
+        // do `HookTerminalResolver.resolve` (which actually needs the
+        // `@MainActor` plugin registry) and the `@Published` writes that
+        // SwiftUI requires.
+        let commentaryAt = msg.commentary_timestamp.flatMap(WireEventTranslator.parseIsoTimestamp)
+        let prepared = AttentionEvent.prepare(
+            commentaryText: msg.commentary_text,
+            promptText: msg.prompt_text,
+            kind: kind,
+            rawEventName: msg.event,
+            notificationType: msg.notification_type,
+            toolName: msg.tool_name,
+            toolInput: msg.tool_input,
+            provider: provider
+        )
+
+        // Resolve happens in three hops so the plugin enrichers
+        // (notably Ghostty's `osascript` via NSTask) don't block the
+        // main thread. Instruments traced 2.87 s + 1.79 s main-thread
+        // hangs to this exact path during tool-heavy event bursts.
+        //
+        //   1. main → snapshot `pluginRegistry.terminals` (it's @MainActor)
+        //   2. global(.userInitiated) → `HookTerminalResolver.resolve(...)`
+        //      runs `enrichContext` (osascript / lstat / posix_spawn)
+        //      off the main thread. The `Plugin` and `TerminalPlugin`
+        //      protocols are not @MainActor, and
+        //      `TerminalContextEnriching` explicitly documents
+        //      enrichers as safe to call from a background queue.
+        //   3. main → makeEvent + notchCenter.enqueue (SwiftUI state
+        //      writes require the main actor).
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            // Hop the actor explicitly: PluginRegistry and the
-            // resolver are `@MainActor`, but `DispatchQueue.main.async`
-            // is not actor-isolated to the type checker. We're already
-            // on the main thread, so assume the actor.
-            let resolved = MainActor.assumeIsolated {
-                HookTerminalResolver.resolve(
+            let plugins = MainActor.assumeIsolated {
+                self.pluginRegistry?.terminals ?? [:]
+            }
+
+            DispatchQueue.global(qos: .userInitiated).async {
+                let resolved = HookTerminalResolver.resolve(
                     env: msg.terminal_env ?? [:],
                     hostAppBundleId: msg.host_app_bundle_id,
                     fallbackTerminalName: msg.terminal_name,
                     event: msg.event,
                     cwd: msg.cwd,
-                    plugins: self.pluginRegistry?.terminals ?? [:]
+                    plugins: plugins
                 )
-            }
 
-            if !resolved.claimed {
-                if let bundleId = msg.host_app_bundle_id, !bundleId.isEmpty {
-                    MissingPluginRecommendationStore.shared.recordUnclaimedHost(
-                        bundleID: bundleId,
-                        provider: provider
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    self.finishProcessing(
+                        msg: msg,
+                        provider: provider,
+                        kind: kind,
+                        pending: pending,
+                        replayed: replayed,
+                        prepared: prepared,
+                        commentaryAt: commentaryAt,
+                        resolved: resolved
                     )
                 }
             }
-
-            // Hook fired from a GUI host (non-empty `__CFBundleIdentifier`)
-            // that no installed terminal plugin claims — typically
-            // Claude.app / Codex.app sessions when their plugins aren't
-            // installed. Surfacing such an event would build a row whose
-            // source tag and focus button can't render (no capability to
-            // address). Drop the event entirely; `pending` (if any) closes
-            // the hook fd via ARC so the hook subprocess sees EOF and
-            // falls through to its CLI's native behavior. Apple Terminal
-            // is host-resident and always claims `com.apple.Terminal`;
-            // third-party hosts must be installed to register.
-            if !resolved.claimed,
-               let bundleId = msg.host_app_bundle_id,
-               !bundleId.isEmpty {
-                DiagnosticLogger.shared.verbose(
-                    "Bridge dropped unclaimed-host event=\(msg.event) provider=\(provider.rawValue) session=\(msg.session_id ?? "-") hostApp=\(bundleId) replayed=\(replayed)"
-                )
-                return
-            }
-
-            let event = WireEventTranslator.makeEvent(
-                from: msg,
-                provider: provider,
-                kind: kind,
-                pending: pending,
-                resolvedTerminalName: resolved.canonicalName,
-                resolvedTerminalContext: resolved.context
-            )
-
-            let promptLen = msg.prompt_text?.count ?? 0
-            let commentaryLen = msg.commentary_text?.count ?? 0
-            let msgLen = msg.message?.count ?? 0
-            DiagnosticLogger.shared.verbose(
-                "Bridge rx event=\(event.rawEventName) provider=\(event.provider.rawValue) session=\(event.sessionId) tool=\(event.toolName ?? "-") toolUseId=\(event.toolUseId ?? "-") expectsResp=\(msg.expects_response == true) replayed=\(replayed) notif=\(event.notificationType ?? "-") promptLen=\(promptLen) commentaryLen=\(commentaryLen) msgLen=\(msgLen) commentaryTs=\(msg.commentary_timestamp ?? "-") parsedTs=\(event.commentaryAt?.timeIntervalSince1970.description ?? "-") hostApp=\(msg.host_app_bundle_id ?? "-") resolvedTerminal=\(resolved.canonicalName ?? "-")"
-            )
-
-            if event.rawEventName == "PermissionRequest" || event.rawEventName == "ToolPermission" {
-                let schema: String = {
-                    guard let input = msg.tool_input, !input.isEmpty else { return "-" }
-                    return input
-                        .sorted(by: { $0.key < $1.key })
-                        .map { "\($0.key):\(WireEventTranslator.jsonKindLabel($0.value))" }
-                        .joined(separator: ",")
-                }()
-                DiagnosticLogger.shared.verbose(
-                    "Bridge perm-schema provider=\(event.provider.rawValue) tool=\(event.toolName ?? "-") rawEvent=\(event.rawEventName) notif=\(event.notificationType ?? "-") schema={\(schema)}"
-                )
-            }
-
-            self.notchCenter?.enqueue(event)
         }
+    }
+
+    @MainActor
+    private func finishProcessing(
+        msg: WireMessage,
+        provider: ProviderKind,
+        kind: AttentionKind,
+        pending: PendingResponse?,
+        replayed: Bool,
+        prepared: PreparedAttentionEvent,
+        commentaryAt: Date?,
+        resolved: HookTerminalResolver.Resolved
+    ) {
+        if !resolved.claimed {
+            if let bundleId = msg.host_app_bundle_id, !bundleId.isEmpty {
+                MissingPluginRecommendationStore.shared.recordUnclaimedHost(
+                    bundleID: bundleId,
+                    provider: provider
+                )
+            }
+        }
+
+        // Hook fired from a GUI host (non-empty `__CFBundleIdentifier`)
+        // that no installed terminal plugin claims — typically
+        // Claude.app / Codex.app sessions when their plugins aren't
+        // installed. Surfacing such an event would build a row whose
+        // source tag and focus button can't render (no capability to
+        // address). Drop the event entirely; `pending` (if any) closes
+        // the hook fd via ARC so the hook subprocess sees EOF and
+        // falls through to its CLI's native behavior. Apple Terminal
+        // is host-resident and always claims `com.apple.Terminal`;
+        // third-party hosts must be installed to register.
+        if !resolved.claimed,
+           let bundleId = msg.host_app_bundle_id,
+           !bundleId.isEmpty {
+            DiagnosticLogger.shared.verbose(
+                "Bridge dropped unclaimed-host event=\(msg.event) provider=\(provider.rawValue) session=\(msg.session_id ?? "-") hostApp=\(bundleId) replayed=\(replayed)"
+            )
+            return
+        }
+
+        let event = WireEventTranslator.makeEvent(
+            from: msg,
+            provider: provider,
+            kind: kind,
+            pending: pending,
+            resolvedTerminalName: resolved.canonicalName,
+            resolvedTerminalContext: resolved.context,
+            prepared: prepared,
+            commentaryAt: commentaryAt
+        )
+
+        let promptLen = msg.prompt_text?.count ?? 0
+        let commentaryLen = msg.commentary_text?.count ?? 0
+        let msgLen = msg.message?.count ?? 0
+        DiagnosticLogger.shared.verbose(
+            "Bridge rx event=\(event.rawEventName) provider=\(event.provider.rawValue) session=\(event.sessionId) tool=\(event.toolName ?? "-") toolUseId=\(event.toolUseId ?? "-") expectsResp=\(msg.expects_response == true) replayed=\(replayed) notif=\(event.notificationType ?? "-") promptLen=\(promptLen) commentaryLen=\(commentaryLen) msgLen=\(msgLen) commentaryTs=\(msg.commentary_timestamp ?? "-") parsedTs=\(event.commentaryAt?.timeIntervalSince1970.description ?? "-") hostApp=\(msg.host_app_bundle_id ?? "-") resolvedTerminal=\(resolved.canonicalName ?? "-")"
+        )
+
+        if event.rawEventName == "PermissionRequest" || event.rawEventName == "ToolPermission" {
+            let schema: String = {
+                guard let input = msg.tool_input, !input.isEmpty else { return "-" }
+                return input
+                    .sorted(by: { $0.key < $1.key })
+                    .map { "\($0.key):\(WireEventTranslator.jsonKindLabel($0.value))" }
+                    .joined(separator: ",")
+            }()
+            DiagnosticLogger.shared.verbose(
+                "Bridge perm-schema provider=\(event.provider.rawValue) tool=\(event.toolName ?? "-") rawEvent=\(event.rawEventName) notif=\(event.notificationType ?? "-") schema={\(schema)}"
+            )
+        }
+
+        self.notchCenter?.enqueue(event)
     }
 
     /// Read every payload that HookCLI dropped into the pending dir while

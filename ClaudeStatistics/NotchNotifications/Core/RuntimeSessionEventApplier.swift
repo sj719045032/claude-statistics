@@ -471,6 +471,12 @@ enum RuntimeSessionEventApplier {
     // MARK: - Private
 
     private static func operationSummary(for event: AttentionEvent) -> String? {
+        // Prefer the cached value pre-computed off the main queue by
+        // `AttentionEvent.prepare(...)`. `ToolActivityFormatter.shellCommandSummary`
+        // is the dominant main-thread cost in `ActiveSessionsTracker.record`
+        // when shell tools fire in bursts (Instruments showed it as a hot
+        // path in the 465ms hook-batch hang).
+        if let prepared = event.prepared { return prepared.operationSummary }
         guard let tool = event.toolName, let input = event.toolInput else { return nil }
         return ToolActivityFormatter.operationSummary(tool: tool, input: input)
     }

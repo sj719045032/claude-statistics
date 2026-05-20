@@ -45,8 +45,16 @@ enum HookTerminalResolver {
     ///      gets a chance to add window/tab/surface ids the env
     ///      doesn't carry — Ghostty walks its windows via osascript
     ///      from inside its own plugin this way.
-    @MainActor
-    static func resolve(
+    /// Called off-main from `AttentionBridge.processWireMessage` so the
+    /// hot path (Ghostty's `enrichContext` invokes osascript / NSTask, and
+    /// Kitty/Codex paths walk env + lstat) doesn't block SwiftUI's render
+    /// loop during reveal-close animation. The `Plugin` and
+    /// `TerminalPlugin` protocols don't declare `@MainActor`, and
+    /// `TerminalContextEnriching.enrichContext` explicitly documents
+    /// itself as "safe to call from a non-main actor" — see protocol doc.
+    /// Caller is responsible for snapshotting the `plugins` dictionary
+    /// off the @MainActor `PluginRegistry` before invoking us.
+    nonisolated static func resolve(
         env: [String: String],
         hostAppBundleId: String?,
         fallbackTerminalName: String?,
@@ -112,8 +120,9 @@ enum HookTerminalResolver {
         return Resolved(canonicalName: trimmed?.nonEmpty, context: HookTerminalContext(), claimed: false)
     }
 
-    @MainActor
-    private static func enrich(
+    // Like `resolve`, called off-main so the plugin's enricher can do
+    // heavy work (osascript, lstat, etc.) without blocking SwiftUI.
+    nonisolated private static func enrich(
         plugin: any TerminalPlugin,
         base: HookTerminalContext,
         event: String,
