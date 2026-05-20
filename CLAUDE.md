@@ -146,6 +146,23 @@ bash scripts/release.sh 2.10.0 --notes $'## What\'s New\n- ...\n\n## 中文\n- .
 bash scripts/release.sh 2.10.0 --notes-file /tmp/notes.md
 ```
 
+**IMPORTANT — commit your code changes BEFORE running `release.sh`.**
+The script only commits `appcast.xml` + `project.pbxproj` + `project.yml`
+(the version-bump bookkeeping); any other modified source files are
+left in the working tree. If you skip this, the DMG/ZIP attached to
+the release still contains your changes (build happens before commit,
+from the working tree) — but the v<version> git tag points at the
+appcast commit, so anyone tracing the tag to the source won't find the
+shipped behavior. Always:
+
+```bash
+git status                    # confirm no surprise edits
+git add <your-files>          # specific files, not -A
+git commit -m "..."
+git push
+bash scripts/release.sh <version>
+```
+
 The script handles all steps automatically:
 1. Runs `build-dmg.sh` (builds Release app, creates DMG + ZIP, generates Sparkle deltas + appcast.xml)
 2. Commits `appcast.xml`, `project.pbxproj`, `project.yml` and pushes
