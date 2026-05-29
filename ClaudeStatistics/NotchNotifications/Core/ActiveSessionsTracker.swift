@@ -782,9 +782,11 @@ final class ActiveSessionsTracker: ObservableObject {
     /// a single visible row. A bg-pty fork child (e.g. a computer-use
     /// sub-session) resolves — via daemon topology — to the foreground
     /// `claude` pid that owns the tab; we group by that owner and keep
-    /// the foreground/main session (its own pid == the owner), or the
-    /// most-recently-active member if the main one isn't tracked (e.g.
-    /// the foreground tab exited but the bg task is still running).
+    /// the most-recently-active session in the tab — a working
+    /// computer-use child surfaces its live activity, and the foreground
+    /// conversation wins whenever the user is typing in it. (Always
+    /// keeping the foreground pid froze the row on an idle main session
+    /// while a bg child did all the work.)
     private func collapseSameTabSessions(_ runtimes: [RuntimeSession]) -> [RuntimeSession] {
         func owner(_ runtime: RuntimeSession) -> pid_t? {
             guard let pid = runtime.pid else { return nil }
@@ -802,8 +804,7 @@ final class ActiveSessionsTracker: ObservableObject {
             if members.count == 1 {
                 result.append(members[0])
             } else {
-                let rep = members.first(where: { $0.pid == ownerPid })
-                    ?? members.max(by: { $0.lastActivityAt < $1.lastActivityAt })!
+                let rep = members.max(by: { $0.lastActivityAt < $1.lastActivityAt })!
                 result.append(rep)
                 collapsedNotes.append(
                     "owner=\(ownerPid) kept=\(rep.sessionId.prefix(8)) of "
