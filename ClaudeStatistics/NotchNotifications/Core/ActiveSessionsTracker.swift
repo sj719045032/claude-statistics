@@ -58,6 +58,13 @@ final class ActiveSessionsTracker: ObservableObject {
     // sessions). Stops `grantInferenceGrace` from re-extending the
     // grace pass forever; cleared if a later attempt succeeds.
     private var inferenceFailedPids: Set<pid_t> = []
+    // pid → foreground (tab-owning) `claude` pid, learned from daemon
+    // topology recovery. A bg-pty fork child maps to its parent's pid;
+    // `refresh` groups by this to collapse same-tab sessions onto one row.
+    private var inferredHostPidByPid: [pid_t: pid_t] = [:]
+    // De-dupes the per-refresh tab-collapse diagnostic so it logs only
+    // when the collapsed set changes (refresh runs on a tight timer).
+    private var lastCollapseSignature = ""
 
     // `mergeLatestTaskIfAvailable` (TodoWrite task list extraction from the
     // Claude transcript) opens, seeks, and reads JSONL on the main thread.
@@ -771,6 +778,48 @@ final class ActiveSessionsTracker: ObservableObject {
         return pidInferenceInFlight.contains(pid)
     }
 
+    /// Collapse Claude Code sessions that share one terminal tab down to
+    /// a single visible row. A bg-pty fork child (e.g. a computer-use
+    /// sub-session) resolves — via daemon topology — to the foreground
+    /// `claude` pid that owns the tab; we group by that owner and keep
+    /// the foreground/main session (its own pid == the owner), or the
+    /// most-recently-active member if the main one isn't tracked (e.g.
+    /// the foreground tab exited but the bg task is still running).
+    private func collapseSameTabSessions(_ runtimes: [RuntimeSession]) -> [RuntimeSession] {
+        func owner(_ runtime: RuntimeSession) -> pid_t? {
+            guard let pid = runtime.pid else { return nil }
+            return inferredHostPidByPid[pid] ?? pid
+        }
+        var groups: [pid_t: [RuntimeSession]] = [:]
+        var ungrouped: [RuntimeSession] = []
+        for runtime in runtimes {
+            if let owner = owner(runtime) { groups[owner, default: []].append(runtime) }
+            else { ungrouped.append(runtime) }
+        }
+        var result = ungrouped
+        var collapsedNotes: [String] = []
+        for (ownerPid, members) in groups {
+            if members.count == 1 {
+                result.append(members[0])
+            } else {
+                let rep = members.first(where: { $0.pid == ownerPid })
+                    ?? members.max(by: { $0.lastActivityAt < $1.lastActivityAt })!
+                result.append(rep)
+                collapsedNotes.append(
+                    "owner=\(ownerPid) kept=\(rep.sessionId.prefix(8)) of "
+                    + "[\(members.map { String($0.sessionId.prefix(8)) }.joined(separator: ","))]")
+            }
+        }
+        let signature = collapsedNotes.sorted().joined(separator: "; ")
+        if signature != lastCollapseSignature {
+            lastCollapseSignature = signature
+            if !signature.isEmpty {
+                DiagnosticLogger.shared.info("tab-collapse \(signature)")
+            }
+        }
+        return result
+    }
+
     private func kickOffTerminalNameInference(forPid pid: pid_t, cwd: String?) {
         guard !pidInferenceInFlight.contains(pid) else { return }
         pidInferenceInFlight.insert(pid)
@@ -784,7 +833,8 @@ final class ActiveSessionsTracker: ObservableObject {
             // foreground terminal (ghostty/iTerm) that actually launched
             // it. Falls back to the plain parent-chain walk for ordinary
             // (non-bg-pty) sessions where recovery returns nil.
-            let proc = ProcessTreeWalker.recoverClaudeHostTerminal(startingAt: pid, cwd: cwd)
+            let recovered = ProcessTreeWalker.recoverClaudeHostTerminal(startingAt: pid, cwd: cwd)
+            let proc = recovered?.terminal
                 ?? ProcessTreeWalker.findTerminalProcessSynchronously(startingAt: pid)
             await MainActor.run {
                 guard let self else { return }
@@ -799,6 +849,11 @@ final class ActiveSessionsTracker: ObservableObject {
                     return
                 }
                 self.inferredTerminalNameByPid[pid] = alias
+                // Remember the foreground (tab-owning) pid so refresh can
+                // collapse this session onto the main row of its tab.
+                if let foregroundPid = recovered?.foregroundPid {
+                    self.inferredHostPidByPid[pid] = foregroundPid
+                }
                 self.inferenceFailedPids.remove(pid)
                 self.backfillTerminalName(forPid: pid, alias: alias)
                 self.refresh()
@@ -872,9 +927,11 @@ final class ActiveSessionsTracker: ObservableObject {
         displacedSessionIds = displacedSessionIds.filter { now.timeIntervalSince($0.value) < activeWindow }
 
         var merged: [String: ActiveSession] = [:]
-        for runtime in runtimeByKey.values {
+        let visibleRuntimes = collapseSameTabSessions(
+            runtimeByKey.values.filter { !displacedSessionIds.keys.contains($0.sessionId) }
+        )
+        for runtime in visibleRuntimes {
             let key = Self.key(provider: runtime.provider, sessionId: runtime.sessionId)
-            guard !displacedSessionIds.keys.contains(runtime.sessionId) else { continue }
             merged[key] = runtime.activeSession
         }
 

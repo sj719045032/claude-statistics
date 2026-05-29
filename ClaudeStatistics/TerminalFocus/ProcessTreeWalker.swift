@@ -191,7 +191,16 @@ enum ProcessTreeWalker {
     //      cwd is an ancestor of this session's cwd.
     // Depends on Claude Code's private daemon-dir layout + CLI flags;
     // returns nil (caller leaves the row hidden) if that shape changes.
-    static func recoverClaudeHostTerminal(startingAt pid: pid_t, cwd: String?) -> TerminalProcess? {
+    /// `terminal` is the GUI app to focus; `foregroundPid` is the
+    /// foreground `claude` process that owns the terminal tab — bg-pty
+    /// fork children resolve to their parent's pid, which the tracker
+    /// uses to collapse same-tab sessions onto the main row.
+    struct RecoveredHost {
+        let terminal: TerminalProcess
+        let foregroundPid: pid_t
+    }
+
+    static func recoverClaudeHostTerminal(startingAt pid: pid_t, cwd: String?) -> RecoveredHost? {
         let tree = buildTree()
 
         // (1) daemon topology: walk this pid's ancestry looking for the
@@ -215,7 +224,9 @@ enum ProcessTreeWalker {
                 "bg-pty recover pid=\(pid) bgHost=\(cur) daemonDir=\(dir) "
                 + "daemonPid=\(daemonPid.map(String.init) ?? "-") "
                 + "fgPid=\(foregroundPid.map(String.init) ?? "-") host=\(host?.bundleId ?? "-")")
-            if let host { return host }
+            if let host, let fg = foregroundPid {
+                return RecoveredHost(terminal: host, foregroundPid: pid_t(fg))
+            }
             current = tree[cur]?.ppid
         }
 
@@ -223,7 +234,7 @@ enum ProcessTreeWalker {
         let fallback = foregroundClaudeTerminal(ancestorOf: cwd, tree: tree)
         DiagnosticLogger.shared.info(
             "bg-pty recover pid=\(pid) daemon-topology miss → cwd-fallback="
-            + "\(fallback?.bundleId ?? "-") cwd=\(cwd ?? "-")")
+            + "\(fallback?.terminal.bundleId ?? "-") cwd=\(cwd ?? "-")")
         return fallback
     }
 
@@ -283,7 +294,7 @@ enum ProcessTreeWalker {
 
     /// A foreground `claude` (real tty) whose cwd is an ancestor of
     /// `target`; deepest ancestor wins (closest enclosing project).
-    private static func foregroundClaudeTerminal(ancestorOf target: String?, tree: [Int: ProcessInfo]) -> TerminalProcess? {
+    private static func foregroundClaudeTerminal(ancestorOf target: String?, tree: [Int: ProcessInfo]) -> RecoveredHost? {
         let want = normalizedPath(target)
         guard !want.isEmpty else { return nil }
 
@@ -300,8 +311,11 @@ enum ProcessTreeWalker {
             }
         }
 
-        guard let pid = best?.pid else { return nil }
-        return bestTerminalProcessSynchronously(in: processChain(startingAt: pid_t(pid), tree: tree))
+        guard let pid = best?.pid,
+              let terminal = bestTerminalProcessSynchronously(in: processChain(startingAt: pid_t(pid), tree: tree)) else {
+            return nil
+        }
+        return RecoveredHost(terminal: terminal, foregroundPid: pid_t(pid))
     }
 
     private static func isAncestor(_ ancestor: String, of path: String) -> Bool {
