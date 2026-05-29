@@ -82,6 +82,20 @@ public struct ProfileOrganization: Codable, Sendable {
         }
     }
 
+    /// Whether this is a shared team/enterprise org rather than an
+    /// individual (Pro/Max) account — lets the account card tell apart
+    /// the team vs personal identity behind the same email.
+    public var isTeamAccount: Bool {
+        organizationType == "claude_team" || organizationType == "claude_enterprise"
+    }
+
+    /// Short "Team" / "Enterprise" / "Personal" badge for the account
+    /// card. Team/enterprise orgs surface their type; everything else
+    /// (Pro / Max / unknown individual) reads as "Personal".
+    public var accountScopeDisplayName: String {
+        isTeamAccount ? orgTypeDisplayName : "Personal"
+    }
+
     public var tierDisplayName: String {
         guard let tier = rateLimitTier else { return "–" }
         if tier.contains(" "), tier != tier.lowercased() {

@@ -335,6 +335,14 @@ struct SettingsView: View {
                                     .padding(.vertical, 2)
                                     .background(Color.blue.opacity(0.1))
                                     .clipShape(Capsule())
+                                let isTeam = org.isTeamAccount
+                                Text(org.accountScopeDisplayName)
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(isTeam ? Color.orange : Color.secondary)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background((isTeam ? Color.orange : Color.gray).opacity(0.12))
+                                    .clipShape(Capsule())
                             }
                         }
                         Text(profile.account?.email ?? "")
