@@ -22,6 +22,17 @@ public struct SessionFilterContext: Sendable {
     /// without a PTY (Codex.app embedded codex-cli).
     public let terminalName: String?
     public let projectPath: String?
+    /// Strong focus-routing signals. When any is present the focus
+    /// subsystem can land the click on the source terminal even if
+    /// `terminalName` didn't resolve to a registered plugin — e.g.
+    /// Claude Code `--bg-pty-host` sessions whose hook fires from a
+    /// tty-less daemon process and falls `terminalName` back to `$TERM`
+    /// ("xterm-256color"). Mirrors the host's `ActiveSession.canFocusBack`
+    /// and the focus router's own gate.
+    public let terminalStableID: String?
+    public let terminalTabID: String?
+    public let terminalWindowID: String?
+    public let terminalSocket: String?
 
     public init(
         providerId: String,
@@ -30,7 +41,11 @@ public struct SessionFilterContext: Sendable {
         tty: String?,
         pid: pid_t?,
         terminalName: String?,
-        projectPath: String?
+        projectPath: String?,
+        terminalStableID: String? = nil,
+        terminalTabID: String? = nil,
+        terminalWindowID: String? = nil,
+        terminalSocket: String? = nil
     ) {
         self.providerId = providerId
         self.sessionId = sessionId
@@ -39,6 +54,10 @@ public struct SessionFilterContext: Sendable {
         self.pid = pid
         self.terminalName = terminalName
         self.projectPath = projectPath
+        self.terminalStableID = terminalStableID
+        self.terminalTabID = terminalTabID
+        self.terminalWindowID = terminalWindowID
+        self.terminalSocket = terminalSocket
     }
 }
 

@@ -172,6 +172,143 @@ enum ProcessTreeWalker {
         guard let tty, !tty.isEmpty, tty != "??" else { return nil }
         return tty.hasPrefix("/dev/") ? tty : "/dev/\(tty)"
     }
+
+    // MARK: - Claude Code daemon / bg-pty-host recovery
+    //
+    // Claude Code 2.1.x runs a session's agent loop (and fires its
+    // hooks) from a detached `--bg-pty-host` process that LaunchServices
+    // reparents to pid 1. The normal parent-chain walk therefore
+    // dead-ends before reaching the foreground terminal, the row shows
+    // up as `terminal_name = $TERM` ("xterm-256color") which no plugin
+    // claims, and `TerminalFocusableFilter` hides it. Recover the real
+    // host terminal best-effort:
+    //   1. daemon topology — the bg-pty-host's `--bg-pty-host <path>`
+    //      arg names a `/tmp/cc-daemon-<uid>/<id>/…` socket; the
+    //      `claude daemon run` process holding `<id>/control.sock`
+    //      carries `--spawned-by {"pid":N}`, and N is the foreground
+    //      `claude` sitting in the real terminal tab.
+    //   2. cwd fallback — a foreground `claude` with a real tty whose
+    //      cwd is an ancestor of this session's cwd.
+    // Depends on Claude Code's private daemon-dir layout + CLI flags;
+    // returns nil (caller leaves the row hidden) if that shape changes.
+    static func recoverClaudeHostTerminal(startingAt pid: pid_t, cwd: String?) -> TerminalProcess? {
+        let tree = buildTree()
+
+        // (1) daemon topology: walk this pid's ancestry looking for the
+        // bg-pty-host arg, then hop daemon → spawned-by foreground pid.
+        var current: Int? = Int(pid)
+        var seen: Set<Int> = []
+        var depth = 0
+        while let cur = current, cur > 1, depth < 50, !seen.contains(cur) {
+            seen.insert(cur)
+            depth += 1
+            guard let dir = daemonDir(fromCommand: fullCommand(pid: cur)) else {
+                current = tree[cur]?.ppid
+                continue
+            }
+            let daemonPid = daemonPidHoldingControlSock(dir: dir)
+            let foregroundPid = daemonPid.flatMap { spawnedByPid(fromCommand: fullCommand(pid: $0)) }
+            let host = foregroundPid.flatMap {
+                bestTerminalProcessSynchronously(in: processChain(startingAt: pid_t($0), tree: tree))
+            }
+            DiagnosticLogger.shared.info(
+                "bg-pty recover pid=\(pid) bgHost=\(cur) daemonDir=\(dir) "
+                + "daemonPid=\(daemonPid.map(String.init) ?? "-") "
+                + "fgPid=\(foregroundPid.map(String.init) ?? "-") host=\(host?.bundleId ?? "-")")
+            if let host { return host }
+            current = tree[cur]?.ppid
+        }
+
+        // (2) cwd fallback.
+        let fallback = foregroundClaudeTerminal(ancestorOf: cwd, tree: tree)
+        DiagnosticLogger.shared.info(
+            "bg-pty recover pid=\(pid) daemon-topology miss → cwd-fallback="
+            + "\(fallback?.bundleId ?? "-") cwd=\(cwd ?? "-")")
+        return fallback
+    }
+
+    private static func fullCommand(pid: Int) -> String? {
+        guard let result = TerminalProcessRunner.run(
+            executable: "/bin/ps",
+            arguments: ["-o", "command=", "-p", "\(pid)"]
+        ),
+        result.terminationStatus == 0 else {
+            return nil
+        }
+        let trimmed = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// Extracts `/tmp/cc-daemon-<uid>/<id>` (the daemon instance dir)
+    /// from a `--bg-pty-host <socketPath>` command line.
+    private static func daemonDir(fromCommand command: String?) -> String? {
+        guard let command, command.contains("--bg-pty-host"),
+              let range = command.range(
+                  of: #"/(?:private/)?tmp/cc-daemon-[0-9]+/[0-9a-fA-F]+"#,
+                  options: .regularExpression) else {
+            return nil
+        }
+        return String(command[range])
+    }
+
+    /// The `claude daemon run` pid holding `<dir>/control.sock`.
+    private static func daemonPidHoldingControlSock(dir: String) -> Int? {
+        guard let result = TerminalProcessRunner.run(
+            executable: "/usr/sbin/lsof",
+            arguments: ["-t", "\(dir)/control.sock"]
+        ),
+        result.terminationStatus == 0 else {
+            return nil
+        }
+        let pids = result.stdout
+            .split(whereSeparator: { $0 == "\n" || $0 == " " })
+            .compactMap { Int($0) }
+        for candidate in pids where (fullCommand(pid: candidate)?.contains("daemon run") ?? false) {
+            return candidate
+        }
+        return pids.first
+    }
+
+    /// Parses `"pid":N` out of a daemon's `--spawned-by {…}` JSON arg.
+    private static func spawnedByPid(fromCommand command: String?) -> Int? {
+        guard let command,
+              let range = command.range(
+                  of: #""pid"\s*:\s*[0-9]+"#,
+                  options: .regularExpression) else {
+            return nil
+        }
+        let digits = command[range].drop(while: { !$0.isNumber })
+        return Int(digits)
+    }
+
+    /// A foreground `claude` (real tty) whose cwd is an ancestor of
+    /// `target`; deepest ancestor wins (closest enclosing project).
+    private static func foregroundClaudeTerminal(ancestorOf target: String?, tree: [Int: ProcessInfo]) -> TerminalProcess? {
+        let want = normalizedPath(target)
+        guard !want.isEmpty else { return nil }
+
+        var best: (depth: Int, pid: Int)?
+        for info in tree.values {
+            guard info.tty != nil else { continue }
+            let command = info.command.lowercased()
+            guard command == "claude" || command.hasSuffix("/claude") else { continue }
+            let dir = normalizedPath(workingDirectory(pid: info.pid))
+            guard !dir.isEmpty, isAncestor(dir, of: want) else { continue }
+            let depth = dir.split(separator: "/").count
+            if best == nil || depth > best!.depth {
+                best = (depth, info.pid)
+            }
+        }
+
+        guard let pid = best?.pid else { return nil }
+        return bestTerminalProcessSynchronously(in: processChain(startingAt: pid_t(pid), tree: tree))
+    }
+
+    private static func isAncestor(_ ancestor: String, of path: String) -> Bool {
+        if ancestor == path { return true }
+        let prefix = ancestor.hasSuffix("/") ? ancestor : ancestor + "/"
+        return path.hasPrefix(prefix)
+    }
 }
 
 private struct ProcessInfo {

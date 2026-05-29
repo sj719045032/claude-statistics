@@ -10,6 +10,20 @@ struct TerminalFocusableFilter: SessionEventFilter {
     let id = "terminal-focusable"
 
     func shouldDisplay(_ context: SessionFilterContext) -> Bool {
+        // A live focus-routing signal (stableID / tabID / windowID /
+        // socket) means the click handler has somewhere to land even
+        // when `terminalName` didn't resolve to a registered plugin —
+        // e.g. Claude Code `--bg-pty-host` sessions whose hook fires
+        // from a tty-less daemon process and falls the name back to
+        // `$TERM` ("xterm-256color"). Keep these; this matches the focus
+        // router's gate (`TerminalFocusRouteHandler`) and
+        // `ActiveSession.canFocusBack`.
+        if context.terminalStableID?.isEmpty == false
+            || context.terminalTabID?.isEmpty == false
+            || context.terminalWindowID?.isEmpty == false
+            || context.terminalSocket?.isEmpty == false {
+            return true
+        }
         // Reject rows with no `terminal_name`. Hook-driven events always
         // arrive with a plugin-resolved name (`HookTerminalResolver`
         // populates it before `WireEventTranslator.makeEvent`, and

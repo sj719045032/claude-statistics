@@ -53,6 +53,11 @@ final class ActiveSessionsTracker: ObservableObject {
     // resolve once per pid asynchronously and replay through `refresh()`.
     private var inferredTerminalNameByPid: [pid_t: String] = [:]
     private var pidInferenceInFlight: Set<pid_t> = []
+    // Pids whose terminal-name inference came back empty (no host
+    // terminal found — genuinely terminal-less cloud / ssh / SDK
+    // sessions). Stops `grantInferenceGrace` from re-extending the
+    // grace pass forever; cleared if a later attempt succeeds.
+    private var inferenceFailedPids: Set<pid_t> = []
 
     // `mergeLatestTaskIfAvailable` (TodoWrite task list extraction from the
     // Claude transcript) opens, seeks, and reads JSONL on the main thread.
@@ -269,6 +274,13 @@ final class ActiveSessionsTracker: ObservableObject {
         let filterCtx = filterContext(forEvent: event)
         if sessionFilters.allSatisfy({ $0.shouldDisplay(filterCtx) }) {
             droppedSessionIds.remove(event.sessionId)
+        } else if grantInferenceGrace(terminalName: event.terminalName, pid: event.pid, cwd: event.projectPath) {
+            // tty-less host (Claude Code bg-pty-host etc.) whose
+            // terminal_name hasn't resolved to a registered plugin yet —
+            // async inference is now in flight; keep the row visible
+            // until a later refresh re-judges it with the repaired
+            // identity instead of flickering it out and back in.
+            droppedSessionIds.remove(event.sessionId)
         } else {
             droppedSessionIds.insert(event.sessionId)
         }
@@ -446,11 +458,11 @@ final class ActiveSessionsTracker: ObservableObject {
         // Codex.app embeds codex-cli with no PTY). When the hook's pid maps
         // to a registered terminal/plugin via the parent process chain, keep
         // the row alive instead of letting the focus filter drop it.
-        if (runtime.terminalName?.nilIfEmpty == nil), let pid = runtime.pid {
+        if shouldInferTerminalName(runtime.terminalName), let pid = runtime.pid {
             if let cached = inferredTerminalNameByPid[pid] {
                 runtime.terminalName = cached
             } else {
-                kickOffTerminalNameInference(forPid: pid)
+                kickOffTerminalNameInference(forPid: pid, cwd: runtime.projectPath)
             }
         }
         runtime.terminalSocket = event.terminalSocket?.nilIfEmpty ?? runtime.terminalSocket
@@ -577,11 +589,11 @@ final class ActiveSessionsTracker: ObservableObject {
         if needsTTY {
             runtime.tty = recovered.tty
         }
-        if runtime.terminalName?.nilIfEmpty == nil {
+        if shouldInferTerminalName(runtime.terminalName) {
             if let cached = inferredTerminalNameByPid[recovered.pid] {
                 runtime.terminalName = cached
             } else {
-                kickOffTerminalNameInference(forPid: recovered.pid)
+                kickOffTerminalNameInference(forPid: recovered.pid, cwd: runtime.projectPath)
             }
         }
     }
@@ -691,14 +703,26 @@ final class ActiveSessionsTracker: ObservableObject {
     }
 
     private func filterContext(forEvent event: AttentionEvent) -> SessionFilterContext {
-        SessionFilterContext(
+        // Judge against any cached pid→terminal-name inference so a
+        // bg-pty-host row is filtered on its repaired identity, not the
+        // raw `$TERM` fallback ("xterm-256color") the hook carried.
+        var terminalName = event.terminalName
+        if shouldInferTerminalName(terminalName), let pid = event.pid,
+           let cached = inferredTerminalNameByPid[pid] {
+            terminalName = cached
+        }
+        return SessionFilterContext(
             providerId: event.provider.rawValue,
             sessionId: event.sessionId,
             prompt: event.livePrompt,
             tty: event.tty,
             pid: event.pid,
-            terminalName: event.terminalName,
-            projectPath: event.projectPath
+            terminalName: terminalName,
+            projectPath: event.projectPath,
+            terminalStableID: event.terminalStableID?.nilIfEmpty,
+            terminalTabID: event.terminalTabID?.nilIfEmpty,
+            terminalWindowID: event.terminalWindowID?.nilIfEmpty,
+            terminalSocket: event.terminalSocket?.nilIfEmpty
         )
     }
 
@@ -710,23 +734,72 @@ final class ActiveSessionsTracker: ObservableObject {
             tty: runtime.tty,
             pid: runtime.pid,
             terminalName: runtime.terminalName,
-            projectPath: runtime.projectPath
+            projectPath: runtime.projectPath,
+            terminalStableID: runtime.terminalStableID?.nilIfEmpty,
+            terminalTabID: runtime.terminalTabID?.nilIfEmpty,
+            terminalWindowID: runtime.terminalWindowID?.nilIfEmpty,
+            terminalSocket: runtime.terminalSocket?.nilIfEmpty
         )
     }
 
-    private func kickOffTerminalNameInference(forPid pid: pid_t) {
+    /// A terminal name needs (re)inference when it's missing or doesn't
+    /// resolve to a registered terminal plugin — the latter covers
+    /// Claude Code bg-pty-host hooks that fall `terminal_name` back to
+    /// `$TERM` ("xterm-256color"), which no plugin claims.
+    private func shouldInferTerminalName(_ name: String?) -> Bool {
+        guard let name = name?.nilIfEmpty else { return true }
+        return !TerminalRegistry.canFocusBackToTerminal(named: name)
+    }
+
+    /// record-time: should a not-yet-resolved tty-less session get a
+    /// grace pass through the filter chain? Ensures inference is running.
+    /// Grace is granted only before the first miss is recorded, but a
+    /// retry still fires afterwards so a transient lsof/ps hiccup can
+    /// recover on a later event.
+    private func grantInferenceGrace(terminalName: String?, pid: pid_t?, cwd: String?) -> Bool {
+        guard shouldInferTerminalName(terminalName), let pid else { return false }
+        if inferredTerminalNameByPid[pid] != nil { return false }
+        let firstAttempt = !inferenceFailedPids.contains(pid)
+        kickOffTerminalNameInference(forPid: pid, cwd: cwd)
+        return firstAttempt
+    }
+
+    /// refresh-time: don't garbage-collect a row whose terminal-name
+    /// inference is still in flight (the grace pass from record()).
+    private func inferenceGraceActive(terminalName: String?, pid: pid_t?) -> Bool {
+        guard shouldInferTerminalName(terminalName), let pid else { return false }
+        return pidInferenceInFlight.contains(pid)
+    }
+
+    private func kickOffTerminalNameInference(forPid pid: pid_t, cwd: String?) {
         guard !pidInferenceInFlight.contains(pid) else { return }
         pidInferenceInFlight.insert(pid)
         Task.detached(priority: .background) { [weak self] in
-            let proc = ProcessTreeWalker.findTerminalProcessSynchronously(startingAt: pid)
+            // Claude Code daemon/bg-pty-host topology recovery FIRST: a
+            // bg-pty session's parent chain ends at ClaudeCode.app (the
+            // executor), which the Claude-app terminal plugin claims as a
+            // "terminal" — so the plain walk would mislabel the row
+            // `claude` and focus would activate the desktop app instead
+            // of the real tab. Recovery hops daemon → spawned-by to the
+            // foreground terminal (ghostty/iTerm) that actually launched
+            // it. Falls back to the plain parent-chain walk for ordinary
+            // (non-bg-pty) sessions where recovery returns nil.
+            let proc = ProcessTreeWalker.recoverClaudeHostTerminal(startingAt: pid, cwd: cwd)
+                ?? ProcessTreeWalker.findTerminalProcessSynchronously(startingAt: pid)
             await MainActor.run {
                 guard let self else { return }
                 self.pidInferenceInFlight.remove(pid)
                 guard let bundleId = proc?.bundleId,
                       let alias = TerminalRegistry.primaryTerminalNameAlias(forBundleId: bundleId) else {
+                    // No host terminal found — record the miss so the
+                    // grace pass stops re-extending. A genuinely
+                    // terminal-less session gets hidden on next refresh.
+                    self.inferenceFailedPids.insert(pid)
+                    self.refresh()
                     return
                 }
                 self.inferredTerminalNameByPid[pid] = alias
+                self.inferenceFailedPids.remove(pid)
                 self.backfillTerminalName(forPid: pid, alias: alias)
                 self.refresh()
             }
@@ -736,7 +809,7 @@ final class ActiveSessionsTracker: ObservableObject {
     private func backfillTerminalName(forPid pid: pid_t, alias: String) {
         var changed = false
         for (key, runtime) in runtimeByKey
-            where runtime.pid == pid && (runtime.terminalName?.nilIfEmpty == nil) {
+            where runtime.pid == pid && shouldInferTerminalName(runtime.terminalName) {
             var updated = runtime
             updated.terminalName = alias
             runtimeByKey[key] = TerminalIdentityResolver.sanitized(updated)
@@ -784,7 +857,8 @@ final class ActiveSessionsTracker: ObservableObject {
         if !sessionFilters.isEmpty {
             for (key, runtime) in runtimeByKey {
                 let ctx = filterContext(forRuntime: runtime)
-                if !sessionFilters.allSatisfy({ $0.shouldDisplay(ctx) }) {
+                if !sessionFilters.allSatisfy({ $0.shouldDisplay(ctx) }),
+                   !inferenceGraceActive(terminalName: runtime.terminalName, pid: runtime.pid) {
                     runtimeByKey.removeValue(forKey: key)
                 }
             }
