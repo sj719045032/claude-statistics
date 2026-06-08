@@ -147,6 +147,7 @@ final class CredentialService {
         if let raw = readRawCredentialJSONStringFromFile() {
             let record = ClaudeCredentialRecord(jsonString: raw, source: .file, keychainAttributes: nil)
             updateCache(record)
+            syncToBackup(record)
             resetBypassBackup()
             return record
         }
@@ -214,6 +215,10 @@ final class CredentialService {
     // MARK: - Keychain
 
     private func readRawCredentialRecordFromKeychain() -> ClaudeCredentialRecord? {
+        if let record = readKeychainViaSecurityTool() {
+            return record
+        }
+
         var query = baseKeychainQuery()
         query[kSecReturnData as String] = true
         query[kSecReturnAttributes as String] = true
@@ -246,17 +251,43 @@ final class CredentialService {
         _ rawJSONString: String,
         keychainAttributes: ClaudeKeychainItemAttributes
     ) throws {
+        guard !rawJSONString.isEmpty else { return }
+
+        // Prefer /usr/bin/security: it is Apple-signed and authorized via the
+        // item's partition list (apple-tool:), so it can read/write without
+        // triggering a keychain prompt or resetting the partition list.
+        // Direct SecItem* calls from our app risk the "Always Allow" dialog
+        // which rewrites the partition list and kicks CLI out.
+        let existingAccount = readExistingKeychainAccount()
+        if writeKeychainViaSecurityTool(rawJSONString, account: existingAccount) {
+            DiagnosticLogger.shared.info("Claude keychain item written via security tool (partition list preserved)")
+            return
+        }
+
         guard let data = rawJSONString.data(using: .utf8) else {
             throw NSError(domain: NSCocoaErrorDomain, code: NSFileWriteInapplicableStringEncodingError)
         }
 
         let normalizedAccount = normalizedKeychainAccount(keychainAttributes.account)
+
+        var updateAttrs: [String: Any] = [kSecValueData as String: data]
+        if let normalizedAccount {
+            updateAttrs[kSecAttrAccount as String] = normalizedAccount
+        }
+        let updateStatus = SecItemUpdate(baseKeychainQuery() as CFDictionary,
+                                          updateAttrs as CFDictionary)
+
+        if updateStatus == errSecSuccess {
+            DiagnosticLogger.shared.info("Claude keychain item updated via SecItemUpdate (fallback)")
+            return
+        }
+
+        if updateStatus != errSecItemNotFound {
+            DiagnosticLogger.shared.warning("Claude keychain update denied (status=\(updateStatus)), file fallback only")
+            return
+        }
+
         let access = makeSharedAccess()
-
-        // Delete any existing item so the SecItemAdd below establishes a fresh ACL
-        // that includes both this app and /usr/bin/security (the CLI's keychain reader).
-        SecItemDelete(baseKeychainQuery() as CFDictionary)
-
         var addQuery = baseKeychainQuery()
         addQuery[kSecValueData as String] = data
         if let normalizedAccount {
@@ -270,91 +301,101 @@ final class CredentialService {
         guard addStatus == errSecSuccess else {
             throw NSError(domain: NSOSStatusErrorDomain, code: Int(addStatus))
         }
-
-        applyPartitionList(account: normalizedAccount)
+        DiagnosticLogger.shared.info("Claude keychain item created with shared ACL (fallback)")
     }
 
-    /// Runs `/usr/bin/security set-generic-password-partition-list` to authorize
-    /// the CLI's security-tool reads without triggering a password prompt.
-    /// Silently no-ops if the keychain is locked or the command fails.
-    private func applyPartitionList(account: String?) {
-        var partitions = ["apple:", "apple-tool:"]
-        if let teamID = detectClaudeTeamID() {
-            partitions.append("teamid:\(teamID)")
+    // MARK: - Security tool helpers
+
+    /// Reads the keychain item via `/usr/bin/security find-generic-password -w`.
+    /// Apple-signed and in the partition list — never triggers a prompt.
+    private func readKeychainViaSecurityTool() -> ClaudeCredentialRecord? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+        process.arguments = [
+            "find-generic-password",
+            "-s", Self.keychainServiceName,
+            "-w",
+        ]
+        process.standardInput = FileHandle.nullDevice
+        let stdoutPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = Pipe()
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return nil }
+        } catch {
+            return nil
         }
 
+        let data = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        guard let jsonString = String(data: data, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !jsonString.isEmpty else {
+            return nil
+        }
+
+        let account = readExistingKeychainAccount()
+        return ClaudeCredentialRecord(
+            jsonString: jsonString,
+            source: .keychain,
+            keychainAttributes: ClaudeKeychainItemAttributes(
+                service: Self.keychainServiceName,
+                account: account
+            )
+        )
+    }
+
+    /// Reads just the `kSecAttrAccount` of the existing item.
+    /// Attribute-only reads bypass the ACL decrypt check and never prompt.
+    private func readExistingKeychainAccount() -> String? {
+        var query = baseKeychainQuery()
+        query[kSecReturnAttributes as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+              let attrs = item as? [String: Any] else {
+            return nil
+        }
+        return attrs[kSecAttrAccount as String] as? String
+    }
+
+    /// Writes keychain data via `/usr/bin/security add-generic-password -U`.
+    /// Matches the existing item by service + account and updates data in place
+    /// (SecItemUpdate under the hood), preserving the ACL and partition list.
+    private func writeKeychainViaSecurityTool(_ rawJSONString: String, account: String?) -> Bool {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
         var args = [
-            "set-generic-password-partition-list",
+            "add-generic-password",
+            "-U",
             "-s", Self.keychainServiceName,
-            "-S", partitions.joined(separator: ","),
+            "-w", rawJSONString,
         ]
         if let account, !account.isEmpty {
             args += ["-a", account]
         }
         process.arguments = args
         process.standardInput = FileHandle.nullDevice
-        let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            let stderr = String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-            let stdout = String(data: stdoutPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-            if process.terminationStatus == 0 {
-                DiagnosticLogger.shared.info("Claude keychain partition list updated: \(partitions.joined(separator: ","))")
-            } else {
-                let trimmedErr = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
-                let trimmedOut = stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-                DiagnosticLogger.shared.warning("Failed to set partition list: exit=\(process.terminationStatus) args=\(args) stderr=\(trimmedErr) stdout=\(trimmedOut.prefix(200))")
-            }
-        } catch {
-            DiagnosticLogger.shared.warning("Failed to spawn security for partition list: \(error.localizedDescription)")
-        }
-    }
-
-    /// Parses `TeamIdentifier=...` from `codesign -dv` output for the installed claude binary.
-    private func detectClaudeTeamID() -> String? {
-        let candidates = [
-            "\(NSHomeDirectory())/.local/bin/claude",
-            "/usr/local/bin/claude",
-            "/opt/homebrew/bin/claude",
-        ]
-        guard let claudePath = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
-            return nil
-        }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
-        process.arguments = ["-dv", claudePath]
-        let stderrPipe = Pipe()
-        process.standardError = stderrPipe
         process.standardOutput = Pipe()
-        process.standardInput = FileHandle.nullDevice
+        process.standardError = stderrPipe
 
         do {
             try process.run()
             process.waitUntilExit()
-        } catch {
-            return nil
-        }
-
-        let data = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-        guard let output = String(data: data, encoding: .utf8) else { return nil }
-
-        for line in output.split(separator: "\n") {
-            if let range = line.range(of: "TeamIdentifier=") {
-                let tid = String(line[range.upperBound...]).trimmingCharacters(in: .whitespaces)
-                if !tid.isEmpty, tid != "not set" {
-                    return tid
-                }
+            if process.terminationStatus == 0 {
+                return true
             }
+            let stderr = String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            DiagnosticLogger.shared.warning(
+                "security add-generic-password failed: exit=\(process.terminationStatus) stderr=\(stderr.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))"
+            )
+        } catch {
+            DiagnosticLogger.shared.warning("Failed to spawn security for keychain write: \(error.localizedDescription)")
         }
-        return nil
+        return false
     }
 
     /// Builds a SecAccess whose trusted-applications list covers this app,
@@ -367,13 +408,25 @@ final class CredentialService {
             Bundle.main.bundlePath,
             "/usr/bin/security",
         ]
+
+        let releaseAppPath = "/Applications/Claude Statistics.app"
+        if Bundle.main.bundlePath != releaseAppPath,
+           FileManager.default.fileExists(atPath: releaseAppPath) {
+            paths.append(releaseAppPath)
+        }
+
         let claudeCandidates = [
             "\(NSHomeDirectory())/.local/bin/claude",
             "/usr/local/bin/claude",
             "/opt/homebrew/bin/claude",
         ]
-        if let claudeBinary = claudeCandidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
-            paths.append(claudeBinary)
+        for candidate in claudeCandidates {
+            guard FileManager.default.isExecutableFile(atPath: candidate) else { continue }
+            paths.append(candidate)
+            if let resolved = resolveSymlink(candidate), resolved != candidate {
+                paths.append(resolved)
+            }
+            break
         }
 
         for path in paths {
@@ -399,6 +452,17 @@ final class CredentialService {
             return nil
         }
         return access
+    }
+
+    private func resolveSymlink(_ path: String) -> String? {
+        guard let resolved = try? FileManager.default.destinationOfSymbolicLink(atPath: path) else {
+            return nil
+        }
+        let absolute = resolved.hasPrefix("/")
+            ? resolved
+            : ((path as NSString).deletingLastPathComponent as NSString).appendingPathComponent(resolved)
+        guard FileManager.default.isExecutableFile(atPath: absolute) else { return nil }
+        return absolute
     }
 
     // MARK: - File fallback

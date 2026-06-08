@@ -71,6 +71,7 @@ enum ClaudeAuthStoreError: LocalizedError {
     case notFound(String)
     case invalidJSON
     case missingIdentity
+    case insufficientScope
 
     var errorDescription: String? {
         switch self {
@@ -80,6 +81,8 @@ enum ClaudeAuthStoreError: LocalizedError {
             "Claude credentials are not valid JSON."
         case .missingIdentity:
             "Claude credentials do not include an account email."
+        case .insufficientScope:
+            "This token only has read-only permissions and cannot be used in Sync mode. Please sign in via the CLI."
         }
     }
 }
@@ -367,7 +370,8 @@ final class ClaudeAccountManager: ObservableObject {
         importOrphanedManagedConfigsIfNeeded()
 
         do {
-            if let material = readCurrentLiveMaterial() {
+            if let material = readCurrentLiveMaterial(),
+               Self.hasAdequateScopeForSync(material.rawJSONString) {
                 liveAccount = material.identity
                 do {
                     _ = try upsertManagedAccount(from: material)
@@ -378,9 +382,11 @@ final class ClaudeAccountManager: ObservableObject {
                 liveAccount = nil
             }
 
-            managedAccounts = try loadSnapshot().accounts.sorted { lhs, rhs in
-                lhs.updatedAt > rhs.updatedAt
-            }
+            managedAccounts = try loadSnapshot().accounts
+                .filter { Self.hasAdequateScopeForSync($0.rawJSONString) }
+                .sorted { lhs, rhs in
+                    lhs.updatedAt > rhs.updatedAt
+                }
         } catch {
             managedAccounts = []
             errorMessage = error.localizedDescription
@@ -554,12 +560,28 @@ final class ClaudeAccountManager: ObservableObject {
     }
 
     private func activateLiveAccount(_ material: ClaudeAuthMaterial) throws {
+        guard Self.hasAdequateScopeForSync(material.rawJSONString) else {
+            throw ClaudeAuthStoreError.insufficientScope
+        }
         try CredentialService.shared.writeRawCredentialJSONString(
             material.rawJSONString,
             keychainAttributes: effectiveKeychainAttributes(for: material)
         )
         try ClaudeAuthStore.writeAccountMetadata(material.metadataJSONString)
         UsageAPIService.shared.resetLocalState()
+    }
+
+    /// Returns false if the token was issued by our Independent OAuth flow
+    /// (scope: `user:profile` only) — these must not be written to the CLI's keychain.
+    static func hasAdequateScopeForSync(_ rawJSONString: String) -> Bool {
+        guard let data = rawJSONString.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let oauth = json["claudeAiOauth"] as? [String: Any],
+              let scopes = oauth["scopes"] as? [String] else {
+            // No scopes field = CLI-issued token (CLI doesn't persist scopes array)
+            return true
+        }
+        return !scopes.allSatisfy { $0 == "user:profile" }
     }
 
     private func makeClaudeLoginScript() throws -> String {

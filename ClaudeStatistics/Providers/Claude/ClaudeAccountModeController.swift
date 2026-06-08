@@ -36,13 +36,11 @@ final class ClaudeAccountModeController {
         let previous = mode
         guard previous != newValue else { return }
         UserDefaults.standard.set(newValue == .sync, forKey: Self.defaultsKey)
-        // Any cached token belongs to the old mode — purge so downstream reads
-        // go through the new mode's credential source.
-        CredentialService.shared.invalidate()
+        CredentialService.shared.invalidate(forceBypassBackup: true)
         NotificationCenter.default.post(
             name: .claudeAccountModeChanged,
             object: nil,
-            userInfo: ["mode": newValue.rawValue]
+            userInfo: ["mode": newValue.rawValue, "previous": previous.rawValue]
         )
     }
 
