@@ -60,6 +60,13 @@ struct SessionRow: View {
                             .cornerRadius(Theme.badgeRadius)
                     }
 
+                    if session.isArchived {
+                        Image(systemName: "archivebox")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                            .help("session.archived.help")
+                    }
+
                     if isHovered && !isSelecting {
                         CopyButton(text: session.displayName, help: "detail.copyPath")
                     }
@@ -96,10 +103,12 @@ struct SessionRow: View {
                         Label("\(qs.messageCount)", systemImage: "message")
                             .font(.system(size: 9))
                             .foregroundStyle(.tertiary)
-                        Text(TimeFormatter.fileSize(session.fileSize))
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
-                    } else {
+                        if !session.isArchived {
+                            Text(TimeFormatter.fileSize(session.fileSize))
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                        }
+                    } else if !session.isArchived {
                         Text(TimeFormatter.fileSize(session.fileSize))
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
@@ -145,13 +154,15 @@ struct SessionRow: View {
                     .help("session.transcript.help")
                 }
 
-                Button(action: onResume) {
-                    Image(systemName: "terminal")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Color.blue)
+                if !session.isArchived {
+                    Button(action: onResume) {
+                        Image(systemName: "terminal")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.blue)
+                    }
+                    .buttonStyle(.hoverScale)
+                    .help("session.resume.help")
                 }
-                .buttonStyle(.hoverScale)
-                .help("session.resume.help")
 
                 DestructiveIconButton(action: onDelete)
                     .buttonStyle(.hoverScale)

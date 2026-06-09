@@ -12,6 +12,7 @@ struct SessionParseOutcome {
     let displayStats: SessionStats?
     let searchMessages: [SearchIndexMessage]
     let shouldRetry: Bool
+    let compressedTranscript: Data?
 }
 
 /// Stateless validator that runs `SessionProvider.parseSession` once, sanity-checks
@@ -23,7 +24,8 @@ enum SessionParseValidator {
         provider: any SessionProvider,
         session: Session,
         quick: SessionQuickStats,
-        cached: DatabaseService.CachedSession?
+        cached: DatabaseService.CachedSession?,
+        archiveTranscript: Bool = true
     ) async -> SessionParseOutcome {
         // PR6: combined parse + FTS extract — one file IO, one decode
         // pass per pass through the validator.
@@ -35,7 +37,8 @@ enum SessionParseValidator {
                 committedStats: firstStats,
                 displayStats: firstStats,
                 searchMessages: firstResult.searchMessages,
-                shouldRetry: false
+                shouldRetry: false,
+                compressedTranscript: archiveTranscript ? compressFileData(at: session.filePath) : nil
             )
         }
 
@@ -52,7 +55,8 @@ enum SessionParseValidator {
                 committedStats: retryStats,
                 displayStats: retryStats,
                 searchMessages: retryResult.searchMessages,
-                shouldRetry: false
+                shouldRetry: false,
+                compressedTranscript: archiveTranscript ? compressFileData(at: session.filePath) : nil
             )
         }
 
@@ -63,8 +67,14 @@ enum SessionParseValidator {
             committedStats: nil,
             displayStats: cached?.sessionStats,
             searchMessages: [],
-            shouldRetry: true
+            shouldRetry: true,
+            compressedTranscript: nil
         )
+    }
+
+    private static func compressFileData(at path: String) -> Data? {
+        guard let rawData = FileManager.default.contents(atPath: path) else { return nil }
+        return (try? (rawData as NSData).compressed(using: .zlib)) as Data?
     }
 
     static func suspiciousReason(

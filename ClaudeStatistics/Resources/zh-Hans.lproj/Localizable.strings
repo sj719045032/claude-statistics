@@ -21,6 +21,7 @@
 "session.deleteWarning" = "此操作不可撤销。";
 "session.new.help" = "在相同目录新建会话";
 "session.resume.help" = "恢复会话";
+"session.archived.help" = "原始文件已删除 — 查看缓存数据";
 "session.delete.help" = "删除会话";
 "session.delete.immediate.help" = "立即删除（跳过弹窗确认）";
 "session.projectSelect.help" = "选择此项目的全部会话";
@@ -79,6 +80,8 @@
 "detail.model" = "模型";
 "detail.duration" = "时长";
 "detail.size" = "大小";
+"detail.status" = "状态";
+"detail.status.archived" = "原始文件已删除";
 "detail.contextWindow" = "上下文窗口";
 "detail.started" = "开始时间";
 "detail.lastActive" = "最后活跃";
@@ -775,3 +778,21 @@
 
 /* Account source — subscription scope note */
 "claude.accountSource.help.subscriptionNote" = "此设置只影响 Anthropic OAuth 凭证的来源。GLM Coding Plan / 其他第三方订阅有自己的账号管理,在身份选择器内切换。";
+
+/* Backup & Restore */
+"settings.backupRestore" = "备份与恢复";
+"backup.export" = "导出备份";
+"backup.export.description" = "将所有统计数据、偏好设置和插件配置导出为备份文件，可用于迁移到其他电脑。";
+"backup.export.dbSize" = "数据库大小";
+"backup.export.button" = "导出备份…";
+"backup.export.success" = "备份导出成功";
+"backup.import" = "导入备份";
+"backup.import.description" = "从之前导出的备份文件恢复统计数据。这将替换所有当前数据。";
+"backup.import.button" = "导入备份…";
+"backup.import.confirm.title" = "确认导入？";
+"backup.import.confirm.message" = "此备份由 v%@ 于 %@ 创建，包含 %d 个会话。\n\n导入将替换所有当前数据，此操作不可撤销。";
+"backup.import.confirm.cancel" = "取消";
+"backup.import.confirm.proceed" = "导入";
+"backup.import.restart.title" = "需要重启";
+"backup.import.restart.message" = "数据已恢复成功，需要重启应用以加载导入的数据。";
+"backup.import.restart.button" = "立即重启";

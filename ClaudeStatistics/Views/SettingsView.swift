@@ -44,6 +44,7 @@ struct SettingsView: View {
     @State private var showTerminalFocusSettings = false
     @State private var showDeveloperSettings = false
     @State private var showPluginSettings = false
+    @State private var showBackupRestore = false
     @State private var hasToken: Bool?
     @State private var pluginUpdateCount: Int?
     @State private var missingPluginRecommendation: MissingPluginRecommendation?
@@ -80,6 +81,8 @@ struct SettingsView: View {
                     verboseLogging: $verboseLogging,
                     onBack: { showDeveloperSettings = false }
                 )
+            } else if showBackupRestore {
+                BackupRestoreView(onBack: { showBackupRestore = false })
             } else if showPluginSettings {
                 PluginsSettingsView(
                     pluginRegistry: appState.pluginRegistry,
@@ -249,6 +252,17 @@ struct SettingsView: View {
                             .labelStyle(SettingsRowLabelStyle())
                         Spacer()
                         Image(systemName: "arrow.up.forward.square")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+
+                SettingsRowButton(action: { showBackupRestore = true }) {
+                    HStack {
+                        Label("settings.backupRestore", systemImage: "arrow.triangle.2.circlepath")
+                            .labelStyle(SettingsRowLabelStyle())
+                        Spacer()
+                        Image(systemName: "chevron.right")
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                     }

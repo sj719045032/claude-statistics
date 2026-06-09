@@ -7,6 +7,10 @@ extension TranscriptParser {
         guard let data = FileManager.default.contents(atPath: filePath) else {
             return []
         }
+        return parseTrendData(fromData: data, granularity: granularity)
+    }
+
+    func parseTrendData(fromData data: Data, granularity: TrendGranularity) -> [TrendDataPoint] {
         let content = String(decoding: data, as: UTF8.self)
 
         let decoder = JSONDecoder()

@@ -25,6 +25,10 @@ public struct Session: Identifiable, Hashable, Sendable {
     /// field on first parse. `nil` until the parser fills it in.
     public var cwd: String?
 
+    /// `true` when the source `.jsonl` file has been deleted but the
+    /// session's stats and transcript are still available from the DB cache.
+    public var isArchived: Bool
+
     public init(
         id: String,
         externalID: String,
@@ -47,6 +51,7 @@ public struct Session: Identifiable, Hashable, Sendable {
         self.fileSize = fileSize
         self.cwd = cwd
         self.metadata = metadata
+        self.isArchived = false
     }
 
     public var displayName: String {

@@ -48,6 +48,30 @@ final class DatabaseService {
         self.db = nil
     }
 
+    func checkpoint() {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db else { return }
+        sqlite3_wal_checkpoint_v2(db, nil, SQLITE_CHECKPOINT_TRUNCATE, nil, nil)
+    }
+
+    func backupProviderSummary() -> [String: Int] {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db else { return [:] }
+        let sql = "SELECT provider, COUNT(*) FROM session_cache GROUP BY provider"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [:] }
+        defer { sqlite3_finalize(stmt) }
+        var result: [String: Int] = [:]
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let provider = String(cString: sqlite3_column_text(stmt, 0))
+            let count = Int(sqlite3_column_int(stmt, 1))
+            result[provider] = count
+        }
+        return result
+    }
+
     // MARK: - Schema
 
     private func createTables() {
@@ -78,9 +102,11 @@ final class DatabaseService {
 
     /// Current schema version.
     /// v10 refreshes cached Codex quick titles after prompt-cleaning changes.
-    private static let currentSchemaVersion: Int32 = 10
+    /// v11 adds transcript_blob, project_path, cwd columns for session archival.
+    private static let currentSchemaVersion: Int32 = 11
     private static let fullResetSchemaVersion: Int32 = 9
     private static let codexTitleCacheMigrationVersion: Int32 = 10
+    private static let archivalColumnsVersion: Int32 = 11
 
     private func migrateIfNeeded() {
         var version: Int32 = 0
@@ -103,6 +129,12 @@ final class DatabaseService {
             execute("PRAGMA user_version = \(version)")
         }
 
+        if version < Self.archivalColumnsVersion {
+            addArchivalColumns()
+            version = Self.archivalColumnsVersion
+            execute("PRAGMA user_version = \(version)")
+        }
+
         if version < Self.currentSchemaVersion {
             resetDatabase()
             execute("PRAGMA user_version = \(Self.currentSchemaVersion)")
@@ -116,6 +148,12 @@ final class DatabaseService {
         execute("DROP TABLE IF EXISTS messages")
         execute("DROP TABLE IF EXISTS session_cache")
         createTables()
+    }
+
+    private func addArchivalColumns() {
+        execute("ALTER TABLE session_cache ADD COLUMN transcript_blob BLOB")
+        execute("ALTER TABLE session_cache ADD COLUMN project_path TEXT")
+        execute("ALTER TABLE session_cache ADD COLUMN cwd TEXT")
     }
 
     func resetProviderCache(provider: ProviderKind) {
@@ -158,6 +196,9 @@ final class DatabaseService {
         let mtime: Date
         let quickStats: SessionQuickStats?
         let sessionStats: SessionStats?
+        let projectPath: String?
+        let cwd: String?
+        let hasTranscript: Bool
     }
 
     /// Load all cached sessions from the database
@@ -167,7 +208,8 @@ final class DatabaseService {
         guard let db else { return [:] }
 
         let sql = """
-            SELECT session_id, file_size, mtime, quick_json, stats_json
+            SELECT session_id, file_size, mtime, quick_json, stats_json,
+                   project_path, cwd, transcript_blob IS NOT NULL
             FROM session_cache
             WHERE provider = ?
         """
@@ -196,13 +238,28 @@ final class DatabaseService {
                 stats = try? decoder.decode(SessionStats.self, from: json)
             }
 
+            var projectPath: String?
+            if let ptr = sqlite3_column_text(stmt, 5) {
+                projectPath = String(cString: ptr)
+            }
+
+            var cwd: String?
+            if let ptr = sqlite3_column_text(stmt, 6) {
+                cwd = String(cString: ptr)
+            }
+
+            let hasTranscript = sqlite3_column_int(stmt, 7) != 0
+
             result[sessionId] = CachedSession(
                 provider: provider,
                 sessionId: sessionId,
                 fileSize: fileSize,
                 mtime: mtime,
                 quickStats: quick,
-                sessionStats: stats
+                sessionStats: stats,
+                projectPath: projectPath,
+                cwd: cwd,
+                hasTranscript: hasTranscript
             )
         }
 
@@ -268,7 +325,8 @@ final class DatabaseService {
 
         let placeholders = Array(repeating: "?", count: sessionIds.count).joined(separator: ",")
         let sql = """
-            SELECT session_id, file_size, mtime, quick_json, stats_json
+            SELECT session_id, file_size, mtime, quick_json, stats_json,
+                   project_path, cwd, transcript_blob IS NOT NULL
             FROM session_cache
             WHERE provider = ? AND session_id IN (\(placeholders))
         """
@@ -302,13 +360,28 @@ final class DatabaseService {
                 stats = try? decoder.decode(SessionStats.self, from: json)
             }
 
+            var projectPath: String?
+            if let ptr = sqlite3_column_text(stmt, 5) {
+                projectPath = String(cString: ptr)
+            }
+
+            var cwd: String?
+            if let ptr = sqlite3_column_text(stmt, 6) {
+                cwd = String(cString: ptr)
+            }
+
+            let hasTranscript = sqlite3_column_int(stmt, 7) != 0
+
             result[sessionId] = CachedSession(
                 provider: provider,
                 sessionId: sessionId,
                 fileSize: fileSize,
                 mtime: mtime,
                 quickStats: quick,
-                sessionStats: stats
+                sessionStats: stats,
+                projectPath: projectPath,
+                cwd: cwd,
+                hasTranscript: hasTranscript
             )
         }
 
@@ -528,6 +601,102 @@ final class DatabaseService {
                 sqlite3_finalize(stmt2)
             }
         }
+        execute("COMMIT")
+    }
+
+    // MARK: - Transcript Archival
+
+    func saveTranscriptAndMetadata(
+        provider: ProviderKind,
+        sessionId: String,
+        compressedTranscript: Data,
+        projectPath: String,
+        cwd: String?
+    ) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db else { return }
+
+        let sql = """
+            UPDATE session_cache
+            SET transcript_blob = ?, project_path = ?, cwd = ?
+            WHERE provider = ? AND session_id = ?
+        """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+
+        compressedTranscript.withUnsafeBytes { buf in
+            sqlite3_bind_blob(stmt, 1, buf.baseAddress, Int32(buf.count), sqliteTransient)
+        }
+        sqlite3_bind_text(stmt, 2, projectPath, -1, sqliteTransient)
+        if let cwd {
+            sqlite3_bind_text(stmt, 3, cwd, -1, sqliteTransient)
+        } else {
+            sqlite3_bind_null(stmt, 3)
+        }
+        sqlite3_bind_text(stmt, 4, provider.rawValue, -1, sqliteTransient)
+        sqlite3_bind_text(stmt, 5, sessionId, -1, sqliteTransient)
+        sqlite3_step(stmt)
+    }
+
+    func loadTranscript(provider: ProviderKind, sessionId: String) -> Data? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db else { return nil }
+
+        let sql = "SELECT transcript_blob FROM session_cache WHERE provider = ? AND session_id = ?"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_text(stmt, 1, provider.rawValue, -1, sqliteTransient)
+        sqlite3_bind_text(stmt, 2, sessionId, -1, sqliteTransient)
+
+        guard sqlite3_step(stmt) == SQLITE_ROW,
+              sqlite3_column_type(stmt, 0) == SQLITE_BLOB else { return nil }
+        let count = Int(sqlite3_column_bytes(stmt, 0))
+        guard count > 0, let ptr = sqlite3_column_blob(stmt, 0) else { return nil }
+        return Data(bytes: ptr, count: count)
+    }
+
+    /// Reset cache only for sessions that still exist on disk.
+    /// Archived sessions (not in liveIds) are preserved.
+    func resetLiveSessions(provider: ProviderKind, liveIds: Set<String>) {
+        guard !liveIds.isEmpty else { return }
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db else { return }
+
+        execute("BEGIN TRANSACTION")
+        defer {
+            if sqlite3_get_autocommit(db) == 0 {
+                execute("ROLLBACK")
+            }
+        }
+
+        let placeholders = Array(repeating: "?", count: liveIds.count).joined(separator: ",")
+        let statements = [
+            "DELETE FROM session_cache WHERE provider = ? AND session_id IN (\(placeholders))",
+            "DELETE FROM messages WHERE provider = ? AND session_id IN (\(placeholders))"
+        ]
+
+        for sql in statements {
+            var stmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+            sqlite3_bind_text(stmt, 1, provider.rawValue, -1, sqliteTransient)
+            var idx: Int32 = 2
+            for id in liveIds {
+                sqlite3_bind_text(stmt, idx, id, -1, sqliteTransient)
+                idx += 1
+            }
+            guard sqlite3_step(stmt) == SQLITE_DONE else {
+                sqlite3_finalize(stmt)
+                return
+            }
+            sqlite3_finalize(stmt)
+        }
+
         execute("COMMIT")
     }
 

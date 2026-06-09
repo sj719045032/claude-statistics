@@ -44,6 +44,28 @@ public protocol SessionDataProvider: Sendable {
     /// methods, preserving compatibility with plugins built against
     /// older SDK revisions.
     func parseSessionAndSearchIndex(at path: String) -> SessionParseResult
+
+    /// Optional incremental parser for append-only file formats (JSONL).
+    /// Parses only bytes after `fromOffset`, merges into `existingStats`,
+    /// and returns the updated stats with the new offset. Providers whose
+    /// files are not append-only (e.g. JSON) should keep the default nil.
+    func parseSessionIncremental(
+        fromData data: Data,
+        fromOffset: Int64,
+        existingStats: SessionStats,
+        path: String
+    ) -> IncrementalParseResult?
+}
+
+/// Output of `SessionDataProvider.parseSessionIncremental`.
+public struct IncrementalParseResult: Sendable {
+    public let stats: SessionStats
+    public let newOffset: Int64
+
+    public init(stats: SessionStats, newOffset: Int64) {
+        self.stats = stats
+        self.newOffset = newOffset
+    }
 }
 
 /// Combined output of `SessionDataProvider.parseSessionAndSearchIndex`.
@@ -80,6 +102,11 @@ extension SessionDataProvider {
     public var isInstalled: Bool {
         FileManager.default.fileExists(atPath: configDirectory)
     }
+
+    public func parseSessionIncremental(
+        fromData data: Data, fromOffset: Int64,
+        existingStats: SessionStats, path: String
+    ) -> IncrementalParseResult? { nil }
 
     /// Default combined parser: falls back to the two separate calls.
     /// Plugins that share a file load between the two paths should

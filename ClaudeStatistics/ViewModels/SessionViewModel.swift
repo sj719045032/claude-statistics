@@ -228,6 +228,13 @@ final class SessionViewModel: ObservableObject {
         isLoadingStats = true
         selectedSessionStats = nil
 
+        if session.isArchived {
+            // For archived sessions, use the cached stats from parsedStats
+            selectedSessionStats = store.parsedStats[session.id]
+            isLoadingStats = false
+            return
+        }
+
         let provider = store.provider
         let path = session.filePath
         Task.detached {
@@ -244,7 +251,22 @@ final class SessionViewModel: ObservableObject {
     }
 
     func loadMessages(for session: Session) async -> [TranscriptDisplayMessage] {
-        await loadMessages(at: session.filePath)
+        if !session.isArchived {
+            return await loadMessages(at: session.filePath)
+        }
+        // Archived session: decompress transcript from DB
+        let store = self.store
+        return await Task.detached {
+            guard let data = store.resolveTranscriptData(for: session) else { return [] }
+            // Extract session UUID from the composite session ID (format: "project::uuid")
+            let sessionId: String
+            if let range = session.id.range(of: "::", options: .backwards) {
+                sessionId = String(session.id[range.upperBound...])
+            } else {
+                sessionId = session.id
+            }
+            return TranscriptParser.shared.parseMessages(fromData: data, sessionId: sessionId)
+        }.value
     }
 
     func loadMessages(at path: String) async -> [TranscriptDisplayMessage] {
@@ -255,10 +277,18 @@ final class SessionViewModel: ObservableObject {
     }
 
     func loadTrendData(for session: Session, granularity: TrendGranularity) async -> [TrendDataPoint] {
-        let provider = store.provider
-        let path = session.filePath
+        if !session.isArchived {
+            let provider = store.provider
+            let path = session.filePath
+            return await Task.detached {
+                provider.parseTrendData(from: path, granularity: granularity)
+            }.value
+        }
+        // Archived session: decompress transcript from DB
+        let store = self.store
         return await Task.detached {
-            provider.parseTrendData(from: path, granularity: granularity)
+            guard let data = store.resolveTranscriptData(for: session) else { return [] }
+            return TranscriptParser.shared.parseTrendData(fromData: data, granularity: granularity)
         }.value
     }
 

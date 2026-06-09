@@ -30,6 +30,11 @@ final class SessionDataStore: ObservableObject {
     private var retryAttemptCounts: [String: Int] = [:]
     private var retryTask: Task<Void, Never>?
     private var pendingRescan = false
+    /// Byte offset of last successful parse per session, for incremental parsing.
+    private var lastParsedOffsets: [String: Int64] = [:]
+    /// Sessions that had dirty events since last transcript archive.
+    private var dirtyArchiveIds: Set<String> = []
+    private var archiveTimer: Task<Void, Never>?
     /// Pending dirty-id batch for in-flight coalescing. New watcher fires merge
     /// into this set while a `processDirtyBatch` task is running; the running
     /// task drains the merged set when it finishes.
@@ -85,6 +90,7 @@ final class SessionDataStore: ObservableObject {
                 }
             }
             watcher?.start()
+            startArchiveTimer()
             initialLoad()
         }
     }
@@ -93,9 +99,38 @@ final class SessionDataStore: ObservableObject {
         watcher?.stop()
         retryTask?.cancel()
         retryTask = nil
+        archiveTimer?.cancel()
+        archiveTimer = nil
         parseQueue.cancelAllOperations()
         db.close()
         isStarted = false
+    }
+
+    private func startArchiveTimer() {
+        archiveTimer?.cancel()
+        archiveTimer = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1 * 60 * 60 * 1_000_000_000)
+                guard let self, !Task.isCancelled else { return }
+                self.archiveDirtySessions()
+            }
+        }
+    }
+
+    private func archiveDirtySessions() {
+        let ids = dirtyArchiveIds
+        dirtyArchiveIds.removeAll()
+        guard !ids.isEmpty else { return }
+        let sessions = self.sessions.filter { ids.contains($0.id) && !$0.isArchived && !$0.filePath.isEmpty }
+        guard !sessions.isEmpty else { return }
+        let providerKind = self.kind
+        let db = self.db
+        Task.detached {
+            for session in sessions {
+                Self.archiveTranscriptIfNeeded(db: db, provider: providerKind, session: session)
+            }
+            DiagnosticLogger.shared.info("[\(providerKind.rawValue)] Periodic archive: compressed \(sessions.count) active sessions")
+        }
     }
 
     // MARK: - Popover visibility
@@ -144,6 +179,7 @@ final class SessionDataStore: ObservableObject {
             // the user sees complete data as soon as possible after a crash recovery.
             var interruptedIds: [Session] = []
             var freshOrChangedIds: [Session] = []
+            var cachedOffsets: [String: Int64] = [:]
             for session in scannedSessions {
                 if db.needsReparse(sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, cache: cache) {
                     if let cached = cache[session.id], cached.sessionStats == nil, cached.quickStats != nil {
@@ -154,6 +190,9 @@ final class SessionDataStore: ObservableObject {
                 } else if let cached = cache[session.id] {
                     if let q = cached.quickStats { quickMap[session.id] = q }
                     if let s = cached.sessionStats { statsMap[session.id] = s }
+                    if !session.filePath.isEmpty {
+                        cachedOffsets[session.id] = session.fileSize
+                    }
                     if Self.needsSearchIndexRepair(
                         session: session,
                         cached: cached,
@@ -171,24 +210,51 @@ final class SessionDataStore: ObservableObject {
                 )
             }
 
+            // Synthesize archived sessions from DB cache for sessions whose
+            // .jsonl files have been deleted (e.g. by CC's 30-day cleanup).
+            let scannedIds = Set(scannedSessions.map(\.id))
+            var archivedSessions: [Session] = []
+            for (sessionId, cached) in cache where !scannedIds.contains(sessionId) {
+                guard cached.sessionStats != nil else { continue }
+                let startTime: Date? = cached.quickStats?.startTime
+                    ?? cached.sessionStats?.startTime
+                var session = Session(
+                    id: sessionId,
+                    externalID: sessionId,
+                    provider: providerKind.rawValue,
+                    projectPath: cached.projectPath ?? "",
+                    filePath: "",
+                    startTime: startTime,
+                    lastModified: cached.mtime,
+                    fileSize: 0,
+                    cwd: cached.cwd
+                )
+                session.isArchived = true
+                archivedSessions.append(session)
+                if let q = cached.quickStats { quickMap[sessionId] = q }
+                if let s = cached.sessionStats { statsMap[sessionId] = s }
+            }
+            if !archivedSessions.isEmpty {
+                DiagnosticLogger.shared.info(
+                    "[\(providerKind.rawValue)] Loaded \(archivedSessions.count) archived sessions from DB cache"
+                )
+            }
+            let allSessions = scannedSessions + archivedSessions
+
             let initialQuickMap = quickMap
             let initialStatsMap = statsMap
             let initialHasStats = !statsMap.isEmpty
             let initialParseProgress: String? = dirtyIds.isEmpty ? nil : "Loading..."
             await MainActor.run {
-                self.sessions = scannedSessions
+                self.sessions = allSessions
                 self.quickStats = initialQuickMap
                 self.parsedStats = initialStatsMap
+                self.lastParsedOffsets.merge(cachedOffsets) { _, new in new }
                 if initialHasStats { self.rebucket() }
                 self.parseProgress = initialParseProgress
             }
 
             if dirtyIds.isEmpty && indexRepairIds.isEmpty {
-                // Clean up DB entries for deleted sessions
-                let currentIds = Set(scannedSessions.map(\.id))
-                let staleIds = Set(cache.keys).subtracting(currentIds)
-                if !staleIds.isEmpty { db.removeSessions(provider: providerKind, staleIds) }
-
                 await MainActor.run {
                     self.isFullParseComplete = true
                     self.parseProgress = nil
@@ -263,18 +329,27 @@ final class SessionDataStore: ObservableObject {
                     ))
                 }
                 db.saveSessionsStatsAndIndexes(provider: providerKind, requests: saveRequests)
+
+                // Archive transcript blobs for sessions that don't have one yet
+                // Seed incremental parse offsets for successfully parsed sessions
+                var batchOffsets: [String: Int64] = [:]
+                for result in results {
+                    guard result.committedStats != nil,
+                          let session = sessionsById[result.sessionId] else { continue }
+                    Self.archiveTranscriptIfNeeded(
+                        db: db, provider: providerKind, session: session,
+                        compressedTranscript: result.compressedTranscript
+                    )
+                    if !session.filePath.isEmpty {
+                        batchOffsets[session.id] = session.fileSize
+                    }
+                }
+
                 processed += results.count
 
                 let processedCount = processed
                 let shouldRebucket = processedCount % 20 < batchSize || processedCount == total
                 await MainActor.run {
-                    // Stage all parsedStats writes from this 8-session batch
-                    // into a local copy and assign once. ObservableObject
-                    // would otherwise fire `objectWillChange` per write
-                    // (8x per batch) — SwiftUI does coalesce per RunLoop
-                    // turn but Combine subscribers and downstream
-                    // `removeDuplicates()` chains do not, so the staged
-                    // assign also helps `@Published` consumers.
                     var staged = self.parsedStats
                     for result in results {
                         self.handleParseRetryState(for: result.sessionId, shouldRetry: result.shouldRetry)
@@ -283,6 +358,7 @@ final class SessionDataStore: ObservableObject {
                         }
                     }
                     self.parsedStats = staged
+                    self.lastParsedOffsets.merge(batchOffsets) { _, new in new }
                     self.parseProgress = "Parsing \(processedCount)/\(total)"
                     self.parsePercent = Double(processedCount) / Double(total)
                     if shouldRebucket {
@@ -306,10 +382,24 @@ final class SessionDataStore: ObservableObject {
                 )
             }
 
-            // Clean up DB entries for deleted sessions
-            let currentIds = Set(scannedSessions.map(\.id))
-            let staleIds = Set(cache.keys).subtracting(currentIds)
-            if !staleIds.isEmpty { db.removeSessions(provider: providerKind, staleIds) }
+            // Backfill transcript blobs for sessions that have files on
+            // disk and stats in cache but no archived transcript yet.
+            let sessionsNeedingBackfill = scannedSessions.filter { session in
+                guard let cached = cache[session.id],
+                      cached.sessionStats != nil,
+                      !cached.hasTranscript else { return false }
+                return true
+            }
+            if !sessionsNeedingBackfill.isEmpty {
+                DiagnosticLogger.shared.info(
+                    "[\(providerKind.rawValue)] Backfilling transcript archive for \(sessionsNeedingBackfill.count) sessions"
+                )
+                for session in sessionsNeedingBackfill {
+                    Self.archiveTranscriptIfNeeded(
+                        db: db, provider: providerKind, session: session
+                    )
+                }
+            }
 
             await MainActor.run {
                 self.rebucket()
@@ -399,8 +489,9 @@ final class SessionDataStore: ObservableObject {
                 scannedSessions = SessionDeduplicator.deduplicate(provider.scanSessions(), provider: providerKind)
                 let fingerprints = db.loadCacheFingerprints(provider: providerKind)
                 await MainActor.run {
-                    self.sessions = scannedSessions
-                    self.cleanupDeletedSessions(current: scannedSessions)
+                    // Preserve archived sessions that have no files on disk
+                    let archivedSessions = self.sessions.filter(\.isArchived)
+                    self.sessions = scannedSessions + archivedSessions
                 }
                 dirtySessions = scannedSessions.filter {
                     ids.contains($0.id) || db.needsReparse(
@@ -433,13 +524,47 @@ final class SessionDataStore: ObservableObject {
             }
 
             // PR5: batch all dirty-refresh stats writes into one
-                    // transaction at end of loop. parsedStats / progress
+            // transaction at end of loop. parsedStats / progress
             // still update per-iteration so the UI reflects each
             // parse completing; if the app crashes mid-loop the
             // unsaved sessions are simply re-detected as dirty on
             // next launch (file mtime > cached mtime).
             var saveRequests: [DatabaseService.SaveSessionStatsRequest] = []
+            let lastOffsets = await MainActor.run { self.lastParsedOffsets }
+            let existingStats = await MainActor.run { self.parsedStats }
             for (i, session) in dirtySessions.enumerated() {
+                guard FileManager.default.fileExists(atPath: session.filePath) else { continue }
+                // Try incremental parse when we have offset + existing stats
+                if let offset = lastOffsets[session.id],
+                   let existing = existingStats[session.id],
+                   let fileData = FileManager.default.contents(atPath: session.filePath),
+                   Int64(fileData.count) > offset,
+                   let result = provider.parseSessionIncremental(
+                       fromData: fileData, fromOffset: offset,
+                       existingStats: existing, path: session.filePath
+                   ) {
+                    let stats = result.stats
+                    let newOffset = result.newOffset
+                    saveRequests.append(DatabaseService.SaveSessionStatsRequest(
+                        sessionId: session.id,
+                        fileSize: session.fileSize,
+                        mtime: session.lastModified,
+                        stats: stats,
+                        searchMessages: []
+                    ))
+                    await MainActor.run {
+                        self.lastParsedOffsets[session.id] = newOffset
+                        self.parsedStats[session.id] = stats
+                        if showProgress {
+                            let processed = i + 1
+                            self.parseProgress = "Updating \(processed)/\(total)"
+                            self.parsePercent = Double(processed) / Double(total)
+                        }
+                    }
+                    continue
+                }
+
+                // Full parse fallback
                 let quick = provider.parseQuickStats(at: session.filePath)
                 db.saveQuickStats(provider: providerKind, sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, stats: quick)
                 await MainActor.run { self.quickStats[session.id] = quick }
@@ -448,7 +573,8 @@ final class SessionDataStore: ObservableObject {
                     provider: provider,
                     session: session,
                     quick: quick,
-                    cached: cache[session.id]
+                    cached: cache[session.id],
+                    archiveTranscript: false
                 )
                 if let stats = outcome.committedStats {
                     saveRequests.append(DatabaseService.SaveSessionStatsRequest(
@@ -458,6 +584,12 @@ final class SessionDataStore: ObservableObject {
                         stats: stats,
                         searchMessages: outcome.searchMessages
                     ))
+                    if !session.filePath.isEmpty {
+                        let fileSize = (try? FileManager.default.attributesOfItem(atPath: session.filePath)[.size] as? Int64) ?? session.fileSize
+                        await MainActor.run {
+                            self.lastParsedOffsets[session.id] = fileSize
+                        }
+                    }
                 }
                 await MainActor.run {
                     self.handleParseRetryState(for: session.id, shouldRetry: outcome.shouldRetry)
@@ -472,6 +604,11 @@ final class SessionDataStore: ObservableObject {
                 }
             }
             db.saveSessionsStatsAndIndexes(provider: providerKind, requests: saveRequests)
+
+            let parsedSessionIds = Set(dirtySessions.map(\.id))
+            await MainActor.run {
+                self.dirtyArchiveIds.formUnion(parsedSessionIds)
+            }
 
             if showProgress {
                 await MainActor.run {
@@ -560,6 +697,33 @@ final class SessionDataStore: ObservableObject {
             (stats?.totalTokens ?? 0) > 0 ||
             session.fileSize >= 4_096
         return likelySearchable
+    }
+
+    // MARK: - Transcript Archival
+
+    nonisolated private static func archiveTranscriptIfNeeded(
+        db: DatabaseService,
+        provider: ProviderKind,
+        session: Session,
+        compressedTranscript: Data? = nil
+    ) {
+        guard !session.isArchived, !session.filePath.isEmpty else { return }
+        let compressed: Data
+        if let preComputed = compressedTranscript {
+            compressed = preComputed
+        } else {
+            guard let rawData = FileManager.default.contents(atPath: session.filePath),
+                  let c = (try? (rawData as NSData).compressed(using: .zlib)) as Data?
+            else { return }
+            compressed = c
+        }
+        db.saveTranscriptAndMetadata(
+            provider: provider,
+            sessionId: session.id,
+            compressedTranscript: compressed,
+            projectPath: session.projectPath,
+            cwd: session.cwd
+        )
     }
 
     // MARK: - Rebucket (PR3 — runs off the main thread)
@@ -864,7 +1028,9 @@ final class SessionDataStore: ObservableObject {
     func deleteSessions(_ ids: Set<String>) {
         let fm = FileManager.default
         for session in sessions where ids.contains(session.id) {
-            try? fm.removeItem(atPath: session.filePath)
+            if !session.isArchived, !session.filePath.isEmpty {
+                try? fm.removeItem(atPath: session.filePath)
+            }
         }
         sessions.removeAll { ids.contains($0.id) }
         for id in ids {
@@ -885,24 +1051,32 @@ final class SessionDataStore: ObservableObject {
         dirtySessionIds.removeAll()
         parseQueue.cancelAllOperations()
         isFullParseComplete = false
-        db.resetProviderCache(provider: provider.kind)
+        // Only reset sessions that still have files on disk;
+        // archived sessions (no .jsonl) are preserved.
+        let liveIds = Set(sessions.filter { !$0.isArchived }.map(\.id))
+        db.resetLiveSessions(provider: provider.kind, liveIds: liveIds)
         quickStats.removeAll()
         parsedStats.removeAll()
         initialLoad()
     }
 
-    // MARK: - Helpers
+    // MARK: - Transcript Resolution
 
-    private func cleanupDeletedSessions(current: [Session]) {
-        let currentIds = Set(current.map(\.id))
-        let staleIds = Set(parsedStats.keys).subtracting(currentIds)
-        if staleIds.isEmpty { return }
-        for id in staleIds {
-            parsedStats.removeValue(forKey: id)
-            quickStats.removeValue(forKey: id)
+    /// Returns the raw transcript data for a session — from disk if the
+    /// file exists, otherwise decompressed from the DB blob archive.
+    nonisolated func resolveTranscriptData(for session: Session) -> Data? {
+        if !session.filePath.isEmpty,
+           let data = FileManager.default.contents(atPath: session.filePath) {
+            return data
         }
-        db.removeSessions(provider: provider.kind, staleIds)
+        guard let compressed = db.loadTranscript(
+            provider: ProviderKind(rawValue: session.provider) ?? .claude,
+            sessionId: session.id
+        ) else { return nil }
+        return (try? (compressed as NSData).decompressed(using: .zlib)) as Data?
     }
+
+    // MARK: - Helpers
 
     /// Search messages via FTS index. Runs on a detached task so SQLite
     /// FTS work never blocks the main thread; callers gate stale results

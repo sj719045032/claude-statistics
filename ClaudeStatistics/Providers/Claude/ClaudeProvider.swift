@@ -81,6 +81,18 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
         TranscriptParser.shared.parseTrendData(from: filePath, granularity: granularity)
     }
 
+    func parseSessionIncremental(
+        fromData data: Data,
+        fromOffset: Int64,
+        existingStats: SessionStats,
+        path: String
+    ) -> IncrementalParseResult? {
+        TranscriptParser.shared.parseSessionIncremental(
+            fromData: data, fromOffset: fromOffset,
+            existingStats: existingStats, path: path
+        )
+    }
+
     func openNewSession(_ session: Session) {
         TerminalRegistry.launch(
             TerminalLaunchRequest(

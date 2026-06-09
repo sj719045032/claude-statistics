@@ -21,6 +21,7 @@
 "session.deleteWarning" = "This cannot be undone.";
 "session.new.help" = "New session in same directory";
 "session.resume.help" = "Resume session";
+"session.archived.help" = "Source file deleted — viewing cached data";
 "session.delete.help" = "Delete session";
 "session.delete.immediate.help" = "Delete now (skip confirmation)";
 "session.projectSelect.help" = "Select all sessions in this project";
@@ -79,6 +80,8 @@
 "detail.model" = "Model";
 "detail.duration" = "Duration";
 "detail.size" = "Size";
+"detail.status" = "Status";
+"detail.status.archived" = "Source file deleted";
 "detail.contextWindow" = "Context Window";
 "detail.started" = "Started";
 "detail.lastActive" = "Last Active";
@@ -762,3 +765,21 @@
 
 /* Account source — subscription scope note */
 "claude.accountSource.help.subscriptionNote" = "This setting only affects Anthropic OAuth credential routing. Token-based subscription plans (GLM Coding Plan / 第三方) keep their own per-account state in the identity picker.";
+
+/* Backup & Restore */
+"settings.backupRestore" = "Backup & Restore";
+"backup.export" = "Export Backup";
+"backup.export.description" = "Export all statistics data, preferences and plugin settings to a backup file. Use this to transfer data to another computer.";
+"backup.export.dbSize" = "Database size";
+"backup.export.button" = "Export Backup…";
+"backup.export.success" = "Backup exported successfully";
+"backup.import" = "Import Backup";
+"backup.import.description" = "Restore statistics data from a previously exported backup file. This will replace all current data.";
+"backup.import.button" = "Import Backup…";
+"backup.import.confirm.title" = "Import Backup?";
+"backup.import.confirm.message" = "This backup was created by v%@ on %@, containing %d sessions.\n\nImporting will replace all current data. This cannot be undone.";
+"backup.import.confirm.cancel" = "Cancel";
+"backup.import.confirm.proceed" = "Import";
+"backup.import.restart.title" = "Restart Required";
+"backup.import.restart.message" = "Data has been restored successfully. The app needs to restart to load the imported data.";
+"backup.import.restart.button" = "Restart Now";

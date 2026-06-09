@@ -275,6 +275,7 @@
 		C8359F096BA8063C42EBC8BD /* TerminalLaunchRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44B525D19903D64B4730721F /* TerminalLaunchRequest.swift */; };
 		CA577998156D7C9A33505E8B /* SubscriptionAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFF877A722EE685280F5006E /* SubscriptionAdapter.swift */; };
 		CA878855FD348BFB14EB4AD4 /* UsageCacheFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63A930C7EEA38F606F3DA640 /* UsageCacheFile.swift */; };
+		CB56AECCF22AE53C09ED6D62 /* BackupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F5AFDEA3CED74AC95823E84 /* BackupService.swift */; };
 		CB7192EB415FA3046FB236B1 /* TranscriptParser+Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2ECFFB813325710CC7E258B /* TranscriptParser+Session.swift */; };
 		CB71D274EA08799E1FA3256D /* ToolActivityFormatter+Completion.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF76C0BD045510B9035C9733 /* ToolActivityFormatter+Completion.swift */; };
 		CBB169B288ADC8D710097947 /* SubscriptionAccount.swift in Sources */ = {isa = PBXBuildFile; fileRef = C72208A683BEB5066A8F960B /* SubscriptionAccount.swift */; };
@@ -295,6 +296,7 @@
 		D64171EFA61052FC0A315681 /* SessionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B71B5593D63536AB462D70 /* SessionViewModel.swift */; };
 		D7035463E2541293F55B654D /* ClaudePKCE.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDE6D238094644B3E5ECD8C9 /* ClaudePKCE.swift */; };
 		D73C2A7290E0250F8B50A372 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3374C538E77CED126DE3016 /* StatusBarController.swift */; };
+		D763A67422B2ADDC89D90900 /* BackupRestoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A85035F6BFB5F17EB6B9CEB5 /* BackupRestoreView.swift */; };
 		D99027587C25DA018DE94928 /* ActiveSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E023CB9F472AC7C93777B50 /* ActiveSession.swift */; };
 		DE4144CC6421F5ECD432A66C /* TranscriptParser+Trend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3184FFA7D8598D923510D8EE /* TranscriptParser+Trend.swift */; };
 		DF30CD5504F391E42C582602 /* PluginTrustGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBF2E6F7720B297179A63812 /* PluginTrustGate.swift */; };
@@ -569,6 +571,7 @@
 		7AA9035C5B842200A3C1F84E /* ClaudeProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeProvider.swift; sourceTree = "<group>"; };
 		7B25AF636A6F7215674EA418 /* NotchHookSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchHookSync.swift; sourceTree = "<group>"; };
 		7B2F3C5ACC349B41B04463E5 /* PluginInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginInstaller.swift; sourceTree = "<group>"; };
+		7F5AFDEA3CED74AC95823E84 /* BackupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupService.swift; sourceTree = "<group>"; };
 		7F675DD2E08BB0AC4ADBB101 /* AttentionEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionEvent.swift; sourceTree = "<group>"; };
 		805E37589FAEC2B84328D36A /* WireMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WireMessage.swift; sourceTree = "<group>"; };
 		806EBE2626FDBEC34484CEEC /* SharePluginScoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharePluginScoring.swift; sourceTree = "<group>"; };
@@ -619,6 +622,7 @@
 		A776ADBF033757E89353F9E2 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		A7C96479A32A5A1C4D1A624B /* ShareRoleEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRoleEngine.swift; sourceTree = "<group>"; };
 		A813789C1EB3786DF379C58F /* PerformanceTracer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceTracer.swift; sourceTree = "<group>"; };
+		A85035F6BFB5F17EB6B9CEB5 /* BackupRestoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupRestoreView.swift; sourceTree = "<group>"; };
 		A872F99484F4F48F8F878E49 /* ShareRoleEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRoleEngineTests.swift; sourceTree = "<group>"; };
 		A888011251B29752ABC4A00A /* CodexTestPlaceholder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexTestPlaceholder.swift; sourceTree = "<group>"; };
 		A8921BE3208B862105FFAF93 /* AppleScriptHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleScriptHelpers.swift; sourceTree = "<group>"; };
@@ -898,6 +902,7 @@
 		23FF6F758EC531D3457CE044 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				7F5AFDEA3CED74AC95823E84 /* BackupService.swift */,
 				6749A9BF125AC2A04C7043D5 /* DatabaseService.swift */,
 				FBBBF4BC180317B171751BFF /* MissingPluginRecommendationStore.swift */,
 				112EF6F371B42B148DE15314 /* PluginRecommendationEngine.swift */,
@@ -1095,6 +1100,7 @@
 		4337A4F0688054868392343C /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				A85035F6BFB5F17EB6B9CEB5 /* BackupRestoreView.swift */,
 				E0391684C6F0698CF06A66BA /* IdentityPickerView.swift */,
 				FE48286336B9D3C392E19DB4 /* NotchNotificationsSection.swift */,
 				4CBD4314CF7DB28B0E45E950 /* PricingManageView.swift */,
@@ -1551,6 +1557,8 @@
 				EE3493DDFB2070C49ADD989F /* AttentionBridgeAuth.swift in Sources */,
 				A63890A01AF570ADBA7E4E11 /* AttentionEvent.swift in Sources */,
 				4A69484840B48CDE187957E0 /* AutoRefreshCoordinator.swift in Sources */,
+				D763A67422B2ADDC89D90900 /* BackupRestoreView.swift in Sources */,
+				CB56AECCF22AE53C09ED6D62 /* BackupService.swift in Sources */,
 				BDBBC60B4BA024F4BF03D8EF /* BuiltinProviderPlugins.swift in Sources */,
 				F324566F7B85AFF3C7E1EEAC /* CalendarHeatmap.swift in Sources */,
 				F34E915FE87F63D8BB7181BD /* ClaudeAccountManager.swift in Sources */,

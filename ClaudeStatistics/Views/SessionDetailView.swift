@@ -69,12 +69,14 @@ struct SessionDetailView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
 
-                Button(action: onResume) {
-                    Label("detail.resume", systemImage: "terminal")
-                        .font(.system(size: 11))
+                if !session.isArchived {
+                    Button(action: onResume) {
+                        Label("detail.resume", systemImage: "terminal")
+                            .font(.system(size: 11))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -97,7 +99,9 @@ struct SessionDetailView: View {
                                 .font(.system(size: 10, design: .monospaced))
                                 .foregroundStyle(.tertiary)
                                 .lineLimit(1)
-                            CopyButton(text: resumeCommand, help: "detail.copyResumeCommand")
+                            if !session.isArchived {
+                                CopyButton(text: resumeCommand, help: "detail.copyResumeCommand")
+                            }
                         }
                         if let sessionName, !sessionName.isEmpty {
                             Text(sessionName)
@@ -170,7 +174,11 @@ struct SessionDetailView: View {
                         InfoCell(title: "detail.duration", value: TimeFormatter.duration(duration), icon: "clock")
                         Divider().frame(height: 28)
                     }
-                    InfoCell(title: "detail.size", value: TimeFormatter.fileSize(session.fileSize), icon: "doc")
+                    if session.isArchived {
+                        InfoCell(title: "detail.status", value: LanguageManager.localizedString("detail.status.archived"), icon: "archivebox")
+                    } else {
+                        InfoCell(title: "detail.size", value: TimeFormatter.fileSize(session.fileSize), icon: "doc")
+                    }
                 }
                 if let start = stats.startTime {
                     Divider()

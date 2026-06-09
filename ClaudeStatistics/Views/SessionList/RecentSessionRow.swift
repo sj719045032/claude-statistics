@@ -47,6 +47,13 @@ struct RecentSessionRow: View {
                             .cornerRadius(Theme.badgeRadius)
                     }
 
+                    if session.isArchived {
+                        Image(systemName: "archivebox")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                            .help("session.archived.help")
+                    }
+
                     if isHovered {
                         CopyButton(text: session.displayName, help: "detail.copyPath")
                     }
@@ -89,10 +96,12 @@ struct RecentSessionRow: View {
                         Label("\(qs.messageCount)", systemImage: "message")
                             .font(.system(size: 9))
                             .foregroundStyle(.tertiary)
-                        Text(TimeFormatter.fileSize(session.fileSize))
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
-                    } else {
+                        if !session.isArchived {
+                            Text(TimeFormatter.fileSize(session.fileSize))
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                        }
+                    } else if !session.isArchived {
                         Text(TimeFormatter.fileSize(session.fileSize))
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
@@ -121,13 +130,15 @@ struct RecentSessionRow: View {
                 .buttonStyle(.hoverScale)
                 .help("session.new.help")
 
-                Button(action: onResume) {
-                    Image(systemName: "terminal")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.blue)
+                if !session.isArchived {
+                    Button(action: onResume) {
+                        Image(systemName: "terminal")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.blue)
+                    }
+                    .buttonStyle(.hoverScale)
+                    .help("session.resume.help")
                 }
-                .buttonStyle(.hoverScale)
-                .help("session.resume.help")
             }
 
             Image(systemName: "chevron.right")

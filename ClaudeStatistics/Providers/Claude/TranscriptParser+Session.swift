@@ -263,4 +263,173 @@ extension TranscriptParser {
 
         return stats
     }
+
+    /// Incremental parse: only processes new lines appended after `fromOffset`.
+    /// Merges new entries into `existingStats.fiveMinSlices`, then recomputes
+    /// aggregates. Skips subagent re-scan (handled by next full parse on restart).
+    /// Returns nil if the file hasn't grown past the offset.
+    func parseSessionIncremental(
+        fromData data: Data,
+        fromOffset: Int64,
+        existingStats: SessionStats,
+        path: String
+    ) -> IncrementalParseResult? {
+        let offset = Int(fromOffset)
+        guard offset > 0, offset < data.count else { return nil }
+
+        var stats = existingStats
+        var messageData: [String: MessageAccum] = [:]
+        var seenToolUseIds: Set<String> = []
+        var toolUseTimes: [(Date, String)] = []
+        var userMessageTimes: [Date] = []
+        let cal = Calendar.current
+        let isoFmt = ISO8601DateFormatter()
+        isoFmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let isoFmtFallback = ISO8601DateFormatter()
+        isoFmtFallback.formatOptions = [.withInternetDateTime]
+
+        func parseTimestamp(_ str: String?) -> Date? {
+            guard let str else { return nil }
+            return isoFmt.date(from: str) ?? isoFmtFallback.date(from: str)
+        }
+
+        func fiveMinKey(for date: Date) -> Date {
+            var comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+            comps.minute = ((comps.minute ?? 0) / 5) * 5
+            comps.second = 0
+            comps.nanosecond = 0
+            guard let result = cal.date(from: comps) else { return date }
+            if comps.hour == 0 {
+                return cal.date(byAdding: .hour, value: -1, to: result)!
+            }
+            return result
+        }
+
+        let assistantMarker = Data("\"assistant\"".utf8)
+        let userMarker = Data("\"user\"".utf8)
+        let humanMarker = Data("\"human\"".utf8)
+
+        var lineStart = data.index(data.startIndex, offsetBy: offset)
+        while lineStart < data.endIndex {
+            let lineEnd = data[lineStart...].firstIndex(of: UInt8(ascii: "\n")) ?? data.endIndex
+            let lineSlice = data[lineStart..<lineEnd]
+            lineStart = lineEnd < data.endIndex ? data.index(after: lineEnd) : data.endIndex
+            guard lineSlice.count > 10 else { continue }
+
+            let hasAssistant = lineSlice.range(of: assistantMarker) != nil
+            let hasUser = !hasAssistant && (lineSlice.range(of: userMarker) != nil || lineSlice.range(of: humanMarker) != nil)
+            guard hasAssistant || hasUser else { continue }
+
+            guard let json = try? JSONSerialization.jsonObject(with: lineSlice) as? [String: Any] else { continue }
+            let entryType = json["type"] as? String ?? ""
+            let timestamp = parseTimestamp(json["timestamp"] as? String)
+
+            if let date = timestamp {
+                if stats.endTime == nil || date > stats.endTime! { stats.endTime = date }
+            }
+
+            if entryType == "user" || entryType == "human" {
+                stats.userMessageCount += 1
+                if let ts = timestamp { userMessageTimes.append(fiveMinKey(for: ts)) }
+                if let message = json["message"] as? [String: Any] {
+                    let text: String? = (message["content"] as? String)
+                        ?? (message["content"] as? [[String: Any]])?.compactMap({ $0["text"] as? String }).joined(separator: "\n")
+                    if let text, let cleaned = Self.cleanUserDisplayText(text) {
+                        stats.lastPrompt = cleaned.count > 200 ? String(cleaned.prefix(200)) + "…" : cleaned
+                        stats.lastPromptAt = timestamp
+                    }
+                }
+
+            } else if entryType == "assistant" {
+                guard let message = json["message"] as? [String: Any] else { continue }
+                let msgId = message["id"] as? String ?? UUID().uuidString
+                let isFirstOccurrence = messageData[msgId] == nil
+
+                if isFirstOccurrence {
+                    stats.assistantMessageCount += 1
+                }
+
+                let model = message["model"] as? String
+                let isSynthetic = model == "<synthetic>"
+                let currentModel = isSynthetic ? stats.model : (model ?? stats.model)
+                if let model, model != "Unknown", !isSynthetic {
+                    stats.model = model
+                }
+
+                if let usage = message["usage"] as? [String: Any] {
+                    let inputTokens = usage["input_tokens"] as? Int ?? 0
+                    let outputTokens = usage["output_tokens"] as? Int ?? 0
+                    let cacheCreationTotal = usage["cache_creation_input_tokens"] as? Int ?? 0
+                    let cacheReadTokens = usage["cache_read_input_tokens"] as? Int ?? 0
+                    let cacheCreation = usage["cache_creation"] as? [String: Any]
+
+                    let contextSize = inputTokens + cacheCreationTotal + cacheReadTokens
+                    if contextSize > 0 { stats.contextTokens = contextSize }
+
+                    messageData[msgId] = MessageAccum(
+                        model: currentModel,
+                        timestamp: timestamp,
+                        inputTokens: inputTokens,
+                        outputTokens: outputTokens,
+                        cacheCreationTotalTokens: cacheCreationTotal,
+                        cacheReadTokens: cacheReadTokens,
+                        cacheCreation5mTokens: cacheCreation?["ephemeral_5m_input_tokens"] as? Int ?? 0,
+                        cacheCreation1hTokens: cacheCreation?["ephemeral_1h_input_tokens"] as? Int ?? 0
+                    )
+
+                    if let content = message["content"] as? [[String: Any]] {
+                        for item in content {
+                            if item["type"] as? String == "tool_use", let toolName = item["name"] as? String {
+                                let toolId = item["id"] as? String ?? UUID().uuidString
+                                if !seenToolUseIds.contains(toolId) {
+                                    seenToolUseIds.insert(toolId)
+                                    if let ts = timestamp { toolUseTimes.append((fiveMinKey(for: ts), toolName)) }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if let preview = Self.extractAssistantPreview(fromRawMessage: message) {
+                    stats.lastOutputPreview = preview
+                    stats.lastOutputPreviewAt = timestamp
+                }
+            }
+        }
+
+        // Merge new entries into existing fiveMinSlices
+        for (_, accum) in messageData {
+            if let ts = accum.timestamp {
+                let sliceKey = fiveMinKey(for: ts)
+                var slice = stats.fiveMinSlices[sliceKey] ?? DaySlice()
+                slice.totalInputTokens += accum.inputTokens
+                slice.totalOutputTokens += accum.outputTokens
+                slice.cacheCreationTotalTokens += accum.cacheCreationTotalTokens
+                slice.cacheReadTokens += accum.cacheReadTokens
+                slice.cacheCreation5mTokens += accum.cacheCreation5mTokens
+                slice.cacheCreation1hTokens += accum.cacheCreation1hTokens
+                slice.messageCount += 1
+                var ms = slice.modelBreakdown[accum.model, default: ModelTokenStats()]
+                ms.inputTokens += accum.inputTokens
+                ms.outputTokens += accum.outputTokens
+                ms.cacheCreationTotalTokens += accum.cacheCreationTotalTokens
+                ms.cacheReadTokens += accum.cacheReadTokens
+                ms.cacheCreation5mTokens += accum.cacheCreation5mTokens
+                ms.cacheCreation1hTokens += accum.cacheCreation1hTokens
+                ms.messageCount += 1
+                slice.modelBreakdown[accum.model] = ms
+                stats.fiveMinSlices[sliceKey] = slice
+            }
+        }
+        for time in userMessageTimes {
+            stats.fiveMinSlices[time, default: DaySlice()].messageCount += 1
+        }
+        for (time, toolName) in toolUseTimes {
+            stats.fiveMinSlices[time, default: DaySlice()].toolUseCounts[toolName, default: 0] += 1
+            stats.fiveMinSlices[time, default: DaySlice()].messageCount += 1
+        }
+
+        stats.precomputeAggregates()
+        return IncrementalParseResult(stats: stats, newOffset: Int64(data.count))
+    }
 }

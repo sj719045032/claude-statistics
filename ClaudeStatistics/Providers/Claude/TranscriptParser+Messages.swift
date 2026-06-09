@@ -22,9 +22,14 @@ extension TranscriptParser {
     /// version keeps just the source `Data` plus the produced
     /// `[TranscriptDisplayMessage]`.
     func parseMessages(at path: String) -> [TranscriptDisplayMessage] {
+        guard let data = FileManager.default.contents(atPath: path) else { return [] }
+        let sessionId = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
+        return parseMessages(fromData: data, sessionId: sessionId)
+    }
+
+    func parseMessages(fromData data: Data, sessionId: String) -> [TranscriptDisplayMessage] {
         let signpostState = PerformanceTracer.begin("Claude.parseMessages")
         defer { PerformanceTracer.end("Claude.parseMessages", signpostState) }
-        guard let data = FileManager.default.contents(atPath: path) else { return [] }
         let decoder = JSONDecoder()
 
         var messages: [TranscriptDisplayMessage] = []
@@ -70,7 +75,6 @@ extension TranscriptParser {
                 }
                 // Pattern 2: [Image #N] → ~/.claude/image-cache/{sessionId}/{N}.png
                 if imagePaths.isEmpty {
-                    let sessionId = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
                     let cacheDir = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/image-cache/\(sessionId)")
                     for m in Self.imageNumPattern.matches(in: cleaned, range: nsRange) {
                         if let r = Range(m.range(at: 1), in: cleaned) {
