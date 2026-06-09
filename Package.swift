@@ -48,8 +48,8 @@ let package = Package(
         // SDK_MODE_BEGIN — managed by scripts/sdk-mode.sh
         .binaryTarget(
             name: "ClaudeStatisticsKit",
-            url: "https://github.com/sj719045032/claude-statistics/releases/download/sdk-v0.4.0/ClaudeStatisticsKit.xcframework.zip",
-            checksum: "aa136d70846c82fa7fa5470c0c9664b3241e29387d117cd0c86d0a41a52f9a7b"
+            url: "https://github.com/sj719045032/claude-statistics/releases/download/sdk-v0.5.0/ClaudeStatisticsKit.xcframework.zip",
+            checksum: "c312dc7e3af0b41838e4205beb326dd968f078a57813496dd86bb6a1955150f7"
         )
         // SDK_MODE_END
     ]
