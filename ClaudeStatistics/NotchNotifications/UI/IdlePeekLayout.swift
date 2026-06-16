@@ -1,29 +1,25 @@
 import SwiftUI
+import AppKit
 
-/// Single source of truth for an idle-peek session row's layout height. Used
-/// by both the shell sizing in `NotchContainerView.idlePeekContentHeight` and
-/// the per-row `.frame(height:)` in `IdlePeekCard` so the two are guaranteed
-/// to agree — no estimate/actual mismatch, no inner empty gap below the last
-/// row, no overflow clipping. Rows are forced to this deterministic height.
+/// Single source of truth for an idle-peek session row's layout height.
+///
+/// In detailed mode, triptych text can wrap to 2 lines. The layout uses
+/// synchronous `NSString.size` measurement to predict which lines wrap,
+/// so the shell height is accurate without async preference keys.
 enum IdlePeekLayout {
-    /// Rendered height for the dedicated current-task line in
-    /// `ActiveSessionRow`.
+    /// Single-line triptych slot height.
+    static let triptychSlotHeight: CGFloat = 13
+    /// Rendered height for the dedicated current-task line.
     static let taskLineHeight: CGFloat = 13
     /// Adding the current-task line opens one more outer `VStack(spacing: 3)`
     /// gap between row children.
     static let taskLineExtraGap: CGFloat = 3
-    /// Rendered height per tool row inside `detailedToolsSection`. Tool rows
-    /// are size-10/9 SF Pro / mono / rounded inside an HStack — empirically
-    /// ~13pt at the system default leading.
-    static let toolLineHeight: CGFloat = 13
-    /// `VStack(spacing: 2)` gap between adjacent tool rows in the section.
-    static let toolRowSpacing: CGFloat = 2
-    /// `detailedToolsSection` adds `.padding(.top, 2)` of its own.
-    static let toolSectionLead: CGFloat = 2
-    /// Inserting `detailedToolsSection` adds one extra child to the row's
-    /// outer `VStack(spacing: 3)`, contributing one more 3pt gap that the
-    /// triptych-only baseline doesn't include.
-    static let detailedSectionExtraGap: CGFloat = 3
+
+    /// Font used by triptych text in `ActiveSessionRow.triptychRow`.
+    private static let triptychFont = NSFont.monospacedSystemFont(ofSize: 10, weight: .medium)
+    /// Available width for triptych text inside detailed-mode panel.
+    /// 540 (panel) − 18×2 (container pad) − 8×2 (row pad) − 15 (circle+gap) − 16 (icon+gap) = 457
+    private static let detailedTextWidth: CGFloat = 457
 
     static func rowHeight(
         for session: ActiveSession,
@@ -34,25 +30,16 @@ enum IdlePeekLayout {
         if session.currentTask != nil {
             height += taskLineHeight + taskLineExtraGap
         }
-
         guard detailedMode else { return height }
-        // Matches `activeToolsToShowInDetail`: all in-flight tools render in
-        // the detail section now that MIDDLE is a count-only aggregate. Also
-        // counts fresh recently-completed entries (afterglow window) so
-        // sub-second tools have a stable row instead of flashing past.
-        let active = session.activeTools.count
-        let cutoff = Date().addingTimeInterval(-ActiveSession.recentToolsWindow)
-        let recent = (session.recentlyCompletedTools ?? [])
-            .filter { $0.completedAt >= cutoff }
-            .count
-        let total = active + recent
-        guard total > 0 else { return height }
-        // Section height = N rows × rowH + (N-1) × rowSpacing + lead.
-        // Plus one extra 3pt gap from the outer VStack opening up.
+
+        let content = session.triptychContent
+        let attrs: [NSAttributedString.Key: Any] = [.font: triptychFont]
+        for text in [content.promptText, content.actionText, content.commentaryText] {
+            let w = (text as NSString).size(withAttributes: attrs).width
+            if w > detailedTextWidth {
+                height += triptychSlotHeight
+            }
+        }
         return height
-            + CGFloat(total) * toolLineHeight
-            + CGFloat(max(0, total - 1)) * toolRowSpacing
-            + toolSectionLead
-            + detailedSectionExtraGap
     }
 }

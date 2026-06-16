@@ -30,16 +30,13 @@ struct IdlePeekCard: View {
                                 ActiveSessionRow(session: session, isKeyboardSelected: keyboardSelectedSessionID == session.id && !keyboardSelectsToggle) {
                                     onOpenSession(session)
                                 }
-                                // Force each row to the same height the shell
-                                // uses when summing `idlePeekContentHeight`.
-                                // Guarantees shell edge == last row edge, no
-                                // estimate/actual slack leaking as bottom
-                                // padding.
-                                .frame(height: IdlePeekLayout.rowHeight(
-                                    for: session,
-                                    baseHeight: rowHeight,
-                                    detailedMode: detailedMode
-                                ))
+                                .frame(
+                                    height: IdlePeekLayout.rowHeight(
+                                        for: session,
+                                        baseHeight: rowHeight,
+                                        detailedMode: detailedMode
+                                    )
+                                )
                             }
                         }
                     }
@@ -79,7 +76,7 @@ struct IdlePeekCard: View {
         .frame(
             maxWidth: .infinity,
             minHeight: contentHeight,
-            maxHeight: detailedMode ? .infinity : contentHeight,
+            maxHeight: contentHeight,
             alignment: .topLeading
         )
         .clipped()

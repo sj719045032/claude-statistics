@@ -586,10 +586,6 @@ struct NotchContainerView: View {
             } else {
                 h = idlePeekShellHeightOverride ?? idlePeekExpandedShellHeight(showingAllSessions: idlePeekShowingAllSessions)
             }
-            // Detailed mode widens every expanded panel (idle peek + all
-            // event cards) so long command previews, diffs, and permission
-            // payloads have room to breathe without wrapping. When the
-            // preference is off, everyone shares the compact 440pt width.
             let w = idlePeekDetailedRows
                 ? NotchStateMachine.expandedDetailedWidth
                 : NotchStateMachine.expandedWidth

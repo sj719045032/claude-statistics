@@ -25,10 +25,7 @@ final class NotchStateMachine: ObservableObject {
 
     // Expanded (opened) — Dynamic Island style
     static let expandedWidth: CGFloat     = 440
-    /// Wider IdlePeek for the detailed-rows opt-in. Modest bump (100pt) so
-    /// per-tool lines can show longer paths / commands without the row
-    /// becoming a billboard — 720 felt cavernous when most rows are just two
-    /// short status lines.
+    /// Wider IdlePeek for the detailed-rows opt-in.
     static let expandedDetailedWidth: CGFloat = 540
     static let expandedMinHeight: CGFloat = 150
     static let openedTopCornerRadius: CGFloat    = 19

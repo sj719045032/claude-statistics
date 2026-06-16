@@ -28,14 +28,6 @@ struct ActiveSessionRow: View {
     /// Seconds per pulse cycle for the running-status dot ring.
     private let pulseCycle: TimeInterval = 1.1
 
-    private var sortedActiveTools: [(id: String, entry: ActiveToolEntry)] {
-        session.activeTools
-            .map { (id: $0.key, entry: $0.value) }
-            .sorted { $0.entry.startedAt < $1.entry.startedAt }
-    }
-
-    /// Triptych payload — same content in both modes. Detailed mode adds the
-    /// per-tool list below the triptych; otherwise the row reads identically.
     private var triptych: ProviderSessionDisplayContent {
         session.triptychContent
     }
@@ -51,23 +43,6 @@ struct ActiveSessionRow: View {
         }
 
         return raw
-    }
-
-    /// Active tools to render in the detail section. Always surface every
-    /// in-flight tool — MIDDLE in detailed mode is a CLI-style count
-    /// aggregate ("Reading 1 file"), so the specific target belongs here
-    /// and there's no duplication to guard against.
-    private var activeToolsToShowInDetail: [(id: String, entry: ActiveToolEntry)] {
-        sortedActiveTools
-    }
-
-    private var freshRecentlyCompleted: [CompletedToolEntry] {
-        let cutoff = Date().addingTimeInterval(-ActiveSession.recentToolsWindow)
-        return (session.recentlyCompletedTools ?? []).filter { $0.completedAt >= cutoff }
-    }
-
-    private var hasDetailedSectionContent: Bool {
-        !activeToolsToShowInDetail.isEmpty || !freshRecentlyCompleted.isEmpty
     }
 
     var body: some View {
@@ -171,23 +146,17 @@ struct ActiveSessionRow: View {
                             .frame(height: rowSlotHeight, alignment: .topLeading)
                     }
                     promptLine
-                        .frame(height: rowSlotHeight, alignment: .topLeading)
+                        .triptychSlot(compact: !detailedMode)
                     if triptych.isChronologicallyReversed {
                         commentaryLine
-                            .frame(height: rowSlotHeight, alignment: .topLeading)
+                            .triptychSlot(compact: !detailedMode)
                         actionLine
-                            .frame(height: rowSlotHeight, alignment: .topLeading)
-                        if detailedMode && hasDetailedSectionContent {
-                            detailedToolsSection
-                        }
+                            .triptychSlot(compact: !detailedMode)
                     } else {
                         actionLine
-                            .frame(height: rowSlotHeight, alignment: .topLeading)
-                        if detailedMode && hasDetailedSectionContent {
-                            detailedToolsSection
-                        }
+                            .triptychSlot(compact: !detailedMode)
                         commentaryLine
-                            .frame(height: rowSlotHeight, alignment: .topLeading)
+                            .triptychSlot(compact: !detailedMode)
                     }
                 }
             }
@@ -227,90 +196,6 @@ struct ActiveSessionRow: View {
     }
 
     @ViewBuilder
-    private var detailedToolsSection: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach(activeToolsToShowInDetail, id: \.id) { item in
-                    toolRow(
-                        toolName: item.entry.toolName,
-                        detail: item.entry.detail,
-                        elapsed: Self.elapsedText(from: item.entry.startedAt, to: context.date),
-                        trailing: nil,
-                        faded: false
-                    )
-                }
-                ForEach(Array(freshRecentlyCompleted.enumerated()), id: \.offset) { _, entry in
-                    toolRow(
-                        toolName: entry.toolName,
-                        detail: entry.detail,
-                        elapsed: nil,
-                        trailing: String(
-                            format: LanguageManager.localizedString("notch.detailed.finishedAgo"),
-                            Self.elapsedText(from: entry.completedAt, to: context.date)
-                        ),
-                        faded: true,
-                        failed: entry.failed
-                    )
-                }
-            }
-            .padding(.top, 2)
-        }
-    }
-
-    @ViewBuilder
-    private func toolRow(
-        toolName: String,
-        detail: String?,
-        elapsed: String?,
-        trailing: String?,
-        faded: Bool,
-        failed: Bool = false
-    ) -> some View {
-        let baseOpacity: Double = faded ? 0.42 : 0.78
-        let detailOpacity: Double = faded ? 0.34 : 0.58
-        let trailingOpacity: Double = faded ? 0.30 : 0.40
-        let iconColor = failed ? Color.red : (faded ? Color.green : Self.toolTint(for: toolName))
-        HStack(alignment: .firstTextBaseline, spacing: 5) {
-            Image(systemName: failed ? "xmark.circle" : (faded ? "checkmark" : ActiveSession.toolSymbol(toolName)))
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(iconColor.opacity(baseOpacity))
-                .frame(width: 11)
-            Text(toolName)
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(baseOpacity))
-            if let detail, !detail.isEmpty {
-                Text(detail)
-                    .font(.system(size: 10, weight: .regular, design: .monospaced))
-                    .foregroundStyle(.white.opacity(detailOpacity))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-            Spacer(minLength: 4)
-            if let elapsed {
-                Text(elapsed)
-                    .font(.system(size: 9, weight: .regular, design: .monospaced))
-                    .foregroundStyle(.white.opacity(trailingOpacity))
-            }
-            if let trailing {
-                Text(trailing)
-                    .font(.system(size: 9, weight: .regular, design: .monospaced))
-                    .foregroundStyle(.white.opacity(trailingOpacity))
-            }
-        }
-    }
-
-    private static func elapsedText(from started: Date, to now: Date) -> String {
-        let secs = Int(max(0, now.timeIntervalSince(started)))
-        if secs < 60 { return "\(secs)s" }
-        if secs < 3600 {
-            let m = secs / 60, s = secs % 60
-            return s == 0 ? "\(m)m" : "\(m)m\(s)s"
-        }
-        let h = secs / 3600, m = (secs % 3600) / 60
-        return m == 0 ? "\(h)h" : "\(h)h\(m)m"
-    }
-
-    @ViewBuilder
     private var promptLine: some View {
         triptychRow(
             symbol: triptych.promptSymbol,
@@ -318,7 +203,8 @@ struct ActiveSessionRow: View {
             symbolColor: .cyan,
             textOpacity: 0.62,
             symbolOpacity: 0.58,
-            truncation: .tail
+            truncation: .tail,
+            lines: detailedMode ? 2 : 1
         )
     }
 
@@ -330,7 +216,8 @@ struct ActiveSessionRow: View {
             symbolColor: Self.semanticTint(for: triptych.commentarySymbol),
             textOpacity: 0.62,
             symbolOpacity: 0.58,
-            truncation: .tail
+            truncation: .tail,
+            lines: detailedMode ? 2 : 1
         )
     }
 
@@ -341,7 +228,8 @@ struct ActiveSessionRow: View {
         symbolColor: Color,
         textOpacity: Double,
         symbolOpacity: Double,
-        truncation: Text.TruncationMode
+        truncation: Text.TruncationMode,
+        lines: Int = 1
     ) -> some View {
         HStack(alignment: .top, spacing: 5) {
             Image(systemName: symbol)
@@ -352,8 +240,9 @@ struct ActiveSessionRow: View {
             Text(text)
                 .font(.system(size: 10, weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(textOpacity))
-                .lineLimit(1)
+                .lineLimit(lines)
                 .truncationMode(truncation)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -361,16 +250,18 @@ struct ActiveSessionRow: View {
     private var actionLine: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             HStack(spacing: 8) {
-                HStack(spacing: 4) {
+                HStack(alignment: .top, spacing: 4) {
                     Image(systemName: triptych.actionSymbol)
                         .font(.system(size: 9, weight: .medium))
                         .foregroundStyle(Self.semanticTint(for: triptych.actionSymbol).opacity(0.82))
                         .frame(width: 11)
+                        .padding(.top, 2)
                     Text(triptych.actionText)
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.78))
-                        .lineLimit(1)
+                        .lineLimit(detailedMode ? 2 : 1)
                         .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     if let elapsed = session.currentToolElapsedText(at: context.date) {
                         Text(elapsed)
                             .font(.system(size: 10, weight: .regular, design: .monospaced))
@@ -381,6 +272,20 @@ struct ActiveSessionRow: View {
         }
     }
 
+}
+
+private extension View {
+    @ViewBuilder
+    func triptychSlot(compact: Bool) -> some View {
+        if compact {
+            self.frame(height: IdlePeekLayout.triptychSlotHeight, alignment: .topLeading)
+        } else {
+            self.fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+extension ActiveSessionRow {
     private static func semanticTint(for symbol: String) -> Color {
         switch symbol {
         case "hourglass", "brain.head.profile":
@@ -400,24 +305,4 @@ struct ActiveSessionRow: View {
         }
     }
 
-    private static func toolTint(for toolName: String) -> Color {
-        switch ToolActivityFormatter.canonicalToolName(toolName) {
-        case "read", "ls", "glob":
-            return .cyan
-        case "grep", "search", "websearch", "webfetch":
-            return .teal
-        case "write", "edit", "multiedit", "notebookedit":
-            return .orange
-        case "bash", "shell", "killshell":
-            return .purple
-        case "todowrite", "taskcreate", "taskupdate", "tasklist":
-            return .mint
-        case "askuserquestion":
-            return .pink
-        case "task", "agent":
-            return .indigo
-        default:
-            return .blue
-        }
-    }
 }

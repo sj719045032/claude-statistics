@@ -178,6 +178,7 @@ struct WaitingInputCard: View {
 
     private var activityLine: String? {
         if case .permissionRequest = event.kind { return nil }
+        if case .taskDone = event.kind { return nil }
         guard let activity = lastActivity?.trimmingCharacters(in: .whitespacesAndNewlines),
               !activity.isEmpty,
               activity.caseInsensitiveCompare(title) != .orderedSame,
