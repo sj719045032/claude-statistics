@@ -189,6 +189,7 @@ struct ClaudeStatusLineAdapter: StatusLineInstalling {
 enum ClaudePricingCatalog {
     // Source: Anthropic Claude pricing (2026-03-20)
     static let builtinModels: [String: ModelPricing.Pricing] = [
+        "claude-opus-4-8":            ModelPricing.Pricing(input: 5.0, output: 25.0, cacheWrite5m: 6.25, cacheWrite1h: 10.0, cacheRead: 0.50),
         "claude-opus-4-7":            ModelPricing.Pricing(input: 5.0, output: 25.0, cacheWrite5m: 6.25, cacheWrite1h: 10.0, cacheRead: 0.50),
         "claude-opus-4-6":            ModelPricing.Pricing(input: 5.0, output: 25.0, cacheWrite5m: 6.25, cacheWrite1h: 10.0, cacheRead: 0.50),
         "claude-opus-4-5-20251101":   ModelPricing.Pricing(input: 5.0, output: 25.0, cacheWrite5m: 6.25, cacheWrite1h: 10.0, cacheRead: 0.50),
