@@ -208,8 +208,12 @@ final class UsageViewModel: ObservableObject {
                 if usageData == nil { loadCache() }
             }
         } catch {
-            errorMessage = error.localizedDescription
+            // Network failure (e.g. a timeout that survived the service-layer
+            // retries). Degrade gracefully: fall back to the last cached
+            // snapshot and suppress the alarming error when we have something
+            // to show — the "updated X ago" timestamp already signals staleness.
             if usageData == nil { loadCache() }
+            errorMessage = usageData == nil ? error.localizedDescription : nil
         }
 
         isLoading = false
