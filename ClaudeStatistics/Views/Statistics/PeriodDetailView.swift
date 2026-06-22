@@ -66,6 +66,23 @@ struct PeriodDetailView: View {
                         }
                     }
 
+                    // 1b. Source split — Cowork (Claude Desktop) vs Claude Code.
+                    // Only shown when Cowork usage exists in this period.
+                    if stat.hasCoworkUsage {
+                        SectionCard {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Label("Source", systemImage: "person.2")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                sourceRow(name: SessionOrigin.claudeCode.displayName,
+                                          cost: stat.claudeCodeCost, tokens: stat.claudeCodeTokens, total: stat.totalCost)
+                                sourceRow(name: SessionOrigin.cowork.displayName,
+                                          cost: stat.coworkCost, tokens: stat.coworkTokens, total: stat.totalCost)
+                            }
+                        }
+                    }
+
                     // 2. Trend chart
                     SectionCard {
                         VStack(spacing: 8) {
@@ -151,6 +168,43 @@ struct PeriodDetailView: View {
                 .font(.system(size: 14, weight: .semibold, design: .monospaced))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// One row of the Cowork-vs-Claude-Code source split: name, a cost-share
+    /// bar, the share %, the token count, and the dollar cost.
+    private func sourceRow(name: String, cost: Double, tokens: Int, total: Double) -> some View {
+        let fraction = total > 0 ? max(0, min(1, cost / total)) : 0
+        return HStack(spacing: 8) {
+            Text(name)
+                .font(.system(size: 11, weight: .medium))
+                .frame(width: 92, alignment: .leading)
+                .lineLimit(1)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.secondary.opacity(0.15))
+                    Capsule().fill(Color.accentColor.opacity(0.7))
+                        .frame(width: max(2, geo.size.width * fraction))
+                }
+            }
+            .frame(height: 6)
+            Text("\(Int((fraction * 100).rounded()))%")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .frame(width: 34, alignment: .trailing)
+            Text(Self.formatTokens(tokens))
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .frame(width: 50, alignment: .trailing)
+            Text(formatCost(cost))
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .frame(width: 62, alignment: .trailing)
+        }
+    }
+
+    private static func formatTokens(_ count: Int) -> String {
+        if count >= 1_000_000 { return String(format: "%.1fM", Double(count) / 1_000_000) }
+        if count >= 1_000 { return String(format: "%.0fk", Double(count) / 1_000) }
+        return "\(count)"
     }
 
     private func metricWithDelta<Content: View>(delta: Double?, isInverse: Bool, @ViewBuilder content: () -> Content) -> some View {

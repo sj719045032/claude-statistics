@@ -155,13 +155,34 @@ struct PeriodStats: Identifiable {
     var hasEstimatedCost: Bool = false
     var modelBreakdown: [String: ModelUsage] = [:]
 
+    // Cowork (Claude Desktop local agent mode) subset of the totals above, so
+    // the UI can show a "Cowork vs Claude Code" split. Claude Code = total − Cowork.
+    var coworkCost: Double = 0
+    var coworkTokens: Int = 0
+    var coworkMessageCount: Int = 0
+
     var id: Date { period }
 
     var totalTokens: Int {
         totalInputTokens + totalOutputTokens + cacheCreationTotalTokens + cacheReadTokens
     }
 
-    mutating func accumulate(daySlice slice: DaySlice) {
+    var claudeCodeCost: Double { max(0, totalCost - coworkCost) }
+    var claudeCodeTokens: Int { max(0, totalTokens - coworkTokens) }
+    var claudeCodeMessageCount: Int { max(0, messageCount - coworkMessageCount) }
+    var hasCoworkUsage: Bool { coworkTokens > 0 || coworkCost > 0 }
+
+    mutating func accumulate(daySlice slice: DaySlice, origin: SessionOrigin = .claudeCode) {
+        if origin == .cowork {
+            coworkCost += slice.estimatedCost
+            coworkTokens += slice.totalInputTokens + slice.totalOutputTokens
+                + slice.cacheCreationTotalTokens + slice.cacheReadTokens
+            coworkMessageCount += slice.messageCount
+        }
+        accumulateTotals(daySlice: slice)
+    }
+
+    private mutating func accumulateTotals(daySlice slice: DaySlice) {
         totalInputTokens += slice.totalInputTokens
         totalOutputTokens += slice.totalOutputTokens
         cacheCreation5mTokens += slice.cacheCreation5mTokens
@@ -201,7 +222,17 @@ struct PeriodStats: Identifiable {
         }
     }
 
-    mutating func accumulate(stats: SessionStats) {
+    mutating func accumulate(stats: SessionStats, origin: SessionOrigin = .claudeCode) {
+        if origin == .cowork {
+            coworkCost += stats.estimatedCost
+            coworkTokens += stats.totalInputTokens + stats.totalOutputTokens
+                + stats.cacheCreationTotalTokens + stats.cacheReadTokens
+            coworkMessageCount += stats.messageCount
+        }
+        accumulateTotals(stats: stats)
+    }
+
+    private mutating func accumulateTotals(stats: SessionStats) {
         totalInputTokens += stats.totalInputTokens
         totalOutputTokens += stats.totalOutputTokens
         cacheCreation5mTokens += stats.cacheCreation5mTokens

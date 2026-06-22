@@ -48,9 +48,34 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
     }
 
     func makeWatcher(onChange: @escaping (Set<String>) -> Void) -> (any SessionWatcher)? {
+        let fm = FileManager.default
+        var watchers: [any SessionWatcher] = []
+
         let projectsDir = (CredentialService.shared.claudeConfigDir() as NSString).appendingPathComponent("projects")
-        guard FileManager.default.fileExists(atPath: projectsDir) else { return nil }
-        return FSEventsWatcher(path: projectsDir, debounceSeconds: 2.0, onChange: onChange)
+        if fm.fileExists(atPath: projectsDir) {
+            watchers.append(FSEventsWatcher(path: projectsDir, debounceSeconds: 2.0, onChange: onChange))
+        }
+
+        // Also watch the Cowork (local agent mode) tree so its usage updates
+        // live. Filter to real transcripts only — the tree also holds workspace
+        // files, audit logs, and subagent transcripts we don't ingest.
+        let coworkRoot = (NSHomeDirectory() as NSString)
+            .appendingPathComponent("Library/Application Support/Claude/local-agent-mode-sessions")
+        if fm.fileExists(atPath: coworkRoot) {
+            watchers.append(FSEventsWatcher(
+                path: coworkRoot,
+                debounceSeconds: 2.0,
+                fileFilter: { path in
+                    path.hasSuffix(".jsonl")
+                        && path.contains("/.claude/projects/")
+                        && !path.contains("/subagents/")
+                },
+                onChange: onChange
+            ))
+        }
+
+        guard !watchers.isEmpty else { return nil }
+        return watchers.count == 1 ? watchers[0] : CompositeSessionWatcher(watchers: watchers)
     }
 
     func changedSessionIds(for changedPaths: Set<String>) -> Set<String> {

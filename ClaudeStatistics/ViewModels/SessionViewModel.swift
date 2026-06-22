@@ -15,7 +15,13 @@ struct ProjectGroup: Identifiable {
 
     var displayName: String {
         let path = resolvedPath
-        return (path as NSString).lastPathComponent
+        let name = (path as NSString).lastPathComponent
+        // Cowork sessions group under an opaque sandbox path; prefix them so
+        // they read as Cowork in every project breakdown.
+        if SessionOrigin.of(filePath: path) == .cowork {
+            return "\(SessionOrigin.cowork.displayName): \(name)"
+        }
+        return name
     }
 
     var shortPath: String {
