@@ -22,12 +22,27 @@ final class UsageAPIService: ProviderUsageSource {
             throw UsageError.invalidURL
         }
 
+        // Retry transient connectivity failures (a slow / throttled cross-border
+        // TLS handshake is the usual cause of "request timed out" on this
+        // endpoint). Non-transient outcomes (401 / 429 / decoding) are thrown
+        // from inside `requestUsage` and propagate without a retry.
+        let usageData = try await Self.withTransientRetry {
+            try await self.requestUsage(url: url, token: tokenInfo.token)
+        }
+
+        // Cache the result
+        saveToCache(usageData)
+
+        return usageData
+    }
+
+    private func requestUsage(url: URL, token: String) async throws -> UsageData {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue("Bearer \(tokenInfo.token)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
         request.setValue("claude-code/2.1", forHTTPHeaderField: "User-Agent")
-        request.timeoutInterval = 15
+        request.timeoutInterval = 30
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -51,18 +66,49 @@ final class UsageAPIService: ProviderUsageSource {
         }
 
         let decoder = JSONDecoder()
-        let usageData: UsageData
         do {
-            usageData = try decoder.decode(UsageAPIResponse.self, from: data).asUsageData
+            return try decoder.decode(UsageAPIResponse.self, from: data).asUsageData
         } catch {
             let raw = String(data: data, encoding: .utf8) ?? "<binary>"
             throw UsageError.decodingFailed(detail: error.localizedDescription, raw: raw)
         }
+    }
 
-        // Cache the result
-        saveToCache(usageData)
+    // MARK: - Transient retry
 
-        return usageData
+    /// Run `operation`, retrying only on transient connectivity `URLError`s
+    /// (timeout, refused / lost connection, DNS). Up to `attempts` tries with a
+    /// short backoff between them. Any non-`URLError` — e.g.
+    /// `UsageError.rateLimited` / `.unauthorized` / decoding failures — is
+    /// thrown immediately and never retried.
+    static func withTransientRetry<T>(
+        attempts: Int = 3,
+        backoffSeconds: [UInt64] = [1, 2],
+        _ operation: () async throws -> T
+    ) async throws -> T {
+        var lastError: Error = UsageError.invalidResponse
+        let total = max(1, attempts)
+        for attempt in 0..<total {
+            do {
+                return try await operation()
+            } catch let error as URLError where isTransient(error) {
+                lastError = error
+                guard attempt < total - 1 else { break }
+                let delay = backoffSeconds[min(attempt, backoffSeconds.count - 1)]
+                try? await Task.sleep(nanoseconds: delay * 1_000_000_000)
+            }
+        }
+        throw lastError
+    }
+
+    static func isTransient(_ error: URLError) -> Bool {
+        switch error.code {
+        case .timedOut, .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed,
+             .networkConnectionLost, .notConnectedToInternet, .secureConnectionFailed:
+            return true
+        default:
+            return false
+        }
     }
 
     // MARK: - Token Refresh
@@ -130,11 +176,17 @@ final class UsageAPIService: ProviderUsageSource {
             throw UsageError.invalidURL
         }
 
+        return try await Self.withTransientRetry {
+            try await self.requestProfile(url: url, token: token)
+        }
+    }
+
+    private func requestProfile(url: URL, token: String) async throws -> UserProfile {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
-        request.timeoutInterval = 15
+        request.timeoutInterval = 30
 
         let (data, response) = try await URLSession.shared.data(for: request)
 

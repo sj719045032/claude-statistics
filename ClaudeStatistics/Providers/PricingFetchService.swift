@@ -134,6 +134,7 @@ final class PricingFetchService: ProviderPricingFetching {
 
         let mappings: [(pattern: String, ids: [String])] = [
             // Latest
+            ("opus 4.8",   ["claude-opus-4-8"]),
             ("opus 4.7",   ["claude-opus-4-7"]),
             ("opus 4.6",   ["claude-opus-4-6"]),
             ("opus 4.5",   ["claude-opus-4-5-20251101"]),
@@ -144,19 +145,63 @@ final class PricingFetchService: ProviderPricingFetching {
             ("sonnet 4.5", ["claude-sonnet-4-5-20250929"]),
             ("sonnet 4",   ["claude-sonnet-4-20250514"]),
             ("sonnet 3.7", ["claude-3-7-sonnet-20250219"]),
-            ("haiku 4.5",  ["claude-haiku-4-5-20251001"]),
+            ("haiku 4.5",  ["claude-haiku-4-5-20251001", "claude-haiku-4-5"]),
             ("haiku 3.5",  ["claude-3-5-haiku-20241022"]),
             ("haiku 3",    ["claude-3-haiku-20240307"]),
         ]
 
         for mapping in mappings {
-            if name.contains(mapping.pattern) {
+            // Match on a complete version token so a base pattern like
+            // "opus 4" never swallows a newer minor release such as
+            // "opus 4.8" (which used to fall through to the wrong base id).
+            if matchesVersionToken(name, mapping.pattern) {
                 return mapping.ids
             }
         }
 
-        // Fallback: construct a reasonable ID
-        return [displayName.lowercased().replacingOccurrences(of: " ", with: "-")]
+        // Fallback for any model not in the table above (e.g. a release
+        // newer than this build): derive the canonical Anthropic-style id
+        // straight from the display name instead of a naive slug. This is
+        // what keeps "Claude Opus 4.8" → "claude-opus-4-8" rather than the
+        // old "opus-4.8" (dotted, un-prefixed) that matched nothing.
+        return [canonicalModelId(from: displayName)]
+    }
+
+    /// True if `pattern` (e.g. "opus 4.8") appears in `name` as a complete
+    /// version token — not as the prefix of a longer version. Without this,
+    /// the "opus 4" pattern matches "claude opus 4.8" via plain `contains`
+    /// and the new model gets priced as the old base model.
+    private func matchesVersionToken(_ name: String, _ pattern: String) -> Bool {
+        guard let range = name.range(of: pattern) else { return false }
+        let rest = name[range.upperBound...]
+        guard let next = rest.first else { return true }   // pattern ends the string
+        if next.isNumber { return false }                  // e.g. "opus 4" vs "opus 40"
+        if next == "." {
+            // ".<digit>" means a longer minor version (e.g. "opus 4" vs "opus 4.8")
+            if let after = rest.dropFirst().first, after.isNumber { return false }
+        }
+        return true
+    }
+
+    /// Derive a canonical Anthropic model id from a docs display name.
+    ///   "Claude Opus 4.8"                        -> "claude-opus-4-8"
+    ///   "Claude Mythos 5 (limited availability)" -> "claude-mythos-5"
+    /// Drops parenthetical qualifiers and collapses dots/spaces to dashes so
+    /// the id matches the dash-delimited model strings used in transcripts.
+    private func canonicalModelId(from displayName: String) -> String {
+        var text = displayName.lowercased()
+        if let paren = text.firstIndex(of: "(") {
+            text = String(text[..<paren])
+        }
+        let separators = CharacterSet(charactersIn: " ./_")
+        let parts = text
+            .components(separatedBy: separators)
+            .filter { !$0.isEmpty }
+        var id = parts.joined(separator: "-")
+        if !id.hasPrefix("claude-") {
+            id = "claude-" + id
+        }
+        return id
     }
 }
 

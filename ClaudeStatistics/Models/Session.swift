@@ -138,6 +138,7 @@ final class ModelPricing {
         if lower.contains("gemini-3-pro") { return models["gemini-3-pro-preview"] ?? defaultPricing }
         if lower.contains("gemini-3.1-flash-lite") { return models["gemini-3.1-flash-lite-preview"] ?? defaultPricing }
         if lower.contains("gemini-3-flash") { return models["gemini-3-flash-preview"] ?? defaultPricing }
+        if lower.contains("gpt-5.5") { return models["gpt-5.5"] ?? defaultPricing }
         if lower.contains("gpt-5.4-mini") { return models["gpt-5.4-mini"] ?? defaultPricing }
         if lower.contains("gpt-5.4") { return models["gpt-5.4"] ?? defaultPricing }
         if lower.contains("gpt-5.3-codex") { return models["gpt-5.3-codex"] ?? defaultPricing }
@@ -153,6 +154,7 @@ final class ModelPricing {
             if lower.contains("flash") { return models["gemini-2.5-flash"] ?? defaultPricing }
             if lower.contains("pro") { return models["gemini-2.5-pro"] ?? defaultPricing }
         }
+        if lower.contains("opus-4-8") { return models["claude-opus-4-8"] ?? defaultPricing }
         if lower.contains("opus-4-7") { return models["claude-opus-4-7"] ?? defaultPricing }
         if lower.contains("opus-4-6") { return models["claude-opus-4-6"] ?? defaultPricing }
         if lower.contains("opus-4-5") { return models["claude-opus-4-5-20251101"] ?? defaultPricing }
