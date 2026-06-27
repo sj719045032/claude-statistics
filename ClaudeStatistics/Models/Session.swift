@@ -138,7 +138,10 @@ final class ModelPricing {
         if lower.contains("gemini-3-pro") { return models["gemini-3-pro-preview"] ?? defaultPricing }
         if lower.contains("gemini-3.1-flash-lite") { return models["gemini-3.1-flash-lite-preview"] ?? defaultPricing }
         if lower.contains("gemini-3-flash") { return models["gemini-3-flash-preview"] ?? defaultPricing }
+        if lower.contains("gpt-5.5-pro") { return models["gpt-5.5-pro"] ?? defaultPricing }
         if lower.contains("gpt-5.5") { return models["gpt-5.5"] ?? defaultPricing }
+        if lower.contains("gpt-5.4-pro") { return models["gpt-5.4-pro"] ?? defaultPricing }
+        if lower.contains("gpt-5.4-nano") { return models["gpt-5.4-nano"] ?? defaultPricing }
         if lower.contains("gpt-5.4-mini") { return models["gpt-5.4-mini"] ?? defaultPricing }
         if lower.contains("gpt-5.4") { return models["gpt-5.4"] ?? defaultPricing }
         if lower.contains("gpt-5.3-codex") { return models["gpt-5.3-codex"] ?? defaultPricing }
