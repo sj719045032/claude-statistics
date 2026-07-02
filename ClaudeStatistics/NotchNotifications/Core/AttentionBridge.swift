@@ -291,18 +291,18 @@ final class AttentionBridge {
         // Hook fired from a GUI host (non-empty `__CFBundleIdentifier`)
         // that no installed terminal plugin claims — typically
         // Claude.app / Codex.app sessions when their plugins aren't
-        // installed. Surfacing such an event would build a row whose
-        // source tag and focus button can't render (no capability to
-        // address). Drop the event entirely; `pending` (if any) closes
-        // the hook fd via ARC so the hook subprocess sees EOF and
-        // falls through to its CLI's native behavior. Apple Terminal
-        // is host-resident and always claims `com.apple.Terminal`;
-        // third-party hosts must be installed to register.
-        if !resolved.claimed,
-           let bundleId = msg.host_app_bundle_id,
-           !bundleId.isEmpty {
+        // installed. Non-permission events would build a row whose
+        // source tag and focus button can't render, so drop them.
+        // Permission prompts are different: missing focus metadata is
+        // less harmful than hiding an approval request the user needs
+        // to notice.
+        if Self.shouldDropUnclaimedHost(
+            claimed: resolved.claimed,
+            hostAppBundleId: msg.host_app_bundle_id,
+            kind: kind
+        ) {
             DiagnosticLogger.shared.verbose(
-                "Bridge dropped unclaimed-host event=\(msg.event) provider=\(provider.rawValue) session=\(msg.session_id ?? "-") hostApp=\(bundleId) replayed=\(replayed)"
+                "Bridge dropped unclaimed-host event=\(msg.event) provider=\(provider.rawValue) session=\(msg.session_id ?? "-") hostApp=\(msg.host_app_bundle_id ?? "-") replayed=\(replayed)"
             )
             return
         }
@@ -339,6 +339,22 @@ final class AttentionBridge {
         }
 
         self.notchCenter?.enqueue(event)
+    }
+
+    static func shouldDropUnclaimedHost(
+        claimed: Bool,
+        hostAppBundleId: String?,
+        kind: AttentionKind
+    ) -> Bool {
+        guard !claimed,
+              let bundleId = hostAppBundleId,
+              !bundleId.isEmpty else {
+            return false
+        }
+        if case .permissionRequest = kind {
+            return false
+        }
+        return true
     }
 
     /// Read every payload that HookCLI dropped into the pending dir while

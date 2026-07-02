@@ -53,37 +53,37 @@ struct HookRunner: HookHelperContext {
     let provider: ProviderKind
 
     func run() -> Int32 {
+        guard let payload = readPayload() else {
+            return 0
+        }
+
         // Source-side host-claim filter. When the hook fires from a
         // GUI host whose bundle id isn't claimed by any installed
         // terminal plugin (e.g. Claude.app / Codex.app sessions
-        // without their .csplugin), exit before doing any socket I/O —
-        // the host would drop these events anyway via the
-        // `HookTerminalResolver` claim check in AttentionBridge.
+        // without their .csplugin), exit before doing any socket I/O.
+        // Permission prompts are exempt: AttentionBridge is allowed to
+        // surface them even without focus metadata, because hiding an
+        // approval request is worse than rendering a less-specific card.
         // Reading is best-effort: if the file is missing (host has
         // never been launched, or pre-dates this feature), fall
         // through so AttentionBridge enforces the same rule. File
         // absence must NEVER cause a false drop on its own.
-        if let bundleId = ProcessInfo.processInfo.environment["__CFBundleIdentifier"],
-           !bundleId.isEmpty,
-           let installed = AppRuntimePaths.loadInstalledTerminalBundles(),
-           !installed.isEmpty,
-           !installed.contains(bundleId) {
-            guard Self.marketplaceHasTerminalPlugin(bundleID: bundleId) else {
-                return 0
-            }
+        if Self.shouldDropUnclaimedHostBeforeSocket(
+            payload: payload,
+            hostAppBundleId: ProcessInfo.processInfo.environment["__CFBundleIdentifier"],
+            installedTerminalBundles: AppRuntimePaths.loadInstalledTerminalBundles(),
+            marketplaceHasTerminalPlugin: Self.marketplaceHasTerminalPlugin(bundleID:)
+        ) {
+            return 0
         }
 
-        return sendToHost()
+        return sendToHost(payload: payload)
     }
 
-    private func sendToHost() -> Int32 {
+    private func sendToHost(payload: [String: Any]) -> Int32 {
         if ProcessInfo.processInfo.environment["CLAUDE_STATS_HOOK_PRINT_PATHS"] == "1" {
             let line = "root=\(AppRuntimePaths.rootDirectory) socket=\(AttentionBridgeAuth.socketPath)\n"
             FileHandle.standardError.write(Data(line.utf8))
-        }
-
-        guard let payload = readPayload() else {
-            return 0
         }
 
         let action: HookAction?
@@ -113,6 +113,34 @@ struct HookRunner: HookHelperContext {
             action.printDecision?(stringValue(response?["decision"]))
         }
         return 0
+    }
+
+    static func shouldDropUnclaimedHostBeforeSocket(
+        payload: [String: Any],
+        hostAppBundleId: String?,
+        installedTerminalBundles: Set<String>?,
+        marketplaceHasTerminalPlugin: (String) -> Bool
+    ) -> Bool {
+        guard !isPermissionPayload(payload),
+              let bundleId = hostAppBundleId,
+              !bundleId.isEmpty,
+              let installed = installedTerminalBundles,
+              !installed.isEmpty,
+              !installed.contains(bundleId) else {
+            return false
+        }
+
+        return !marketplaceHasTerminalPlugin(bundleId)
+    }
+
+    static func isPermissionPayload(_ payload: [String: Any]) -> Bool {
+        let event = stringValue(payload["hook_event_name"]) ?? stringValue(payload["event"])
+        if event == "PermissionRequest" || event == "ToolPermission" {
+            return true
+        }
+
+        let notificationType = stringValue(payload["notification_type"])
+        return notificationType == "permission_prompt" || notificationType == "ToolPermission"
     }
 
     private static func marketplaceHasTerminalPlugin(bundleID: String) -> Bool {
