@@ -17,6 +17,9 @@ final class ToolActivityFormatterPermissionsTests: XCTestCase {
         return dict
     }
 
+    private typealias StructuredField = ToolActivityFormatter.PermissionPreviewContent.StructuredField
+    private typealias StructuredValue = ToolActivityFormatter.PermissionPreviewContent.StructuredValue
+
     // MARK: - bash
 
     func test_permissionPreview_bash_commandPrimary() {
@@ -438,7 +441,9 @@ final class ToolActivityFormatterPermissionsTests: XCTestCase {
             tool: "unknown_tool",
             input: ["foo": .string("bar")]
         )
-        XCTAssertEqual(result.primary, .inline("bar"))
+        XCTAssertEqual(result.primary, .fields([
+            StructuredField(label: "foo", value: .inline("bar"))
+        ]))
     }
 
     func test_permissionPreview_default_multilineCodePrimary() {
@@ -446,23 +451,9 @@ final class ToolActivityFormatterPermissionsTests: XCTestCase {
             tool: "unknown_tool",
             input: ["foo": .string("line1\nline2")]
         )
-        // Default-branch primary keeps embedded newlines (render() flattens
-        // \n to space for non-path keys, so a normal string key won't trigger
-        // .code; pass a path-like key to keep newlines.)
-        // Use a path-like key so renderForKey returns the raw text and the
-        // primary becomes .code.
-        let pathResult = ToolActivityFormatter.permissionPreview(
-            tool: "unknown_tool",
-            input: ["file_path": .string("/a\n/b")]
-        )
-        XCTAssertEqual(pathResult.primary, .code("/a\n/b"))
-        // For non-path string keys the default branch flattens newlines,
-        // producing a single-line .inline primary.
-        if case .inline(let text) = result.primary {
-            XCTAssertFalse(text.contains("\n"))
-        } else {
-            XCTFail("expected inline primary, got \(String(describing: result.primary))")
-        }
+        XCTAssertEqual(result.primary, .fields([
+            StructuredField(label: "foo", value: .code("line1\nline2"))
+        ]))
     }
 
     func test_permissionPreview_default_descriptionKeyGoesToDescriptions() {
@@ -474,7 +465,9 @@ final class ToolActivityFormatterPermissionsTests: XCTestCase {
             ]
         )
         XCTAssertTrue(result.descriptions.contains("explain me"))
-        XCTAssertEqual(result.primary, .inline("bar"))
+        XCTAssertEqual(result.primary, .fields([
+            StructuredField(label: "foo", value: .inline("bar"))
+        ]))
     }
 
     func test_permissionPreview_default_extraKeysGoToMetadata() {
@@ -486,11 +479,32 @@ final class ToolActivityFormatterPermissionsTests: XCTestCase {
                 "gamma": .string("third")
             ]
         )
-        // Keys are sorted alphabetically: alpha=primary, beta and gamma → meta
-        XCTAssertEqual(result.primary, .inline("first"))
-        let dict = metaDict(result.metadata)
-        XCTAssertEqual(dict["beta"], "second")
-        XCTAssertEqual(dict["gamma"], "third")
+        XCTAssertTrue(result.metadata.isEmpty)
+        XCTAssertEqual(result.primary, .fields([
+            StructuredField(label: "alpha", value: .inline("first")),
+            StructuredField(label: "beta", value: .inline("second")),
+            StructuredField(label: "gamma", value: .inline("third"))
+        ]))
+    }
+
+    func test_permissionPreview_default_notionLikePayloadKeepsNestedShape() {
+        let result = ToolActivityFormatter.permissionPreview(
+            tool: "notion.notion-update-page",
+            input: [
+                "command": .string("insert_content"),
+                "content": .string("line1\nline2"),
+                "page_id": .string("39032101206f80f58610ce819ffba400"),
+                "position": .object(["type": .string("end")])
+            ]
+        )
+        XCTAssertEqual(result.primary, .fields([
+            StructuredField(label: "command", value: .inline("insert_content")),
+            StructuredField(label: "content", value: .code("line1\nline2")),
+            StructuredField(label: "page id", value: .inline("39032101206f80f58610ce819ffba400")),
+            StructuredField(label: "position", value: .object([
+                StructuredField(label: "type", value: .inline("end"))
+            ]))
+        ]))
     }
 
     func test_permissionPreview_default_proseKeysSetMatches() {

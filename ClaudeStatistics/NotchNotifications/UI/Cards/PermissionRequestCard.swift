@@ -284,6 +284,8 @@ struct PermissionRequestCard: View {
             }
         case .questions(let prompts):
             questionPromptsView(prompts)
+        case .fields(let fields):
+            StructuredPermissionFieldsView(fields: fields)
         }
     }
 
@@ -427,6 +429,128 @@ struct PermissionRequestCard: View {
         let s = Int(seconds.rounded())
         if s >= 60 { return "\(s / 60)m\(s % 60)s" }
         return "\(s)s"
+    }
+}
+
+private struct StructuredPermissionFieldsView: View {
+    let fields: [ToolActivityFormatter.PermissionPreviewContent.StructuredField]
+    var depth: Int = 0
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: depth == 0 ? 8 : 6) {
+            ForEach(Array(fields.enumerated()), id: \.offset) { _, field in
+                StructuredPermissionFieldView(field: field, depth: depth)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct StructuredPermissionFieldView: View {
+    let field: ToolActivityFormatter.PermissionPreviewContent.StructuredField
+    let depth: Int
+
+    var body: some View {
+        let value = field.value
+        switch value {
+        case .inline:
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                fieldLabel
+                    .frame(width: depth == 0 ? 76 : 64, alignment: .leading)
+                StructuredPermissionValueView(value: value, depth: depth)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+        case .code:
+            VStack(alignment: .leading, spacing: 5) {
+                fieldLabel
+                StructuredPermissionValueView(value: value, depth: depth)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+        case .object, .array:
+            VStack(alignment: .leading, spacing: 5) {
+                fieldLabel
+                StructuredPermissionValueView(value: value, depth: depth)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var fieldLabel: some View {
+        Text(field.label)
+            .font(.system(size: 10, weight: .medium, design: .rounded))
+            .foregroundStyle(.white.opacity(depth == 0 ? 0.46 : 0.36))
+            .lineLimit(1)
+            .truncationMode(.tail)
+    }
+}
+
+private struct StructuredPermissionValueView: View {
+    let value: ToolActivityFormatter.PermissionPreviewContent.StructuredValue
+    let depth: Int
+
+    var body: some View {
+        valueBody(value)
+    }
+
+    private func valueBody(_ value: ToolActivityFormatter.PermissionPreviewContent.StructuredValue) -> AnyView {
+        switch value {
+        case .inline(let text):
+            return AnyView(
+                Text(text)
+                    .font(.system(size: 10.5, weight: .regular, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.76))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            )
+
+        case .code(let text):
+            return AnyView(
+                Text(text)
+                    .font(.system(size: 10.5, weight: .regular, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.86))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 5))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5)
+                            .strokeBorder(Color.white.opacity(0.07), lineWidth: 1)
+                    )
+            )
+
+        case .object(let fields):
+            return AnyView(
+                StructuredPermissionFieldsView(fields: fields, depth: depth + 1)
+                    .padding(.leading, 9)
+                    .overlay(alignment: .leading) {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.10))
+                            .frame(width: 1)
+                    }
+            )
+
+        case .array(let values):
+            return AnyView(
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(values.enumerated()), id: \.offset) { index, value in
+                        HStack(alignment: .top, spacing: 7) {
+                            Text("\(index + 1)")
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.36))
+                                .frame(width: 14, alignment: .trailing)
+                            StructuredPermissionValueView(value: value, depth: depth + 1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            )
+        }
     }
 }
 

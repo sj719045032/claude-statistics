@@ -35,6 +35,19 @@ extension ToolActivityFormatter {
             case diff(old: String, new: String)        // edit tool
             case list([String])                        // todo items
             case questions([QuestionPrompt])
+            case fields([StructuredField])             // generic object/array payloads from provider tools
+        }
+
+        struct StructuredField: Equatable {
+            let label: String
+            let value: StructuredValue
+        }
+
+        indirect enum StructuredValue: Equatable {
+            case inline(String)
+            case code(String)
+            case object([StructuredField])
+            case array([StructuredValue])
         }
         let primary: Primary?
         let metadata: [(label: String, value: String)]
@@ -245,32 +258,26 @@ extension ToolActivityFormatter {
             return PermissionPreviewContent(primary: nil, metadata: meta, descriptions: [])
 
         default:
-            // Fallback: first string-like field is primary, others go to
-            // metadata (short) or descriptions (if key indicates prose).
-            let descriptionKeys: Set<String> = [
-                "description", "prompt", "message", "reason", "warning", "explanation"
-            ]
-            var primaryText: String?
-            var meta: [(String, String)] = []
+            // Fallback for provider/plugin tools: keep the input shape visible
+            // instead of flattening unknown objects into a JSON-looking blob.
+            let descriptionKeys = genericDescriptionKeys
+            var fields: [PermissionPreviewContent.StructuredField] = []
             var descriptions: [String] = []
             for key in input.keys.sorted() {
-                guard let value = input[key],
-                      let rendered = renderForKey(key, value),
-                      !rendered.isEmpty else { continue }
+                guard let value = input[key] else { continue }
                 if descriptionKeys.contains(key.lowercased()) {
-                    descriptions.append(rendered)
-                } else if primaryText == nil {
-                    primaryText = rendered
-                } else {
-                    meta.append((prettyKey(key), truncate(rendered, limit: 160)))
+                    if let rendered = renderForKey(key, value), !rendered.isEmpty {
+                        descriptions.append(rendered)
+                    }
+                    continue
+                }
+                if let field = structuredPermissionField(key: key, value: value) {
+                    fields.append(field)
                 }
             }
-            let primary: PermissionPreviewContent.Primary? = primaryText.map { text in
-                text.contains("\n") ? .code(text) : .inline(text)
-            }
             return PermissionPreviewContent(
-                primary: primary,
-                metadata: meta,
+                primary: fields.isEmpty ? nil : .fields(fields),
+                metadata: [],
                 descriptions: descriptions
             )
         }
@@ -403,5 +410,89 @@ extension ToolActivityFormatter {
             options: questionOptions(from: object["options"]),
             multiSelect: multiSelect
         )
+    }
+
+    private static let genericDescriptionKeys: Set<String> = [
+        "description", "prompt", "message", "reason", "warning", "explanation"
+    ]
+
+    private static let genericLongTextKeys: Set<String> = [
+        "body",
+        "configure",
+        "content",
+        "markdown",
+        "new_str",
+        "new_string",
+        "old_str",
+        "old_string",
+        "replacement",
+        "text"
+    ]
+
+    private static func structuredPermissionField(
+        key: String,
+        value: JSONValue
+    ) -> PermissionPreviewContent.StructuredField? {
+        guard let structuredValue = structuredPermissionValue(key: key, value: value) else {
+            return nil
+        }
+        return PermissionPreviewContent.StructuredField(
+            label: prettyKey(key),
+            value: structuredValue
+        )
+    }
+
+    private static func structuredPermissionValue(
+        key: String,
+        value: JSONValue
+    ) -> PermissionPreviewContent.StructuredValue? {
+        switch value {
+        case .string(let text):
+            let normalized = text
+                .replacingOccurrences(of: "\r\n", with: "\n")
+                .replacingOccurrences(of: "\r", with: "\n")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !normalized.isEmpty else { return nil }
+            if shouldRenderGenericValueAsCode(key: key, text: normalized) {
+                return .code(normalized)
+            }
+            let inline = normalized
+                .replacingOccurrences(of: "\n", with: " ")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return inline.isEmpty ? nil : .inline(inline)
+
+        case .number(let number):
+            let integer = Int(number)
+            if Double(integer) == number {
+                return .inline("\(integer)")
+            }
+            return .inline("\(number)")
+
+        case .bool(let flag):
+            return .inline(flag ? "true" : "false")
+
+        case .null:
+            return nil
+
+        case .array(let items):
+            let values = items.compactMap { structuredPermissionValue(key: key, value: $0) }
+            guard !values.isEmpty else { return nil }
+            return .array(values)
+
+        case .object(let object):
+            let fields = object.keys.sorted().compactMap { nestedKey -> PermissionPreviewContent.StructuredField? in
+                guard let nestedValue = object[nestedKey] else { return nil }
+                return structuredPermissionField(key: nestedKey, value: nestedValue)
+            }
+            guard !fields.isEmpty else { return nil }
+            return .object(fields)
+        }
+    }
+
+    private static func shouldRenderGenericValueAsCode(key: String, text: String) -> Bool {
+        let normalizedKey = key.lowercased()
+        return text.contains("\n")
+            || text.count > 120
+            || genericLongTextKeys.contains(normalizedKey)
     }
 }
