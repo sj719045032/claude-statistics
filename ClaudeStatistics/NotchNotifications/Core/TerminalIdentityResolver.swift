@@ -120,7 +120,11 @@ enum TerminalIdentityResolver {
         // + same pid is the only stable host identity, and a new SessionStart
         // should replace the older session in that app process.
         let pid = event.pid
-        let canMatchSamePid = pid != nil && tty == nil && tabID == nil && stableID == nil
+        let canMatchSamePid = event.provider.descriptor.displacesActiveSessionsOnSameHostProcess
+            && pid != nil
+            && tty == nil
+            && tabID == nil
+            && stableID == nil
 
         return runtimes.compactMap { key, runtime -> DisplacedSession? in
             guard key != newKey else { return nil }
@@ -212,7 +216,8 @@ enum TerminalIdentityResolver {
     ) -> [String: RuntimeSession] {
         var result = runtimes
         let candidates = runtimes.compactMap { key, runtime -> (key: String, runtime: RuntimeSession)? in
-            guard runtime.pid != nil,
+            guard runtime.provider.descriptor.displacesActiveSessionsOnSameHostProcess,
+                  runtime.pid != nil,
                   runtime.tty?.nilIfEmpty == nil,
                   runtime.terminalTabID?.nilIfEmpty == nil,
                   runtime.terminalStableID?.nilIfEmpty == nil,

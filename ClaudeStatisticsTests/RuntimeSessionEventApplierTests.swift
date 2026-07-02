@@ -79,7 +79,8 @@ final class RuntimeSessionEventApplierTests: XCTestCase {
             commentaryText: nil,
             commentaryAt: nil,
             kind: kind,
-            pending: nil
+            pending: nil,
+            prepared: nil
         )
     }
 

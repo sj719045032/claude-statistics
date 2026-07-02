@@ -37,6 +37,8 @@ xcodebuild -project ClaudeStatistics.xcodeproj \
   clean build \
   MARKETING_VERSION="${VERSION}" \
   CURRENT_PROJECT_VERSION="${VERSION}" \
+  CLANG_ENABLE_EXPLICIT_MODULES=NO \
+  SWIFT_ENABLE_EXPLICIT_MODULES=NO \
   2>&1 | tail -5
 
 APP_PATH="${BUILD_DIR}/Build/Products/Release/${APP_NAME}.app"

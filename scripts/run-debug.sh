@@ -109,6 +109,8 @@ if ! xcodebuild build \
     -configuration Debug \
     -destination 'platform=macOS' \
     -derivedDataPath "${BUILD_DIR}" \
+    CLANG_ENABLE_EXPLICIT_MODULES=NO \
+    SWIFT_ENABLE_EXPLICIT_MODULES=NO \
     PRODUCT_BUNDLE_IDENTIFIER="${DEBUG_BUNDLE_ID}" \
     >"${BUILD_LOG}" 2>&1; then
   echo "==> BUILD FAILED — compile errors:"

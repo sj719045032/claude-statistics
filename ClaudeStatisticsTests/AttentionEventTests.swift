@@ -30,7 +30,8 @@ final class AttentionEventTests: XCTestCase {
             commentaryText: "\n  Final answer from the transcript.  \n",
             commentaryAt: Date(timeIntervalSince1970: 1_700_000_001),
             kind: .taskDone(summary: nil),
-            pending: nil
+            pending: nil,
+            prepared: nil
         )
 
         XCTAssertEqual(event.livePreview, "Final answer from the transcript.")
@@ -62,7 +63,8 @@ final class AttentionEventTests: XCTestCase {
             commentaryText: "Final answer from the transcript.",
             commentaryAt: Date(timeIntervalSince1970: 1_700_000_001),
             kind: .taskDone(summary: "Explicit completion summary"),
-            pending: nil
+            pending: nil,
+            prepared: nil
         )
 
         XCTAssertEqual(event.livePreview, "Explicit completion summary")

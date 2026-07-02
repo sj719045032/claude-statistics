@@ -36,7 +36,8 @@ final class PermissionRequestRegistryTests: XCTestCase {
             commentaryText: nil,
             commentaryAt: nil,
             kind: kind,
-            pending: nil
+            pending: nil,
+            prepared: nil
         )
     }
 

@@ -31,6 +31,8 @@ xcodebuild test \
     -configuration Debug \
     -destination 'platform=macOS' \
     -derivedDataPath "${BUILD_DIR}" \
+    CLANG_ENABLE_EXPLICIT_MODULES=NO \
+    SWIFT_ENABLE_EXPLICIT_MODULES=NO \
     PRODUCT_BUNDLE_IDENTIFIER="${DEBUG_BUNDLE_ID}" \
     >"${TEST_LOG}" 2>&1 || TEST_STATUS=$?
 

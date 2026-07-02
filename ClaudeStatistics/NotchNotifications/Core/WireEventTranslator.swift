@@ -97,7 +97,20 @@ enum WireEventTranslator {
         prepared: PreparedAttentionEvent? = nil,
         commentaryAt: Date? = nil
     ) -> AttentionEvent {
-        AttentionEvent(
+        let terminalSocket = resolvedTerminalContext?.socket ?? msg.terminal_socket
+        let terminalWindowID = resolvedTerminalContext?.windowID ?? msg.terminal_window_id
+        let terminalTabID = resolvedTerminalContext?.tabID ?? msg.terminal_tab_id
+        let rawTerminalStableID = resolvedTerminalContext?.surfaceID ?? msg.terminal_surface_id
+        let terminalStableID = provider.descriptor.activeSessionStableID(
+            sessionId: msg.session_id,
+            tty: msg.tty,
+            terminalSocket: terminalSocket,
+            terminalWindowID: terminalWindowID,
+            terminalTabID: terminalTabID,
+            terminalStableID: rawTerminalStableID
+        )
+
+        return AttentionEvent(
             id: UUID(),
             provider: provider,
             rawEventName: msg.event,
@@ -113,10 +126,10 @@ enum WireEventTranslator {
             tty: msg.tty,
             pid: msg.pid.map { Int32($0) },
             terminalName: resolvedTerminalName ?? msg.terminal_name,
-            terminalSocket: resolvedTerminalContext?.socket ?? msg.terminal_socket,
-            terminalWindowID: resolvedTerminalContext?.windowID ?? msg.terminal_window_id,
-            terminalTabID: resolvedTerminalContext?.tabID ?? msg.terminal_tab_id,
-            terminalStableID: resolvedTerminalContext?.surfaceID ?? msg.terminal_surface_id,
+            terminalSocket: terminalSocket,
+            terminalWindowID: terminalWindowID,
+            terminalTabID: terminalTabID,
+            terminalStableID: terminalStableID,
             receivedAt: Date(),
             promptText: msg.prompt_text,
             commentaryText: msg.commentary_text,

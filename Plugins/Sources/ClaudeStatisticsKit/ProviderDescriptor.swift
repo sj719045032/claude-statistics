@@ -12,6 +12,21 @@ import SwiftUI
 /// because the alias tables they close over reference host-internal
 /// `ClaudeToolNames` / `CodexToolNames` / `GeminiToolNames` enums).
 /// Stage 4 moves those instances into the per-provider plugin packages.
+public enum ProviderActiveSessionIdentityPolicy: String, Sendable, Codable {
+    /// When hook events have no terminal locator (tty / tab / socket /
+    /// surface id), treat the host process as the visible-session
+    /// identity. A new SessionStart from the same host replaces older
+    /// runtime rows. This preserves terminal-style semantics: one tab
+    /// fronts one active CLI conversation.
+    case hostProcessFallback
+    /// When hook events have no terminal locator, keep provider
+    /// sessions distinct and use the provider session id as the stable
+    /// focus locator. Chat-app hosts with native thread deep links use
+    /// this so several open conversations in one app process can all
+    /// stay visible.
+    case providerSession
+}
+
 public struct ProviderDescriptor: Sendable {
     /// Stable, globally-unique identifier. For builtin providers the
     /// id matches the legacy `ProviderKind.rawValue` so on-disk caches
@@ -75,6 +90,10 @@ public struct ProviderDescriptor: Sendable {
     /// triptych. Gemini emits "process group pgid:" / "background pids:"
     /// banners; other providers contribute nothing here.
     public let notchNoisePrefixes: [String]
+    /// How the active-session tracker should identify rows when a
+    /// provider fires hooks from an app process that does not expose a
+    /// terminal tty / tab / socket / surface locator.
+    public let activeSessionIdentityPolicy: ProviderActiveSessionIdentityPolicy
     /// Localization key for the notch's static "still working" hint
     /// shown when no operation text is available. Claude uses
     /// `"notch.operation.thinking"`; Codex / Gemini use the more
@@ -105,6 +124,50 @@ public struct ProviderDescriptor: Sendable {
         notchNoisePrefixes: [String] = [],
         notchProcessingHintKey: String = "notch.operation.working"
     ) {
+        self.init(
+            id: id,
+            displayName: displayName,
+            iconAssetName: iconAssetName,
+            accentColor: accentColor,
+            badgeColor: badgeColor,
+            notchEnabledDefaultsKey: notchEnabledDefaultsKey,
+            capabilities: capabilities,
+            resolveToolAlias: resolveToolAlias,
+            canonicalizeSessionID: canonicalizeSessionID,
+            postStopExitGrace: postStopExitGrace,
+            syncsTranscriptToActiveSessions: syncsTranscriptToActiveSessions,
+            commandFilteredNotchPreview: commandFilteredNotchPreview,
+            notchNoisePrefixes: notchNoisePrefixes,
+            activeSessionIdentityPolicy: .hostProcessFallback,
+            notchProcessingHintKey: notchProcessingHintKey
+        )
+    }
+
+    public init(
+        id: String,
+        displayName: String,
+        iconAssetName: String,
+        accentColor: Color,
+        badgeColor: Color? = nil,
+        notchEnabledDefaultsKey: String,
+        capabilities: ProviderCapabilities = ProviderCapabilities(
+            supportsCost: false,
+            supportsUsage: false,
+            supportsProfile: false,
+            supportsStatusLine: false,
+            supportsExactPricing: false,
+            supportsResume: false,
+            supportsNewSession: false
+        ),
+        resolveToolAlias: @escaping @Sendable (String) -> String?,
+        canonicalizeSessionID: (@Sendable (String) -> String)? = nil,
+        postStopExitGrace: TimeInterval? = nil,
+        syncsTranscriptToActiveSessions: Bool = false,
+        commandFilteredNotchPreview: Bool = false,
+        notchNoisePrefixes: [String] = [],
+        activeSessionIdentityPolicy: ProviderActiveSessionIdentityPolicy,
+        notchProcessingHintKey: String = "notch.operation.working"
+    ) {
         self.id = id
         self.displayName = displayName
         self.iconAssetName = iconAssetName
@@ -118,6 +181,7 @@ public struct ProviderDescriptor: Sendable {
         self.syncsTranscriptToActiveSessions = syncsTranscriptToActiveSessions
         self.commandFilteredNotchPreview = commandFilteredNotchPreview
         self.notchNoisePrefixes = notchNoisePrefixes
+        self.activeSessionIdentityPolicy = activeSessionIdentityPolicy
         self.notchProcessingHintKey = notchProcessingHintKey
     }
 
@@ -125,6 +189,40 @@ public struct ProviderDescriptor: Sendable {
     /// the raw value when the descriptor declares no normalizer.
     public func canonicalSessionID(_ sessionId: String) -> String {
         canonicalizeSessionID?(sessionId) ?? sessionId
+    }
+
+    /// Effective stable locator for active-session tracking. Most
+    /// providers should pass through the terminal's real surface id.
+    /// Providers with native per-session app deep links can opt in to
+    /// using their own session id only when no terminal locator exists.
+    public func activeSessionStableID(
+        sessionId: String?,
+        tty: String?,
+        terminalSocket: String?,
+        terminalWindowID: String?,
+        terminalTabID: String?,
+        terminalStableID: String?
+    ) -> String? {
+        let rawStableID = terminalStableID?.nilIfEmpty
+        guard activeSessionIdentityPolicy == .providerSession else {
+            return rawStableID
+        }
+
+        let hasTerminalLocator = tty?.nilIfEmpty != nil
+            || terminalSocket?.nilIfEmpty != nil
+            || terminalWindowID?.nilIfEmpty != nil
+            || terminalTabID?.nilIfEmpty != nil
+            || rawStableID != nil
+        guard !hasTerminalLocator else { return rawStableID }
+        return sessionId?.nilIfEmpty
+    }
+
+    public var displacesActiveSessionsOnSameHostProcess: Bool {
+        activeSessionIdentityPolicy == .hostProcessFallback
+    }
+
+    public var collapsesActiveSessionsByHostProcess: Bool {
+        activeSessionIdentityPolicy == .hostProcessFallback
     }
 
     /// Lower-cased canonical tool name for this provider's raw tool name.
@@ -145,5 +243,12 @@ public struct ProviderDescriptor: Sendable {
             return mapped
         }
         return normalized
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }

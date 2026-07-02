@@ -145,7 +145,8 @@ final class InformationalEventGateTests: XCTestCase {
             commentaryText: nil,
             commentaryAt: nil,
             kind: .activityPulse,
-            pending: nil
+            pending: nil,
+            prepared: nil
         )
     }
 }

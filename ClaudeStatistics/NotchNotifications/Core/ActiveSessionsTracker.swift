@@ -231,29 +231,12 @@ final class ActiveSessionsTracker: ObservableObject {
                 continue
             }
 
-            var fresh = RuntimeSession(
+            let fresh = runtimeShell(
                 provider: provider,
-                sessionId: runtimeSessionID,
-                projectPath: session.cwd?.nilIfEmpty ?? session.projectPath.nilIfEmpty,
-                currentActivity: nil,
-                latestProgressNote: nil,
-                latestProgressNoteAt: nil,
-                latestPreview: nil,
-                currentOperation: nil,
-                tty: nil,
-                pid: nil,
-                terminalName: nil,
-                terminalSocket: nil,
-                terminalWindowID: nil,
-                terminalTabID: nil,
-                terminalStableID: nil,
-                lastActivityAt: session.lastModified,
-                status: .running,
-                currentToolDetail: nil
+                session: session,
+                quickStats: quickStats[session.id],
+                parsedStats: parsedStats[session.id]
             )
-            RuntimeSessionEventApplier.merge(runtime: &fresh, signals: signals)
-            mergeLatestTaskIfAvailable(from: session, into: &fresh)
-            recoverClaudeProcessContextIfNeeded(for: &fresh)
             runtimeByKey[key] = TerminalIdentityResolver.sanitized(fresh)
             DiagnosticLogger.shared.verbose(
                 "Active restore provider=\(provider.rawValue) session=\(runtimeSessionID) sourceID=\(session.id) project=\(session.cwd?.nilIfEmpty ?? session.projectPath.nilIfEmpty ?? "-") lastModified=\(session.lastModified.timeIntervalSince1970) signals=\(signals.count)"
@@ -505,6 +488,12 @@ final class ActiveSessionsTracker: ObservableObject {
     ) {
         guard !sourceSessions.isEmpty else { return }
 
+        let now = Date()
+        let cutoff = now.addingTimeInterval(-activeWindow)
+        let providerId = provider.rawValue
+        let recentSessions = sourceSessions
+            .filter { $0.provider == providerId && $0.lastModified > cutoff }
+            .sorted { $0.lastModified > $1.lastModified }
         let sessionsByRuntimeID = Dictionary(uniqueKeysWithValues: sourceSessions.map {
             (Self.runtimeSessionID(for: $0), $0)
         })
@@ -513,6 +502,19 @@ final class ActiveSessionsTracker: ObservableObject {
         var matchedRuntimeCount = 0
         var signalCount = 0
         var progressNoteCount = 0
+        for session in recentSessions {
+            let runtimeSessionID = Self.runtimeSessionID(for: session)
+            let key = Self.key(provider: provider, sessionId: runtimeSessionID)
+            guard runtimeByKey[key] == nil else { continue }
+            runtimeByKey[key] = TerminalIdentityResolver.sanitized(runtimeShell(
+                provider: provider,
+                session: session,
+                quickStats: quickStats[session.id],
+                parsedStats: parsedStats[session.id]
+            ))
+            didChange = true
+        }
+
         for (key, var runtime) in runtimeByKey where runtime.provider == provider {
             guard let session = sessionsByRuntimeID[runtime.sessionId] else { continue }
             matchedRuntimeCount += 1
@@ -547,6 +549,49 @@ final class ActiveSessionsTracker: ObservableObject {
         guard didChange else { return }
         persistRuntime()
         refresh()
+    }
+
+    private func runtimeShell(
+        provider: ProviderKind,
+        session: Session,
+        quickStats: SessionQuickStats?,
+        parsedStats: SessionStats?
+    ) -> RuntimeSession {
+        let runtimeSessionID = Self.runtimeSessionID(for: session)
+        let signals = RuntimeSessionEventApplier.signals(from: quickStats, stats: parsedStats)
+        let terminalStableID = provider.descriptor.activeSessionStableID(
+            sessionId: runtimeSessionID,
+            tty: nil,
+            terminalSocket: nil,
+            terminalWindowID: nil,
+            terminalTabID: nil,
+            terminalStableID: nil
+        )
+        let terminalName = terminalStableID == nil ? nil : provider.rawValue
+        var runtime = RuntimeSession(
+            provider: provider,
+            sessionId: runtimeSessionID,
+            projectPath: session.cwd?.nilIfEmpty ?? session.projectPath.nilIfEmpty,
+            currentActivity: nil,
+            latestProgressNote: nil,
+            latestProgressNoteAt: nil,
+            latestPreview: nil,
+            currentOperation: nil,
+            tty: nil,
+            pid: nil,
+            terminalName: terminalName,
+            terminalSocket: nil,
+            terminalWindowID: nil,
+            terminalTabID: nil,
+            terminalStableID: terminalStableID,
+            lastActivityAt: session.lastModified,
+            status: .running,
+            currentToolDetail: nil
+        )
+        RuntimeSessionEventApplier.merge(runtime: &runtime, signals: signals)
+        mergeLatestTaskIfAvailable(from: session, into: &runtime)
+        recoverClaudeProcessContextIfNeeded(for: &runtime)
+        return runtime
     }
 
     private func displacePriorSessionsInSameTab(excludingKey newKey: String, event: AttentionEvent) {
@@ -795,8 +840,12 @@ final class ActiveSessionsTracker: ObservableObject {
         var groups: [pid_t: [RuntimeSession]] = [:]
         var ungrouped: [RuntimeSession] = []
         for runtime in runtimes {
-            if let owner = owner(runtime) { groups[owner, default: []].append(runtime) }
-            else { ungrouped.append(runtime) }
+            guard runtime.provider.descriptor.collapsesActiveSessionsByHostProcess,
+                  let owner = owner(runtime) else {
+                ungrouped.append(runtime)
+                continue
+            }
+            groups[owner, default: []].append(runtime)
         }
         var result = ungrouped
         var collapsedNotes: [String] = []

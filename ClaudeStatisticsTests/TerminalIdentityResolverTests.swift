@@ -82,7 +82,8 @@ final class TerminalIdentityResolverTests: XCTestCase {
             commentaryText: nil,
             commentaryAt: nil,
             kind: .sessionStart(source: nil),
-            pending: nil
+            pending: nil,
+            prepared: nil
         )
     }
 
