@@ -1024,6 +1024,13 @@ final class ActiveSessionsTracker: ObservableObject {
     }
 
     private func shouldKeep(runtime: RuntimeSession, cutoff: Date, now: Date) -> Bool {
+        if runtime.provider.descriptor.activeSessionIdentityPolicy == .providerSession {
+            return ProviderSessionRuntimeRetentionPolicy.shouldKeep(
+                runtime: runtime,
+                cutoff: cutoff,
+                now: now
+            )
+        }
         return LivenessChecker.shouldKeepSession(
             provider: runtime.provider,
             lastActivityAt: runtime.lastActivityAt,
