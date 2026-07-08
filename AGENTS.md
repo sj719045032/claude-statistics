@@ -1,5 +1,12 @@
 # Repository Guidelines
 
+## Required Local Guide
+
+Read `CLAUDE.md` before changing build, test, SDK, plugin catalog, website
+deploy, or release workflows. Treat its account-specific GitHub instructions
+as authoritative, including switching to `sj719045032` for GitHub release
+publishing and switching back to the normal development account afterwards.
+
 ## Project Structure & Module Organization
 
 `ClaudeStatistics/` contains the app code. Key folders are `App/` for entry and status bar wiring, `Views/` and `ViewModels/` for UI state, `Services/` for parsing/storage/update logic, `Providers/` for Claude/Codex/Gemini integrations, `Models/` for shared data types, `Utilities/` for helpers, and `Resources/` plus `Assets.xcassets/` for localized strings and images. Project generation is driven by `project.yml`, release/support scripts live in `scripts/`, the marketing site lives in `website/`, and product docs/screenshots are under `docs/`.
