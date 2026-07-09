@@ -803,12 +803,14 @@ final class SessionDataStore: ObservableObject {
         var buckets: [Date: PeriodStats] = [:]
         var periodSessionIds: [Date: Set<String>] = [:]
         var periodModelSessionIds: [Date: [String: Set<String>]] = [:]
+        let originBySessionId = Self.originBySessionId(snapshot.sessions)
 
         let resetDate = snapshot.weeklyResetDate
         // Use fiveMinSlices when weekly period has non-midnight boundary for accurate attribution
         let useFineSlices = snapshot.selectedPeriod == .weekly && resetDate != nil
 
         for (sessionId, stats) in snapshot.parsedStats {
+            let origin = originBySessionId[sessionId] ?? .claudeCode
             let slices = useFineSlices ? stats.fiveMinSlices : stats.daySlices
             if !slices.isEmpty {
                 for (sliceStart, slice) in slices {
@@ -820,7 +822,7 @@ final class SessionDataStore: ObservableObject {
                             chartLabel: snapshot.selectedPeriod.chartLabel(for: periodStart, weeklyResetDate: resetDate)
                         )
                     }
-                    buckets[periodStart]?.accumulate(daySlice: slice)
+                    buckets[periodStart]?.accumulate(daySlice: slice, origin: origin)
                     periodSessionIds[periodStart, default: []].insert(sessionId)
                     for model in slice.modelBreakdown.keys {
                         var modelDict = periodModelSessionIds[periodStart] ?? [:]
@@ -842,7 +844,7 @@ final class SessionDataStore: ObservableObject {
                         chartLabel: snapshot.selectedPeriod.chartLabel(for: periodStart, weeklyResetDate: resetDate)
                     )
                 }
-                buckets[periodStart]?.accumulate(stats: stats)
+                buckets[periodStart]?.accumulate(stats: stats, origin: origin)
                 periodSessionIds[periodStart, default: []].insert(sessionId)
                 for model in stats.modelBreakdown.keys {
                     var modelDict = periodModelSessionIds[periodStart] ?? [:]
@@ -901,10 +903,12 @@ final class SessionDataStore: ObservableObject {
         let label = snapshot.allTimeLabel
         var agg = PeriodStats(period: Date.distantPast, periodLabel: label, chartLabel: label)
         var modelSessionIds: [String: Set<String>] = [:]
+        let originBySessionId = originBySessionId(snapshot.sessions)
 
         for (sessionId, stats) in snapshot.parsedStats {
+            let origin = originBySessionId[sessionId] ?? .claudeCode
             if stats.fiveMinSlices.isEmpty {
-                agg.accumulate(stats: stats)
+                agg.accumulate(stats: stats, origin: origin)
                 for model in stats.modelBreakdown.keys {
                     modelSessionIds[model, default: []].insert(sessionId)
                 }
@@ -913,7 +917,7 @@ final class SessionDataStore: ObservableObject {
                 }
             } else {
                 for (_, slice) in stats.fiveMinSlices {
-                    agg.accumulate(daySlice: slice)
+                    agg.accumulate(daySlice: slice, origin: origin)
                     for model in slice.modelBreakdown.keys {
                         modelSessionIds[model, default: []].insert(sessionId)
                     }
@@ -943,6 +947,15 @@ final class SessionDataStore: ObservableObject {
             availableHeatmapYears: allTimeAgg.availableYears,
             topProjects: allTimeAgg.topProjects
         )
+    }
+
+    /// Map each session id to its origin (Claude Code vs Cowork), derived from
+    /// the transcript path. Built once per rebucket so the per-session lookup
+    /// inside the aggregation loop stays O(1).
+    private nonisolated static func originBySessionId(_ sessions: [Session]) -> [String: SessionOrigin] {
+        sessions.reduce(into: [:]) { map, session in
+            map[session.id] = SessionOrigin.of(session)
+        }
     }
 
     /// Pure model-usage rollup across periods; static so both

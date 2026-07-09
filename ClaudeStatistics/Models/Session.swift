@@ -157,6 +157,7 @@ final class ModelPricing {
             if lower.contains("flash") { return models["gemini-2.5-flash"] ?? defaultPricing }
             if lower.contains("pro") { return models["gemini-2.5-pro"] ?? defaultPricing }
         }
+        if lower.contains("opus-4-8") { return models["claude-opus-4-8"] ?? defaultPricing }
         if lower.contains("opus-4-7") { return models["claude-opus-4-7"] ?? defaultPricing }
         if lower.contains("opus-4-6") { return models["claude-opus-4-6"] ?? defaultPricing }
         if lower.contains("opus-4-5") { return models["claude-opus-4-5-20251101"] ?? defaultPricing }

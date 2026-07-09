@@ -96,6 +96,7 @@
 		41F437133AA470C7C0627F58 /* SessionDetailComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968A3D03AB67BF96301BDEBC /* SessionDetailComponents.swift */; };
 		4240E761B7F8133A796C82CB /* PerformanceTracer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A813789C1EB3786DF379C58F /* PerformanceTracer.swift */; };
 		425E1709E0DB410412C38880 /* ShareRole.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E1858F23256C6FEBB750A08 /* ShareRole.swift */; };
+		435B4D219A54DC16E073D991 /* CompositeSessionWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF8A81E83C637C7791202194 /* CompositeSessionWatcher.swift */; };
 		435C5E5C30F6B2F28851BDDA /* HookCLI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027CDBE36D6D9439DB32C0AE /* HookCLI.swift */; };
 		437AC945F5CE5337ED23DF9A /* AllTimeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99EA37388B7B02AEDF9C7A78 /* AllTimeView.swift */; };
 		43F77DC1A91245709B224E22 /* SessionProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 993CBC30E02D8B4126EE22D5 /* SessionProvider.swift */; };
@@ -107,6 +108,7 @@
 		458ECCAB134D9365C506A44E /* PluginLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 617B0905848AE0C8B5086C24 /* PluginLoader.swift */; };
 		4595CF76EA672D49B9A3B417 /* NotchRuntimeCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06379230FC976FFF3DCD0718 /* NotchRuntimeCoordinator.swift */; };
 		45A6E616AE59B788E2E060B0 /* ProviderSessionDisplayFormatter+Filters.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDD81B5645107DB493B28671 /* ProviderSessionDisplayFormatter+Filters.swift */; };
+		46AD351F300F569915B41CD7 /* SessionOrigin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F05325F22423FED9226540A /* SessionOrigin.swift */; };
 		4734910CD82A2F831E344A1C /* ActivateFocuser.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD33F591AEEB93C40913AC8F /* ActivateFocuser.swift */; };
 		47A83054A930EBE901475499 /* SessionEventFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E8E4DC8B420779A317D82BC /* SessionEventFilter.swift */; };
 		47CD3FFD29021D5E276726EC /* TerminalLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 627DB5506169F425D07E46D4 /* TerminalLauncher.swift */; };
@@ -455,6 +457,7 @@
 		1E1B7BED272EFA6F7FB5C0B3 /* IdlePeekCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdlePeekCard.swift; sourceTree = "<group>"; };
 		1E5CDED000AE05D3ACDCD5D3 /* ProviderSessionRuntimeRetentionPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderSessionRuntimeRetentionPolicyTests.swift; sourceTree = "<group>"; };
 		1EBE034854D1539811ED0D5F /* SearchUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchUtils.swift; sourceTree = "<group>"; };
+		1F05325F22423FED9226540A /* SessionOrigin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionOrigin.swift; sourceTree = "<group>"; };
 		1F87F4ECC169E8118DB6035E /* TerminalDispatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalDispatch.swift; sourceTree = "<group>"; };
 		2292302272EF00BEA6426BAA /* NotificationTimerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationTimerStore.swift; sourceTree = "<group>"; };
 		2365B90C4B9B32DEA0C8687B /* BuiltinProviderPlugins.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuiltinProviderPlugins.swift; sourceTree = "<group>"; };
@@ -662,6 +665,7 @@
 		BDA63237DD4854F868A0DCE4 /* ModifierRecorderRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierRecorderRow.swift; sourceTree = "<group>"; };
 		BF23C58F1F4E3E5605623ECE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		BF69875F08146D684A061030 /* DiagnosticLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogger.swift; sourceTree = "<group>"; };
+		BF8A81E83C637C7791202194 /* CompositeSessionWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositeSessionWatcher.swift; sourceTree = "<group>"; };
 		C120104D02EE6397B7344DE2 /* InformationalEventGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InformationalEventGate.swift; sourceTree = "<group>"; };
 		C1495CB41B3081140E52E690 /* LivenessChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivenessChecker.swift; sourceTree = "<group>"; };
 		C220944581C7418B7B1797F3 /* ShareImageExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareImageExporter.swift; sourceTree = "<group>"; };
@@ -840,10 +844,12 @@
 				EDE6D238094644B3E5ECD8C9 /* ClaudePKCE.swift */,
 				7AA9035C5B842200A3C1F84E /* ClaudeProvider.swift */,
 				669DD3F7CA0ACD5A8FFF69A3 /* ClaudeProviderAccountCardAccessory.swift */,
+				BF8A81E83C637C7791202194 /* CompositeSessionWatcher.swift */,
 				EA6D16472FCD12FE7A8C1891 /* CredentialService.swift */,
 				D0CA06E1C8046BE97A74F7C3 /* IndependentClaudeAccountManager.swift */,
 				BAEEBABA82636376B36824D8 /* IndependentClaudeAccountViewModel.swift */,
 				768B90604779E18157A73FBB /* IndependentClaudeCredentialStore.swift */,
+				1F05325F22423FED9226540A /* SessionOrigin.swift */,
 				54DA495D7C6105F8AD37FD7D /* SessionScanner.swift */,
 				FF2A749714584E4976171E9D /* StatusLineInstaller.swift */,
 				AC6EE5A2DBB624AC7941EBC0 /* StatusLineScript.swift */,
@@ -1590,6 +1596,7 @@
 				EC17520544A6FEEA8B3F3430 /* ClaudeProvider.swift in Sources */,
 				480C7AC744109467B48A6A47 /* ClaudeProviderAccountCardAccessory.swift in Sources */,
 				FEFC2968DA07D06063D40E24 /* ClaudeStatisticsApp.swift in Sources */,
+				435B4D219A54DC16E073D991 /* CompositeSessionWatcher.swift in Sources */,
 				64FC425E3CB736B3E5BBF6E1 /* CopyButton.swift in Sources */,
 				64954F8535C5DA9FD1AE6D8B /* CostModelsCard.swift in Sources */,
 				58C1BB54AF46F2D4E1C5DAAB /* CredentialService.swift in Sources */,
@@ -1684,6 +1691,7 @@
 				E45AD6199CAB1661300675D6 /* SessionDetailView.swift in Sources */,
 				5822530ADF9C4D163335599A /* SessionListHelpers.swift in Sources */,
 				9BE83C21285426ACBCAE6024 /* SessionListView.swift in Sources */,
+				46AD351F300F569915B41CD7 /* SessionOrigin.swift in Sources */,
 				CF82020D3789B8CCE83B2DAA /* SessionParseValidator.swift in Sources */,
 				43F77DC1A91245709B224E22 /* SessionProvider.swift in Sources */,
 				7C6F2559DC6E88F725FDE0A4 /* SessionRow.swift in Sources */,
