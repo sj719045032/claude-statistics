@@ -425,9 +425,9 @@ please open an issue — we're happy to add it.
 
 <a href="https://www.star-history.com/?repos=sj719045032%2Fclaude-statistics&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=sj719045032/claude-statistics&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=sj719045032/claude-statistics&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=sj719045032/claude-statistics&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=sj719045032/claude-statistics&type=date&theme=dark&legend=top-left&sealed_token=bIdRqXdtaeZr4oV35jSoUNV5Rnfym-51HvwtWLV0zUCDcY_dT0075anjnZ_Fq64gY83-zpA6qaGVPVI9XuxNsYbacQL9UrWgrkFUXEvi7jjFSFKmdk4k87YUf9KZ5iyhj-0bLgnOxBeQHmzTJHKyirj4CGtscuAO8y-WQAqwqKHGqoE1E_RZdrmHWAtY" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=sj719045032/claude-statistics&type=date&legend=top-left&sealed_token=bIdRqXdtaeZr4oV35jSoUNV5Rnfym-51HvwtWLV0zUCDcY_dT0075anjnZ_Fq64gY83-zpA6qaGVPVI9XuxNsYbacQL9UrWgrkFUXEvi7jjFSFKmdk4k87YUf9KZ5iyhj-0bLgnOxBeQHmzTJHKyirj4CGtscuAO8y-WQAqwqKHGqoE1E_RZdrmHWAtY" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=sj719045032/claude-statistics&type=date&legend=top-left&sealed_token=bIdRqXdtaeZr4oV35jSoUNV5Rnfym-51HvwtWLV0zUCDcY_dT0075anjnZ_Fq64gY83-zpA6qaGVPVI9XuxNsYbacQL9UrWgrkFUXEvi7jjFSFKmdk4k87YUf9KZ5iyhj-0bLgnOxBeQHmzTJHKyirj4CGtscuAO8y-WQAqwqKHGqoE1E_RZdrmHWAtY" />
  </picture>
 </a>
 
