@@ -7,7 +7,6 @@ final class PricingFetchService: ProviderPricingFetching {
     static let shared = PricingFetchService()
 
     private let pricingURL = "https://platform.claude.com/docs/en/about-claude/pricing"
-    private let minimumVersion = 4.5
 
     private init() {}
 
@@ -37,7 +36,7 @@ final class PricingFetchService: ProviderPricingFetching {
     /// Parse pricing from HTML table rows.
     /// The page renders as HTML with <tr>/<td> tags containing data like:
     ///   <td>Claude Opus 4.6</td><td>$5 / MTok</td><td>$6.25 / MTok</td>...
-    private func parsePricingFromHTML(_ html: String) throws -> [String: ModelPricing.Pricing] {
+    func parsePricingFromHTML(_ html: String) throws -> [String: ModelPricing.Pricing] {
         var results: [String: ModelPricing.Pricing] = [:]
 
         // Extract all <tr>...</tr> blocks that contain "Claude" and "MTok"
@@ -50,8 +49,8 @@ final class PricingFetchService: ProviderPricingFetching {
 
             // Must contain Claude model name and pricing
             guard rowHTML.contains("Claude") && rowHTML.contains("MTok") else { continue }
-            // Skip deprecated
-            guard !rowHTML.contains("deprecated") else { continue }
+            // Skip deprecated rows regardless of how the docs capitalize the label.
+            guard !rowHTML.lowercased().contains("deprecated") else { continue }
 
             // Extract all <td> cell contents
             let cells = extractTDContents(from: rowHTML)
@@ -75,7 +74,12 @@ final class PricingFetchService: ProviderPricingFetching {
             )
 
             for modelId in mapToModelIds(displayName: modelName) {
-                results[modelId] = pricing
+                // The docs can list the same model again for future, batch, or
+                // promotional pricing. The first six-column row is the current
+                // standard rate shown at the top of the page.
+                if results[modelId] == nil {
+                    results[modelId] = pricing
+                }
             }
         }
 
@@ -118,45 +122,55 @@ final class PricingFetchService: ProviderPricingFetching {
         return Double(cleaned)
     }
 
-    /// Check if model version is >= 4.5
-    private func shouldInclude(modelName: String) -> Bool {
-        for part in modelName.components(separatedBy: " ") {
-            if let version = Double(part), version >= minimumVersion {
-                return true
-            }
-        }
-        return false
-    }
-
     /// Map display names like "Claude Opus 4.6" to API model IDs
     private func mapToModelIds(displayName: String) -> [String] {
-        let name = displayName.lowercased()
-
-        let mappings: [(pattern: String, ids: [String])] = [
-            // Latest
-            ("opus 4.7",   ["claude-opus-4-7"]),
-            ("opus 4.6",   ["claude-opus-4-6"]),
-            ("opus 4.5",   ["claude-opus-4-5-20251101"]),
-            ("opus 4.1",   ["claude-opus-4-1-20250805"]),
-            ("opus 4",     ["claude-opus-4-20250514"]),
-            ("opus 3",     ["claude-3-opus-20240229"]),
-            ("sonnet 4.6", ["claude-sonnet-4-6"]),
-            ("sonnet 4.5", ["claude-sonnet-4-5-20250929"]),
-            ("sonnet 4",   ["claude-sonnet-4-20250514"]),
-            ("sonnet 3.7", ["claude-3-7-sonnet-20250219"]),
-            ("haiku 4.5",  ["claude-haiku-4-5-20251001"]),
-            ("haiku 3.5",  ["claude-3-5-haiku-20241022"]),
-            ("haiku 3",    ["claude-3-haiku-20240307"]),
+        let canonicalId = canonicalModelId(from: displayName)
+        let aliases: [String: [String]] = [
+            "claude-opus-4-5": ["claude-opus-4-5-20251101"],
+            "claude-opus-4-1": ["claude-opus-4-1-20250805"],
+            "claude-opus-4": ["claude-opus-4-20250514"],
+            "claude-opus-3": ["claude-3-opus-20240229"],
+            "claude-sonnet-4-5": ["claude-sonnet-4-5-20250929"],
+            "claude-sonnet-4": ["claude-sonnet-4-20250514"],
+            "claude-sonnet-3-7": ["claude-3-7-sonnet-20250219"],
+            "claude-haiku-4-5": ["claude-haiku-4-5", "claude-haiku-4-5-20251001"],
+            "claude-haiku-3-5": ["claude-3-5-haiku-20241022"],
+            "claude-haiku-3": ["claude-3-haiku-20240307"],
         ]
 
-        for mapping in mappings {
-            if name.contains(mapping.pattern) {
-                return mapping.ids
-            }
+        if let knownAliases = aliases[canonicalId] {
+            return [canonicalId] + knownAliases.filter { $0 != canonicalId }
+        }
+        return [canonicalId]
+    }
+
+    /// Derive a future-proof Anthropic model id from a docs display name.
+    /// Parenthetical availability notes are not part of the API model id.
+    private func canonicalModelId(from displayName: String) -> String {
+        var text = displayName.lowercased()
+        if let paren = text.firstIndex(of: "(") {
+            text = String(text[..<paren])
         }
 
-        // Fallback: construct a reasonable ID
-        return [displayName.lowercased().replacingOccurrences(of: " ", with: "-")]
+        // Pricing rows sometimes append availability dates without
+        // parentheses. Capture only the stable leading
+        // "Claude <family> <version>" name while preserving decimals.
+        if let regex = try? NSRegularExpression(pattern: #"^claude\s+([a-z0-9-]+)\s+([0-9]+(?:\.[0-9]+)?)"#),
+           let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+           let familyRange = Range(match.range(at: 1), in: text),
+           let versionRange = Range(match.range(at: 2), in: text) {
+            let family = text[familyRange]
+            let version = text[versionRange].replacingOccurrences(of: ".", with: "-")
+            return "claude-\(family)-\(version)"
+        }
+
+        let parts = text.components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+        var id = parts.joined(separator: "-")
+        if !id.hasPrefix("claude-") {
+            id = "claude-" + id
+        }
+        return id
     }
 }
 
