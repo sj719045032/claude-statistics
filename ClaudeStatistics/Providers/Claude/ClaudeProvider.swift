@@ -18,7 +18,7 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
     var supportedNotchEvents: Set<NotchEventKind> { [.permission, .waitingInput, .taskDone, .taskFailed] }
     var pricingFetcher: (any ProviderPricingFetching)? { PricingFetchService.shared }
     var pricingSourceLocalizationKey: String? { "pricing.source.claude" }
-    var pricingSourceURL: URL? { URL(string: "https://docs.anthropic.com/en/docs/about-claude/pricing") }
+    var pricingSourceURL: URL? { URL(string: "https://platform.claude.com/docs/en/about-claude/pricing") }
     var pricingUpdatedLocalizationKey: String? { "pricing.updated.claude" }
     var credentialHintLocalizationKey: String? {
         switch ClaudeAccountModeController.shared.mode {
@@ -187,18 +187,38 @@ struct ClaudeStatusLineAdapter: StatusLineInstalling {
 }
 
 enum ClaudePricingCatalog {
-    // Source: Anthropic Claude pricing (2026-03-20)
-    static let builtinModels: [String: ModelPricing.Pricing] = [
-        "claude-opus-4-7":            ModelPricing.Pricing(input: 5.0, output: 25.0, cacheWrite5m: 6.25, cacheWrite1h: 10.0, cacheRead: 0.50),
-        "claude-opus-4-6":            ModelPricing.Pricing(input: 5.0, output: 25.0, cacheWrite5m: 6.25, cacheWrite1h: 10.0, cacheRead: 0.50),
-        "claude-opus-4-5-20251101":   ModelPricing.Pricing(input: 5.0, output: 25.0, cacheWrite5m: 6.25, cacheWrite1h: 10.0, cacheRead: 0.50),
-        "claude-opus-4-1-20250805":   ModelPricing.Pricing(input: 15.0, output: 75.0, cacheWrite5m: 18.75, cacheWrite1h: 30.0, cacheRead: 1.50),
-        "claude-opus-4-20250514":     ModelPricing.Pricing(input: 15.0, output: 75.0, cacheWrite5m: 18.75, cacheWrite1h: 30.0, cacheRead: 1.50),
-        "claude-sonnet-4-6":          ModelPricing.Pricing(input: 3.0, output: 15.0, cacheWrite5m: 3.75, cacheWrite1h: 6.0, cacheRead: 0.30),
-        "claude-sonnet-4-5-20250929": ModelPricing.Pricing(input: 3.0, output: 15.0, cacheWrite5m: 3.75, cacheWrite1h: 6.0, cacheRead: 0.30),
-        "claude-sonnet-4-20250514":   ModelPricing.Pricing(input: 3.0, output: 15.0, cacheWrite5m: 3.75, cacheWrite1h: 6.0, cacheRead: 0.30),
-        "claude-haiku-4-5-20251001":  ModelPricing.Pricing(input: 1.0, output: 5.0, cacheWrite5m: 1.25, cacheWrite1h: 2.0, cacheRead: 0.10),
-        "claude-3-5-haiku-20241022":  ModelPricing.Pricing(input: 0.80, output: 4.0, cacheWrite5m: 1.0, cacheWrite1h: 1.60, cacheRead: 0.08),
-        "claude-3-haiku-20240307":    ModelPricing.Pricing(input: 0.25, output: 1.25, cacheWrite5m: 0.3125, cacheWrite1h: 0.50, cacheRead: 0.025),
-    ]
+    // Source: Anthropic Claude pricing (2026-07-10)
+    static var builtinModels: [String: ModelPricing.Pricing] {
+        models(at: Date())
+    }
+
+    static let sonnet5StandardPricingStart = Date(timeIntervalSince1970: 1_788_220_800) // 2026-09-01 00:00 UTC
+    static let sonnet5IntroPricing = ModelPricing.Pricing(
+        input: 2.0, output: 10.0,
+        cacheWrite5m: 2.50, cacheWrite1h: 4.0, cacheRead: 0.20
+    )
+    static let sonnet5StandardPricing = ModelPricing.Pricing(
+        input: 3.0, output: 15.0,
+        cacheWrite5m: 3.75, cacheWrite1h: 6.0, cacheRead: 0.30
+    )
+
+    static func models(at date: Date) -> [String: ModelPricing.Pricing] {
+        [
+            "claude-fable-5":             ModelPricing.Pricing(input: 10.0, output: 50.0, cacheWrite5m: 12.50, cacheWrite1h: 20.0, cacheRead: 1.0),
+            "claude-mythos-5":            ModelPricing.Pricing(input: 10.0, output: 50.0, cacheWrite5m: 12.50, cacheWrite1h: 20.0, cacheRead: 1.0),
+            "claude-opus-4-8":            ModelPricing.Pricing(input: 5.0, output: 25.0, cacheWrite5m: 6.25, cacheWrite1h: 10.0, cacheRead: 0.50),
+            "claude-opus-4-7":            ModelPricing.Pricing(input: 5.0, output: 25.0, cacheWrite5m: 6.25, cacheWrite1h: 10.0, cacheRead: 0.50),
+            "claude-opus-4-6":            ModelPricing.Pricing(input: 5.0, output: 25.0, cacheWrite5m: 6.25, cacheWrite1h: 10.0, cacheRead: 0.50),
+            "claude-opus-4-5-20251101":   ModelPricing.Pricing(input: 5.0, output: 25.0, cacheWrite5m: 6.25, cacheWrite1h: 10.0, cacheRead: 0.50),
+            "claude-opus-4-1-20250805":   ModelPricing.Pricing(input: 15.0, output: 75.0, cacheWrite5m: 18.75, cacheWrite1h: 30.0, cacheRead: 1.50),
+            "claude-opus-4-20250514":     ModelPricing.Pricing(input: 15.0, output: 75.0, cacheWrite5m: 18.75, cacheWrite1h: 30.0, cacheRead: 1.50),
+            "claude-sonnet-5":            date < sonnet5StandardPricingStart ? sonnet5IntroPricing : sonnet5StandardPricing,
+            "claude-sonnet-4-6":          ModelPricing.Pricing(input: 3.0, output: 15.0, cacheWrite5m: 3.75, cacheWrite1h: 6.0, cacheRead: 0.30),
+            "claude-sonnet-4-5-20250929": ModelPricing.Pricing(input: 3.0, output: 15.0, cacheWrite5m: 3.75, cacheWrite1h: 6.0, cacheRead: 0.30),
+            "claude-sonnet-4-20250514":   ModelPricing.Pricing(input: 3.0, output: 15.0, cacheWrite5m: 3.75, cacheWrite1h: 6.0, cacheRead: 0.30),
+            "claude-haiku-4-5-20251001":  ModelPricing.Pricing(input: 1.0, output: 5.0, cacheWrite5m: 1.25, cacheWrite1h: 2.0, cacheRead: 0.10),
+            "claude-3-5-haiku-20241022":  ModelPricing.Pricing(input: 0.80, output: 4.0, cacheWrite5m: 1.0, cacheWrite1h: 1.60, cacheRead: 0.08),
+            "claude-3-haiku-20240307":    ModelPricing.Pricing(input: 0.25, output: 1.25, cacheWrite5m: 0.3125, cacheWrite1h: 0.50, cacheRead: 0.025),
+        ]
+    }
 }

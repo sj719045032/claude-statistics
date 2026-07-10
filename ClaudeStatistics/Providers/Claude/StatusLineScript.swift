@@ -121,26 +121,51 @@ extension StatusLineInstaller {
             pass
 
         # Fallback pricing per million tokens: (input, output, cache_write_1h, cache_read)
+        sonnet_5_intro = (2.0, 10.0, 4.0, 0.20)
+        sonnet_5_standard = (3.0, 15.0, 6.0, 0.30)
+        sonnet_5 = sonnet_5_intro if time.time() < 1788220800 else sonnet_5_standard
         FALLBACK = {
+            "fable-5":    (10.0, 50.0, 20.0, 1.00),
+            "mythos-5":   (10.0, 50.0, 20.0, 1.00),
+            "opus-4-8":   (5.0,  25.0, 10.0,  0.50),
             "opus-4-7":   (5.0,  25.0, 10.0,  0.50),
             "opus-4-6":   (5.0,  25.0, 10.0,  0.50),
             "opus-4-5":   (5.0,  25.0, 10.0,  0.50),
             "opus-4-1":   (15.0, 75.0, 30.0,  1.50),
             "opus-4":     (15.0, 75.0, 30.0,  1.50),
-            "sonnet":     (3.0,  15.0, 6.0,   0.30),
-            "haiku":      (0.80, 4.0,  1.60,  0.08),
+            "sonnet-5":   sonnet_5,
+            "sonnet":     sonnet_5,
+            "haiku-4-5":  (1.0,  5.0,  2.0,   0.10),
+            "haiku":      (1.0,  5.0,  2.0,   0.10),
         }
+
+        ALIASES = {
+            "best": "fable-5", "fable": "fable-5", "mythos": "mythos-5",
+            "opus": "opus-4-8", "sonnet": "sonnet-5", "haiku": "haiku-4-5",
+        }
+
+        def pricing_tuple(p):
+            return (p.get("input", 3.0), p.get("output", 15.0),
+                    p.get("cache_write_1h", 6.0), p.get("cache_read", 0.30))
+
+        def effective_pricing(model, rate):
+            if "sonnet-5" in model and rate in (sonnet_5_intro, sonnet_5_standard):
+                return sonnet_5
+            return rate
 
         def get_pricing(mid):
             m = (mid or "").lower()
             if mid in app_pricing:
-                p = app_pricing[mid]
-                return (p.get("input", 3.0), p.get("output", 15.0),
-                        p.get("cache_write_1h", 6.0), p.get("cache_read", 0.30))
+                return effective_pricing(m, pricing_tuple(app_pricing[mid]))
+            if m in ALIASES:
+                alias = ALIASES[m]
+                for k, p in app_pricing.items():
+                    if alias in k.lower():
+                        return effective_pricing(alias, pricing_tuple(p))
+                return FALLBACK[alias]
             for k, p in app_pricing.items():
                 if k.lower() in m or m in k.lower():
-                    return (p.get("input", 3.0), p.get("output", 15.0),
-                            p.get("cache_write_1h", 6.0), p.get("cache_read", 0.30))
+                    return effective_pricing(k.lower(), pricing_tuple(p))
             for k, r in FALLBACK.items():
                 if k in m:
                     return r

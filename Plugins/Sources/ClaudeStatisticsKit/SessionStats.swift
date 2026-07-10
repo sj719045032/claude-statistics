@@ -134,7 +134,12 @@ public struct SessionStats: Codable, Sendable {
     /// `ProviderPlugin` factory.
     public var contextWindowSize: Int {
         let m = model.lowercased()
-        if m.contains("opus-4-7") || m.contains("opus-4-6") {
+        let millionTokenModels = [
+            "fable-5", "mythos-5", "mythos-preview",
+            "opus-4-8", "opus-4-7", "opus-4-6",
+            "sonnet-5", "sonnet-4-6",
+        ]
+        if millionTokenModels.contains(where: m.contains) {
             return 1_000_000
         }
         return 200_000

@@ -37,7 +37,10 @@ final class PricingFetchService: ProviderPricingFetching {
     /// Parse pricing from HTML table rows.
     /// The page renders as HTML with <tr>/<td> tags containing data like:
     ///   <td>Claude Opus 4.6</td><td>$5 / MTok</td><td>$6.25 / MTok</td>...
-    private func parsePricingFromHTML(_ html: String) throws -> [String: ModelPricing.Pricing] {
+    func parsePricingFromHTML(
+        _ html: String,
+        now: Date = Date()
+    ) throws -> [String: ModelPricing.Pricing] {
         var results: [String: ModelPricing.Pricing] = [:]
 
         // Extract all <tr>...</tr> blocks that contain "Claude" and "MTok"
@@ -61,6 +64,7 @@ final class PricingFetchService: ProviderPricingFetching {
 
             let modelName = cells[0].trimmingCharacters(in: .whitespaces)
             guard modelName.contains("Claude") else { continue }
+            guard isPricingRowActive(modelName: modelName, at: now) else { continue }
 
             guard let input = parseDollarValue(cells[1]),
                   let cache5m = parseDollarValue(cells[2]),
@@ -84,6 +88,51 @@ final class PricingFetchService: ProviderPricingFetching {
         }
 
         return results
+    }
+
+    /// Sonnet 5 has two rows in Anthropic's pricing table: an introductory
+    /// price through August 31, 2026 and the standard price starting the next
+    /// day. Ignore the row that is not active yet (or is no longer active).
+    private func isPricingRowActive(modelName: String, at date: Date) -> Bool {
+        let name = modelName.lowercased()
+
+        if name.contains("through ") {
+            guard let endDate = effectiveDate(after: "through ", in: name),
+                  let exclusiveEnd = Calendar.gregorianUTC.date(byAdding: .day, value: 1, to: endDate) else {
+                return false
+            }
+            return date < exclusiveEnd
+        }
+
+        if name.contains("starting ") {
+            guard let startDate = effectiveDate(after: "starting ", in: name) else {
+                return false
+            }
+            return date >= startDate
+        }
+
+        return true
+    }
+
+    private func effectiveDate(after marker: String, in modelName: String) -> Date? {
+        guard let markerRange = modelName.range(of: marker) else { return nil }
+        let suffix = String(modelName[markerRange.upperBound...])
+        guard let regex = try? NSRegularExpression(
+            pattern: "^[a-z]+\\s+\\d{1,2},\\s+\\d{4}",
+            options: .caseInsensitive
+        ), let match = regex.firstMatch(
+            in: suffix,
+            range: NSRange(suffix.startIndex..., in: suffix)
+        ), let range = Range(match.range, in: suffix) else {
+            return nil
+        }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "MMMM d, yyyy"
+        return formatter.date(from: String(suffix[range]))
     }
 
     /// Extract text content from all <td>...</td> tags in an HTML string, stripping nested tags
@@ -134,12 +183,17 @@ final class PricingFetchService: ProviderPricingFetching {
 
         let mappings: [(pattern: String, ids: [String])] = [
             // Latest
+            ("fable 5",    ["claude-fable-5"]),
+            ("mythos 5",   ["claude-mythos-5"]),
+            ("mythos preview", ["claude-mythos-preview"]),
+            ("opus 4.8",   ["claude-opus-4-8"]),
             ("opus 4.7",   ["claude-opus-4-7"]),
             ("opus 4.6",   ["claude-opus-4-6"]),
             ("opus 4.5",   ["claude-opus-4-5-20251101"]),
             ("opus 4.1",   ["claude-opus-4-1-20250805"]),
             ("opus 4",     ["claude-opus-4-20250514"]),
             ("opus 3",     ["claude-3-opus-20240229"]),
+            ("sonnet 5",   ["claude-sonnet-5"]),
             ("sonnet 4.6", ["claude-sonnet-4-6"]),
             ("sonnet 4.5", ["claude-sonnet-4-5-20250929"]),
             ("sonnet 4",   ["claude-sonnet-4-20250514"]),
@@ -157,6 +211,14 @@ final class PricingFetchService: ProviderPricingFetching {
 
         // Fallback: construct a reasonable ID
         return [displayName.lowercased().replacingOccurrences(of: " ", with: "-")]
+    }
+}
+
+private extension Calendar {
+    static var gregorianUTC: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
     }
 }
 

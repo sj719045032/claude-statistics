@@ -359,7 +359,12 @@ struct PricingManageView: View {
                     return true
                 }
             }
-            .map { (id: $0.key, pricing: $0.value) }
+            .map {
+                (
+                    id: $0.key,
+                    pricing: ModelPricing.effectiveClaudePricing($0.value, modelID: $0.key)
+                )
+            }
     }
 
     private var subscriptionPricingGroups: [SubscriptionPricingGroup] {

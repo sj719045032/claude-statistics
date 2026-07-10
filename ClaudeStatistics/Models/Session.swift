@@ -72,16 +72,93 @@ final class ModelPricing {
         // Try loading from config file
         if let data = fm.contents(atPath: pricingFilePath),
            let loaded = try? JSONDecoder().decode(PricingFile.self, from: data) {
+            let repairedModels = Self.repairedClaudePricingModels(loaded.models)
             var merged = Self.builtinModels()
-            merged.merge(loaded.models) { _, user in user }
+            merged.merge(repairedModels) { _, user in user }
             models = merged
             if let d = loaded.default_pricing { defaultPricing = d }
+            if repairedModels != loaded.models { savePricing() }
             return
         }
 
         // Use built-in defaults and write config file for user to edit
         models = Self.builtinModels()
         savePricing()
+    }
+
+    /// Repairs values written by older releases of the Claude pricing parser.
+    /// Opus 4.8 used to match the broad "opus 4" rule, which both omitted the
+    /// new key and overwrote historical Opus 4 pricing. Mythos 5 included its
+    /// availability note in the generated ID, while Sonnet 5 included its price
+    /// dates. Sonnet 5's official introductory rate expires on September 1, 2026.
+    static func repairedClaudePricingModels(
+        _ loadedModels: [String: Pricing],
+        now: Date = Date()
+    ) -> [String: Pricing] {
+        var repaired = loadedModels
+        let malformedMythosID = "claude-mythos-5-(limited-availability)"
+        let malformedSonnet5IDs = repaired.keys.filter {
+            $0.hasPrefix("claude-sonnet-5through-") ||
+                $0.hasPrefix("claude-sonnet-5starting-")
+        }
+        let hasParserArtifacts = repaired[malformedMythosID] != nil || !malformedSonnet5IDs.isEmpty
+        let legacyOpus4ID = "claude-opus-4-20250514"
+        let opus48ID = "claude-opus-4-8"
+        let opus48Pricing = ModelPricing.Pricing(
+            input: 5.0, output: 25.0,
+            cacheWrite5m: 6.25, cacheWrite1h: 10.0, cacheRead: 0.50
+        )
+
+        if hasParserArtifacts,
+           repaired[opus48ID] == nil,
+           repaired[legacyOpus4ID] == opus48Pricing {
+            repaired[opus48ID] = opus48Pricing
+            repaired.removeValue(forKey: legacyOpus4ID)
+        }
+
+        if let mythosPricing = repaired.removeValue(forKey: malformedMythosID),
+           repaired["claude-mythos-5"] == nil {
+            repaired["claude-mythos-5"] = mythosPricing
+        }
+
+        if !malformedSonnet5IDs.isEmpty {
+            for id in malformedSonnet5IDs {
+                repaired.removeValue(forKey: id)
+            }
+            if repaired["claude-sonnet-5"] == nil {
+                repaired["claude-sonnet-5"] = now < ClaudePricingCatalog.sonnet5StandardPricingStart
+                    ? ClaudePricingCatalog.sonnet5IntroPricing
+                    : ClaudePricingCatalog.sonnet5StandardPricing
+            }
+        }
+
+        if let sonnet5Pricing = repaired["claude-sonnet-5"] {
+            repaired["claude-sonnet-5"] = Self.effectiveClaudePricing(
+                sonnet5Pricing,
+                modelID: "claude-sonnet-5",
+                at: now
+            )
+        }
+
+        return repaired
+    }
+
+    /// Applies scheduled official pricing changes at lookup time so a long-lived
+    /// app does not need to restart at the cutover. Prices that do not exactly
+    /// match either official Sonnet 5 rate are treated as user overrides.
+    static func effectiveClaudePricing(
+        _ pricing: Pricing,
+        modelID: String,
+        at date: Date = Date()
+    ) -> Pricing {
+        guard modelID.lowercased().contains("sonnet-5"),
+              pricing == ClaudePricingCatalog.sonnet5IntroPricing ||
+                pricing == ClaudePricingCatalog.sonnet5StandardPricing else {
+            return pricing
+        }
+        return date < ClaudePricingCatalog.sonnet5StandardPricingStart
+            ? ClaudePricingCatalog.sonnet5IntroPricing
+            : ClaudePricingCatalog.sonnet5StandardPricing
     }
 
     /// Merge remotely fetched pricing into the current model set and persist
@@ -132,8 +209,10 @@ final class ModelPricing {
     }
 
     func pricing(for model: String) -> Pricing {
-        if let p = models[model] { return p }
         let lower = model.lowercased()
+        if let p = models[model] {
+            return Self.effectiveClaudePricing(p, modelID: lower)
+        }
         if lower.contains("gemini-3.1-pro") { return models["gemini-3.1-pro-preview"] ?? defaultPricing }
         if lower.contains("gemini-3-pro") { return models["gemini-3-pro-preview"] ?? defaultPricing }
         if lower.contains("gemini-3.1-flash-lite") { return models["gemini-3.1-flash-lite-preview"] ?? defaultPricing }
@@ -161,15 +240,41 @@ final class ModelPricing {
             if lower.contains("flash") { return models["gemini-2.5-flash"] ?? defaultPricing }
             if lower.contains("pro") { return models["gemini-2.5-pro"] ?? defaultPricing }
         }
-        if lower.contains("opus-4-7") { return models["claude-opus-4-7"] ?? defaultPricing }
-        if lower.contains("opus-4-6") { return models["claude-opus-4-6"] ?? defaultPricing }
-        if lower.contains("opus-4-5") { return models["claude-opus-4-5-20251101"] ?? defaultPricing }
-        if lower.contains("opus-4-1") { return models["claude-opus-4-1-20250805"] ?? defaultPricing }
-        if lower.contains("opus-4") { return models["claude-opus-4-20250514"] ?? defaultPricing }
-        if lower.contains("opus") { return models.first { $0.key.contains("opus") }?.value ?? defaultPricing }
-        if lower.contains("haiku") { return models.first { $0.key.contains("haiku") }?.value ?? defaultPricing }
-        if lower.contains("sonnet") { return models.first { $0.key.contains("sonnet") }?.value ?? defaultPricing }
+        if let fallbackID = Self.claudeFallbackModelID(for: lower) {
+            let pricing = models[fallbackID] ?? defaultPricing
+            return Self.effectiveClaudePricing(pricing, modelID: fallbackID)
+        }
         return defaultPricing
+    }
+
+    /// Resolves Claude aliases and suffixed model IDs without collapsing older
+    /// versioned models onto the latest family price.
+    static func claudeFallbackModelID(for model: String) -> String? {
+        let lower = model.lowercased()
+        if lower == "best" || lower.contains("fable") { return "claude-fable-5" }
+        if lower.contains("mythos-preview") { return nil }
+        if lower.contains("mythos") { return "claude-mythos-5" }
+        if lower.contains("opus-4-8") { return "claude-opus-4-8" }
+        if lower.contains("opus-4-7") { return "claude-opus-4-7" }
+        if lower.contains("opus-4-6") { return "claude-opus-4-6" }
+        if lower.contains("opus-4-5") { return "claude-opus-4-5-20251101" }
+        if lower.contains("opus-4-1") { return "claude-opus-4-1-20250805" }
+        if lower.contains("opus-4") { return "claude-opus-4-20250514" }
+        if lower.contains("3-opus") { return "claude-3-opus-20240229" }
+        if lower.contains("opus") { return "claude-opus-4-8" }
+        if lower.contains("haiku-4-5") { return "claude-haiku-4-5-20251001" }
+        if lower.contains("3-5-haiku") { return "claude-3-5-haiku-20241022" }
+        if lower.contains("3-haiku") { return "claude-3-haiku-20240307" }
+        if lower.contains("haiku") { return "claude-haiku-4-5-20251001" }
+        if lower.contains("sonnet-5") { return "claude-sonnet-5" }
+        if lower.contains("sonnet-4-6") { return "claude-sonnet-4-6" }
+        if lower.contains("sonnet-4-5") { return "claude-sonnet-4-5-20250929" }
+        if lower.contains("sonnet-4") { return "claude-sonnet-4-20250514" }
+        if lower.contains("3-7-sonnet") { return "claude-3-7-sonnet-20250219" }
+        if lower.contains("3-5-sonnet") { return "claude-3-5-sonnet-20241022" }
+        if lower.contains("3-sonnet") { return "claude-3-sonnet-20240229" }
+        if lower.contains("sonnet") { return "claude-sonnet-5" }
+        return nil
     }
 
     // Keep static convenience methods for compatibility
