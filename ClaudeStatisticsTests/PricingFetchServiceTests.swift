@@ -142,6 +142,10 @@ final class PricingFetchServiceTests: XCTestCase {
         )
         XCTAssertEqual(ModelPricing.claudeFallbackModelID(for: "sonnet"), "claude-sonnet-5")
         XCTAssertEqual(ModelPricing.claudeFallbackModelID(for: "opus"), "claude-opus-4-8")
+        XCTAssertEqual(
+            ModelPricing.claudeLegacyFallbackPricing(for: "claude-3-opus-20240229"),
+            pricing(15, 75, 18.75, 30, 1.5)
+        )
     }
 
     func testStatusLineNormalizesPersistedSonnet5PriceAtCutover() throws {
@@ -174,6 +178,8 @@ final class PricingFetchServiceTests: XCTestCase {
             "cache_write_1h": 4.5, "cache_read": 0.25,
         }
         assert get_pricing("claude-sonnet-5") == (2.25, 11.0, 4.5, 0.25)
+        app_pricing = {}
+        assert get_pricing("claude-3-opus-20240229") == (15.0, 75.0, 30.0, 1.5)
         """
 
         let cacheURL = FileManager.default.temporaryDirectory

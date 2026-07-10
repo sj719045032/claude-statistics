@@ -241,7 +241,9 @@ final class ModelPricing {
             if lower.contains("pro") { return models["gemini-2.5-pro"] ?? defaultPricing }
         }
         if let fallbackID = Self.claudeFallbackModelID(for: lower) {
-            let pricing = models[fallbackID] ?? defaultPricing
+            let pricing = models[fallbackID]
+                ?? Self.claudeLegacyFallbackPricing(for: fallbackID)
+                ?? defaultPricing
             return Self.effectiveClaudePricing(pricing, modelID: fallbackID)
         }
         return defaultPricing
@@ -275,6 +277,14 @@ final class ModelPricing {
         if lower.contains("3-sonnet") { return "claude-3-sonnet-20240229" }
         if lower.contains("sonnet") { return "claude-sonnet-5" }
         return nil
+    }
+
+    static func claudeLegacyFallbackPricing(for modelID: String) -> Pricing? {
+        guard modelID == "claude-3-opus-20240229" else { return nil }
+        return ModelPricing.Pricing(
+            input: 15.0, output: 75.0,
+            cacheWrite5m: 18.75, cacheWrite1h: 30.0, cacheRead: 1.50
+        )
     }
 
     // Keep static convenience methods for compatibility

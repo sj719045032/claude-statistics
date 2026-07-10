@@ -45,10 +45,13 @@ extension TranscriptParser {
 
                 if !countedMsgIds.contains(msgId) {
                     countedMsgIds.insert(msgId)
-                    if quick.model == nil, let m = entry.message?.model {
-                        quick.model = m
-                    }
                     quick.messageCount += 1
+                }
+
+                if let model = entry.message?.model,
+                   model != "Unknown",
+                   model != "<synthetic>" {
+                    quick.model = model
                 }
 
                 // Overwrite with latest entry (last has final output tokens)
@@ -82,19 +85,6 @@ extension TranscriptParser {
         quick.totalTokens = Int(Double(totalInput + totalOutput + cacheCreate + cacheRead) * ratio)
         quick.messageCount = max(quick.messageCount, Int(Double(quick.messageCount) * ratio))
 
-        // Estimate cost from head tokens (more accurate than extrapolation)
-        if let model = quick.model {
-            quick.estimatedCost = ModelPricing.estimateCost(
-                model: model,
-                inputTokens: Int(Double(totalInput) * ratio),
-                outputTokens: Int(Double(totalOutput) * ratio),
-                cacheCreation5mTokens: 0,
-                cacheCreation1hTokens: Int(Double(cacheCreate) * ratio),
-                cacheCreationTotalTokens: Int(Double(cacheCreate) * ratio),
-                cacheReadTokens: Int(Double(cacheRead) * ratio)
-            )
-        }
-
         // Read last user message from end of file
         // Prefer actual user message over last-prompt (which isn't written after every message)
         let tailSize: UInt64 = min(fileSize, 512 * 1024)
@@ -106,6 +96,7 @@ extension TranscriptParser {
             let tailLines = tailContent.components(separatedBy: "\n")
             var foundPrompt = false
             var foundOutputPreview = false
+            var foundModel = false
             var latestSlug: String?
             var latestCustomTitle: String?
             for line in tailLines.reversed() {
@@ -120,6 +111,15 @@ extension TranscriptParser {
                 }
                 if latestSlug == nil, let s = entry.slug {
                     latestSlug = s
+                }
+
+                if !foundModel,
+                   entry.type == "assistant",
+                   let model = entry.message?.model,
+                   model != "Unknown",
+                   model != "<synthetic>" {
+                    quick.model = model
+                    foundModel = true
                 }
 
                 if !foundPrompt, entry.type == "user" || entry.type == "human" {
@@ -148,6 +148,20 @@ extension TranscriptParser {
             }
             quick.sessionName = TitleSanitizer.sanitize(latestCustomTitle ?? latestSlug)
         }  // end do
+
+        // Estimate cost from head tokens using the latest real model found in
+        // the tail. This keeps cost and session-list model display consistent.
+        if let model = quick.model {
+            quick.estimatedCost = ModelPricing.estimateCost(
+                model: model,
+                inputTokens: Int(Double(totalInput) * ratio),
+                outputTokens: Int(Double(totalOutput) * ratio),
+                cacheCreation5mTokens: 0,
+                cacheCreation1hTokens: Int(Double(cacheCreate) * ratio),
+                cacheCreationTotalTokens: Int(Double(cacheCreate) * ratio),
+                cacheReadTokens: Int(Double(cacheRead) * ratio)
+            )
+        }
 
         // If the initial 16 KB read didn't surface a topic (e.g. the first real user
         // message was embedded in a large line containing base64 image data), do a

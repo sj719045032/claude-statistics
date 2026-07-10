@@ -133,6 +133,7 @@ extension StatusLineInstaller {
             "opus-4-5":   (5.0,  25.0, 10.0,  0.50),
             "opus-4-1":   (15.0, 75.0, 30.0,  1.50),
             "opus-4":     (15.0, 75.0, 30.0,  1.50),
+            "3-opus":     (15.0, 75.0, 30.0,  1.50),
             "sonnet-5":   sonnet_5,
             "sonnet":     sonnet_5,
             "haiku-4-5":  (1.0,  5.0,  2.0,   0.10),

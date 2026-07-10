@@ -160,6 +160,18 @@ final class TranscriptParserTests: XCTestCase {
         XCTAssertEqual(stats.model, "claude-sonnet-4-6")
     }
 
+    func test_quickStatsUsesLatestNonSyntheticModelBeyondHeadChunk() {
+        let path = writeJSONL([
+            assistantEntry(id: "m1", model: "claude-sonnet-4-6", outputTokens: 1),
+            userEntry(text: String(repeating: "x", count: 20_000)),
+            assistantEntry(id: "m2", model: "claude-opus-4-8", outputTokens: 1),
+            assistantEntry(id: "m3", model: "<synthetic>", outputTokens: 1),
+        ])
+
+        let stats = TranscriptParser.shared.parseSessionQuick(at: path)
+        XCTAssertEqual(stats.model, "claude-opus-4-8")
+    }
+
     // MARK: - Tool tracking
 
     func test_toolUseCount() {
