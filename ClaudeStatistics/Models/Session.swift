@@ -5,11 +5,19 @@ import ClaudeStatisticsKit
 // host-side helpers below that depend on the still-host-side `ProviderKind`.
 
 extension Session {
+    static let resumeDisabledMetadataKey = "session.resumeDisabled"
+
     /// Best-effort mapping back to the legacy `ProviderKind` enum for code
     /// paths that still depend on host-side branching. Returns `nil` when
     /// `provider` is a third-party plugin id outside the builtin trio.
     var providerKind: ProviderKind? {
         ProviderKind(rawValue: provider)
+    }
+
+    /// Per-session override for providers whose session source cannot be
+    /// resumed by the provider's normal local CLI command.
+    var isResumable: Bool {
+        !isArchived && metadata[Self.resumeDisabledMetadataKey] != "true"
     }
 }
 

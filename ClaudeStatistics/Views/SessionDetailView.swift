@@ -69,7 +69,7 @@ struct SessionDetailView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
 
-                if !session.isArchived {
+                if session.isResumable {
                     Button(action: onResume) {
                         Label("detail.resume", systemImage: "terminal")
                             .font(.system(size: 11))
@@ -99,7 +99,7 @@ struct SessionDetailView: View {
                                 .font(.system(size: 10, design: .monospaced))
                                 .foregroundStyle(.tertiary)
                                 .lineLimit(1)
-                            if !session.isArchived {
+                            if session.isResumable {
                                 CopyButton(text: resumeCommand, help: "detail.copyResumeCommand")
                             }
                         }

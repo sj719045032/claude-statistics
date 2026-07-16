@@ -96,6 +96,7 @@
 		41F437133AA470C7C0627F58 /* SessionDetailComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968A3D03AB67BF96301BDEBC /* SessionDetailComponents.swift */; };
 		4240E761B7F8133A796C82CB /* PerformanceTracer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A813789C1EB3786DF379C58F /* PerformanceTracer.swift */; };
 		425E1709E0DB410412C38880 /* ShareRole.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E1858F23256C6FEBB750A08 /* ShareRole.swift */; };
+		435B4D219A54DC16E073D991 /* CompositeSessionWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF8A81E83C637C7791202194 /* CompositeSessionWatcher.swift */; };
 		435C5E5C30F6B2F28851BDDA /* HookCLI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027CDBE36D6D9439DB32C0AE /* HookCLI.swift */; };
 		437AC945F5CE5337ED23DF9A /* AllTimeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99EA37388B7B02AEDF9C7A78 /* AllTimeView.swift */; };
 		43F77DC1A91245709B224E22 /* SessionProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 993CBC30E02D8B4126EE22D5 /* SessionProvider.swift */; };
@@ -234,6 +235,7 @@
 		A2F7960601060A4F2D8BE790 /* CanonicalToolName.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F23EB1047050D22FF96E2B2 /* CanonicalToolName.swift */; };
 		A5B9E8F4EA41FC8313BF3228 /* ClaudeHookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9503F292FA4FB52DDDF97355 /* ClaudeHookInstaller.swift */; };
 		A63890A01AF570ADBA7E4E11 /* AttentionEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F675DD2E08BB0AC4ADBB101 /* AttentionEvent.swift */; };
+		A677E603B5B9387FBDE9DCC5 /* SessionScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 526E26CF5BF88B70E50C7A89 /* SessionScannerTests.swift */; };
 		A76D5FAB925364D1B09EAFB8 /* SessionDetailHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAA4142E960434BF58DDCA67 /* SessionDetailHelpers.swift */; };
 		A830A50BBE76ECD3E3990820 /* ShareCardThemePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0398E20299823326D6ED583C /* ShareCardThemePlugin.swift */; };
 		A9723A287A67EB64F2129F55 /* TerminalSetupStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B647877D9FE1AF5ABBC059A /* TerminalSetupStatus.swift */; };
@@ -512,6 +514,7 @@
 		4D7AC12A966340D54D712D4B /* NotchAutoAllowRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchAutoAllowRulesTests.swift; sourceTree = "<group>"; };
 		4DFE81229B8A87810C7DF58A /* MessageRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageRow.swift; sourceTree = "<group>"; };
 		4E1858F23256C6FEBB750A08 /* ShareRole.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRole.swift; sourceTree = "<group>"; };
+		526E26CF5BF88B70E50C7A89 /* SessionScannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionScannerTests.swift; sourceTree = "<group>"; };
 		52E462E75817E26A0FBF0558 /* ModelTokenStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelTokenStats.swift; sourceTree = "<group>"; };
 		52FF7E2030D328036A1F8F6D /* SharePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharePreviewView.swift; sourceTree = "<group>"; };
 		5306E49F4AF08425229312F0 /* UsageViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageViewModel.swift; sourceTree = "<group>"; };
@@ -664,6 +667,7 @@
 		BDA63237DD4854F868A0DCE4 /* ModifierRecorderRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierRecorderRow.swift; sourceTree = "<group>"; };
 		BF23C58F1F4E3E5605623ECE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		BF69875F08146D684A061030 /* DiagnosticLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogger.swift; sourceTree = "<group>"; };
+		BF8A81E83C637C7791202194 /* CompositeSessionWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositeSessionWatcher.swift; sourceTree = "<group>"; };
 		C120104D02EE6397B7344DE2 /* InformationalEventGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InformationalEventGate.swift; sourceTree = "<group>"; };
 		C1495CB41B3081140E52E690 /* LivenessChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivenessChecker.swift; sourceTree = "<group>"; };
 		C220944581C7418B7B1797F3 /* ShareImageExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareImageExporter.swift; sourceTree = "<group>"; };
@@ -805,6 +809,7 @@
 				F3D7D7759B0623FB3A0EFA15 /* RuntimeSessionEventApplierTests.swift */,
 				B9210B3A2B673F785B3BEC07 /* RuntimeStatePersistorTests.swift */,
 				4B842A348C3909C8D98C92B1 /* SessionDisplayDialogueTests.swift */,
+				526E26CF5BF88B70E50C7A89 /* SessionScannerTests.swift */,
 				A872F99484F4F48F8F878E49 /* ShareRoleEngineTests.swift */,
 				0EBE4F4448DEBA3C067FBC16 /* SmokeTests.swift */,
 				F041A00EBEFC1AF58EEE0C78 /* TerminalIdentityResolverTests.swift */,
@@ -843,6 +848,7 @@
 				EDE6D238094644B3E5ECD8C9 /* ClaudePKCE.swift */,
 				7AA9035C5B842200A3C1F84E /* ClaudeProvider.swift */,
 				669DD3F7CA0ACD5A8FFF69A3 /* ClaudeProviderAccountCardAccessory.swift */,
+				BF8A81E83C637C7791202194 /* CompositeSessionWatcher.swift */,
 				EA6D16472FCD12FE7A8C1891 /* CredentialService.swift */,
 				D0CA06E1C8046BE97A74F7C3 /* IndependentClaudeAccountManager.swift */,
 				BAEEBABA82636376B36824D8 /* IndependentClaudeAccountViewModel.swift */,
@@ -1538,6 +1544,7 @@
 				2605B8EACB69A1FD335D21AC /* RuntimeSessionEventApplierTests.swift in Sources */,
 				AB0DFD87C29996F0C42D5E5D /* RuntimeStatePersistorTests.swift in Sources */,
 				FBF2DAF01D66B86D4FF704B9 /* SessionDisplayDialogueTests.swift in Sources */,
+				A677E603B5B9387FBDE9DCC5 /* SessionScannerTests.swift in Sources */,
 				5C10ED712F0303F6EFFD2081 /* ShareRoleEngineTests.swift in Sources */,
 				E6EFB7589EEC1AFD2C58C748 /* SmokeTests.swift in Sources */,
 				C823AB056D6A7D684FBCD644 /* TerminalIdentityResolverTests.swift in Sources */,
@@ -1594,6 +1601,7 @@
 				EC17520544A6FEEA8B3F3430 /* ClaudeProvider.swift in Sources */,
 				480C7AC744109467B48A6A47 /* ClaudeProviderAccountCardAccessory.swift in Sources */,
 				FEFC2968DA07D06063D40E24 /* ClaudeStatisticsApp.swift in Sources */,
+				435B4D219A54DC16E073D991 /* CompositeSessionWatcher.swift in Sources */,
 				64FC425E3CB736B3E5BBF6E1 /* CopyButton.swift in Sources */,
 				64954F8535C5DA9FD1AE6D8B /* CostModelsCard.swift in Sources */,
 				58C1BB54AF46F2D4E1C5DAAB /* CredentialService.swift in Sources */,

@@ -48,13 +48,30 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
     }
 
     func makeWatcher(onChange: @escaping (Set<String>) -> Void) -> (any SessionWatcher)? {
+        let fileManager = FileManager.default
+        var watchers: [any SessionWatcher] = []
+
         let projectsDir = (CredentialService.shared.claudeConfigDir() as NSString).appendingPathComponent("projects")
-        guard FileManager.default.fileExists(atPath: projectsDir) else { return nil }
-        return FSEventsWatcher(path: projectsDir, debounceSeconds: 2.0, onChange: onChange)
+        if fileManager.fileExists(atPath: projectsDir) {
+            watchers.append(FSEventsWatcher(path: projectsDir, debounceSeconds: 2.0, onChange: onChange))
+        }
+
+        if let coworkWatchDirectory = SessionScanner.shared.coworkWatchDirectory {
+            watchers.append(FSEventsWatcher(
+                path: coworkWatchDirectory,
+                debounceSeconds: 2.0,
+                fileFilter: { SessionScanner.shared.isCoworkTranscriptPath($0) },
+                onChange: onChange
+            ))
+        }
+
+        guard !watchers.isEmpty else { return nil }
+        if watchers.count == 1 { return watchers[0] }
+        return CompositeSessionWatcher(watchers: watchers)
     }
 
     func changedSessionIds(for changedPaths: Set<String>) -> Set<String> {
-        Set(changedPaths.compactMap { SessionScanner.uniqueSessionId(forTranscriptPath: $0) })
+        Set(changedPaths.compactMap { SessionScanner.shared.uniqueSessionId(forTranscriptPath: $0) })
     }
 
     func parseQuickStats(at path: String) -> SessionQuickStats {
@@ -106,6 +123,7 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
     }
 
     func resumeSession(_ session: Session) {
+        guard session.isResumable else { return }
         TerminalRegistry.launch(
             TerminalLaunchRequest(
                 executable: "claude",

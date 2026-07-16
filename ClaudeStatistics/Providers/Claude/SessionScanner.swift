@@ -4,71 +4,177 @@ import ClaudeStatisticsKit
 final class SessionScanner {
     static let shared = SessionScanner()
 
-    private init() {}
+    static let coworkOriginMetadataKey = "claude.sessionOrigin"
+    static let coworkOriginMetadataValue = "cowork"
+
+    private let fileManager: FileManager
+    private let projectsDirectory: () -> String
+    let coworkSessionsDirectory: String
+
+    var coworkWatchDirectory: String? {
+        if fileManager.fileExists(atPath: coworkSessionsDirectory) {
+            return coworkSessionsDirectory
+        }
+
+        let parent = (coworkSessionsDirectory as NSString).deletingLastPathComponent
+        return fileManager.fileExists(atPath: parent) ? parent : nil
+    }
+
+    init(
+        fileManager: FileManager = .default,
+        projectsDirectory: @escaping () -> String = {
+            (CredentialService.shared.claudeConfigDir() as NSString)
+                .appendingPathComponent("projects")
+        },
+        coworkSessionsDirectory: String = (NSHomeDirectory() as NSString)
+            .appendingPathComponent("Library/Application Support/Claude/local-agent-mode-sessions")
+    ) {
+        self.fileManager = fileManager
+        self.projectsDirectory = projectsDirectory
+        self.coworkSessionsDirectory = coworkSessionsDirectory
+    }
 
     func scanSessions() -> [Session] {
-        let claudeDir = CredentialService.shared.claudeConfigDir()
-        let projectsDir = (claudeDir as NSString).appendingPathComponent("projects")
-        let fm = FileManager.default
+        var sessions = scanProjectsDirectory(projectsDirectory())
+        sessions.append(contentsOf: scanCoworkSessions())
+        return sessions.sorted { $0.lastModified > $1.lastModified }
+    }
 
-        guard fm.fileExists(atPath: projectsDir) else { return [] }
+    private func scanProjectsDirectory(
+        _ projectsDir: String,
+        idNamespace: String? = nil,
+        metadata: [String: String] = [:]
+    ) -> [Session] {
+        guard fileManager.fileExists(atPath: projectsDir),
+              let projectDirs = try? fileManager.contentsOfDirectory(atPath: projectsDir) else {
+            return []
+        }
 
         var sessions: [Session] = []
-
-        guard let projectDirs = try? fm.contentsOfDirectory(atPath: projectsDir) else { return [] }
 
         for projectDir in projectDirs {
             let projectPath = (projectsDir as NSString).appendingPathComponent(projectDir)
 
             var isDir: ObjCBool = false
-            guard fm.fileExists(atPath: projectPath, isDirectory: &isDir), isDir.boolValue else { continue }
+            guard fileManager.fileExists(atPath: projectPath, isDirectory: &isDir), isDir.boolValue else { continue }
 
-            guard let files = try? fm.contentsOfDirectory(atPath: projectPath) else { continue }
+            guard let files = try? fileManager.contentsOfDirectory(atPath: projectPath) else { continue }
 
             for file in files where file.hasSuffix(".jsonl") {
-                let filePath = (projectPath as NSString).appendingPathComponent(file)
-                let sessionId = (file as NSString).deletingPathExtension
-                let uniqueSessionId = Self.uniqueSessionId(projectDirectory: projectDir, transcriptFileName: file)
-
-                guard let attrs = try? fm.attributesOfItem(atPath: filePath) else { continue }
-                let modDate = attrs[.modificationDate] as? Date ?? Date.distantPast
-                let fileSize = attrs[.size] as? Int64 ?? 0
-
-                // Skip tiny files (likely empty sessions)
-                guard fileSize > 100 else { continue }
-
-                // Include subagent file sizes for cache invalidation
-                var combinedSize = fileSize
-                let subagentDir = (projectPath as NSString)
-                    .appendingPathComponent(sessionId)
-                    .appending("/subagents")
-                if let subFiles = try? fm.contentsOfDirectory(atPath: subagentDir) {
-                    for subFile in subFiles where subFile.hasSuffix(".jsonl") {
-                        let subPath = (subagentDir as NSString).appendingPathComponent(subFile)
-                        if let subAttrs = try? fm.attributesOfItem(atPath: subPath),
-                           let subSize = subAttrs[.size] as? Int64 {
-                            combinedSize += subSize
-                        }
-                    }
+                if let session = makeSession(
+                    projectPath: projectPath,
+                    projectDirectory: projectDir,
+                    transcriptFileName: file,
+                    idNamespace: idNamespace,
+                    metadata: metadata
+                ) {
+                    sessions.append(session)
                 }
-
-                let cwd = readCwd(from: filePath)
-
-                sessions.append(Session(
-                    id: uniqueSessionId,
-                    externalID: sessionId,
-                    provider: ProviderKind.claude.rawValue,
-                    projectPath: projectDir,
-                    filePath: filePath,
-                    startTime: nil,
-                    lastModified: modDate,
-                    fileSize: combinedSize,
-                    cwd: cwd
-                ))
             }
         }
 
-        return sessions.sorted { $0.lastModified > $1.lastModified }
+        return sessions
+    }
+
+    /// Claude Desktop Cowork runs Claude Code in a per-session sandbox. Its
+    /// standard Claude transcripts live under:
+    ///   <root>/<workspace>/<session>/local_<id>/.claude/projects/<project>/*.jsonl
+    /// Walk only those fixed directory levels so workspace files, outputs,
+    /// audit logs, and subagent transcripts never become top-level sessions.
+    private func scanCoworkSessions() -> [Session] {
+        guard fileManager.fileExists(atPath: coworkSessionsDirectory),
+              let workspaces = try? fileManager.contentsOfDirectory(atPath: coworkSessionsDirectory) else {
+            return []
+        }
+
+        var sessions: [Session] = []
+        for workspace in workspaces {
+            let workspacePath = (coworkSessionsDirectory as NSString).appendingPathComponent(workspace)
+            guard let sessionDirectories = try? fileManager.contentsOfDirectory(atPath: workspacePath) else {
+                continue
+            }
+
+            for sessionDirectory in sessionDirectories {
+                let sessionPath = (workspacePath as NSString).appendingPathComponent(sessionDirectory)
+                guard let localDirectories = try? fileManager.contentsOfDirectory(atPath: sessionPath) else {
+                    continue
+                }
+
+                for localDirectory in localDirectories where localDirectory.hasPrefix("local_") {
+                    let projectsPath = (sessionPath as NSString)
+                        .appendingPathComponent(localDirectory)
+                        .appending("/.claude/projects")
+                    let namespace = [workspace, sessionDirectory, localDirectory].joined(separator: "/")
+                    sessions.append(contentsOf: scanProjectsDirectory(
+                        projectsPath,
+                        idNamespace: "cowork::\(namespace)",
+                        metadata: [
+                            Self.coworkOriginMetadataKey: Self.coworkOriginMetadataValue,
+                            Session.resumeDisabledMetadataKey: "true"
+                        ]
+                    ))
+                }
+            }
+        }
+
+        return sessions
+    }
+
+    private func makeSession(
+        projectPath: String,
+        projectDirectory: String,
+        transcriptFileName: String,
+        idNamespace: String?,
+        metadata: [String: String]
+    ) -> Session? {
+        let filePath = (projectPath as NSString).appendingPathComponent(transcriptFileName)
+        let sessionId = (transcriptFileName as NSString).deletingPathExtension
+        let baseId = Self.uniqueSessionId(
+            projectDirectory: projectDirectory,
+            transcriptFileName: transcriptFileName
+        )
+        let uniqueSessionId = idNamespace.map { "\($0)::\(baseId)" } ?? baseId
+
+        guard let attrs = try? fileManager.attributesOfItem(atPath: filePath) else { return nil }
+        let modDate = attrs[.modificationDate] as? Date ?? Date.distantPast
+        let fileSize = attrs[.size] as? Int64 ?? 0
+
+        // Skip tiny files (likely empty sessions)
+        guard fileSize > 100 else { return nil }
+
+        // Include subagent file sizes for cache invalidation. TranscriptParser
+        // folds those subagent files into the parent session, so they must not
+        // also be emitted as independent sessions.
+        var combinedSize = fileSize
+        let subagentDir = (projectPath as NSString)
+            .appendingPathComponent(sessionId)
+            .appending("/subagents")
+        if let subFiles = try? fileManager.contentsOfDirectory(atPath: subagentDir) {
+            for subFile in subFiles where subFile.hasSuffix(".jsonl") {
+                let subPath = (subagentDir as NSString).appendingPathComponent(subFile)
+                if let subAttrs = try? fileManager.attributesOfItem(atPath: subPath),
+                   let subSize = subAttrs[.size] as? Int64 {
+                    combinedSize += subSize
+                }
+            }
+        }
+
+        return Session(
+            id: uniqueSessionId,
+            externalID: sessionId,
+            provider: ProviderKind.claude.rawValue,
+            projectPath: projectDirectory,
+            filePath: filePath,
+            startTime: nil,
+            lastModified: modDate,
+            fileSize: combinedSize,
+            cwd: readCwd(from: filePath),
+            metadata: metadata
+        )
+    }
+
+    func isCoworkTranscriptPath(_ path: String) -> Bool {
+        coworkPathComponents(for: path) != nil
     }
 
     static func uniqueSessionId(projectDirectory: String, transcriptFileName: String) -> String {
@@ -76,11 +182,40 @@ final class SessionScanner {
         return "\(projectDirectory)::\(basename)"
     }
 
-    static func uniqueSessionId(forTranscriptPath path: String) -> String? {
+    func uniqueSessionId(forTranscriptPath path: String) -> String? {
+        if let components = coworkPathComponents(for: path) {
+            let namespace = components.prefix(3).joined(separator: "/")
+            return "cowork::\(namespace)::" + Self.uniqueSessionId(
+                projectDirectory: components[5],
+                transcriptFileName: components[6]
+            )
+        }
+
         let fileName = (path as NSString).lastPathComponent
         let projectDir = (((path as NSString).deletingLastPathComponent as NSString).lastPathComponent)
         guard fileName.hasSuffix(".jsonl"), !projectDir.isEmpty else { return nil }
-        return uniqueSessionId(projectDirectory: projectDir, transcriptFileName: fileName)
+        return Self.uniqueSessionId(projectDirectory: projectDir, transcriptFileName: fileName)
+    }
+
+    private func coworkPathComponents(for path: String) -> [String]? {
+        let rootComponents = URL(fileURLWithPath: coworkSessionsDirectory)
+            .standardizedFileURL.pathComponents
+        let pathComponents = URL(fileURLWithPath: path)
+            .standardizedFileURL.pathComponents
+
+        guard pathComponents.count == rootComponents.count + 7,
+              Array(pathComponents.prefix(rootComponents.count)) == rootComponents else {
+            return nil
+        }
+
+        let relative = Array(pathComponents.dropFirst(rootComponents.count))
+        guard relative[2].hasPrefix("local_"),
+              relative[3] == ".claude",
+              relative[4] == "projects",
+              relative[6].hasSuffix(".jsonl") else {
+            return nil
+        }
+        return relative
     }
 
     /// Read cwd from the transcript payload. We stream the file in fixed chunks

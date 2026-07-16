@@ -300,6 +300,7 @@ final class SessionViewModel: ObservableObject {
     }
 
     func resumeSession(_ session: Session) {
+        guard session.isResumable else { return }
         if TerminalSetupCoordinator.shared.prepareForTerminalAction() {
             return
         }

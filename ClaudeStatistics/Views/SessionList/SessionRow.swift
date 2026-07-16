@@ -154,7 +154,7 @@ struct SessionRow: View {
                     .help("session.transcript.help")
                 }
 
-                if !session.isArchived {
+                if session.isResumable {
                     Button(action: onResume) {
                         Image(systemName: "terminal")
                             .font(.system(size: 10))

@@ -130,7 +130,7 @@ struct RecentSessionRow: View {
                 .buttonStyle(.hoverScale)
                 .help("session.new.help")
 
-                if !session.isArchived {
+                if session.isResumable {
                     Button(action: onResume) {
                         Image(systemName: "terminal")
                             .font(.system(size: 10))
