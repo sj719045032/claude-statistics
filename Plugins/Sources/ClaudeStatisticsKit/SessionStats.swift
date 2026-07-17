@@ -134,6 +134,11 @@ public struct SessionStats: Codable, Sendable {
     /// `ProviderPlugin` factory.
     public var contextWindowSize: Int {
         let m = model.lowercased()
+        // Codex GPT-5.6 rollout token_count events report an effective
+        // model_context_window of 258,400 tokens.
+        if m.contains("gpt-5.6") {
+            return 258_400
+        }
         let millionTokenModels = [
             "fable-5", "mythos-5", "mythos-preview",
             "opus-4-8", "opus-4-7", "opus-4-6",

@@ -5,6 +5,7 @@ struct RecentSessionRow: View {
     let session: Session
     let quickStats: SessionQuickStats?
     let cachedStats: SessionStats?
+    var aggregateMetrics: SessionListMetrics? = nil
     let isSelected: Bool
     let onTap: () -> Void
     let onNewSession: () -> Void
@@ -70,7 +71,29 @@ struct RecentSessionRow: View {
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
 
-                    if let stats = cachedStats {
+                    if let metrics = aggregateMetrics {
+                        Label("\(metrics.messageCount)", systemImage: "message")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.tertiary)
+                        Text(TimeFormatter.tokenCount(metrics.totalTokens))
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                        Text(formatCost(metrics.estimatedCost))
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundStyle(costColor(metrics.estimatedCost))
+
+                        if let stats = cachedStats, stats.contextTokens > 0 {
+                            let pct = stats.contextUsagePercent
+                            let color: Color = pct >= 80 ? .red : pct >= 50 ? .orange : .green
+                            Text(String(format: "%.0f%%", pct))
+                                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                .foregroundStyle(color)
+                                .padding(.horizontal, 3)
+                                .padding(.vertical, 1)
+                                .background(color.opacity(0.1))
+                                .cornerRadius(3)
+                        }
+                    } else if let stats = cachedStats {
                         Label("\(stats.messageCount)", systemImage: "message")
                             .font(.system(size: 9))
                             .foregroundStyle(.tertiary)

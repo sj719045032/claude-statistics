@@ -342,6 +342,9 @@ struct MenuBarView: View {
                 supportsCost: sessionViewModel.providerCapabilities.supportsCost,
                 topic: store.quickStats[session.id]?.topic,
                 sessionName: store.quickStats[session.id]?.sessionName,
+                subagents: sessionViewModel.subagents(for: session),
+                subagentStats: store.parsedStats,
+                subagentQuickStats: store.quickStats,
                 stats: sessionViewModel.selectedSessionStats,
                 isLoading: sessionViewModel.isLoadingStats,
                 onNewSession: { sessionViewModel.openNewSession(session) },
@@ -352,13 +355,13 @@ struct MenuBarView: View {
                 loadTrendData: { granularity in
                     await sessionViewModel.loadTrendData(for: session, granularity: granularity)
                 },
-                onBack: { sessionViewModel.selectedSession = nil; sessionViewModel.selectedSessionStats = nil },
+                onBack: { sessionViewModel.closeSessionDetail() },
                 onDelete: {
                     sessionViewModel.deleteSession(session)
-                    sessionViewModel.selectedSession = nil
-                    sessionViewModel.selectedSessionStats = nil
+                    sessionViewModel.closeSessionDetail()
                 },
-                onViewTranscript: { sessionViewModel.openTranscript(for: session) }
+                onViewTranscript: { sessionViewModel.openTranscript(for: session) },
+                onOpenSubagent: { sessionViewModel.selectSubagent($0) }
             )
         } else {
             SessionListView(viewModel: sessionViewModel, store: store)

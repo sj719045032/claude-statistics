@@ -8,6 +8,9 @@ struct SessionDetailView: View {
     let supportsCost: Bool
     var topic: String? = nil
     var sessionName: String? = nil
+    var subagents: [Session] = []
+    var subagentStats: [String: SessionStats] = [:]
+    var subagentQuickStats: [String: SessionQuickStats] = [:]
     let stats: SessionStats?
     let isLoading: Bool
     let onNewSession: () -> Void
@@ -17,10 +20,12 @@ struct SessionDetailView: View {
     let onBack: () -> Void
     var onDelete: (() -> Void)? = nil
     var onViewTranscript: (() -> Void)? = nil
+    var onOpenSubagent: ((Session) -> Void)? = nil
 
     @State private var showDeleteConfirm = false
     @State private var isTopicExpanded = false
     @State private var isPromptExpanded = false
+    @State private var isSubagentsExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -89,10 +94,16 @@ struct SessionDetailView: View {
                     // Title
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 4) {
-                            Text(session.displayName)
+                            Text(session.agentDisplayName ?? session.displayName)
                                 .font(.system(size: 14, weight: .semibold))
                                 .lineLimit(1)
                             CopyButton(text: session.displayName, help: "detail.copyPath")
+                        }
+                        if session.isSubagentSession {
+                            Text(session.displayName)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(1)
                         }
                         HStack(spacing: 4) {
                             Text(session.externalID)
@@ -164,6 +175,8 @@ struct SessionDetailView: View {
 
     @ViewBuilder
     private func statsContent(_ stats: SessionStats) -> some View {
+        let familyMetrics = sessionFamilyMetrics(rootStats: stats)
+
         // 1. Overview — identity: what session is this
         SectionCard {
             VStack(spacing: 8) {
@@ -197,21 +210,25 @@ struct SessionDetailView: View {
         SectionCard {
             VStack(spacing: 8) {
                 HStack(spacing: 16) {
-                    CostCell(cost: stats.estimatedCost)
+                    CostCell(cost: familyMetrics.estimatedCost)
                     Divider().frame(height: 28)
-                    TokenCell(tokens: stats.totalTokens)
+                    TokenCell(tokens: familyMetrics.totalTokens)
                     if stats.contextTokens > 0 {
                         Divider().frame(height: 28)
                         VStack(alignment: .leading, spacing: 3) {
                             Label("detail.context", systemImage: "rectangle.stack")
                                 .font(.system(size: 10))
                                 .foregroundStyle(.tertiary)
-                            HStack(spacing: 2) {
+                            HStack(spacing: 8) {
                                 Text("\(TimeFormatter.tokenCount(stats.contextTokens))/\(TimeFormatter.tokenCount(stats.contextWindowSize))")
                                     .font(.system(size: 12, weight: .medium, design: .monospaced))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.75)
+                                Spacer(minLength: 2)
                                 Text(String(format: "%.0f%%", stats.contextUsagePercent))
                                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                                     .foregroundStyle(contextColor(stats.contextUsagePercent))
+                                    .fixedSize()
                             }
                             .lineLimit(1)
                         }
@@ -220,13 +237,17 @@ struct SessionDetailView: View {
                 }
                 Divider()
                 HStack(spacing: 16) {
-                    InfoCell(title: "detail.messages", value: "\(stats.messageCount)", icon: "message")
+                    InfoCell(title: "detail.messages", value: "\(familyMetrics.messageCount)", icon: "message")
                     Divider().frame(height: 28)
-                    InfoCell(title: "detail.user", value: "\(stats.userMessageCount)", icon: "person")
+                    InfoCell(title: "detail.user", value: "\(familyMetrics.userMessageCount)", icon: "person")
                     Divider().frame(height: 28)
-                    InfoCell(title: "detail.assistant", value: "\(stats.assistantMessageCount)", icon: "brain")
+                    InfoCell(title: "detail.assistant", value: "\(familyMetrics.assistantMessageCount)", icon: "brain")
                 }
             }
+        }
+
+        if !subagents.isEmpty {
+            subagentSection
         }
 
         // 3. Trend — how usage changed over time
@@ -261,6 +282,177 @@ struct SessionDetailView: View {
                 }
             }
         }
+    }
+
+    private var subagentSection: some View {
+        SectionCard {
+            VStack(spacing: 8) {
+                Button {
+                    withAnimation(Theme.quickSpring) {
+                        isSubagentsExpanded.toggle()
+                    }
+                } label: {
+                    HStack {
+                        Label("detail.subagents", systemImage: "person.2.fill")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text("\(subagents.count)")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                        Image(systemName: isSubagentsExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if isSubagentsExpanded {
+                    Divider()
+
+                    if let metrics = SessionListMetrics.aggregate(
+                        sessions: subagents,
+                        parsedStats: subagentStats,
+                        quickStats: subagentQuickStats
+                    ) {
+                        HStack(spacing: 12) {
+                            Label("\(metrics.messageCount)", systemImage: "message")
+                            Text(TimeFormatter.tokenCount(metrics.totalTokens))
+                                .fontDesign(.monospaced)
+                            if supportsCost {
+                                Text(formatCost(metrics.estimatedCost))
+                                    .fontWeight(.medium)
+                                    .fontDesign(.monospaced)
+                                    .foregroundStyle(costColor(metrics.estimatedCost))
+                            }
+                            Spacer()
+                        }
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+
+                        Divider()
+                    }
+
+                    ForEach(Array(subagents.enumerated()), id: \.element.id) { index, subagent in
+                        subagentEntry(subagent)
+                        if index < subagents.count - 1 {
+                            Divider()
+                                .padding(.leading, CGFloat(max(0, (subagent.agentDepth ?? 1) - 1) * 10))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func subagentEntry(_ subagent: Session) -> some View {
+        if let onOpenSubagent {
+            Button {
+                onOpenSubagent(subagent)
+            } label: {
+                subagentRow(subagent, showsDisclosure: true)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        } else {
+            subagentRow(subagent, showsDisclosure: false)
+        }
+    }
+
+    private func subagentRow(_ subagent: Session, showsDisclosure: Bool) -> some View {
+        let fullStats = subagentStats[subagent.id]
+        let quick = subagentQuickStats[subagent.id]
+        let messages = fullStats?.messageCount ?? quick?.messageCount ?? 0
+        let tokens = fullStats?.totalTokens ?? quick?.totalTokens ?? 0
+        let cost = fullStats?.estimatedCost ?? quick?.estimatedCost ?? 0
+        let title = subagent.agentDisplayName ?? String(subagent.externalID.prefix(8))
+        let depth = max(1, subagent.agentDepth ?? 1)
+
+        return HStack(spacing: 8) {
+            Image(systemName: "arrow.turn.down.right")
+                .font(.system(size: 8))
+                .foregroundStyle(.quaternary)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(title)
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .lineLimit(1)
+                    Text("L\(depth)")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                    if let nickname = subagent.agentNickname,
+                       nickname != title {
+                        Text(nickname)
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    Text(TimeFormatter.relativeDate(subagent.lastModified))
+                    if messages > 0 {
+                        Label("\(messages)", systemImage: "message")
+                    }
+                    if tokens > 0 {
+                        Text(TimeFormatter.tokenCount(tokens))
+                            .fontDesign(.monospaced)
+                    }
+                }
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+            }
+
+            Spacer()
+
+            if supportsCost, cost > 0 {
+                Text(formatCost(cost))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(costColor(cost))
+            }
+
+            if showsDisclosure {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(.quaternary)
+            }
+        }
+        .padding(.leading, CGFloat((depth - 1) * 10))
+        .help(subagent.agentPath ?? title)
+    }
+
+    private func sessionFamilyMetrics(rootStats: SessionStats) -> DetailFamilyMetrics {
+        var parsedStats = subagentStats
+        parsedStats[session.id] = rootStats
+        let sessions = [session] + subagents
+        let aggregate = SessionListMetrics.aggregate(
+            sessions: sessions,
+            parsedStats: parsedStats,
+            quickStats: subagentQuickStats
+        )
+
+        var userMessages = rootStats.userMessageCount
+        var assistantMessages = rootStats.assistantMessageCount
+        for subagent in subagents {
+            if let stats = parsedStats[subagent.id] {
+                userMessages += stats.userMessageCount
+                assistantMessages += stats.assistantMessageCount
+            } else if let quick = subagentQuickStats[subagent.id] {
+                userMessages += quick.userMessageCount
+                assistantMessages += max(0, quick.messageCount - quick.userMessageCount)
+            }
+        }
+
+        return DetailFamilyMetrics(
+            messageCount: aggregate?.messageCount ?? rootStats.messageCount,
+            userMessageCount: userMessages,
+            assistantMessageCount: assistantMessages,
+            totalTokens: aggregate?.totalTokens ?? rootStats.totalTokens,
+            estimatedCost: aggregate?.estimatedCost ?? rootStats.estimatedCost
+        )
     }
 
     // MARK: - Helpers
@@ -327,4 +519,12 @@ struct SessionDetailView: View {
         }
         return segments
     }
+}
+
+private struct DetailFamilyMetrics {
+    let messageCount: Int
+    let userMessageCount: Int
+    let assistantMessageCount: Int
+    let totalTokens: Int
+    let estimatedCost: Double
 }

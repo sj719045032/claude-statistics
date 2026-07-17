@@ -23,6 +23,16 @@ final class NotchNotificationCenter: ObservableObject {
         DiagnosticLogger.shared.verbose(
             "Notch enqueue start kind=\(describeKind(event.kind)) session=\(event.sessionId) toolUseId=\(event.toolUseId ?? "-") currentEvent=\(currentEvent.map { String($0.id.uuidString.prefix(8)) } ?? "nil") queueCount=\(queue.count)"
         )
+        if activeSessionsTracker?.isSubagentSession(
+            provider: event.provider,
+            sessionId: event.sessionId
+        ) == true {
+            DiagnosticLogger.shared.verbose(
+                "Notch drop: subagent provider=\(event.provider.rawValue) session=\(event.sessionId)"
+            )
+            event.pending?.resolve(.ask)
+            return
+        }
         activeSessionsTracker?.record(event: event)
         event = enrichPermissionRequest(event)
         clearResolvedPermissionRequests(for: event)

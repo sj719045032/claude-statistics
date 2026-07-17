@@ -4,6 +4,8 @@ import SwiftUI
 
 @MainActor
 final class SessionDataStore: ObservableObject {
+    private static let parserRevisionMetadataKey = "session.parserRevision"
+
     // MARK: - Published state (UI binds to these)
 
     @Published var sessions: [Session] = []
@@ -168,6 +170,24 @@ final class SessionDataStore: ObservableObject {
 
             // Load DB cache and determine which sessions need reparsing
             let cache = db.loadAllCached(provider: providerKind)
+            let parserRevisionChangedIds = Set(scannedSessions.compactMap { session -> String? in
+                guard let revision = session.metadata[Self.parserRevisionMetadataKey],
+                      let cached = cache[session.id],
+                      cached.metadata[Self.parserRevisionMetadataKey] != revision else {
+                    return nil
+                }
+                return session.id
+            })
+            if !parserRevisionChangedIds.isEmpty {
+                db.invalidateSessionParseCaches(
+                    provider: providerKind,
+                    sessionIds: parserRevisionChangedIds
+                )
+                DiagnosticLogger.shared.info(
+                    "[\(providerKind.rawValue)] Parser revision changed — rebuilding \(parserRevisionChangedIds.count) session caches"
+                )
+            }
+            db.saveSessionMetadata(provider: providerKind, sessions: scannedSessions)
             let indexedSessionIds = db.indexedSessionIds(provider: providerKind)
             var dirtyIds: [Session] = []
             var indexRepairIds: [Session] = []
@@ -181,7 +201,8 @@ final class SessionDataStore: ObservableObject {
             var freshOrChangedIds: [Session] = []
             var cachedOffsets: [String: Int64] = [:]
             for session in scannedSessions {
-                if db.needsReparse(sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, cache: cache) {
+                if parserRevisionChangedIds.contains(session.id) ||
+                    db.needsReparse(sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, cache: cache) {
                     if let cached = cache[session.id], cached.sessionStats == nil, cached.quickStats != nil {
                         interruptedIds.append(session)
                     } else {
@@ -227,7 +248,8 @@ final class SessionDataStore: ObservableObject {
                     startTime: startTime,
                     lastModified: cached.mtime,
                     fileSize: 0,
-                    cwd: cached.cwd
+                    cwd: cached.cwd,
+                    metadata: cached.metadata
                 )
                 session.isArchived = true
                 archivedSessions.append(session)
@@ -487,6 +509,7 @@ final class SessionDataStore: ObservableObject {
                 // load (no JSON decode) for the staleness filter, then only
                 // decode JSON for the actual dirty sessions as retry fallback.
                 scannedSessions = SessionDeduplicator.deduplicate(provider.scanSessions(), provider: providerKind)
+                db.saveSessionMetadata(provider: providerKind, sessions: scannedSessions)
                 let fingerprints = db.loadCacheFingerprints(provider: providerKind)
                 await MainActor.run {
                     // Preserve archived sessions that have no files on disk
@@ -722,7 +745,8 @@ final class SessionDataStore: ObservableObject {
             sessionId: session.id,
             compressedTranscript: compressed,
             projectPath: session.projectPath,
-            cwd: session.cwd
+            cwd: session.cwd,
+            metadata: session.metadata
         )
     }
 

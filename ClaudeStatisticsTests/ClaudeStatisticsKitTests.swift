@@ -19,6 +19,13 @@ final class ClaudeContextWindowTests: XCTestCase {
         stats.model = "claude-haiku-4-5-20251001"
         XCTAssertEqual(stats.contextWindowSize, 200_000)
     }
+
+    func testCodexGPT56UsesReportedEffectiveWindow() {
+        var stats = SessionStats()
+        stats.model = "gpt-5.6-sol"
+
+        XCTAssertEqual(stats.contextWindowSize, 258_400)
+    }
 }
 
 final class SemVerTests: XCTestCase {

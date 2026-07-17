@@ -7,6 +7,7 @@ struct ProjectGroup: Identifiable {
     var id: String { projectPath }
     let projectPath: String
     let sessions: [Session]
+    let families: [SessionFamily]
     let resolvedPath: String
     var totalCost: Double = 0
     var totalTokens: Int = 0
@@ -30,6 +31,26 @@ struct ProjectGroup: Identifiable {
     var cwdPath: String {
         resolvedPath
     }
+
+    init(
+        projectPath: String,
+        sessions: [Session],
+        resolvedPath: String,
+        totalCost: Double = 0,
+        totalTokens: Int = 0,
+        totalMessages: Int = 0,
+        toolUseCount: Int = 0,
+        families: [SessionFamily]? = nil
+    ) {
+        self.projectPath = projectPath
+        self.sessions = sessions
+        self.families = families ?? SessionHierarchy.families(from: sessions)
+        self.resolvedPath = resolvedPath
+        self.totalCost = totalCost
+        self.totalTokens = totalTokens
+        self.totalMessages = totalMessages
+        self.toolUseCount = toolUseCount
+    }
 }
 
 @MainActor
@@ -45,6 +66,7 @@ final class SessionViewModel: ObservableObject {
     @Published var collapsedProjects: Set<String> = []
     private var selectionAnchorId: String?
     private var selectionAnchorProjectPath: String?
+    private var detailHistory: [Session] = []
 
     /// Transcript view state
     @Published var showTranscript = false
@@ -65,9 +87,10 @@ final class SessionViewModel: ObservableObject {
     private var searchGeneration: UInt64 = 0
 
     /// Cached computed results — only recalculated when inputs change
-    @Published private(set) var recentSessions: [Session] = []
+    @Published private(set) var recentFamilies: [SessionFamily] = []
     @Published private(set) var filteredSessions: [Session] = []
     @Published private(set) var projectGroups: [ProjectGroup] = []
+    private var allFamiliesByRootID: [String: SessionFamily] = [:]
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -120,15 +143,16 @@ final class SessionViewModel: ObservableObject {
 
     private func recomputeGroups() {
         // filteredSessions
-        let filtered: [Session]
+        let directlyFiltered: [Session]
         if searchText.isEmpty {
-            filtered = store.sessions
+            directlyFiltered = store.sessions
         } else {
             var matchedIds = Set<String>()
             var result: [Session] = []
             for session in store.sessions {
                 if SearchUtils.textMatches(query: searchText, in: session.displayName) ||
                     SearchUtils.textMatches(query: searchText, in: session.externalID) ||
+                    SearchUtils.textMatches(query: searchText, in: session.agentDisplayName ?? "") ||
                     SearchUtils.textMatches(query: searchText, in: store.quickStats[session.id]?.topic ?? "") ||
                     SearchUtils.textMatches(query: searchText, in: store.quickStats[session.id]?.sessionName ?? "")
                 {
@@ -145,17 +169,34 @@ final class SessionViewModel: ObservableObject {
                     }
                 }
             }
-            filtered = result
+            directlyFiltered = result
         }
+        let filtered = searchText.isEmpty
+            ? directlyFiltered
+            : SessionHierarchy.includingAncestors(of: directlyFiltered, from: store.sessions)
+        let allFamilies = SessionHierarchy.families(from: store.sessions)
+        allFamiliesByRootID = Dictionary(
+            allFamilies.map { ($0.root.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
         filteredSessions = filtered
-        recentSessions = searchText.isEmpty ? Array(store.sessions.prefix(3)) : []
+        recentFamilies = searchText.isEmpty
+            ? Array(allFamilies.prefix(3))
+            : []
 
         // projectGroups (with pre-computed cost)
         let statsMap = store.parsedStats
         let provider = store.provider
-        let grouped = Dictionary(grouping: filtered) { $0.cwd ?? $0.projectPath }
-        projectGroups = grouped.map { key, sessions in
-            let sorted = sessions.sorted { $0.lastModified > $1.lastModified }
+        let grouped = Dictionary(grouping: SessionHierarchy.families(from: filtered)) {
+            $0.root.cwd ?? $0.root.projectPath
+        }
+        projectGroups = grouped.map { key, families in
+            let sortedFamilies = families.sorted {
+                if $0.latestModified == $1.latestModified { return $0.id > $1.id }
+                return $0.latestModified > $1.latestModified
+            }
+            let familySessions = sortedFamilies.flatMap(\.allSessions)
+            let sorted = familySessions.sorted { $0.lastModified > $1.lastModified }
             let resolvedPath = sorted.first.map(provider.resolvedProjectPath(for:)) ?? key
             var cost = 0.0
             var tokens = 0
@@ -169,8 +210,16 @@ final class SessionViewModel: ObservableObject {
                     toolUseCount += stats.toolUseTotal
                 }
             }
-            return ProjectGroup(projectPath: key, sessions: sorted, resolvedPath: resolvedPath, totalCost: cost,
-                                totalTokens: tokens, totalMessages: messages, toolUseCount: toolUseCount)
+            return ProjectGroup(
+                projectPath: key,
+                sessions: sorted,
+                resolvedPath: resolvedPath,
+                totalCost: cost,
+                totalTokens: tokens,
+                totalMessages: messages,
+                toolUseCount: toolUseCount,
+                families: sortedFamilies
+            )
         }
         .sorted { ($0.sessions.first?.lastModified ?? .distantPast) > ($1.sessions.first?.lastModified ?? .distantPast) }
     }
@@ -190,7 +239,42 @@ final class SessionViewModel: ObservableObject {
         }
     }
 
+    func metrics(for family: SessionFamily) -> SessionListMetrics? {
+        SessionListMetrics.aggregate(
+            sessions: family.allSessions,
+            parsedStats: store.parsedStats,
+            quickStats: store.quickStats
+        )
+    }
+
+    func subagents(for session: Session) -> [Session] {
+        allFamiliesByRootID[session.id]?.descendants ?? []
+    }
+
     func selectSession(_ session: Session) {
+        detailHistory.removeAll()
+        showSessionDetail(session)
+    }
+
+    func selectSubagent(_ session: Session) {
+        guard selectedSession?.id != session.id else { return }
+        if let selectedSession {
+            detailHistory.append(selectedSession)
+        }
+        showSessionDetail(session)
+    }
+
+    func closeSessionDetail() {
+        if let previous = detailHistory.popLast() {
+            showSessionDetail(previous)
+        } else {
+            selectedSession = nil
+            selectedSessionStats = nil
+            isLoadingStats = false
+        }
+    }
+
+    private func showSessionDetail(_ session: Session) {
         selectedSession = session
 
         if let cached = store.parsedStats[session.id] {
@@ -240,6 +324,7 @@ final class SessionViewModel: ObservableObject {
         Task.detached {
             let stats = provider.parseSession(at: path)
             await MainActor.run { [weak self] in
+                guard self?.selectedSession?.id == session.id else { return }
                 self?.selectedSessionStats = stats
                 self?.isLoadingStats = false
             }
@@ -325,14 +410,15 @@ final class SessionViewModel: ObservableObject {
            let anchorId = selectionAnchorId,
            let rangeIds = selectionRangeIds(from: anchorId, to: session.id)
         {
-            selectedIds.formUnion(rangeIds)
+            selectedIds.formUnion(familySessionIDs(forRootIDs: rangeIds))
             return
         }
 
-        if selectedIds.contains(session.id) {
-            selectedIds.remove(session.id)
+        let ids = familySessionIDs(for: session)
+        if ids.isSubset(of: selectedIds) {
+            selectedIds.subtract(ids)
         } else {
-            selectedIds.insert(session.id)
+            selectedIds.formUnion(ids)
         }
         selectionAnchorId = session.id
         selectionAnchorProjectPath = nil
@@ -347,19 +433,25 @@ final class SessionViewModel: ObservableObject {
             return
         }
 
-        let ids = Set(group.sessions.map(\.id))
+        let ids = group.families.reduce(into: Set<String>()) { result, family in
+            result.formUnion(familySessionIDs(for: family.root))
+        }
         if ids.isSubset(of: selectedIds) {
             selectedIds.subtract(ids)
         } else {
             selectedIds.formUnion(ids)
         }
-        selectionAnchorId = group.sessions.first?.id ?? selectionAnchorId
+        selectionAnchorId = group.families.first?.root.id ?? selectionAnchorId
         selectionAnchorProjectPath = group.projectPath
     }
 
     func selectAll() {
-        selectedIds = Set(filteredSessions.map(\.id))
-        selectionAnchorId = filteredSessions.first?.id
+        selectedIds = projectGroups
+            .flatMap(\.families)
+            .reduce(into: Set<String>()) { result, family in
+                result.formUnion(familySessionIDs(for: family.root))
+            }
+        selectionAnchorId = projectGroups.first?.families.first?.root.id
         selectionAnchorProjectPath = projectGroups.first?.projectPath
     }
 
@@ -371,7 +463,9 @@ final class SessionViewModel: ObservableObject {
     }
 
     func projectSelectionState(for group: ProjectGroup) -> ProjectSelectionState {
-        let ids = Set(group.sessions.map(\.id))
+        let ids = group.families.reduce(into: Set<String>()) { result, family in
+            result.formUnion(familySessionIDs(for: family.root))
+        }
         guard !ids.isEmpty else { return .none }
         if ids.isSubset(of: selectedIds) { return .all }
         if ids.isDisjoint(with: selectedIds) { return .none }
@@ -388,6 +482,21 @@ final class SessionViewModel: ObservableObject {
         return selectionRangeIds(from: anchorId, to: sessionId) ?? []
     }
 
+    func familySessionIDs(for session: Session) -> Set<String> {
+        allFamiliesByRootID[session.id]?.sessionIDs ?? [session.id]
+    }
+
+    func isFamilySelected(_ session: Session) -> Bool {
+        familySessionIDs(for: session).isSubset(of: selectedIds)
+    }
+
+    var selectedFamilyCount: Int {
+        projectGroups
+            .flatMap(\.families)
+            .filter { familySessionIDs(for: $0.root).isSubset(of: selectedIds) }
+            .count
+    }
+
     func deleteSessions(_ ids: Set<String>) {
         store.deleteSessions(ids)
         selectedIds.subtract(ids)
@@ -399,12 +508,15 @@ final class SessionViewModel: ObservableObject {
     }
 
     func deleteSession(_ session: Session) {
-        deleteSessions([session.id])
+        deleteSessions(familySessionIDs(for: session))
     }
 
     // MARK: - Aggregate stats
 
     var totalSessions: Int { store.sessions.count }
+    var displayedSessionCount: Int {
+        projectGroups.reduce(0) { $0 + $1.families.count }
+    }
 
     private func selectionRangeIds(from anchorId: String, to sessionId: String) -> Set<String>? {
         let orderedIds = displayedSelectableSessionIds()
@@ -426,7 +538,10 @@ final class SessionViewModel: ObservableObject {
 
         return Set(projectGroups
             .filter { paths.contains($0.projectPath) }
-            .flatMap { $0.sessions.map(\.id) })
+            .flatMap(\.families)
+            .reduce(into: Set<String>()) { result, family in
+                result.formUnion(familySessionIDs(for: family.root))
+            })
     }
 
     private func projectSelectionRangePaths(from anchorPath: String, to projectPath: String) -> Set<String>? {
@@ -444,7 +559,14 @@ final class SessionViewModel: ObservableObject {
     private func displayedSelectableSessionIds() -> [String] {
         projectGroups.flatMap { group -> [String] in
             guard isProjectExpanded(group.projectPath) else { return [] }
-            return group.sessions.map(\.id)
+            return group.families.map(\.root.id)
+        }
+    }
+
+    private func familySessionIDs(forRootIDs rootIDs: Set<String>) -> Set<String> {
+        rootIDs.reduce(into: Set<String>()) { result, rootID in
+            guard let session = store.sessions.first(where: { $0.id == rootID }) else { return }
+            result.formUnion(familySessionIDs(for: session))
         }
     }
 }

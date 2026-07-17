@@ -103,10 +103,12 @@ final class DatabaseService {
     /// Current schema version.
     /// v10 refreshes cached Codex quick titles after prompt-cleaning changes.
     /// v11 adds transcript_blob, project_path, cwd columns for session archival.
-    private static let currentSchemaVersion: Int32 = 11
+    /// v12 preserves provider metadata when a session becomes archived.
+    private static let currentSchemaVersion: Int32 = 12
     private static let fullResetSchemaVersion: Int32 = 9
     private static let codexTitleCacheMigrationVersion: Int32 = 10
     private static let archivalColumnsVersion: Int32 = 11
+    private static let sessionMetadataColumnVersion: Int32 = 12
 
     private func migrateIfNeeded() {
         var version: Int32 = 0
@@ -135,6 +137,12 @@ final class DatabaseService {
             execute("PRAGMA user_version = \(version)")
         }
 
+        if version < Self.sessionMetadataColumnVersion {
+            addSessionMetadataColumn()
+            version = Self.sessionMetadataColumnVersion
+            execute("PRAGMA user_version = \(version)")
+        }
+
         if version < Self.currentSchemaVersion {
             resetDatabase()
             execute("PRAGMA user_version = \(Self.currentSchemaVersion)")
@@ -154,6 +162,10 @@ final class DatabaseService {
         execute("ALTER TABLE session_cache ADD COLUMN transcript_blob BLOB")
         execute("ALTER TABLE session_cache ADD COLUMN project_path TEXT")
         execute("ALTER TABLE session_cache ADD COLUMN cwd TEXT")
+    }
+
+    private func addSessionMetadataColumn() {
+        execute("ALTER TABLE session_cache ADD COLUMN metadata_json TEXT")
     }
 
     func resetProviderCache(provider: ProviderKind) {
@@ -187,6 +199,93 @@ final class DatabaseService {
         execute("COMMIT")
     }
 
+    /// Invalidate derived parse data while preserving the session row,
+    /// relationship metadata, and archived transcript blob. Used when a
+    /// provider bumps `session.parserRevision` for live sessions.
+    func invalidateSessionParseCaches(provider: ProviderKind, sessionIds: Set<String>) {
+        guard !sessionIds.isEmpty else { return }
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db else { return }
+
+        let placeholders = Array(repeating: "?", count: sessionIds.count).joined(separator: ",")
+        let statements = [
+            "UPDATE session_cache SET quick_json = NULL, stats_json = NULL WHERE provider = ? AND session_id IN (\(placeholders))",
+            "DELETE FROM messages WHERE provider = ? AND session_id IN (\(placeholders))"
+        ]
+
+        execute("BEGIN TRANSACTION")
+        var committed = false
+        defer {
+            if !committed, sqlite3_get_autocommit(db) == 0 {
+                execute("ROLLBACK")
+            }
+        }
+
+        for sql in statements {
+            var stmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+            defer { sqlite3_finalize(stmt) }
+            sqlite3_bind_text(stmt, 1, provider.rawValue, -1, sqliteTransient)
+            var bindIndex: Int32 = 2
+            for sessionId in sessionIds {
+                sqlite3_bind_text(stmt, bindIndex, sessionId, -1, sqliteTransient)
+                bindIndex += 1
+            }
+            guard sqlite3_step(stmt) == SQLITE_DONE else { return }
+        }
+
+        execute("COMMIT")
+        committed = true
+    }
+
+    /// Refresh provider-owned session metadata without forcing transcript or
+    /// stats reparsing. This also backfills relationship metadata for cache
+    /// rows created before the metadata column existed.
+    func saveSessionMetadata(provider: ProviderKind, sessions: [Session]) {
+        let sessionsWithMetadata = sessions.filter { !$0.metadata.isEmpty }
+        guard !sessionsWithMetadata.isEmpty else { return }
+
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db else { return }
+
+        let sql = """
+            INSERT INTO session_cache(provider, session_id, file_size, mtime, metadata_json)
+            VALUES(?, ?, ?, ?, ?)
+            ON CONFLICT(provider, session_id) DO UPDATE SET
+                metadata_json = excluded.metadata_json
+        """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+
+        let encoder = JSONEncoder()
+        execute("BEGIN TRANSACTION")
+        var committed = false
+        defer {
+            if !committed, sqlite3_get_autocommit(db) == 0 {
+                execute("ROLLBACK")
+            }
+        }
+
+        for session in sessionsWithMetadata {
+            guard let data = try? encoder.encode(session.metadata),
+                  let json = String(data: data, encoding: .utf8) else { continue }
+            sqlite3_reset(stmt)
+            sqlite3_clear_bindings(stmt)
+            sqlite3_bind_text(stmt, 1, provider.rawValue, -1, sqliteTransient)
+            sqlite3_bind_text(stmt, 2, session.id, -1, sqliteTransient)
+            sqlite3_bind_int64(stmt, 3, session.fileSize)
+            sqlite3_bind_double(stmt, 4, session.lastModified.timeIntervalSince1970)
+            sqlite3_bind_text(stmt, 5, json, -1, sqliteTransient)
+            guard sqlite3_step(stmt) == SQLITE_DONE else { return }
+        }
+
+        execute("COMMIT")
+        committed = true
+    }
+
     // MARK: - Stats Cache
 
     struct CachedSession {
@@ -199,6 +298,7 @@ final class DatabaseService {
         let projectPath: String?
         let cwd: String?
         let hasTranscript: Bool
+        let metadata: [String: String]
     }
 
     /// Load all cached sessions from the database
@@ -209,7 +309,7 @@ final class DatabaseService {
 
         let sql = """
             SELECT session_id, file_size, mtime, quick_json, stats_json,
-                   project_path, cwd, transcript_blob IS NOT NULL
+                   project_path, cwd, transcript_blob IS NOT NULL, metadata_json
             FROM session_cache
             WHERE provider = ?
         """
@@ -249,6 +349,11 @@ final class DatabaseService {
             }
 
             let hasTranscript = sqlite3_column_int(stmt, 7) != 0
+            var metadata: [String: String] = [:]
+            if let ptr = sqlite3_column_text(stmt, 8) {
+                let json = Data(String(cString: ptr).utf8)
+                metadata = (try? decoder.decode([String: String].self, from: json)) ?? [:]
+            }
 
             result[sessionId] = CachedSession(
                 provider: provider,
@@ -259,7 +364,8 @@ final class DatabaseService {
                 sessionStats: stats,
                 projectPath: projectPath,
                 cwd: cwd,
-                hasTranscript: hasTranscript
+                hasTranscript: hasTranscript,
+                metadata: metadata
             )
         }
 
@@ -326,7 +432,7 @@ final class DatabaseService {
         let placeholders = Array(repeating: "?", count: sessionIds.count).joined(separator: ",")
         let sql = """
             SELECT session_id, file_size, mtime, quick_json, stats_json,
-                   project_path, cwd, transcript_blob IS NOT NULL
+                   project_path, cwd, transcript_blob IS NOT NULL, metadata_json
             FROM session_cache
             WHERE provider = ? AND session_id IN (\(placeholders))
         """
@@ -371,6 +477,11 @@ final class DatabaseService {
             }
 
             let hasTranscript = sqlite3_column_int(stmt, 7) != 0
+            var metadata: [String: String] = [:]
+            if let ptr = sqlite3_column_text(stmt, 8) {
+                let json = Data(String(cString: ptr).utf8)
+                metadata = (try? decoder.decode([String: String].self, from: json)) ?? [:]
+            }
 
             result[sessionId] = CachedSession(
                 provider: provider,
@@ -381,7 +492,8 @@ final class DatabaseService {
                 sessionStats: stats,
                 projectPath: projectPath,
                 cwd: cwd,
-                hasTranscript: hasTranscript
+                hasTranscript: hasTranscript,
+                metadata: metadata
             )
         }
 
@@ -611,7 +723,8 @@ final class DatabaseService {
         sessionId: String,
         compressedTranscript: Data,
         projectPath: String,
-        cwd: String?
+        cwd: String?,
+        metadata: [String: String]
     ) {
         lock.lock()
         defer { lock.unlock() }
@@ -619,7 +732,7 @@ final class DatabaseService {
 
         let sql = """
             UPDATE session_cache
-            SET transcript_blob = ?, project_path = ?, cwd = ?
+            SET transcript_blob = ?, project_path = ?, cwd = ?, metadata_json = ?
             WHERE provider = ? AND session_id = ?
         """
         var stmt: OpaquePointer?
@@ -635,8 +748,14 @@ final class DatabaseService {
         } else {
             sqlite3_bind_null(stmt, 3)
         }
-        sqlite3_bind_text(stmt, 4, provider.rawValue, -1, sqliteTransient)
-        sqlite3_bind_text(stmt, 5, sessionId, -1, sqliteTransient)
+        if let data = try? JSONEncoder().encode(metadata),
+           let json = String(data: data, encoding: .utf8) {
+            sqlite3_bind_text(stmt, 4, json, -1, sqliteTransient)
+        } else {
+            sqlite3_bind_null(stmt, 4)
+        }
+        sqlite3_bind_text(stmt, 5, provider.rawValue, -1, sqliteTransient)
+        sqlite3_bind_text(stmt, 6, sessionId, -1, sqliteTransient)
         sqlite3_step(stmt)
     }
 

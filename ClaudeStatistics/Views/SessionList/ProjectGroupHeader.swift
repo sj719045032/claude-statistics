@@ -67,7 +67,7 @@ struct ProjectGroupHeader: View {
                 .help("session.new.help")
             }
 
-            Text("\(group.sessions.count)")
+            Text("\(group.families.count)")
                 .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(.secondary)
 

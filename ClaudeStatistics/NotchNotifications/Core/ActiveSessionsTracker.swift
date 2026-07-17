@@ -90,6 +90,10 @@ final class ActiveSessionsTracker: ObservableObject {
     /// Session ids any filter has dropped. Persisted in memory only —
     /// rebuilt on restart by re-running the chain on persisted runtimes.
     private var droppedSessionIds: Set<String> = []
+    /// Canonical child-thread ids discovered by provider session scans. They
+    /// remain available between transcript syncs so live hook events cannot
+    /// recreate a subagent card after the scanner has hidden it.
+    private var subagentSessionIDsByProvider: [ProviderKind: Set<String>] = [:]
 
     init() {
         self.runtimeByKey = TerminalIdentityResolver.sanitizedTransientSurfaceCollisions(
@@ -167,6 +171,7 @@ final class ActiveSessionsTracker: ObservableObject {
     /// Remove every runtime entry for the given provider. Called when the user
     /// flips that provider's notch switch off so stale cards don't linger.
     func purgeRuntime(for provider: ProviderKind) {
+        subagentSessionIDsByProvider[provider] = nil
         let keysToRemove = runtimeByKey.compactMap { key, runtime -> String? in
             runtime.provider == provider ? key : nil
         }
@@ -191,13 +196,23 @@ final class ActiveSessionsTracker: ObservableObject {
         let now = Date()
         let cutoff = now.addingTimeInterval(-activeWindow)
         let providerId = provider.rawValue
+        var didRestore = updateSubagentSessionIDs(for: provider, sessions: sourceSessions)
         let recentSessions = sourceSessions
-            .filter { $0.provider == providerId && $0.lastModified > cutoff }
+            .filter {
+                $0.provider == providerId
+                    && !$0.isSubagentSession
+                    && $0.lastModified > cutoff
+            }
             .sorted { $0.lastModified > $1.lastModified }
 
-        guard !recentSessions.isEmpty else { return }
+        guard !recentSessions.isEmpty else {
+            if didRestore {
+                persistRuntime()
+                refresh()
+            }
+            return
+        }
 
-        var didRestore = false
         var restoredKeys: Set<String> = []
         for session in recentSessions {
             let runtimeSessionID = Self.runtimeSessionID(for: session)
@@ -252,6 +267,15 @@ final class ActiveSessionsTracker: ObservableObject {
 
     func record(event: AttentionEvent) {
         guard !event.sessionId.isEmpty else { return }
+        if isSubagentSession(provider: event.provider, sessionId: event.sessionId) {
+            let sessionID = event.provider.descriptor.canonicalSessionID(event.sessionId)
+            let key = Self.key(provider: event.provider, sessionId: sessionID)
+            if runtimeByKey.removeValue(forKey: key) != nil {
+                persistRuntime()
+                refresh()
+            }
+            return
+        }
 
         // Run the filter chain. Any filter returning false drops the
         // session — pre-built runtime from earlier hooks (SessionStart
@@ -486,19 +510,27 @@ final class ActiveSessionsTracker: ObservableObject {
         quickStats: [String: SessionQuickStats],
         parsedStats: [String: SessionStats]
     ) {
-        guard !sourceSessions.isEmpty else { return }
-
         let now = Date()
         let cutoff = now.addingTimeInterval(-activeWindow)
         let providerId = provider.rawValue
-        let recentSessions = sourceSessions
+        let visibleSessions = sourceSessions.filter {
+            $0.provider == providerId && !$0.isSubagentSession
+        }
+        var didChange = updateSubagentSessionIDs(for: provider, sessions: sourceSessions)
+        guard !sourceSessions.isEmpty else {
+            if didChange {
+                persistRuntime()
+                refresh()
+            }
+            return
+        }
+        let recentSessions = visibleSessions
             .filter { $0.provider == providerId && $0.lastModified > cutoff }
             .sorted { $0.lastModified > $1.lastModified }
-        let sessionsByRuntimeID = Dictionary(uniqueKeysWithValues: sourceSessions.map {
+        let sessionsByRuntimeID = Dictionary(uniqueKeysWithValues: visibleSessions.map {
             (Self.runtimeSessionID(for: $0), $0)
         })
 
-        var didChange = false
         var matchedRuntimeCount = 0
         var signalCount = 0
         var progressNoteCount = 0
@@ -1249,6 +1281,32 @@ final class ActiveSessionsTracker: ObservableObject {
         let kind = ProviderKind(rawValue: session.provider) ?? .claude
         let raw = session.externalID.nilIfEmpty ?? session.id
         return kind.descriptor.canonicalSessionID(raw)
+    }
+
+    func isSubagentSession(provider: ProviderKind, sessionId: String) -> Bool {
+        let canonicalID = provider.descriptor.canonicalSessionID(sessionId)
+        return subagentSessionIDsByProvider[provider]?.contains(canonicalID) == true
+    }
+
+    @discardableResult
+    private func updateSubagentSessionIDs(
+        for provider: ProviderKind,
+        sessions: [Session]
+    ) -> Bool {
+        let providerID = provider.rawValue
+        let ids = Set(sessions.lazy
+            .filter { $0.provider == providerID && $0.isSubagentSession }
+            .map { Self.runtimeSessionID(for: $0) })
+        subagentSessionIDsByProvider[provider] = ids
+
+        var removedRuntime = false
+        for sessionID in ids {
+            let key = Self.key(provider: provider, sessionId: sessionID)
+            if runtimeByKey.removeValue(forKey: key) != nil {
+                removedRuntime = true
+            }
+        }
+        return removedRuntime
     }
 
 }

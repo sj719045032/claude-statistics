@@ -104,6 +104,7 @@
 "detail.models %lld" = "%lld 个模型";
 "detail.msgs %lld" = "%lld 条消息";
 "detail.sessions %lld" = "%lld 个会话";
+"detail.subagents" = "子代理";
 
 /* Token Labels */
 "token.input" = "In";

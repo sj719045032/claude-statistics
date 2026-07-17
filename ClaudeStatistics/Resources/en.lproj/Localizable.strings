@@ -104,6 +104,7 @@
 "detail.models %lld" = "%lld models";
 "detail.msgs %lld" = "%lld msgs";
 "detail.sessions %lld" = "%lld sessions";
+"detail.subagents" = "Subagents";
 
 /* Token Labels */
 "token.input" = "In";

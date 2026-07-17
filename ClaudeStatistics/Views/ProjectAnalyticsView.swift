@@ -31,10 +31,12 @@ struct ProjectAnalyticsView: View {
     @State private var modelUsages: [ModelUsage] = []
     @State private var toolCounts: [(name: String, count: Int)] = []
     @State private var inlineSelectedSession: Session?
+    @State private var inlineSessionHistory: [Session] = []
 
     var body: some View {
         if let adapter = inlineSessionDetailAdapter,
            let session = inlineSelectedSession {
+            let subagents = group.families.first(where: { $0.root.id == session.id })?.descendants ?? []
             // Inline drill-in: render SessionDetailView as if it were pushed
             // onto this navigation level. Back returns here without changing
             // the surrounding tab or the global `selectedSession`.
@@ -44,6 +46,9 @@ struct ProjectAnalyticsView: View {
                 supportsCost: adapter.supportsCost,
                 topic: store.quickStats[session.id]?.topic,
                 sessionName: store.quickStats[session.id]?.sessionName,
+                subagents: subagents,
+                subagentStats: store.parsedStats,
+                subagentQuickStats: store.quickStats,
                 stats: store.parsedStats[session.id],
                 isLoading: false,
                 onNewSession: { adapter.onNewSession(session) },
@@ -54,15 +59,21 @@ struct ProjectAnalyticsView: View {
                 },
                 onBack: {
                     withAnimation(Theme.springAnimation) {
-                        inlineSelectedSession = nil
+                        closeInlineSessionDetail()
                     }
                 },
                 onDelete: {
                     adapter.onDelete(session)
-                    inlineSelectedSession = nil
+                    closeInlineSessionDetail()
                 },
                 onViewTranscript: adapter.onOpenTranscript.map { handler in
                     { handler(session) }
+                },
+                onOpenSubagent: { subagent in
+                    withAnimation(Theme.springAnimation) {
+                        inlineSessionHistory.append(session)
+                        inlineSelectedSession = subagent
+                    }
                 }
             )
         } else {
@@ -158,6 +169,7 @@ struct ProjectAnalyticsView: View {
                                         maxCost: max(maxCost, 0.000001),
                                         onTap: inlineSessionDetailAdapter == nil ? nil : {
                                             withAnimation(Theme.springAnimation) {
+                                                inlineSessionHistory.removeAll()
                                                 inlineSelectedSession = item.session
                                             }
                                         }
@@ -199,6 +211,10 @@ struct ProjectAnalyticsView: View {
     }
 
     // MARK: - Helpers
+
+    private func closeInlineSessionDetail() {
+        inlineSelectedSession = inlineSessionHistory.popLast()
+    }
 
     private func aggregatedToolCounts() -> [(name: String, count: Int)] {
         var counts: [String: Int] = [:]

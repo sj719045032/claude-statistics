@@ -9,6 +9,7 @@ struct SessionListView: View {
     @ObservedObject var store: SessionDataStore
     @State private var showDeleteConfirm = false
     @State private var deleteTarget: Set<String> = []
+    @State private var deleteTargetDisplayCount = 0
     @State private var selectedProjectForAnalytics: ProjectGroup?
     @State private var isShiftPressed = NSEvent.modifierFlags.contains(.shift)
     @State private var hoveredShiftProjectPath: String?
@@ -88,7 +89,7 @@ struct SessionListView: View {
             // Header
             HStack(spacing: 4) {
                 if viewModel.isSelecting {
-                    Text("session.selected \(viewModel.selectedIds.count)")
+                    Text("session.selected \(viewModel.selectedFamilyCount)")
                         .font(.caption)
                         .foregroundStyle(Color.blue)
 
@@ -107,6 +108,7 @@ struct SessionListView: View {
                                 viewModel.exitSelecting()
                             } else {
                                 deleteTarget = ids
+                                deleteTargetDisplayCount = viewModel.selectedFamilyCount
                                 showDeleteConfirm = true
                             }
                         },
@@ -125,7 +127,7 @@ struct SessionListView: View {
                         .buttonStyle(.plain)
                         .foregroundStyle(.secondary)
                 } else {
-                    Text("session.count \(viewModel.filteredSessions.count)")
+                    Text("session.count \(viewModel.displayedSessionCount)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text("·")
@@ -161,7 +163,7 @@ struct SessionListView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     // Recent sessions
-                    if !viewModel.recentSessions.isEmpty && !viewModel.isSelecting {
+                    if !viewModel.recentFamilies.isEmpty && !viewModel.isSelecting {
                         HStack(spacing: 4) {
                             Image(systemName: "clock")
                                 .font(.system(size: 10))
@@ -174,11 +176,13 @@ struct SessionListView: View {
                         .padding(.horizontal, 12)
                         .padding(.top, 4)
 
-                        ForEach(viewModel.recentSessions) { session in
+                        ForEach(viewModel.recentFamilies) { family in
+                            let session = family.root
                             RecentSessionRow(
                                 session: session,
                                 quickStats: viewModel.quickStat(for: session),
                                 cachedStats: store.parsedStats[session.id],
+                                aggregateMetrics: family.descendants.isEmpty ? nil : viewModel.metrics(for: family),
                                 isSelected: viewModel.selectedSession?.id == session.id,
                                 onTap: { viewModel.selectSession(session) },
                                 onNewSession: { viewModel.openNewSession(session) },
@@ -227,59 +231,18 @@ struct SessionListView: View {
                         )
 
                         if viewModel.isProjectExpanded(group.projectPath) {
-                            ForEach(Array(group.sessions.enumerated()), id: \.element.id) { index, session in
-                                SessionRow(
-                                    session: session,
-                                    quickStats: viewModel.quickStat(for: session),
-                                    cachedStats: store.parsedStats[session.id],
-                                    isSelected: viewModel.selectedSession?.id == session.id,
-                                    isSelecting: viewModel.isSelecting,
-                                    isChecked: viewModel.selectedIds.contains(session.id),
-                                    isRangePreviewed: previewSessionIds.contains(session.id),
-                                    grouped: true,
-                                    searchSnippet: viewModel.searchSnippets[session.id],
-                                    searchQuery: viewModel.searchText,
-                                    onSnippetTap: viewModel.searchSnippets[session.id] != nil ? {
-                                        viewModel.openTranscript(
-                                            for: session,
-                                            searchQuery: viewModel.searchText,
-                                            snippetContext: viewModel.searchSnippets[session.id]
-                                        )
-                                    } : nil,
-                                    onViewTranscript: {
-                                        viewModel.openTranscript(for: session)
-                                    },
-                                    onSelectionHover: { hovering in
-                                        hoveredShiftSessionId = hovering ? session.id : nil
-                                    },
-                                    onTap: {
-                                        if viewModel.isSelecting {
-                                            viewModel.toggleSelect(
-                                                session,
-                                                extendingRange: NSEvent.modifierFlags.contains(.shift)
-                                            )
-                                        } else {
-                                            viewModel.selectSession(session)
-                                        }
-                                    },
-                                    onNewSession: { viewModel.openNewSession(session) },
-                                    onResume: {
-                                        viewModel.resumeSession(session)
-                                    },
-                                    onDelete: { skipConfirm in
-                                        if skipConfirm {
-                                            viewModel.deleteSessions([session.id])
-                                        } else {
-                                            deleteTarget = [session.id]
-                                            showDeleteConfirm = true
-                                        }
-                                    }
+                            ForEach(Array(group.families.enumerated()), id: \.element.id) { familyIndex, family in
+                                sessionRow(
+                                    session: family.root,
+                                    aggregateMetrics: family.descendants.isEmpty ? nil : viewModel.metrics(for: family),
+                                    isRangePreviewed: previewSessionIds.contains(family.root.id)
                                 )
                                 .transition(.asymmetric(
                                     insertion: .push(from: .bottom),
                                     removal: .push(from: .top)
                                 ))
-                                .animation(Theme.quickSpring.delay(Double(index) * 0.02), value: viewModel.isProjectExpanded(group.projectPath))
+                                .animation(Theme.quickSpring.delay(Double(familyIndex) * 0.02), value: viewModel.isProjectExpanded(group.projectPath))
+
                             }
                         }
                     }
@@ -289,10 +252,11 @@ struct SessionListView: View {
         }
         .destructiveConfirmation(
             isPresented: $showDeleteConfirm,
-            title: "session.deleteConfirm \(deleteTarget.count)"
+            title: "session.deleteConfirm \(deleteTargetDisplayCount)"
         ) {
             viewModel.deleteSessions(deleteTarget)
             deleteTarget = []
+            deleteTargetDisplayCount = 0
         }
         .onAppear(perform: installModifierMonitor)
         .onDisappear(perform: removeModifierMonitor)
@@ -319,6 +283,62 @@ struct SessionListView: View {
             return []
         }
         return viewModel.projectSelectionRangePaths(to: hoveredShiftProjectPath)
+    }
+
+    private func sessionRow(
+        session: Session,
+        aggregateMetrics: SessionListMetrics?,
+        isRangePreviewed: Bool
+    ) -> some View {
+        SessionRow(
+            session: session,
+            quickStats: viewModel.quickStat(for: session),
+            cachedStats: store.parsedStats[session.id],
+            aggregateMetrics: aggregateMetrics,
+            isSelected: viewModel.selectedSession?.id == session.id,
+            isSelecting: viewModel.isSelecting,
+            isChecked: viewModel.isFamilySelected(session),
+            isRangePreviewed: isRangePreviewed,
+            grouped: true,
+            searchSnippet: viewModel.searchSnippets[session.id],
+            searchQuery: viewModel.searchText,
+            onSnippetTap: viewModel.searchSnippets[session.id] != nil ? {
+                viewModel.openTranscript(
+                    for: session,
+                    searchQuery: viewModel.searchText,
+                    snippetContext: viewModel.searchSnippets[session.id]
+                )
+            } : nil,
+            onViewTranscript: {
+                viewModel.openTranscript(for: session)
+            },
+            onSelectionHover: { hovering in
+                hoveredShiftSessionId = hovering ? session.id : nil
+            },
+            onTap: {
+                if viewModel.isSelecting {
+                    viewModel.toggleSelect(
+                        session,
+                        extendingRange: NSEvent.modifierFlags.contains(.shift)
+                    )
+                } else {
+                    viewModel.selectSession(session)
+                }
+            },
+            onNewSession: { viewModel.openNewSession(session) },
+            onResume: {
+                viewModel.resumeSession(session)
+            },
+            onDelete: { skipConfirm in
+                if skipConfirm {
+                    viewModel.deleteSession(session)
+                } else {
+                    deleteTarget = viewModel.familySessionIDs(for: session)
+                    deleteTargetDisplayCount = 1
+                    showDeleteConfirm = true
+                }
+            }
+        )
     }
 
     private var shiftPreviewSessionIds: Set<String> {

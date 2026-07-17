@@ -6,6 +6,7 @@ struct SessionRow: View {
     let session: Session
     let quickStats: SessionQuickStats?
     let cachedStats: SessionStats?
+    var aggregateMetrics: SessionListMetrics? = nil
     let isSelected: Bool
     let isSelecting: Bool
     let isChecked: Bool
@@ -85,7 +86,21 @@ struct SessionRow: View {
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
 
-                    if let stats = cachedStats {
+                    if let metrics = aggregateMetrics {
+                        Label("\(metrics.messageCount)", systemImage: "message")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.tertiary)
+                        Text(TimeFormatter.tokenCount(metrics.totalTokens))
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                        Text(formatCost(metrics.estimatedCost))
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundStyle(costColor(metrics.estimatedCost))
+
+                        if let stats = cachedStats, stats.contextTokens > 0 {
+                            contextBadge(stats)
+                        }
+                    } else if let stats = cachedStats {
                         Label("\(stats.messageCount)", systemImage: "message")
                             .font(.system(size: 9))
                             .foregroundStyle(.tertiary)
