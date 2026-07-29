@@ -64,8 +64,8 @@ public struct SessionFilterContext: Sendable {
 /// One node in the host's active-session filter chain. The host runs
 /// every registered filter against a context built from each hook
 /// event (and against persisted runtime rows on every refresh tick);
-/// any filter returning `false` hides the session from "user activity"
-/// surfaces — currently the notch session list, more later.
+/// any filter returning `false` hides the session from Notch user-activity
+/// surfaces, including both the active-session list and event cards.
 ///
 /// Filters are intentionally stateless: state belongs to whatever
 /// constructed them (a plugin holding its own per-instance config).

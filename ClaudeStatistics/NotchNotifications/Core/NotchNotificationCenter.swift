@@ -33,7 +33,13 @@ final class NotchNotificationCenter: ObservableObject {
             event.pending?.resolve(.ask)
             return
         }
-        activeSessionsTracker?.record(event: event)
+        if activeSessionsTracker?.record(event: event) == false {
+            DiagnosticLogger.shared.info(
+                "Notch drop: session-filter provider=\(event.provider.rawValue) session=\(event.sessionId) kind=\(describeKind(event.kind))"
+            )
+            event.pending?.resolve(.ask)
+            return
+        }
         event = enrichPermissionRequest(event)
         clearResolvedPermissionRequests(for: event)
         if event.kind.clearsWaitingInput {

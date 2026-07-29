@@ -265,8 +265,12 @@ final class ActiveSessionsTracker: ObservableObject {
         refresh()
     }
 
-    func record(event: AttentionEvent) {
-        guard !event.sessionId.isEmpty else { return }
+    /// Records an incoming hook event and returns whether it belongs on
+    /// user-visible Notch surfaces. Callers must not enqueue a notification
+    /// card when this returns `false`.
+    @discardableResult
+    func record(event: AttentionEvent) -> Bool {
+        guard !event.sessionId.isEmpty else { return false }
         if isSubagentSession(provider: event.provider, sessionId: event.sessionId) {
             let sessionID = event.provider.descriptor.canonicalSessionID(event.sessionId)
             let key = Self.key(provider: event.provider, sessionId: sessionID)
@@ -274,7 +278,7 @@ final class ActiveSessionsTracker: ObservableObject {
                 persistRuntime()
                 refresh()
             }
-            return
+            return false
         }
 
         // Run the filter chain. Any filter returning false drops the
@@ -304,7 +308,7 @@ final class ActiveSessionsTracker: ObservableObject {
                 persistRuntime()
                 refresh()
             }
-            return
+            return false
         }
 
         let key = Self.key(provider: event.provider, sessionId: event.sessionId)
@@ -312,7 +316,7 @@ final class ActiveSessionsTracker: ObservableObject {
             runtimeByKey.removeValue(forKey: key)
             persistRuntime()
             refresh()
-            return
+            return true
         }
 
         // Any provider's SessionStart in a given terminal tab means every
@@ -502,6 +506,7 @@ final class ActiveSessionsTracker: ObservableObject {
             schedulePostStopExitCheck(key: key, pid: pid, grace: grace)
         }
 
+        return true
     }
 
     func syncTranscriptSignals(
