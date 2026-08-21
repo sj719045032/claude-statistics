@@ -508,18 +508,65 @@ actor TerminalFocusCoordinator {
             )
         }
         // Fallback for non-AppleScript terminals (Kitty / WezTerm /
-        // Alacritty / Warp / unknown): just check if our pid is the
-        // frontmost app's pid.
-        guard let pid else { return false }
+        // Alacritty / Warp / Termius / unknown). See
+        // `frontmostMatchesSession` for why the bundle id — not the pid —
+        // is the load-bearing comparison.
+        var frontmostBundleId: String?
         var frontmostPid: pid_t?
         if Thread.isMainThread {
-            frontmostPid = NSWorkspace.shared.frontmostApplication?.processIdentifier
+            let app = NSWorkspace.shared.frontmostApplication
+            frontmostBundleId = app?.bundleIdentifier
+            frontmostPid = app?.processIdentifier
         } else {
             DispatchQueue.main.sync {
-                frontmostPid = NSWorkspace.shared.frontmostApplication?.processIdentifier
+                let app = NSWorkspace.shared.frontmostApplication
+                frontmostBundleId = app?.bundleIdentifier
+                frontmostPid = app?.processIdentifier
             }
         }
-        return frontmostPid == pid
+        return frontmostMatchesSession(
+            frontmostBundleId: frontmostBundleId,
+            frontmostPid: frontmostPid,
+            terminalBundleId: bundleId,
+            sessionPid: pid
+        )
+    }
+
+    /// Answers "is the terminal hosting this session the app the user is
+    /// looking at?" for terminals with no `TerminalFrontmostSessionProbing`
+    /// conformance.
+    ///
+    /// The bundle id is the load-bearing comparison. `HookRunner` reports
+    /// the CLI's own pid (`getppid()`), never the hosting GUI app's, so the
+    /// original `frontmostPid == pid` check could only match when a
+    /// session's parent process was itself an app with a Dock presence —
+    /// which the shell under a terminal emulator never is. That silently
+    /// disabled focus-silence for every terminal without an AppleScript
+    /// dictionary (Kitty / WezTerm / Alacritty / Warp / Termius): the
+    /// setting was honoured, the probe underneath it always said "not
+    /// focused". The pid comparison stays as a second chance so GUI hosts
+    /// that do report their own pid keep behaving as before.
+    ///
+    /// Bundle-id matching is tab-blind by construction: looking at a
+    /// different tab of the same terminal still counts as focused. That is
+    /// the right trade at this precision level — these terminals are
+    /// `.appOnly`, so a card's focus button could not land on the exact tab
+    /// either, and the setting asks "is the terminal in front?", not "is
+    /// this exact tab in front?". Terminals that can answer precisely
+    /// (Apple Terminal / iTerm2 / Ghostty) never reach this fallback.
+    nonisolated static func frontmostMatchesSession(
+        frontmostBundleId: String?,
+        frontmostPid: pid_t?,
+        terminalBundleId: String?,
+        sessionPid: Int32?
+    ) -> Bool {
+        if let terminalBundleId,
+           let frontmostBundleId,
+           frontmostBundleId == terminalBundleId {
+            return true
+        }
+        guard let sessionPid, let frontmostPid else { return false }
+        return frontmostPid == sessionPid
     }
 
     private nonisolated static func focusedSessionOutputMatches(
