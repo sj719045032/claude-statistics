@@ -125,6 +125,7 @@ extension UsageView {
     enum UsageWindowTab: Hashable {
         case fiveHour
         case sevenDay
+        case sevenDayFable
         case sevenDayOpus
         case sevenDaySonnet
     }
@@ -257,6 +258,14 @@ extension UsageView {
             )
         }
 
+        if let fable = fableWindow(from: usage) {
+            UsageWindowRow(
+                title: "usage.7dayFable",
+                utilization: fable.utilization,
+                countdown: fable.timeUntilReset.map { TimeFormatter.countdown(from: $0) }
+            )
+        }
+
         if let opus = usage.sevenDayOpus {
             UsageWindowRow(
                 title: "usage.7dayOpus",
@@ -304,6 +313,21 @@ extension UsageView {
                         modelFilter: defaultUsageModelFilter
                     )
                 }
+            case .sevenDayFable:
+                windowChart(
+                    for: fableWindow(from: usage),
+                    descriptor: ProviderUsageWindowPresentation(
+                        titleLocalizationKey: "usage.7dayFable",
+                        tabLabel: "7d Fable 5",
+                        durationValue: -7,
+                        durationComponent: .day,
+                        granularity: .hour,
+                        showsExhaustEstimate: true,
+                        showsChart: true
+                    ),
+                    modelFilter: isFable,
+                    modelFilterID: "fable"
+                )
             case .sevenDayOpus:
                 windowChart(
                     for: usage.sevenDayOpus,
@@ -316,7 +340,8 @@ extension UsageView {
                         showsExhaustEstimate: true,
                         showsChart: true
                     ),
-                    modelFilter: isOpus
+                    modelFilter: isOpus,
+                    modelFilterID: "opus"
                 )
             case .sevenDaySonnet:
                 windowChart(
@@ -330,7 +355,8 @@ extension UsageView {
                         showsExhaustEstimate: true,
                         showsChart: true
                     ),
-                    modelFilter: isSonnet
+                    modelFilter: isSonnet,
+                    modelFilterID: "sonnet"
                 )
             }
         }
@@ -574,6 +600,8 @@ extension UsageView {
             return usagePresentation.shortWindow?.tabLabel ?? "5h"
         case .sevenDay:
             return usagePresentation.longWindow?.tabLabel ?? "7d"
+        case .sevenDayFable:
+            return "7d Fable 5"
         case .sevenDayOpus:
             return "7d Opus"
         case .sevenDaySonnet:
@@ -587,6 +615,20 @@ extension UsageView {
 
     private func isOpus(_ model: String) -> Bool {
         model.lowercased().contains("opus")
+    }
+
+    private func isFable(_ model: String) -> Bool {
+        model.lowercased().contains("fable")
+    }
+
+    private func fableWindow(from usage: UsageData) -> UsageWindow? {
+        guard let bucket = usage.providerBuckets?.first(where: {
+            $0.id.lowercased().contains("fable") || $0.title.lowercased().contains("fable")
+        }) else {
+            return nil
+        }
+        let utilization = 100 - min(max(bucket.remainingPercentage, 0), 100)
+        return UsageWindow(utilization: utilization, resetsAt: bucket.resetsAt)
     }
 
     private func isSonnet(_ model: String) -> Bool {
@@ -605,6 +647,9 @@ extension UsageView {
         }
         if usage.sevenDay != nil, usagePresentation.longWindow?.showsChart == true {
             tabs.append(.sevenDay)
+        }
+        if fableWindow(from: usage) != nil {
+            tabs.append(.sevenDayFable)
         }
         if usage.sevenDayOpus != nil {
             tabs.append(.sevenDayOpus)
@@ -661,9 +706,15 @@ extension UsageView {
     private func windowChart(
         for window: UsageWindow?,
         descriptor: ProviderUsageWindowPresentation,
-        modelFilter: ((String) -> Bool)?
+        modelFilter: ((String) -> Bool)?,
+        modelFilterID: String = "all"
     ) -> some View {
-        if let info = windowTrendInfo(for: window, descriptor: descriptor, modelFilter: modelFilter) {
+        if let info = windowTrendInfo(
+            for: window,
+            descriptor: descriptor,
+            modelFilter: modelFilter,
+            modelFilterID: modelFilterID
+        ) {
             windowTimeRange(info)
             UsageTrendChartView(dataPoints: info.dataPoints, granularity: info.granularity, windowStart: info.windowStart, windowEnd: info.windowEnd)
             if !info.modelBreakdown.isEmpty {

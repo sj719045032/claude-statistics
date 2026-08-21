@@ -156,6 +156,7 @@
 "usage.viewOnline" = "在线查看";
 "usage.5hour" = "5 小时";
 "usage.7day" = "7 天";
+"usage.7dayFable" = "7 天 Fable 5";
 "usage.7dayOpus" = "7 天 Opus";
 "usage.7daySonnet" = "7 天 Sonnet";
 "usage.localTrend" = "本地 Token 趋势";
