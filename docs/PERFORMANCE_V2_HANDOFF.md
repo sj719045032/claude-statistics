@@ -339,8 +339,13 @@ numbers for every item are in `PERFORMANCE_V2_EXECUTION.md`.
    (`CLAUDE_STATISTICS_DEBUG_DISABLED_PLUGINS`): 30 sessions parsed, 21
    checkpoints, 30/30 inline archives moved; the user's setting untouched.
 
-**Do not install the new plugins into the shared plugin directory or publish
-them before a host release:** they import ~80 SDK symbols the 3.5.11 app does
+**Released 2026-09-14:** sdk-v0.7.0, host 3.6.0, catalog v1.3.8 and the
+hotfix v1.3.9 (Codex 1.2.1 — 1.2.0 crashed 3.6.0 through a SQLite handle
+closed under a running query; see "Release" in the execution log). Rollback
+copies of 3.5.11 and the previous plugins:
+`~/Library/Application Support/ClaudeStatistics/backups/pre-3.6.0/`.
+
+**Plugins must not ship before the host that exports their SDK symbols:** they import ~80 SDK symbols the 3.5.11 app does
 not export (checked with `nm`), so the release app would lose Codex/Gemini.
 `SDKInfo.apiVersion` is now 0.5.0 and both plugins (manifest 1.2.0) require
 it, so older hosts skip them before `dlopen` instead of failing to load.

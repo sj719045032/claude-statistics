@@ -1165,6 +1165,88 @@ whole-file parse. The catalog fixes are built and tested but not installed —
 authorization. Until that happens, no whole-app claim can be made about the
 Codex path; the isolated parser numbers above are the evidence that exists.
 
+## Release (2026-09-14, authorized by the owner)
+
+Order: SDK, then host, then catalog, then local install.
+
+- **Pre-flight.** The new SDK framework exports 3,093 symbols against 3.5.11's
+  2,795: 298 added, **0 removed**, built with library evolution — plugins
+  already installed from older catalogs keep loading on the new host (the
+  debug build loaded the six installed terminal/app plugins throughout).
+  Pushing as `tinystone007` is refused (403); publishing ran as
+  `sj719045032`.
+- **SDK `sdk-v0.7.0`** (API 0.5.0): xcframework rebuilt on `main` after the
+  API bump, checksum `aac132a2c1e6fdba87afa1d0b3582fcfdc26ef1b891c34b6f5115f998cd8a042`,
+  `scripts/sdk-mode.sh` and `Package.swift` updated in `ac1f4a9`, `main`
+  pushed, release created with the tag on that commit; the downloaded asset's
+  checksum matches.
+- **Catalog ABI check before release** — every plugin built as
+  `release-plugins.sh` builds them, against the published SDK: only
+  CodexPlugin (81) and GeminiPlugin (79) import symbols 3.5.11 lacks, and both
+  require API 0.5.0; the other 14 import none; no plugin imports anything the
+  new SDK lacks.
+- **Host 3.6.0** via `scripts/release.sh 3.6.0` with bilingual notes: DMG,
+  ZIP and Sparkle deltas from 3.5.9, 3.5.10 and 3.5.11 uploaded to
+  https://github.com/sj719045032/claude-statistics/releases/tag/v3.6.0;
+  appcast commit `78d8c2e` pushed, and the served `appcast.xml` lists 3.6.0
+  with all three deltas.
+- **Catalog v1.3.8** via `release-plugins.sh 1.3.8`: 16 bundles rebuilt
+  against sdk-v0.7.0 and uploaded, `index.json` (`7462b29`) listing Codex and
+  Gemini 1.2.0 requiring API 0.5.0. The owner's install got the 3.6.0 app and
+  both plugins from the published assets after checksum checks.
+
+- **Codex 1.2.0 crashed 3.6.0 — found on the owner's machine minutes after
+  release.** After the new plugin was trusted and hot-loaded, the app died
+  with `EXC_BAD_ACCESS` in `sqlite3_step` under
+  `CodexSessionScanner.scanSessions()` (no other thread was in SQLite).
+  `openOrReuseDB` validated the cached handle under `dbLock` but returned it,
+  and callers used it unlocked; when Codex checkpointed its state database,
+  another caller saw the new size/mtime and closed the handle under the first
+  one's query. The race predates this work, but the new off-main
+  `needsRescan` → `metadataDigest()` call made it concurrent with scans on
+  exactly the database changes that trigger the reopen. Contained within
+  minutes: the catalog's Codex entry was rolled back to 1.1.6 (`20a598e`,
+  loads on 3.6.0 through the compatibility path), and the owner's install
+  restored to 1.1.6 from the backup — 3.6.0 relaunched with 668 Codex
+  sessions and no further crash. The backups (3.5.11 app, Codex 1.1.6,
+  Gemini 1.1.0) are in
+  `~/Library/Application Support/ClaudeStatistics/backups/pre-3.6.0/`.
+- **Reproduced before fixing.** `CodexMetadataRescanTests.testConcurrentScansAndDigestsSurviveHandleReopening`
+  runs eight threads of `scanSessions()` / `metadataDigest()` against a
+  fixture database while another connection updates and
+  `wal_checkpoint(TRUNCATE)`s it 400 times, forcing handle reopens. On the
+  1.2.0 scanner the test binary died with `Segmentation fault: 11`.
+- **Fixed in Codex 1.2.1.** The handle is now only used, reopened or closed
+  inside `withDatabase { db in ... }` with `dbLock` held; the scan's query runs
+  there and its results are published after the lock is released. The
+  stress test passes, and all 40 catalog tests passed in the build and five
+  further runs of the same binary. The same bug class was checked in the
+  host: every `DatabaseService` path (archive segments, legacy blob chunks,
+  relocation, checkpoints) prepares, steps and finalizes its statements and
+  opens and closes incremental blob handles within one hold of its lock, and
+  hands out only row ids and copied bytes — a row moved concurrently makes
+  `sqlite3_blob_open` fail, which callers already treat as "not stored". No
+  other catalog plugin uses SQLite.
+- **Claude sessions that never committed (fixed for 3.6.1).** Watching 3.6.0
+  after the hotfix, the log showed "Giving up queued retries" for two large
+  Claude sessions — also present in every debug run since 2026-09-11, never
+  under 3.5.11. The refusal was silent, so the retries were instrumented:
+  every parse failure and every `saveSessionsStatsAndIndexes` refusal now logs
+  its step and SQLite error. On the real transcripts the commit failed at the
+  index key insert: `UNIQUE constraint failed: session_index_keys`. Those
+  transcripts hold the same records twice (7 and 14 repeated message/tool IDs,
+  every pair identical — Claude replays records when a session resumes), and a
+  full `.replaceIdentified` rebuild inserted each ID once per copy; only
+  `.update` deduplicated. Both paths now keep one row per ID (its last
+  occurrence), which loses nothing because the copies are identical, and
+  protects the host from any provider emitting repeated IDs. Tests:
+  `SessionIndexUpdateTests.testFullReplacementWithRepeatedIDsCommitsOneRowPerID`
+  and the gated `ClaudeCommitRealDataTests`, which parses and commits every
+  local Claude transcript through the store's path and requires no retry.
+- **Catalog v1.3.9** (`577fcbd` fix, `9ad6e0f` index): Codex 1.2.1 requiring
+  API 0.5.0 replaces the rolled-back entry; Gemini stays 1.2.0. The served
+  `index.json` lists it.
+
 ## Remaining work
 
 Everything below is open, measured or reasoned, and not waived by the tests:

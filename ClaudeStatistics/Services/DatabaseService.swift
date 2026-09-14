@@ -774,7 +774,15 @@ final class DatabaseService {
         let isoFormatter = ISO8601DateFormatter()
         isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 
-        guard sqlite3_exec(db, "BEGIN TRANSACTION", nil, nil, nil) == SQLITE_OK else { return false }
+        // Every refusal is logged: the store turns `false` into a silent retry.
+        func fail(_ step: String, _ sessionId: String? = nil, error: Error? = nil) -> Bool {
+            let detail = error.map { String(describing: $0) } ?? String(cString: sqlite3_errmsg(db))
+            DiagnosticLogger.shared.warning(
+                "saveSessionsStatsAndIndexes(\(provider.rawValue)\(sessionId.map { " " + $0 } ?? "")) failed at \(step): \(detail)"
+            )
+            return false
+        }
+        guard sqlite3_exec(db, "BEGIN TRANSACTION", nil, nil, nil) == SQLITE_OK else { return fail("begin") }
         var committed = false
         defer {
             if !committed, sqlite3_get_autocommit(db) == 0 {
@@ -810,7 +818,7 @@ final class DatabaseService {
             sqlite3_finalize(deleteStmt)
             sqlite3_finalize(insertStmt)
             sqlite3_finalize(keyInsertStmt)
-            return false
+            return fail("prepare")
         }
         defer {
             sqlite3_finalize(upsertStmt)
@@ -820,19 +828,26 @@ final class DatabaseService {
         }
 
         for request in requests {
-            if case .matches(let expected) = request.expectedCheckpoint,
-               loadParseCheckpointID(provider: provider, sessionId: request.sessionId) != expected {
-                return false
+            if case .matches(let expected) = request.expectedCheckpoint {
+                let stored = loadParseCheckpointID(provider: provider, sessionId: request.sessionId)
+                guard stored == expected else {
+                    DiagnosticLogger.shared.warning(
+                        "Checkpoint of \(provider.rawValue) session \(request.sessionId) changed under its parse " +
+                        "(expected \(expected?.uuidString ?? "none"), stored \(stored?.uuidString ?? "none")); not committing"
+                    )
+                    return false
+                }
             }
-            guard let json = try? encoder.encode(request.stats),
-                  let jsonStr = String(data: json, encoding: .utf8) else { return false }
+            let json: Data
+            do { json = try encoder.encode(request.stats) } catch { return fail("stats json", request.sessionId, error: error) }
+            guard let jsonStr = String(data: json, encoding: .utf8) else { return fail("stats utf8", request.sessionId) }
 
             let checkpointData: Data?
             let quickData: Data?
             do {
                 checkpointData = try request.checkpoint.map { try ParseCheckpointCoding.encode($0) }
                 quickData = try request.quickStats.map { try encoder.encode($0) }
-            } catch { return false }
+            } catch { return fail("checkpoint/quick encoding", request.sessionId, error: error) }
 
             sqlite3_reset(upsertStmt)
             sqlite3_clear_bindings(upsertStmt)
@@ -850,20 +865,24 @@ final class DatabaseService {
             if let quickData, let quickJSON = String(data: quickData, encoding: .utf8) {
                 sqlite3_bind_text(upsertStmt, 8, quickJSON, -1, sqliteTransient)
             } else { sqlite3_bind_null(upsertStmt, 8) }
-            guard sqlite3_step(upsertStmt) == SQLITE_DONE else { return false }
+            guard sqlite3_step(upsertStmt) == SQLITE_DONE else { return fail("upsert", request.sessionId) }
 
             let rows: [(String?, SearchIndexMessage)]
             switch request.searchIndexUpdate {
             case .preserve: continue
             case .replace(let messages): rows = messages.map { (nil, $0) }
-            case .replaceIdentified(let messages): rows = messages.map { ($0.id, $0.message) }
+            case .replaceIdentified(let messages):
+                // Transcripts can hold the same record twice (Claude replays a
+                // message, tool call and all, when a session resumes); one key
+                // per ID, like `.update` below, or the unique index refuses
+                // the whole commit and the session retries forever.
+                rows = Self.lastOccurrences(of: messages)
             case .update(let messages, let removing):
                 let ids = Set(removing).union(messages.map(\.id))
-                guard deleteIdentifiedIndexRows(provider: provider, sessionId: request.sessionId, ids: Array(ids)) else { return false }
-                let lastIndices = Dictionary(messages.enumerated().map { ($0.element.id, $0.offset) }, uniquingKeysWith: { _, last in last })
-                rows = messages.enumerated().compactMap { index, value in
-                    lastIndices[value.id] == index ? (value.id, value.message) : nil
+                guard deleteIdentifiedIndexRows(provider: provider, sessionId: request.sessionId, ids: Array(ids)) else {
+                    return fail("index update delete", request.sessionId)
                 }
+                rows = Self.lastOccurrences(of: messages)
             }
 
             if case .update = request.searchIndexUpdate {
@@ -873,8 +892,10 @@ final class DatabaseService {
                 sqlite3_clear_bindings(deleteStmt)
                 sqlite3_bind_text(deleteStmt, 1, provider.rawValue, -1, sqliteTransient)
                 sqlite3_bind_text(deleteStmt, 2, request.sessionId, -1, sqliteTransient)
-                guard sqlite3_step(deleteStmt) == SQLITE_DONE else { return false }
-                guard deleteIdentifiedIndexRows(provider: provider, sessionId: request.sessionId, ids: nil) else { return false }
+                guard sqlite3_step(deleteStmt) == SQLITE_DONE else { return fail("index delete", request.sessionId) }
+                guard deleteIdentifiedIndexRows(provider: provider, sessionId: request.sessionId, ids: nil) else {
+                    return fail("index key delete", request.sessionId)
+                }
             }
 
             for (id, message) in rows {
@@ -887,7 +908,7 @@ final class DatabaseService {
 
                 let timestamp = message.timestamp.map { isoFormatter.string(from: $0) } ?? ""
                 sqlite3_bind_text(insertStmt, 5, timestamp, -1, sqliteTransient)
-                guard sqlite3_step(insertStmt) == SQLITE_DONE else { return false }
+                guard sqlite3_step(insertStmt) == SQLITE_DONE else { return fail("index insert", request.sessionId) }
                 if let id {
                     let rowID = sqlite3_last_insert_rowid(db)
                     sqlite3_reset(keyInsertStmt)
@@ -896,13 +917,21 @@ final class DatabaseService {
                     sqlite3_bind_text(keyInsertStmt, 2, request.sessionId, -1, sqliteTransient)
                     sqlite3_bind_text(keyInsertStmt, 3, id, -1, sqliteTransient)
                     sqlite3_bind_int64(keyInsertStmt, 4, rowID)
-                    guard sqlite3_step(keyInsertStmt) == SQLITE_DONE else { return false }
+                    guard sqlite3_step(keyInsertStmt) == SQLITE_DONE else { return fail("index key insert", request.sessionId) }
                 }
             }
         }
 
         committed = sqlite3_exec(db, "COMMIT", nil, nil, nil) == SQLITE_OK
-        return committed
+        return committed || fail("commit")
+    }
+
+    /// Identified index rows with one entry per ID — its last occurrence, in order.
+    static func lastOccurrences(of messages: [IdentifiedSearchIndexMessage]) -> [(String?, SearchIndexMessage)] {
+        let lastIndices = Dictionary(messages.enumerated().map { ($0.element.id, $0.offset) }, uniquingKeysWith: { _, last in last })
+        return messages.enumerated().compactMap { index, value in
+            lastIndices[value.id] == index ? (value.id, value.message) : nil
+        }
     }
 
     func loadParseCheckpoint(provider: ProviderKind, sessionId: String) -> SessionParseCheckpoint? {

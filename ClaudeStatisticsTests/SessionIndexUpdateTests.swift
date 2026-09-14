@@ -161,4 +161,17 @@ final class SessionIndexUpdateTests: XCTestCase {
         XCTAssertTrue(database.saveSessionsStatsAndIndexes(provider: .claude, requests: [request(.update(upserting: [identified("a", "fresh answer")], removing: []))]))
         XCTAssertEqual(database.search(query: "fresh", provider: .claude).count, 1)
     }
+
+    /// A transcript can hold the same record twice (Claude replays a message
+    /// when a session resumes), so one full replacement can carry an ID twice.
+    /// It must commit one row per ID instead of failing on the unique key —
+    /// in 3.6.0 such sessions were refused and retried on every refresh.
+    func testFullReplacementWithRepeatedIDsCommitsOneRowPerID() {
+        let messages = [identified("assistant:a", "repeated answer text"), identified("tool:b", "listing files"),
+                        identified("assistant:a", "repeated answer text")]
+        XCTAssertTrue(database.saveSessionsStatsAndIndexes(provider: .claude,
+                                                           requests: [request(.replaceIdentified(messages))]))
+        XCTAssertEqual(database.search(query: "repeated", provider: .claude).count, 1)
+        XCTAssertEqual(database.search(query: "listing", provider: .claude).count, 1)
+    }
 }

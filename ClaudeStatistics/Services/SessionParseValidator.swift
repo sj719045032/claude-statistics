@@ -65,6 +65,7 @@ enum SessionParseValidator {
                 return SessionParseCommitOutcome(stats: nil, quickStats: nil, shouldRetry: outcome.shouldRetry)
             }
             guard database.saveSessionsStatsAndIndexes(provider: provider.kind, requests: [request]) else {
+                DiagnosticLogger.shared.warning("Could not commit \(provider.kind.rawValue) parse for \(session.id); will retry")
                 return SessionParseCommitOutcome(stats: nil, quickStats: nil, shouldRetry: true)
             }
             return SessionParseCommitOutcome(stats: request.stats,
@@ -114,6 +115,9 @@ enum SessionParseValidator {
                 return consume(outcome)
             }
         } catch {
+            if !(error is CancellationError) {
+                DiagnosticLogger.shared.warning("\(provider.kind.rawValue) parse for \(session.id) failed; will retry (\(error))")
+            }
             return consume(SessionParseOutcome(sessionId: session.id, committedStats: nil,
                                        displayStats: cached?.sessionStats, searchMessages: [],
                                        shouldRetry: !(error is CancellationError)))
