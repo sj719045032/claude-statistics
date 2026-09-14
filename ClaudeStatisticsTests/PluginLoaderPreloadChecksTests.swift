@@ -3,11 +3,12 @@ import ClaudeStatisticsKit
 
 @testable import Claude_Statistics
 
-/// A bundle whose id already fills its registry bucket must be refused before
-/// it is dlopened: a loaded image cannot be unloaded, and two images of one
-/// Swift module in the same process leave class lookup ambiguous.
+/// Checks the loader must make before it dlopens a bundle: a loaded image
+/// cannot be unloaded. A bundle whose id already fills its registry bucket
+/// would leave class lookup ambiguous; one requiring a newer SDK API would
+/// fail on missing symbols.
 @MainActor
-final class PluginLoaderDuplicateTests: XCTestCase {
+final class PluginLoaderPreloadChecksTests: XCTestCase {
     private final class Occupant: NSObject, Plugin {
         static let manifest = PluginManifest(
             id: "com.test.duplicate",
@@ -32,11 +33,12 @@ final class PluginLoaderDuplicateTests: XCTestCase {
 
     /// A `.csplugin` with a valid manifest and no executable: if the loader
     /// ever reaches `bundle.load()`, it reports `.bundleLoadFailed`.
-    private func makeBundle(id: String, kind: PluginKind) throws -> URL {
+    private func makeBundle(id: String, kind: PluginKind,
+                            minHostAPIVersion: SemVer = SemVer(major: 0, minor: 1, patch: 0)) throws -> URL {
         let manifest = PluginManifest(
             id: id, kind: kind, displayName: "Fixture",
             version: SemVer(major: 1, minor: 0, patch: 0),
-            minHostAPIVersion: SemVer(major: 0, minor: 1, patch: 0),
+            minHostAPIVersion: minHostAPIVersion,
             permissions: [], principalClass: "FixturePlugin"
         )
         let info: [String: Any] = [
@@ -72,6 +74,32 @@ final class PluginLoaderDuplicateTests: XCTestCase {
         let registry = PluginRegistry()
         try registry.register(Occupant())
         let result = PluginLoader.loadOne(at: try makeBundle(id: Occupant.manifest.id, kind: .terminal), into: registry)
+        guard case .failure(.bundleLoadFailed) = result else {
+            return XCTFail("expected the loader to reach dlopen (no executable), got \(result)")
+        }
+    }
+
+    /// An older host meeting a plugin built for a newer SDK API refuses it
+    /// before dlopen instead of failing there on the symbols it lacks.
+    func testABundleRequiringANewerAPIIsRefusedBeforeItIsLoaded() throws {
+        let host = SDKInfo.apiVersion
+        let newer = SemVer(major: host.major, minor: host.minor + 1, patch: 0)
+        let result = PluginLoader.loadOne(
+            at: try makeBundle(id: "com.test.newer-api", kind: .provider, minHostAPIVersion: newer),
+            into: PluginRegistry()
+        )
+        guard case .failure(.incompatibleAPIVersion(let required, let reported)) = result else {
+            return XCTFail("expected incompatibleAPIVersion before dlopen, got \(result)")
+        }
+        XCTAssertEqual(required, newer)
+        XCTAssertEqual(reported, host)
+    }
+
+    func testABundleRequiringTheCurrentAPIPassesTheGate() throws {
+        let result = PluginLoader.loadOne(
+            at: try makeBundle(id: "com.test.current-api", kind: .provider, minHostAPIVersion: SDKInfo.apiVersion),
+            into: PluginRegistry()
+        )
         guard case .failure(.bundleLoadFailed) = result else {
             return XCTFail("expected the loader to reach dlopen (no executable), got \(result)")
         }

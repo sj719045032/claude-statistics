@@ -206,6 +206,7 @@
 		7C85FEB841835DFA65061033 /* TranscriptArchiverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B19631E1B13CABE4DD5149D2 /* TranscriptArchiverTests.swift */; };
 		7CD9C8820D5C77BDC5DE0E35 /* PendingResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A3701AFF5252558AFDD027 /* PendingResponse.swift */; };
 		7DDF1FCD20AD18EFE47F3067 /* ToolActivityFormatterCompletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F10B1989F38BD8829116BBE /* ToolActivityFormatterCompletionTests.swift */; };
+		7DEA73A1E6C29A8663854E90 /* PluginLoaderPreloadChecksTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB97CF0C98BF9166A86948F /* PluginLoaderPreloadChecksTests.swift */; };
 		7E48B08D0513149CA87ADE4C /* TerminalIdentityResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B71EA214A4CBCF6BFE070E4A /* TerminalIdentityResolver.swift */; };
 		7F16F098F8F04C5E43C3EBB9 /* ShareRoleEngine+Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44906B5E92FE48C21912D41F /* ShareRoleEngine+Formatting.swift */; };
 		7F72608C38B39616482C62AA /* SubscriptionAccountManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A0472E97499A94A812C4036 /* SubscriptionAccountManager.swift */; };
@@ -395,7 +396,6 @@
 		F75862AE702A4F233B03039A /* ClaudeCheckpointParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2358AC9CB5C89A7D0A8AEBE4 /* ClaudeCheckpointParserTests.swift */; };
 		F7761B0329D579925F2DB98E /* UsageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3511F107E29217FB16567AF9 /* UsageView.swift */; };
 		F82494D6CFCDD8BE6B14FC55 /* TranscriptTimestampParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35708AC22F65B04148E72BD6 /* TranscriptTimestampParser.swift */; };
-		F88154549BFC32B848BC46DF /* PluginLoaderDuplicateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22797EC54BB59A2BBAEE36B8 /* PluginLoaderDuplicateTests.swift */; };
 		F9A2EB368C20702F1D6E2FD4 /* MenuBarFooter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67265718ACB26BE5322C36F /* MenuBarFooter.swift */; };
 		FA780917FC578D52FC305583 /* ModifierRecorderRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDA63237DD4854F868A0DCE4 /* ModifierRecorderRow.swift */; };
 		FB9EE9F2ED96FFDB080F9350 /* PagedTranscriptProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9A9A39A6BEC80B60E6FB235 /* PagedTranscriptProvider.swift */; };
@@ -521,7 +521,6 @@
 		1E5CDED000AE05D3ACDCD5D3 /* ProviderSessionRuntimeRetentionPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderSessionRuntimeRetentionPolicyTests.swift; sourceTree = "<group>"; };
 		1EBE034854D1539811ED0D5F /* SearchUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchUtils.swift; sourceTree = "<group>"; };
 		1F87F4ECC169E8118DB6035E /* TerminalDispatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalDispatch.swift; sourceTree = "<group>"; };
-		22797EC54BB59A2BBAEE36B8 /* PluginLoaderDuplicateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginLoaderDuplicateTests.swift; sourceTree = "<group>"; };
 		2292302272EF00BEA6426BAA /* NotificationTimerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationTimerStore.swift; sourceTree = "<group>"; };
 		2358AC9CB5C89A7D0A8AEBE4 /* ClaudeCheckpointParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeCheckpointParserTests.swift; sourceTree = "<group>"; };
 		2365B90C4B9B32DEA0C8687B /* BuiltinProviderPlugins.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuiltinProviderPlugins.swift; sourceTree = "<group>"; };
@@ -740,6 +739,7 @@
 		AD611B9F881CFE1E36A7AC9E /* ProviderSessionRuntimeRetentionPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderSessionRuntimeRetentionPolicy.swift; sourceTree = "<group>"; };
 		AD9EAD578F58BF668BBBFC13 /* TerminalReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalReadiness.swift; sourceTree = "<group>"; };
 		AE2FE68F258A1A73E233CC61 /* TranscriptPagingRealDataTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptPagingRealDataTests.swift; sourceTree = "<group>"; };
+		AEB97CF0C98BF9166A86948F /* PluginLoaderPreloadChecksTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginLoaderPreloadChecksTests.swift; sourceTree = "<group>"; };
 		AED35908F8D6A2C41A2A6E59 /* MenuBarBanners.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarBanners.swift; sourceTree = "<group>"; };
 		B0439EE1DDEC92CC5D5D1A59 /* TerminalProcessRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalProcessRunner.swift; sourceTree = "<group>"; };
 		B0BFB1D124794DCB5E6CC0BE /* ProviderAccountUIResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderAccountUIResolver.swift; sourceTree = "<group>"; };
@@ -928,7 +928,7 @@
 				EB1DFC6E058CCC6A5552A8DD /* NotchStateMachineTests.swift */,
 				563272C01660D2FA4FBCBE13 /* NotificationTimerStoreTests.swift */,
 				86F1F7334EBE1509C248AE11 /* PermissionRequestRegistryTests.swift */,
-				22797EC54BB59A2BBAEE36B8 /* PluginLoaderDuplicateTests.swift */,
+				AEB97CF0C98BF9166A86948F /* PluginLoaderPreloadChecksTests.swift */,
 				38FF156D3AF0B4CEE731144E /* PricingFetchServiceTests.swift */,
 				8C94B6F432561CF7BD3D4FBD /* ProviderSessionDisplayFormatterTests.swift */,
 				1E5CDED000AE05D3ACDCD5D3 /* ProviderSessionRuntimeRetentionPolicyTests.swift */,
@@ -1717,7 +1717,7 @@
 				22DCBBBC8A4BACCCD9C961F7 /* NotchStateMachineTests.swift in Sources */,
 				F508F785ACD950DAA8453487 /* NotificationTimerStoreTests.swift in Sources */,
 				1458F0ADB236E3CA0EDFAF4F /* PermissionRequestRegistryTests.swift in Sources */,
-				F88154549BFC32B848BC46DF /* PluginLoaderDuplicateTests.swift in Sources */,
+				7DEA73A1E6C29A8663854E90 /* PluginLoaderPreloadChecksTests.swift in Sources */,
 				6AEDA946AA94FE9217071F42 /* PricingFetchServiceTests.swift in Sources */,
 				CE2A21F122971B1792CF548D /* ProviderSessionDisplayFormatterTests.swift in Sources */,
 				0A5CBEF5FE38C53D5B64A89F /* ProviderSessionRuntimeRetentionPolicyTests.swift in Sources */,
