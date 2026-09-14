@@ -2160,7 +2160,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3.6.0;
+				CURRENT_PROJECT_VERSION = 3.6.1;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
@@ -2171,7 +2171,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 3.6.0;
+				MARKETING_VERSION = 3.6.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.ClaudeStatisticsKit;
 				PRODUCT_NAME = ClaudeStatisticsKit;
 				SDKROOT = macosx;
@@ -2188,7 +2188,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3.6.0;
+				CURRENT_PROJECT_VERSION = 3.6.1;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
@@ -2199,7 +2199,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 3.6.0;
+				MARKETING_VERSION = 3.6.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.ClaudeStatisticsKit;
 				PRODUCT_NAME = ClaudeStatisticsKit;
 				SDKROOT = macosx;
@@ -2217,11 +2217,11 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3.6.0;
+				CURRENT_PROJECT_VERSION = 3.6.1;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = ClaudeStatistics/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 3.6.0;
+				MARKETING_VERSION = 3.6.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.ClaudeStatistics;
 				PRODUCT_NAME = "Claude Statistics";
 				SDKROOT = macosx;
@@ -2314,11 +2314,11 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3.6.0;
+				CURRENT_PROJECT_VERSION = 3.6.1;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = ClaudeStatistics/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 3.6.0;
+				MARKETING_VERSION = 3.6.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tinystone.ClaudeStatistics;
 				PRODUCT_NAME = "Claude Statistics";
 				SDKROOT = macosx;
