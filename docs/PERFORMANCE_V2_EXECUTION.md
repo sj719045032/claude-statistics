@@ -1196,7 +1196,16 @@ Everything below is open, measured or reasoned, and not waived by the tests:
    same shared plugin directory, so installing them there — or publishing them
    to the catalog for 3.5.11 users — makes those plugins fail to load and
    removes Codex/Gemini from that app. Order: publish the SDK, release a host
-   linking it, then release the catalog. The fixed Codex/Gemini bundles are built and
+   linking it, then release the catalog.
+   The version gate that should have caught this was stale: the new symbols
+   shipped with `SDKInfo.apiVersion` still 0.4.0 and the plugins declaring
+   0.4.0 (Codex) and 0.1.0 (Gemini), so a 3.5.11 host would pass its
+   `minHostAPIVersion` check and fail in `dlopen`. Now `SDKInfo.apiVersion`
+   is **0.5.0** and both plugins are manifest version 1.2.0 requiring 0.5.0:
+   the catalog view, installer and loader of an older host skip them before
+   `dlopen` ("incompatible API version"), and `release-plugins.sh` copies the
+   requirement into `index.json`. Before a release, run the same `nm` check
+   for every catalog plugin rebuilt against the new SDK. The fixed Codex/Gemini bundles are built and
    tested; installing them into the shared plugin directory, releasing the
    catalog and publishing the SDK are separate, authorized steps. The release
    app keeps the old plugins until then, and 3.5.11 cannot read v15-moved

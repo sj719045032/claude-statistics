@@ -342,6 +342,8 @@ numbers for every item are in `PERFORMANCE_V2_EXECUTION.md`.
 **Do not install the new plugins into the shared plugin directory or publish
 them before a host release:** they import ~80 SDK symbols the 3.5.11 app does
 not export (checked with `nm`), so the release app would lose Codex/Gemini.
+`SDKInfo.apiVersion` is now 0.5.0 and both plugins (manifest 1.2.0) require
+it, so older hosts skip them before `dlopen` instead of failing to load.
 
 Remaining work is listed under "Remaining work" in the execution log. The
 "Recent changes" and "Outstanding work" sections below are the second pass's
