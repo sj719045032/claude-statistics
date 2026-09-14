@@ -1243,6 +1243,18 @@ Order: SDK, then host, then catalog, then local install.
   `SessionIndexUpdateTests.testFullReplacementWithRepeatedIDsCommitsOneRowPerID`
   and the gated `ClaudeCommitRealDataTests`, which parses and commits every
   local Claude transcript through the store's path and requires no retry.
+- **Host 3.6.1** (`f612684` fix, appcast `2f28d1b`): released with Sparkle
+  deltas from 3.5.10, 3.5.11 and 3.6.0; the served appcast lists 3.6.1. Before
+  releasing, the full host suite passed (955 tests, 0 failures) and the gated
+  `ClaudeCommitRealDataTests` committed all 38 local Claude session
+  transcripts with no retry — including the two that had been refused.
+  Installed on the owner's machine from the published ZIP (checksum-checked):
+  3.6.1 started with all seven enabled plugins including Codex 1.2.1, parsed
+  38 Claude and 668 Codex sessions, logged no retry or refused save and wrote
+  no crash report. Read-only on the real `data.db` afterwards, the two
+  sessions that had never committed hold checkpoints (322 KB and 241 KB),
+  `index_complete = 1`, and 1,103 and 1,222 index keys — exactly their unique
+  ID counts, one row per repeated record.
 - **Catalog v1.3.9** (`577fcbd` fix, `9ad6e0f` index): Codex 1.2.1 requiring
   API 0.5.0 replaces the rolled-back entry; Gemini stays 1.2.0. The served
   `index.json` lists it.

@@ -345,6 +345,15 @@ closed under a running query; see "Release" in the execution log). Rollback
 copies of 3.5.11 and the previous plugins:
 `~/Library/Application Support/ClaudeStatistics/backups/pre-3.6.0/`.
 
+**3.6.1** fixes Claude sessions whose transcripts repeat records: a full
+identified index rebuild hit the `session_index_keys` unique key, the commit
+was refused and the session retried silently on every refresh (two large
+local sessions, since 2026-09-11). Full replacements now keep one row per ID,
+and refused parses/saves log their step and SQLite error. Run
+`TEST_RUNNER_CLAUDE_STATS_REAL_DATA=1` with `ClaudeCommitRealDataTests` after
+touching the parser or the save path: every local Claude transcript must
+commit without a retry (38/38 on this machine).
+
 **Plugins must not ship before the host that exports their SDK symbols:** they import ~80 SDK symbols the 3.5.11 app does
 not export (checked with `nm`), so the release app would lose Codex/Gemini.
 `SDKInfo.apiVersion` is now 0.5.0 and both plugins (manifest 1.2.0) require
