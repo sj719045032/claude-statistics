@@ -8,7 +8,18 @@ struct MenuBarView: View {
     @ObservedObject var sessionViewModel: SessionViewModel
     @ObservedObject var store: SessionDataStore
     @ObservedObject var updaterService: UpdaterService
-    @State private var selectedTab: AppTab = AppTab.loadOrder().first ?? .sessions
+    @State private var selectedTab: AppTab = MenuBarView.debugInitialTab ?? AppTab.loadOrder().first ?? .sessions
+
+    /// Debug builds only: `CLAUDE_STATISTICS_DEBUG_TAB=<AppTab raw value>` opens
+    /// the panel on that tab, so a launched build can be screenshotted without
+    /// clicking through it (UI automation has no accessibility access here).
+    private static var debugInitialTab: AppTab? {
+        #if DEBUG
+        ProcessInfo.processInfo.environment["CLAUDE_STATISTICS_DEBUG_TAB"].flatMap(AppTab.init(rawValue:))
+        #else
+        nil
+        #endif
+    }
     @State private var tabOrder: [AppTab] = AppTab.loadOrder()
     @State private var showQuitConfirm = false
     @AppStorage(AppPreferences.fontScale) private var fontScale = 1.0

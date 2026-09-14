@@ -119,9 +119,18 @@ final class UsageViewModel: ObservableObject {
     private var usageSource: (any ProviderUsageSource)?
     private var usagePresentation: ProviderUsagePresentation = .standard
     private var cacheWatcher: UsageCacheWatcher?
+    private var refreshTask: Task<ProviderUsageSnapshot, Error>?
+    private var refreshRequestID: UUID?
+    private var sourceGeneration: UInt64 = 0
+    private var wantsRateLimitError = false
+    private var consecutiveFailures = 0
+    private var nextAutomaticRefreshAt: Date?
+    private var rateLimitedUntil: Date?
+    private let now: () -> Date
     weak var store: SessionDataStore?
 
-    init() {
+    init(now: @escaping () -> Date = Date.init) {
+        self.now = now
         // Create coordinator after all stored properties are initialized
         self.autoRefresh = AutoRefreshCoordinator { [weak self] in
             guard let self else { return }
@@ -133,6 +142,14 @@ final class UsageViewModel: ObservableObject {
     }
 
     func configure(source: (any ProviderUsageSource)?, usagePresentation: ProviderUsagePresentation) {
+        sourceGeneration &+= 1
+        refreshTask?.cancel()
+        refreshTask = nil
+        refreshRequestID = nil
+        consecutiveFailures = 0
+        nextAutomaticRefreshAt = nil
+        rateLimitedUntil = nil
+        wantsRateLimitError = false
         stopAutoRefresh()
         stopWatchingCache()
         usageSource = source
@@ -154,7 +171,7 @@ final class UsageViewModel: ObservableObject {
         }
     }
 
-    /// Auto-refresh: timer controls the interval, always call API
+    /// Automatic refreshes share in-flight work and respect failure backoff.
     func refresh() async {
         await refreshUsage(showRateLimitError: false)
     }
@@ -165,61 +182,78 @@ final class UsageViewModel: ObservableObject {
     }
 
     private func refreshUsage(showRateLimitError: Bool) async {
+        if let task = refreshTask, let requestID = refreshRequestID {
+            let generation = sourceGeneration
+            wantsRateLimitError = wantsRateLimitError || showRateLimitError
+            completeRefresh(await task.result, generation: generation, requestID: requestID)
+            return
+        }
+        if let until = rateLimitedUntil, until > now() {
+            if showRateLimitError {
+                errorMessage = rateLimitMessage(for: .rateLimited(retryInSeconds: Int(ceil(until.timeIntervalSince(now())))))
+            }
+            return
+        }
+        if !showRateLimitError, let until = nextAutomaticRefreshAt, until > now() { return }
+        let generation = sourceGeneration
+        let requestID = UUID()
+        let source = usageSource
         isLoading = true
         errorMessage = nil
-
-        do {
-            guard let usageSource else {
-                throw UsageError.invalidResponse
+        wantsRateLimitError = showRateLimitError
+        let task = Task {
+            guard let source else { throw UsageError.invalidResponse }
+            do {
+                return try await source.refreshSnapshot()
+            } catch UsageError.unauthorized {
+                try Task.checkCancellation()
+                guard await source.refreshCredentials() else { throw UsageError.unauthorized }
+                try Task.checkCancellation()
+                return try await source.refreshSnapshot()
             }
-            let snapshot = try await usageSource.refreshSnapshot()
+        }
+        refreshTask = task
+        refreshRequestID = requestID
+        completeRefresh(await task.result, generation: generation, requestID: requestID)
+    }
+
+    private func completeRefresh(_ result: Result<ProviderUsageSnapshot, Error>, generation: UInt64, requestID: UUID) {
+        // Account/provider replacement may have started another request while
+        // a non-cooperative old plugin request was still completing.
+        guard generation == sourceGeneration, refreshRequestID == requestID else { return }
+        refreshTask = nil
+        refreshRequestID = nil
+        isLoading = false
+        switch result {
+        case .success(let snapshot):
             usageData = snapshot.data
             lastFetchedAt = snapshot.fetchedAt
             errorMessage = nil
-        } catch let error as UsageError {
-            switch error {
-            case .rateLimited:
-                if showRateLimitError {
-                    errorMessage = rateLimitMessage(for: error)
-                } else {
-                    loadCache()
-                }
-            case .unauthorized:
-                let refreshed = await usageSource?.refreshCredentials() ?? false
-                if refreshed {
-                    do {
-                        guard let usageSource else {
-                            throw UsageError.invalidResponse
-                        }
-                        let snapshot = try await usageSource.refreshSnapshot()
-                        usageData = snapshot.data
-                        lastFetchedAt = snapshot.fetchedAt
-                        errorMessage = nil
-                    } catch {
-                        errorMessage = error.localizedDescription
-                        if usageData == nil { loadCache() }
-                    }
-                } else {
-                    errorMessage = UsageError.unauthorized.localizedDescription
-                    if usageData == nil { loadCache() }
-                }
-            default:
+            consecutiveFailures = 0
+            nextAutomaticRefreshAt = nil
+            rateLimitedUntil = nil
+        case .failure(let error):
+            guard !(error is CancellationError) else { return }
+            consecutiveFailures = min(consecutiveFailures + 1, 6)
+            let delay = min(900, 30 * pow(2, Double(consecutiveFailures - 1)))
+            nextAutomaticRefreshAt = now().addingTimeInterval(delay)
+            if case UsageError.rateLimited(let seconds) = error {
+                let until = now().addingTimeInterval(TimeInterval(max(1, seconds)))
+                rateLimitedUntil = until
+                nextAutomaticRefreshAt = max(nextAutomaticRefreshAt!, until)
+                if wantsRateLimitError { errorMessage = rateLimitMessage(for: .rateLimited(retryInSeconds: seconds)) }
+            } else {
                 errorMessage = error.localizedDescription
-                if usageData == nil { loadCache() }
             }
-        } catch {
-            errorMessage = error.localizedDescription
             if usageData == nil { loadCache() }
         }
-
-        isLoading = false
     }
 
     func startAutoRefresh() {
         autoRefresh?.start(interval: autoRefreshInterval)
-
+        let generation = sourceGeneration
         Task { [weak self] in
-            guard let self else { return }
+            guard let self, self.sourceGeneration == generation else { return }
             await self.refreshIfStale()
         }
     }
@@ -261,7 +295,7 @@ final class UsageViewModel: ObservableObject {
             return
         }
 
-        let age = Date().timeIntervalSince(lastFetchedAt)
+        let age = now().timeIntervalSince(lastFetchedAt)
         guard age >= autoRefreshInterval else { return }
         await refresh()
     }

@@ -107,6 +107,28 @@ public final class PluginRegistry {
         sources[manifest.id] = source
     }
 
+    /// The bucket in which `register` would throw `duplicateId` for a plugin
+    /// with this id and kind, or nil. The loader asks before dlopening a
+    /// bundle: a loaded image cannot be unloaded, and two images of the same
+    /// Swift module in one process make class lookup ambiguous.
+    public func conflictingBucket(id: String, kind: PluginKind) -> String? {
+        switch kind {
+        case .provider:
+            return providers[id] != nil ? "provider" : nil
+        case .terminal:
+            return terminals[id] != nil ? "terminal" : nil
+        case .shareRole:
+            return shareRoles[id] != nil ? "shareRole" : nil
+        case .shareCardTheme:
+            return shareThemes[id] != nil ? "shareCardTheme" : nil
+        case .both:
+            if providers[id] != nil { return "provider" }
+            return terminals[id] != nil ? "terminal" : nil
+        case .subscriptionExtension:
+            return subscriptionExtensions[id] != nil ? "subscriptionExtension" : nil
+        }
+    }
+
     public func source(for pluginID: String) -> PluginSource? {
         sources[pluginID]
     }

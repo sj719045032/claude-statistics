@@ -1,7 +1,7 @@
 import Foundation
 import ClaudeStatisticsKit
 
-final class ClaudeProvider: SessionProvider, @unchecked Sendable {
+final class ClaudeProvider: SessionProvider, CheckpointedSessionDataProvider, PagedTranscriptProvider, @unchecked Sendable {
     static let shared = ClaudeProvider()
 
     let kind: ProviderKind = .claude
@@ -82,8 +82,23 @@ final class ClaudeProvider: SessionProvider, @unchecked Sendable {
         TranscriptParser.shared.parseSession(at: path)
     }
 
+    var checkpointParserRevision: String { ClaudeCheckpointParser.revision }
+
+    func parseSessionUpdate(at path: String, checkpoint: SessionParseCheckpoint?) throws -> CheckpointedSessionUpdate? {
+        try ClaudeCheckpointParser.parse(at: path, checkpoint: checkpoint)
+    }
+
     func parseMessages(at path: String) -> [TranscriptDisplayMessage] {
         TranscriptParser.shared.parseMessages(at: path)
+    }
+
+    func loadTranscriptOutline(at path: String) throws -> TranscriptOutline {
+        try TranscriptParser.shared.loadTranscriptOutline(at: path)
+    }
+
+    func loadTranscriptPage(at path: String,
+                            entries: [TranscriptOutlineEntry]) throws -> [TranscriptDisplayMessage] {
+        try TranscriptParser.shared.loadTranscriptPage(at: path, entries: entries)
     }
 
     func parseSearchIndexMessages(at path: String) -> [SearchIndexMessage] {

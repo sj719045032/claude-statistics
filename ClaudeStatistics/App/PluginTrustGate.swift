@@ -33,8 +33,18 @@ enum PluginTrustGate {
     /// Singleton trust store. Tests can swap it out via `setTrustStore`.
     private(set) static var trustStore = TrustStore()
     /// Singleton disabled-set store. Tests swap via
-    /// `_resetForTesting(disabledStore:)`.
-    private(set) static var disabledStore = DisabledPluginsStore()
+    /// `_resetForTesting(disabledStore:)`. Debug builds only:
+    /// `CLAUDE_STATISTICS_DEBUG_DISABLED_PLUGINS=<path>` gives the build its own
+    /// disabled-set file, so a plugin can be enabled for a debug run without
+    /// touching the shared file the release app reads.
+    private(set) static var disabledStore: DisabledPluginsStore = {
+        #if DEBUG
+        if let path = ProcessInfo.processInfo.environment["CLAUDE_STATISTICS_DEBUG_DISABLED_PLUGINS"], !path.isEmpty {
+            return DisabledPluginsStore(storeURL: URL(fileURLWithPath: path))
+        }
+        #endif
+        return DisabledPluginsStore()
+    }()
     private static var pending: [PendingEntry] = []
     private static weak var pluginRegistry: PluginRegistry?
     /// Host-plugin factory map injected by `AppState` after init.

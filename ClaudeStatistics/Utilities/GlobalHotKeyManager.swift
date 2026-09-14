@@ -162,6 +162,10 @@ final class GlobalHotKeyManager {
     private var defaultsObserver: NSObjectProtocol?
     private let actions: [GlobalHotKeyAction: @MainActor () -> Void]
     private let signature = OSType(UInt32(ascii: "CSHK"))
+    /// Key code and modifiers last registered, per action. Every defaults
+    /// write in the process posts `didChangeNotification` — TelemetryDeck's
+    /// once a second among them — so re-register only when one changed.
+    private var registeredShortcuts: [GlobalHotKeyAction: [Int]] = [:]
 
     init(actions: [GlobalHotKeyAction: @MainActor () -> Void]) {
         self.actions = actions
@@ -173,7 +177,8 @@ final class GlobalHotKeyManager {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.registerCurrentShortcut()
+            guard let self, self.currentShortcuts() != self.registeredShortcuts else { return }
+            self.registerCurrentShortcut()
         }
     }
 
@@ -187,8 +192,19 @@ final class GlobalHotKeyManager {
         }
     }
 
+    private func currentShortcuts() -> [GlobalHotKeyAction: [Int]] {
+        var result: [GlobalHotKeyAction: [Int]] = [:]
+        for action in GlobalHotKeyAction.allCases where actions[action] != nil {
+            if let shortcut = GlobalHotKeyShortcut.current(for: action) {
+                result[action] = [Int(shortcut.keyCode), Int(shortcut.modifiers)]
+            }
+        }
+        return result
+    }
+
     private func registerCurrentShortcut() {
         unregisterHotKeys()
+        registeredShortcuts = currentShortcuts()
 
         for action in GlobalHotKeyAction.allCases {
             guard actions[action] != nil,

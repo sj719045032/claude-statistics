@@ -16,8 +16,8 @@ enum StatsPeriod: String, CaseIterable {
         }
     }
 
-    func startOfPeriod(for date: Date, weeklyResetDate: Date? = nil) -> Date {
-        let cal = Calendar.current
+    func startOfPeriod(for date: Date, weeklyResetDate: Date? = nil, calendar: Calendar = .current) -> Date {
+        let cal = calendar
         switch self {
         case .all:
             return Date.distantPast

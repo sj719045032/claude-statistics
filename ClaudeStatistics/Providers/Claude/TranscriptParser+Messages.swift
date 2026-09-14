@@ -13,6 +13,196 @@ extension TranscriptParser {
         options: []
     )
 
+    /// What a single record contributes before cross-record linking. Shared by
+    /// the whole-file parse, the outline pass and page materialization so all
+    /// three agree on row ids, ordering and content.
+    enum RecordRow {
+        /// Id is assigned by the linker from the running row counter.
+        case user(TranscriptDisplayMessage)
+        case assistantText(TranscriptDisplayMessage)
+        case toolUse(toolId: String, TranscriptDisplayMessage)
+        case toolResult(toolId: String, text: String)
+    }
+
+    /// Cross-record identity, dedup and result routing. It owns the row
+    /// bookkeeping and hands back positions; each caller owns its own payload
+    /// storage (full messages for a parse, byte locators for an outline).
+    struct RowLinker {
+        struct Slot {
+            let id: String
+            let role: String
+            let toolName: String?
+            /// The row shows its tool result because the call itself carried
+            /// no detail. Decided when the row is created, so an outline can
+            /// cite the result record without materializing the message.
+            let wantsResult: Bool
+        }
+
+        enum Outcome {
+            case appended(Slot)
+            /// A streaming revision of an assistant text row already emitted.
+            case revised(index: Int)
+            /// A duplicate `tool_use` id; the first occurrence owns the row.
+            case skipped
+        }
+
+        private var count = 0
+        private var index = 0
+        private var textRowIndices: [String: Int] = [:]
+        private var toolResultTargets: [String: Int] = [:]
+        private var seenToolIds: Set<String> = []
+
+        /// Accepts the rows that create or revise a display row. A
+        /// `.toolResult` row carries no row of its own — route it through
+        /// `resultTarget(for:)` instead.
+        mutating func accept(_ row: RecordRow) -> Outcome {
+            switch row {
+            case .user:
+                let id = "msg-\(index)"
+                index += 1
+                count += 1
+                return .appended(Slot(id: id, role: "user", toolName: nil, wantsResult: false))
+
+            case .assistantText(let message):
+                if let existing = textRowIndices[message.id] { return .revised(index: existing) }
+                textRowIndices[message.id] = count
+                count += 1
+                return .appended(Slot(id: message.id, role: "assistant", toolName: nil, wantsResult: false))
+
+            case .toolUse(let toolId, let message):
+                guard !seenToolIds.contains(toolId) else { return .skipped }
+                seenToolIds.insert(toolId)
+                let wantsResult = message.toolDetail?.isEmpty ?? true
+                if wantsResult { toolResultTargets[toolId] = count }
+                count += 1
+                index += 1
+                return .appended(Slot(
+                    id: message.id, role: "tool", toolName: message.toolName,
+                    wantsResult: wantsResult
+                ))
+
+            case .toolResult:
+                return .skipped
+            }
+        }
+
+        /// Row that should display `toolId`'s result, or nil when the call
+        /// already carried its own detail or produced no row.
+        func resultTarget(for toolId: String) -> Int? { toolResultTargets[toolId] }
+    }
+
+    /// Map one decoded record to the rows it contributes. `recordOffset` only
+    /// backs the fallback id for a malformed `tool_use` without an id; it keeps
+    /// that id positional so a page load reproduces it without replaying the
+    /// whole file.
+    static func recordRows(from entry: TranscriptEntry, recordOffset: Int64,
+                           sessionId: String) -> [RecordRow] {
+        switch entry.type {
+        case "queue-operation":
+            // Queued user messages (e.g. interrupted and re-sent)
+            guard entry.operation == "enqueue",
+                  let text = entry.content,
+                  let cleaned = cleanUserDisplayText(text) else { return [] }
+            return [.user(TranscriptDisplayMessage(
+                id: "", role: "user", text: cleaned, timestamp: entry.timestampDate
+            ))]
+
+        case "user", "human":
+            guard let text = extractAllText(from: entry),
+                  let cleaned = cleanUserDisplayText(text) else { return [] }
+            // Skip pure image-path messages (image already shown by [Image #N] message)
+            if cleaned.hasPrefix("[Image: source:") && cleaned.hasSuffix("]") { return [] }
+
+            var msg = TranscriptDisplayMessage(
+                id: "", role: "user", text: cleaned, timestamp: entry.timestampDate
+            )
+            msg.imagePaths = imagePaths(in: cleaned, sessionId: sessionId)
+            return [.user(msg)]
+
+        case "assistant":
+            guard let message = entry.message else { return [] }
+            var rows: [RecordRow] = []
+
+            // Text content (dedup streaming). A record without a message id
+            // cannot be revised later, so it gets a positional id.
+            let msgId = message.id ?? "at-\(recordOffset)"
+            let textContent = extractAllText(from: entry)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if let text = textContent, !text.isEmpty {
+                rows.append(.assistantText(TranscriptDisplayMessage(
+                    id: "text-\(msgId)", role: "assistant", text: text, timestamp: entry.timestampDate
+                )))
+            }
+
+            // Tool use + tool result content items
+            for (position, item) in (message.content ?? []).enumerated() {
+                if case .toolUse(let tc) = item {
+                    let toolId = tc.id ?? "at-\(recordOffset)-\(position)"
+                    let name = tc.name ?? "unknown"
+                    let (summary, detail) = toolSummaryAndDetail(name: name, input: tc.input)
+                    var msg = TranscriptDisplayMessage(
+                        id: "tool-\(toolId)", role: "tool", text: summary,
+                        timestamp: entry.timestampDate, toolName: name, toolDetail: detail
+                    )
+                    // Edit tool: store old/new strings for TextDiffView
+                    if name == "Edit", let dict = tc.input?.value as? [String: Any] {
+                        msg.editOldString = dict["old_string"] as? String
+                        msg.editNewString = dict["new_string"] as? String
+                    }
+                    rows.append(.toolUse(toolId: toolId, msg))
+                }
+
+                if case .toolResult(let tr) = item, let toolId = tr.toolUseId,
+                   let resultText = extractToolResultText(tr.content) {
+                    rows.append(.toolResult(toolId: toolId, text: resultText))
+                }
+            }
+            return rows
+
+        default:
+            return []
+        }
+    }
+
+    private static func imagePaths(in cleaned: String, sessionId: String) -> [String] {
+        // Extract image paths: [Image: source: /path] or [Image #N] → construct path
+        let nsRange = NSRange(cleaned.startIndex..., in: cleaned)
+        var imagePaths: [String] = []
+        // Pattern 1: explicit path
+        for m in imagePathPattern.matches(in: cleaned, range: nsRange) {
+            if let r = Range(m.range(at: 1), in: cleaned) {
+                imagePaths.append(String(cleaned[r]))
+            }
+        }
+        guard imagePaths.isEmpty else { return imagePaths }
+
+        // Pattern 2: [Image #N] → ~/.claude/image-cache/{sessionId}/{N}.png
+        let cacheDir = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/image-cache/\(sessionId)")
+        for m in imageNumPattern.matches(in: cleaned, range: nsRange) {
+            if let r = Range(m.range(at: 1), in: cleaned) {
+                let num = String(cleaned[r])
+                let imgPath = (cacheDir as NSString).appendingPathComponent("\(num).png")
+                if FileManager.default.fileExists(atPath: imgPath) {
+                    imagePaths.append(imgPath)
+                }
+            }
+        }
+        return imagePaths
+    }
+
+    /// Replace a row's id while keeping every other field. Row ids come from
+    /// the linker, not from the record the fields were decoded from.
+    static func withId(_ id: String, _ message: TranscriptDisplayMessage) -> TranscriptDisplayMessage {
+        var copy = TranscriptDisplayMessage(
+            id: id, role: message.role, text: message.text, timestamp: message.timestamp,
+            toolName: message.toolName, toolDetail: message.toolDetail
+        )
+        copy.editOldString = message.editOldString
+        copy.editNewString = message.editNewString
+        copy.imagePaths = message.imagePaths
+        return copy
+    }
+
     /// Parse all messages from a JSONL file for transcript display.
     ///
     /// PR7: iterates the file byte-level instead of allocating the
@@ -32,138 +222,49 @@ extension TranscriptParser {
         defer { PerformanceTracer.end("Claude.parseMessages", signpostState) }
         let decoder = JSONDecoder()
 
+        var linker = TranscriptParser.RowLinker()
         var messages: [TranscriptDisplayMessage] = []
-        var seenMsgIds: Set<String> = []
-        var seenToolIds: Set<String> = []
         var toolResults: [String: String] = [:]      // tool_use_id → result text
-        var toolMsgIndices: [String: Int] = [:]       // tool_use_id → index in messages
-        var index = 0
 
         var lineStart = data.startIndex
         while lineStart < data.endIndex {
             let lineEnd = data[lineStart...].firstIndex(of: UInt8(ascii: "\n")) ?? data.endIndex
             let lineSlice = data[lineStart..<lineEnd]
+            let recordOffset = Int64(data.distance(from: data.startIndex, to: lineStart))
             lineStart = lineEnd < data.endIndex ? data.index(after: lineEnd) : data.endIndex
-            guard !lineSlice.isEmpty,
-                  let entry = try? decoder.decode(TranscriptEntry.self, from: lineSlice) else { continue }
+            // Row extraction bridges to Foundation (regex matching over the
+            // message text), which autoreleases. Drain per record or the whole
+            // file's bridged strings stay alive until the parse returns.
+            autoreleasepool {
+                guard !lineSlice.isEmpty,
+                      let entry = try? decoder.decode(TranscriptEntry.self, from: lineSlice) else { return }
 
-            switch entry.type {
-            case "queue-operation":
-                // Queued user messages (e.g. interrupted and re-sent)
-                guard entry.operation == "enqueue" else { continue }
-                guard let text = entry.content, let cleaned = Self.cleanUserDisplayText(text) else { continue }
-                messages.append(TranscriptDisplayMessage(
-                    id: "msg-\(index)", role: "user", text: cleaned, timestamp: entry.timestampDate
-                ))
-                index += 1
-
-            case "user", "human":
-                guard let text = Self.extractAllText(from: entry) else { continue }
-                guard let cleaned = Self.cleanUserDisplayText(text) else { continue }
-
-                // Skip pure image-path messages (image already shown by [Image #N] message)
-                if cleaned.hasPrefix("[Image: source:") && cleaned.hasSuffix("]") { continue }
-
-                // Extract image paths: [Image: source: /path] or [Image #N] → construct path
-                let nsRange = NSRange(cleaned.startIndex..., in: cleaned)
-                var imagePaths: [String] = []
-                // Pattern 1: explicit path
-                for m in Self.imagePathPattern.matches(in: cleaned, range: nsRange) {
-                    if let r = Range(m.range(at: 1), in: cleaned) {
-                        imagePaths.append(String(cleaned[r]))
+                for row in TranscriptParser.recordRows(from: entry, recordOffset: recordOffset, sessionId: sessionId) {
+                    if case .toolResult(let toolId, let text) = row {
+                        toolResults[toolId] = text
+                        continue
+                    }
+                    guard let message = row.message else { continue }
+                    switch linker.accept(row) {
+                    case .appended(let slot):
+                        messages.append(TranscriptParser.withId(slot.id, message))
+                    case .revised(let index):
+                        messages[index] = TranscriptParser.withId(messages[index].id, message)
+                    case .skipped:
+                        continue
                     }
                 }
-                // Pattern 2: [Image #N] → ~/.claude/image-cache/{sessionId}/{N}.png
-                if imagePaths.isEmpty {
-                    let cacheDir = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/image-cache/\(sessionId)")
-                    for m in Self.imageNumPattern.matches(in: cleaned, range: nsRange) {
-                        if let r = Range(m.range(at: 1), in: cleaned) {
-                            let num = String(cleaned[r])
-                            let imgPath = (cacheDir as NSString).appendingPathComponent("\(num).png")
-                            if FileManager.default.fileExists(atPath: imgPath) {
-                                imagePaths.append(imgPath)
-                            }
-                        }
-                    }
-                }
-
-                var msg = TranscriptDisplayMessage(
-                    id: "msg-\(index)", role: "user", text: cleaned, timestamp: entry.timestampDate
-                )
-                msg.imagePaths = imagePaths
-                messages.append(msg)
-                index += 1
-
-            case "assistant":
-                guard let message = entry.message else { continue }
-                let msgId = message.id ?? UUID().uuidString
-
-                // Text content (dedup streaming)
-                let textContent = Self.extractAllText(from: entry)?
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                if let text = textContent, !text.isEmpty {
-                    if seenMsgIds.contains(msgId) {
-                        if let i = messages.indices.last(where: { messages[$0].id == "text-\(msgId)" }) {
-                            messages[i] = TranscriptDisplayMessage(
-                                id: "text-\(msgId)", role: "assistant", text: text, timestamp: entry.timestampDate
-                            )
-                        }
-                    } else {
-                        seenMsgIds.insert(msgId)
-                        messages.append(TranscriptDisplayMessage(
-                            id: "text-\(msgId)", role: "assistant", text: text, timestamp: entry.timestampDate
-                        ))
-                    }
-                }
-
-                // Tool use + tool result content items
-                if let items = message.content {
-                    for item in items {
-                        if case .toolUse(let tc) = item {
-                            let toolId = tc.id ?? "tool-\(index)"
-                            guard !seenToolIds.contains(toolId) else { continue }
-                            seenToolIds.insert(toolId)
-
-                            let name = tc.name ?? "unknown"
-                            let (summary, detail) = Self.toolSummaryAndDetail(name: name, input: tc.input)
-                            let msgIdx = messages.count
-                            var msg = TranscriptDisplayMessage(
-                                id: "tool-\(toolId)", role: "tool", text: summary,
-                                timestamp: entry.timestampDate, toolName: name, toolDetail: detail
-                            )
-                            // Edit tool: store old/new strings for TextDiffView
-                            if name == "Edit", let dict = tc.input?.value as? [String: Any] {
-                                msg.editOldString = dict["old_string"] as? String
-                                msg.editNewString = dict["new_string"] as? String
-                            }
-                            messages.append(msg)
-                            toolMsgIndices[toolId] = msgIdx
-                            index += 1
-                        }
-
-                        if case .toolResult(let tr) = item, let toolId = tr.toolUseId {
-                            if let resultText = Self.extractToolResultText(tr.content) {
-                                toolResults[toolId] = resultText
-                            }
-                        }
-                    }
-                }
-
-            default:
-                continue
             }
         }
 
         // Link tool results to tool messages that don't already have detail from input
         for (toolId, result) in toolResults {
-            guard let msgIdx = toolMsgIndices[toolId], msgIdx < messages.count else { continue }
-            let msg = messages[msgIdx]
-            if msg.toolDetail == nil || msg.toolDetail!.isEmpty {
-                messages[msgIdx] = TranscriptDisplayMessage(
-                    id: msg.id, role: msg.role, text: msg.text,
-                    timestamp: msg.timestamp, toolName: msg.toolName, toolDetail: result
-                )
-            }
+            guard let index = linker.resultTarget(for: toolId), index < messages.count else { continue }
+            let msg = messages[index]
+            messages[index] = TranscriptDisplayMessage(
+                id: msg.id, role: msg.role, text: msg.text,
+                timestamp: msg.timestamp, toolName: msg.toolName, toolDetail: result
+            )
         }
 
         return messages
@@ -172,7 +273,7 @@ extension TranscriptParser {
     // MARK: - Tool summary & detail extraction
 
     /// Returns (summary line, detail content) for a tool call
-    fileprivate static func toolSummaryAndDetail(name: String, input: AnyCodable?) -> (String, String?) {
+    static func toolSummaryAndDetail(name: String, input: AnyCodable?) -> (String, String?) {
         guard let dict = input?.value as? [String: Any] else {
             return (input?.stringValue ?? "", nil)
         }
@@ -227,12 +328,25 @@ extension TranscriptParser {
                 let first = cmd.components(separatedBy: "\n").first ?? cmd
                 return (first.count > 120 ? String(first.prefix(120)) + "…" : first, nil)
             }
-            for (_, v) in dict {
-                if let s = v as? String, !s.isEmpty {
+            // Sorted, not `dict.first` — dictionary order is not stable across
+            // decodes, and the outline pass and a later page load must produce
+            // the same summary for the same record.
+            for key in dict.keys.sorted() {
+                if let s = dict[key] as? String, !s.isEmpty {
                     return (s.count > 120 ? String(s.prefix(120)) + "…" : s, nil)
                 }
             }
             return ("", nil)
+        }
+    }
+}
+
+extension TranscriptParser.RecordRow {
+    /// The display message a row carries, or nil for a bare tool result.
+    var message: TranscriptDisplayMessage? {
+        switch self {
+        case .user(let m), .assistantText(let m), .toolUse(_, let m): return m
+        case .toolResult: return nil
         }
     }
 }

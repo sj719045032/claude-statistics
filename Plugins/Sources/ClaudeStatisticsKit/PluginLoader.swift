@@ -175,6 +175,13 @@ public enum PluginLoader {
         guard trustEvaluator(manifest, url) else {
             return .failure(.trustDenied)
         }
+        // Refuse a duplicate before dlopen, not after: registration would
+        // reject it anyway, but by then its image is mapped for good — and a
+        // second copy of a module already loaded (e.g. a bundled and a user
+        // install of the same plugin) leaves class lookup ambiguous.
+        if let bucket = registry.conflictingBucket(id: manifest.id, kind: manifest.kind) {
+            return .failure(.duplicateId(id: manifest.id, bucket: bucket))
+        }
         // `Bundle.load()` swallows the underlying dyld / code-signing
         // error, so the host previously surfaced an opaque
         // `bundleLoadFailed` regardless of whether dlopen failed on

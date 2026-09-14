@@ -5,8 +5,10 @@ extension TranscriptParser {
     /// Lightweight transcript extraction for FTS indexing. Keep this separate from
     /// parseMessages so startup indexing does not pay UI transcript costs.
     func parseSearchIndexMessages(at path: String) -> [SearchIndexMessage] {
-        guard let data = FileManager.default.contents(atPath: path) else { return [] }
-        return parseSearchIndexMessages(fromData: data)
+        guard let reader = try? TranscriptFileReader(path: path, includeFinalLine: true) else { return [] }
+        // A read error must reject the projection, not masquerade as EOF and
+        // commit the prefix of a truncated/replaced transcript as a full index.
+        return (try? parseSearchIndexMessages(nextLine: { try reader.readNext() })) ?? []
     }
 
     /// Internal entry that takes pre-loaded `Data`, used by the combined
@@ -15,53 +17,29 @@ extension TranscriptParser {
     /// full-`String(decoding:)` allocation, which on a 30 MB JSONL
     /// peaked at several multiples of the on-disk size.
     func parseSearchIndexMessages(fromData data: Data) -> [SearchIndexMessage] {
-        let decoder = JSONDecoder()
-        var messages: [SearchIndexMessage] = []
-
         var lineStart = data.startIndex
-        while lineStart < data.endIndex {
+        return parseSearchIndexMessages(nextLine: {
+            guard lineStart < data.endIndex else { return nil }
             let lineEnd = data[lineStart...].firstIndex(of: UInt8(ascii: "\n")) ?? data.endIndex
             let lineSlice = data[lineStart..<lineEnd]
             lineStart = lineEnd < data.endIndex ? data.index(after: lineEnd) : data.endIndex
-            guard !lineSlice.isEmpty,
-                  let entry = try? decoder.decode(TranscriptEntry.self, from: lineSlice) else { continue }
+            return lineSlice
+        })
+    }
 
-            switch entry.type {
-            case "queue-operation":
-                if entry.operation == "enqueue",
-                   let text = entry.content,
-                   let content = Self.cleanSearchText(text) {
-                    messages.append(SearchIndexMessage(role: "user", content: content, timestamp: entry.timestampDate))
-                }
-
-            case "user", "human":
-                guard let text = Self.extractAllText(from: entry),
-                      let content = Self.cleanSearchText(text) else { continue }
-                messages.append(SearchIndexMessage(role: "user", content: content, timestamp: entry.timestampDate))
-
-            case "assistant":
-                if let text = Self.extractAllText(from: entry),
-                   let content = Self.cleanSearchText(text) {
-                    messages.append(SearchIndexMessage(role: "assistant", content: content, timestamp: entry.timestampDate))
-                }
-
-                guard let items = entry.message?.content else { continue }
-                for item in items {
-                    switch item {
-                    case .toolUse(let tool):
-                        guard let content = Self.searchText(forToolUse: tool) else { continue }
-                        messages.append(SearchIndexMessage(role: "tool", content: content, timestamp: entry.timestampDate))
-                    case .toolResult(let result):
-                        guard let text = Self.extractToolResultText(result.content),
-                              let content = Self.cleanSearchText(String(text.prefix(500))) else { continue }
-                        messages.append(SearchIndexMessage(role: "tool", content: content, timestamp: entry.timestampDate))
-                    default:
-                        continue
-                    }
-                }
-
-            default:
-                continue
+    func parseSearchIndexMessages(nextLine: () throws -> Data?) rethrows -> [SearchIndexMessage] {
+        var messages: [SearchIndexMessage] = []
+        let timestamps = TranscriptTimestampParser()
+        while let lineSlice = try nextLine() {
+            guard !lineSlice.isEmpty else { continue }
+            // Decode and project inside a pool: the decoded tree and the
+            // bridged strings the projection walks are autoreleased, and the
+            // projected `SearchIndexMessage`s escape as native Swift values.
+            autoreleasepool {
+                guard let entry = try? JSONSerialization.jsonObject(with: lineSlice) as? [String: Any] else { return }
+                messages.append(contentsOf: Self.searchIndexProjection(
+                    from: entry, recordID: "", timestamp: timestamps.date(entry["timestamp"] as? String)
+                ).map(\.message))
             }
         }
 
@@ -83,11 +61,54 @@ extension TranscriptParser {
         return SessionParseResult(stats: stats, searchMessages: messages)
     }
 
-    fileprivate static func searchText(forToolUse tool: TranscriptContent.ToolUseContent) -> String? {
-        var parts: [String] = []
-        if let name = tool.name { parts.append(name) }
+    /// A record is decoded once by the checkpoint parser, then projected into
+    /// stats, preview and index. Stable IDs replace streaming revisions in FTS.
+    static func searchIndexProjection(from entry: [String: Any], recordID: String,
+                                      timestamp: Date?) -> [IdentifiedSearchIndexMessage] {
+        let type = entry["type"] as? String ?? ""
+        let message = entry["message"] as? [String: Any] ?? [:]
+        let messageID = message["id"] as? String ?? recordID
+        var result: [IdentifiedSearchIndexMessage] = []
+        func add(_ id: String, _ role: String, _ text: String?) {
+            guard let text, let cleaned = cleanSearchText(text) else { return }
+            result.append(.init(id: id, message: .init(role: role, content: cleaned, timestamp: timestamp)))
+        }
+        switch type {
+        case "queue-operation":
+            if entry["operation"] as? String == "enqueue" { add("queue:\(recordID)", "user", entry["content"] as? String) }
+        case "user", "human":
+            add("user:\(entry["uuid"] as? String ?? recordID)", "user", rawMessageText(message))
+        case "assistant":
+            add("assistant:\(messageID)", "assistant", rawMessageText(message))
+            for (index, item) in (message["content"] as? [[String: Any]] ?? []).enumerated() {
+                let fallback = "\(recordID):\(index)"
+                switch item["type"] as? String {
+                case "tool_use":
+                    add("tool:\(item["id"] as? String ?? fallback)", "tool", searchText(forRawToolUse: item))
+                case "tool_result":
+                    let text = item["content"].flatMap { extractToolResultText(AnyCodable($0)) }
+                    add("result:\(item["tool_use_id"] as? String ?? fallback)", "tool", text.map { String($0.prefix(500)) })
+                default: break
+                }
+            }
+        default: break
+        }
+        return result
+    }
 
-        if let dict = tool.input?.value as? [String: Any] {
+    static func rawMessageText(_ message: [String: Any]) -> String? {
+        if let text = message["content"] as? String { return text }
+        let texts = (message["content"] as? [[String: Any]] ?? []).compactMap {
+            $0["type"] as? String == "text" ? $0["text"] as? String : nil
+        }
+        return texts.isEmpty ? nil : texts.joined(separator: "\n")
+    }
+
+    private static func searchText(forRawToolUse tool: [String: Any]) -> String? {
+        var parts: [String] = []
+        if let name = tool["name"] as? String { parts.append(name) }
+
+        if let dict = tool["input"] as? [String: Any] {
             for key in ["file_path", "path", "pattern"] {
                 if let value = dict[key] as? String { parts.append(value) }
             }

@@ -31,12 +31,8 @@ struct UsageView: View {
     @State private var selectedWindowTab: UsageWindowTab = .fiveHour
     @State private var selectedTrendWindowID: String = ""
 
-    /// PR4: memoize `windowTrendInfo` / `localTrendInfo` results so
-    /// SwiftUI body re-evaluations (tab switches, hover, etc.) don't
-    /// rerun the parsedStats fold. Invalidated whenever `store.
-    /// parsedStatsVersion` bumps.
-    @State private var trendInfoCache: [String: WindowTrendInfo] = [:]
-    @State private var cachedSnapshotVersion: UInt64 = 0
+    @StateObject private var trendModel = UsageTrendViewModel()
+    @State private var trendSnapshotTime = Date()
 
     private var usagePresentation: ProviderUsagePresentation {
         store.provider.usagePresentation
@@ -102,6 +98,20 @@ struct UsageView: View {
                 await profileViewModel.loadProfile()
             }
         }
+        .task(id: appState.isPopoverVisible) {
+            guard appState.isPopoverVisible else {
+                trendModel.stop()
+                return
+            }
+            // A stable snapshot between ticks prevents hover/layout updates
+            // from generating new rolling windows and cache entries.
+            while !Task.isCancelled {
+                trendSnapshotTime = Date()
+                do { try await Task.sleep(nanoseconds: 60_000_000_000) }
+                catch { return }
+            }
+        }
+        .onDisappear { trendModel.stop() }
         .onChange(of: viewModel.usageData) { _, _ in
             ensureValidSelectedWindow()
             ensureValidSelectedTrendWindow()
@@ -109,15 +119,8 @@ struct UsageView: View {
         .onChange(of: viewModel.subscriptionInfo) { _, _ in
             ensureValidSelectedTrendWindow()
         }
-        .onChange(of: store.parsedStatsVersion) { _, newVersion in
-            // PR4: invalidate trend cache the moment the underlying
-            // parsedStats changes (new dirty session parsed, force
-            // rescan, etc.).
-            if cachedSnapshotVersion != newVersion {
-                trendInfoCache.removeAll()
-                cachedSnapshotVersion = newVersion
-            }
-        }
+        .onChange(of: store.parsedStatsVersion) { _, _ in trendSnapshotTime = Date() }
+        .onChange(of: viewModel.lastFetchedAt) { _, _ in trendSnapshotTime = Date() }
     }
 }
 
@@ -128,14 +131,6 @@ extension UsageView {
         case sevenDayFable
         case sevenDayOpus
         case sevenDaySonnet
-    }
-
-    struct WindowTrendInfo {
-        let dataPoints: [TrendDataPoint]
-        let granularity: TrendGranularity
-        let windowStart: Date
-        let windowEnd: Date
-        let modelBreakdown: [ModelUsage]
     }
 
     private var header: some View {
@@ -325,8 +320,7 @@ extension UsageView {
                         showsExhaustEstimate: true,
                         showsChart: true
                     ),
-                    modelFilter: isFable,
-                    modelFilterID: "fable"
+                    modelFilter: .matching("fable")
                 )
             case .sevenDayOpus:
                 windowChart(
@@ -340,8 +334,7 @@ extension UsageView {
                         showsExhaustEstimate: true,
                         showsChart: true
                     ),
-                    modelFilter: isOpus,
-                    modelFilterID: "opus"
+                    modelFilter: .matching("opus")
                 )
             case .sevenDaySonnet:
                 windowChart(
@@ -355,8 +348,7 @@ extension UsageView {
                         showsExhaustEstimate: true,
                         showsChart: true
                     ),
-                    modelFilter: isSonnet,
-                    modelFilterID: "sonnet"
+                    modelFilter: .matching("sonnet")
                 )
             }
         }
@@ -388,96 +380,6 @@ extension UsageView {
         localTrendContent(usage: usage)
     }
 
-    private func windowTrendInfo(
-        for window: UsageWindow?,
-        descriptor: ProviderUsageWindowPresentation,
-        modelFilter: ((String) -> Bool)? = nil,
-        modelFilterID: String = "all"
-    ) -> WindowTrendInfo? {
-        let signpostState = PerformanceTracer.begin("UsageView.windowTrendInfo")
-        defer { PerformanceTracer.end("UsageView.windowTrendInfo", signpostState) }
-        guard store.isFullParseComplete,
-              let window,
-              let resetAt = window.resetsAtDate,
-              let start = Calendar.current.date(byAdding: descriptor.durationComponent, value: descriptor.durationValue, to: resetAt) else {
-            return nil
-        }
-
-        let snapshotTime = min(viewModel.lastFetchedAt ?? Date(), resetAt)
-        guard start < snapshotTime else { return nil }
-
-        let key = "win|\(start.timeIntervalSince1970)|\(snapshotTime.timeIntervalSince1970)|\(resetAt.timeIntervalSince1970)|\(descriptor.granularity)|\(modelFilterID)"
-        if let cached = trendInfoCache[key] { return cached }
-
-        let data = store.aggregateWindowTrendData(
-            from: start,
-            to: snapshotTime,
-            granularity: descriptor.granularity,
-            cumulative: true,
-            modelFilter: modelFilter
-        )
-        guard !data.isEmpty else { return nil }
-        let models = store.windowModelBreakdown(from: start, to: snapshotTime, modelFilter: modelFilter)
-        let info = WindowTrendInfo(
-            dataPoints: data,
-            granularity: descriptor.granularity,
-            windowStart: start,
-            windowEnd: resetAt,
-            modelBreakdown: models
-        )
-        trendInfoCache[key] = info
-        return info
-    }
-
-    private func localTrendInfo(for descriptor: ProviderUsageTrendPresentation, usage: UsageData?) -> WindowTrendInfo? {
-        let signpostState = PerformanceTracer.begin("UsageView.localTrendInfo")
-        defer { PerformanceTracer.end("UsageView.localTrendInfo", signpostState) }
-        let range = localTrendRange(for: descriptor, usage: usage)
-        let dataEnd = min(Date(), range.windowEnd)
-        guard store.isFullParseComplete,
-              range.windowStart < dataEnd else {
-            return nil
-        }
-
-        let modelFamily = descriptor.modelFamily ?? "default"
-        let key = "local|\(range.windowStart.timeIntervalSince1970)|\(dataEnd.timeIntervalSince1970)|\(range.windowEnd.timeIntervalSince1970)|\(descriptor.granularity)|\(modelFamily)"
-        if let cached = trendInfoCache[key] { return cached }
-
-        let filter: ((String) -> Bool)? = {
-            if let family = descriptor.modelFamily {
-                return { model in
-                    let lower = model.lowercased()
-                    if family == "flash" {
-                        return lower.contains("flash") && !lower.contains("lite")
-                    }
-                    if family == "flash-lite" {
-                        return lower.contains("flash-lite")
-                    }
-                    return lower.contains(family.lowercased())
-                }
-            }
-            return defaultUsageModelFilter
-        }()
-
-        let data = store.aggregateWindowTrendData(
-            from: range.windowStart,
-            to: dataEnd,
-            granularity: descriptor.granularity,
-            cumulative: true,
-            modelFilter: filter
-        )
-        let models = store.windowModelBreakdown(from: range.windowStart, to: dataEnd, modelFilter: filter)
-        let info = WindowTrendInfo(
-            dataPoints: data,
-            granularity: descriptor.granularity,
-            windowStart: range.windowStart,
-            windowEnd: range.windowEnd,
-            modelBreakdown: models
-        )
-        trendInfoCache[key] = info
-        return info
-    }
-
     @ViewBuilder
     private func localTrendContent(usage: UsageData?) -> some View {
         let trendWindows = effectiveLocalTrendWindows
@@ -499,33 +401,14 @@ extension UsageView {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                if let info = localTrendInfo(for: descriptor, usage: usage) {
-                    windowTimeRange(info)
-                    UsageTrendChartView(
-                        dataPoints: info.dataPoints,
-                        granularity: info.granularity,
-                        windowStart: info.windowStart,
-                        windowEnd: info.windowEnd
-                    )
-                    if !info.modelBreakdown.isEmpty {
-                        CostModelsCard(models: info.modelBreakdown)
-                    }
-                } else {
-                    let range = localTrendRange(for: descriptor, usage: usage)
-                    windowTimeRange(WindowTrendInfo(
-                        dataPoints: [],
-                        granularity: descriptor.granularity,
-                        windowStart: range.windowStart,
-                        windowEnd: range.windowEnd,
-                        modelBreakdown: []
-                    ))
-                    UsageTrendChartView(
-                        dataPoints: [],
-                        granularity: descriptor.granularity,
-                        windowStart: range.windowStart,
-                        windowEnd: range.windowEnd
-                    )
-                }
+                let range = localTrendRange(for: descriptor, usage: usage)
+                let filter = descriptor.modelFamily.map {
+                    UsageTrendRequest.ModelFilter.matching($0, excluding: $0 == "flash" ? "lite" : nil)
+                } ?? defaultUsageModelFilter
+                trendChart(request: trendRequest(
+                    start: range.windowStart, end: range.windowEnd,
+                    dataEnd: min(trendSnapshotTime, range.windowEnd),
+                    granularity: descriptor.granularity, filter: filter), showsEmpty: true)
             }
         }
     }
@@ -534,7 +417,7 @@ extension UsageView {
         for descriptor: ProviderUsageTrendPresentation,
         usage: UsageData?
     ) -> (windowStart: Date, windowEnd: Date) {
-        let now = Date()
+        let now = trendSnapshotTime
         let windowEnd: Date
         switch descriptor.anchor {
         case .now:
@@ -585,7 +468,7 @@ extension UsageView {
 
         let futureResets = bucketsToSearch
             .compactMap(\.resetsAtDate)
-            .filter { $0 > Date() }
+            .filter { $0 > trendSnapshotTime }
 
         if let latestFutureReset = futureResets.max() {
             return latestFutureReset
@@ -609,18 +492,6 @@ extension UsageView {
         }
     }
 
-    private func isClaude(_ model: String) -> Bool {
-        model.lowercased().contains("claude")
-    }
-
-    private func isOpus(_ model: String) -> Bool {
-        model.lowercased().contains("opus")
-    }
-
-    private func isFable(_ model: String) -> Bool {
-        model.lowercased().contains("fable")
-    }
-
     private func fableWindow(from usage: UsageData) -> UsageWindow? {
         guard let bucket = usage.providerBuckets?.first(where: {
             $0.id.lowercased().contains("fable") || $0.title.lowercased().contains("fable")
@@ -631,12 +502,8 @@ extension UsageView {
         return UsageWindow(utilization: utilization, resetsAt: bucket.resetsAt)
     }
 
-    private func isSonnet(_ model: String) -> Bool {
-        model.lowercased().contains("sonnet")
-    }
-
-    private var defaultUsageModelFilter: ((String) -> Bool)? {
-        store.provider.kind == .claude ? isClaude : nil
+    private var defaultUsageModelFilter: UsageTrendRequest.ModelFilter {
+        store.provider.kind == .claude ? .matching("claude") : .all
     }
 
     private func availableWindowTabs(for usage: UsageData) -> [UsageWindowTab] {
@@ -706,26 +573,46 @@ extension UsageView {
     private func windowChart(
         for window: UsageWindow?,
         descriptor: ProviderUsageWindowPresentation,
-        modelFilter: ((String) -> Bool)?,
-        modelFilterID: String = "all"
+        modelFilter: UsageTrendRequest.ModelFilter
     ) -> some View {
-        if let info = windowTrendInfo(
-            for: window,
-            descriptor: descriptor,
-            modelFilter: modelFilter,
-            modelFilterID: modelFilterID
-        ) {
-            windowTimeRange(info)
-            UsageTrendChartView(dataPoints: info.dataPoints, granularity: info.granularity, windowStart: info.windowStart, windowEnd: info.windowEnd)
-            if !info.modelBreakdown.isEmpty {
-                CostModelsCard(models: info.modelBreakdown)
-            }
+        if let resetAt = window?.resetsAtDate,
+           let start = Calendar.current.date(byAdding: descriptor.durationComponent,
+                                             value: descriptor.durationValue, to: resetAt) {
+            let dataEnd = min(viewModel.lastFetchedAt ?? trendSnapshotTime, resetAt)
+            trendChart(request: trendRequest(start: start, end: resetAt, dataEnd: dataEnd,
+                                             granularity: descriptor.granularity, filter: modelFilter))
         }
     }
 
-    private func windowTimeRange(_ info: WindowTrendInfo) -> some View {
-        let startStr = formatWindowTime(info.windowStart)
-        let endStr = formatWindowTime(info.windowEnd)
+    private func trendRequest(start: Date, end: Date, dataEnd: Date, granularity: TrendGranularity,
+                              filter: UsageTrendRequest.ModelFilter) -> UsageTrendRequest {
+        UsageTrendRequest(source: ObjectIdentifier(store), version: store.parsedStatsVersion,
+                          windowStart: start, windowEnd: end, dataEnd: dataEnd,
+                          granularity: granularity, modelFilter: filter)
+    }
+
+    private func trendChart(request: UsageTrendRequest, showsEmpty: Bool = false) -> some View {
+        let ready = appState.isPopoverVisible && store.isFullParseComplete && request.windowStart < request.dataEnd
+        let info = trendModel.result?.request == request ? trendModel.result : nil
+        return VStack(spacing: 12) {
+            if showsEmpty || info != nil {
+                windowTimeRange(start: request.windowStart, end: request.windowEnd)
+                UsageTrendChartView(dataPoints: info?.dataPoints ?? [], granularity: request.granularity,
+                                    windowStart: request.windowStart, windowEnd: request.windowEnd)
+                if let models = info?.modelBreakdown, !models.isEmpty {
+                    CostModelsCard(models: models)
+                }
+            }
+        }
+        .task(id: ready ? request : nil) {
+            guard ready else { trendModel.stop(); return }
+            trendModel.request(.init(request: request, stats: store.parsedStats, pricing: ModelPricing.shared.snapshot()))
+        }
+    }
+
+    private func windowTimeRange(start: Date, end: Date) -> some View {
+        let startStr = formatWindowTime(start)
+        let endStr = formatWindowTime(end)
         return Text("\(startStr) — \(endStr)")
             .font(.caption2)
             .foregroundStyle(.tertiary)

@@ -710,11 +710,17 @@ final class ActiveSessionsTracker: ObservableObject {
         // previously known `currentTask`, which is acceptable: the field
         // is a display-only summary that catches up within ~50 ms.
         let sessionKey = Self.key(provider: runtime.provider, sessionId: runtime.sessionId)
-        let canIncrement = incremental && runtime.taskTranscriptPath == transcriptPath
+        // Resume from the recorded offset with the task state the prefix left:
+        // the displayed tasks while there are any (hook events keep them
+        // current), else the scanner's own carried state. Without either the
+        // scan starts over from byte 0.
+        let displayedTasks = runtime.runtimeTasks?.isEmpty == false ? runtime.runtimeTasks : nil
+        let baseTasks = displayedTasks ?? runtime.taskScanTasks
+        let canIncrement = incremental && runtime.taskTranscriptPath == transcriptPath && baseTasks != nil
         scheduleAsyncTaskScan(
             sessionKey: sessionKey,
             transcriptPath: transcriptPath,
-            baseTasks: canIncrement ? runtime.runtimeTasks : nil,
+            baseTasks: canIncrement ? baseTasks : nil,
             fromOffset: canIncrement ? runtime.taskTranscriptOffset : nil
         )
     }
@@ -763,6 +769,7 @@ final class ActiveSessionsTracker: ObservableObject {
         // → scheduled another scan whose only delta was a fresh `nextOffset`.
         runtime.taskTranscriptPath = transcriptPath
         runtime.taskTranscriptOffset = scan.nextOffset
+        runtime.taskScanTasks = scan.tasks
 
         // Only the display-visible fields (`runtimeTasks` + `currentTask`)
         // gate a `refresh()` so SwiftUI re-publishes the sessions array.
@@ -1029,7 +1036,7 @@ final class ActiveSessionsTracker: ObservableObject {
                 }
                 return $0.lastActivityAt > $1.lastActivityAt
             }
-        totalCount = fresh.count
+        if totalCount != fresh.count { totalCount = fresh.count }
         // Pre-populate `cachedTriptychContent` for every session that ends up
         // in the @Published `sessions` array. The formatter's candidate chain
         // (activeToolsSummary / currentOperation / currentActivity / etc.)
@@ -1037,11 +1044,15 @@ final class ActiveSessionsTracker: ObservableObject {
         // work here means SwiftUI's row body reads it as an O(1) struct
         // access, and we only pay the formatting cost on actual state
         // transitions instead of every re-render.
-        sessions = fresh.prefix(maxItems).map { session in
+        let visible = fresh.prefix(maxItems).map { session in
             var copy = session
             copy.cachedTriptychContent = ProviderSessionDisplayFormatter(session: copy).content
             return copy
         }
+        // Assigning an identical array still fires `objectWillChange` and
+        // re-renders every Notch row — which the 15 s timer did for nothing.
+        // Rows tick their elapsed time through their own `TimelineView`s.
+        if visible != sessions { sessions = visible }
     }
 
     private func repairIdleClaudeTaskSnapshots() {
@@ -1050,6 +1061,15 @@ final class ActiveSessionsTracker: ObservableObject {
                   runtime.currentTask != nil,
                   runtime.status != .running,
                   runtime.taskTranscriptPath?.nilIfEmpty != nil else {
+                continue
+            }
+            // A transcript that has not grown since its last scan cannot change
+            // the task state that scan produced. The repair still rescans from
+            // the start when it does run, but no longer on every refresh.
+            if let path = runtime.taskTranscriptPath,
+               let offset = runtime.taskTranscriptOffset,
+               let size = try? TranscriptFileSnapshot.read(at: path).size,
+               UInt64(size) == offset {
                 continue
             }
             var updated = runtime

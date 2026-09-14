@@ -44,7 +44,13 @@ final class RuntimeStatePersistor {
     /// Debounced write. Replaces any pending task so only the latest snapshot
     /// reaches disk. Snapshot is captured by value at call time, so MainActor
     /// state can mutate freely afterwards.
+    /// The last state handed to the writer. `refresh()` persists on every
+    /// tick; a state identical to the last one need not be rewritten.
+    private var lastScheduled: [String: RuntimeSession]?
+
     func scheduleWrite(_ runtime: [String: RuntimeSession]) {
+        guard runtime != lastScheduled else { return }
+        lastScheduled = runtime
         pendingTask?.cancel()
         let url = fileURL
         let task = DispatchWorkItem {
@@ -59,6 +65,7 @@ final class RuntimeStatePersistor {
     func flushWrite(_ runtime: [String: RuntimeSession]) {
         pendingTask?.cancel()
         pendingTask = nil
+        lastScheduled = runtime
         Self.write(runtime, to: fileURL)
     }
 

@@ -36,6 +36,11 @@ struct RuntimeSession: Codable, Equatable {
     var runtimeTasks: [String: RuntimeTaskEntry]? = nil
     var taskTranscriptPath: String? = nil
     var taskTranscriptOffset: UInt64? = nil
+    /// Task state the last scan reached at `taskTranscriptOffset`. Unlike
+    /// `runtimeTasks` it survives display resets (Stop, all tasks completed),
+    /// so the next scan can resume instead of rereading the transcript. Nil
+    /// when not recorded (state from an older build): scan from the start.
+    var taskScanTasks: [String: RuntimeTaskEntry]? = nil
     var currentToolName: String? = nil
     var currentToolDetail: String? = nil
     var currentToolStartedAt: Date? = nil

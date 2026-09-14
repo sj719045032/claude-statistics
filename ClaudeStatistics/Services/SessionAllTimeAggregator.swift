@@ -108,7 +108,7 @@ enum SessionAllTimeAggregator {
     static func allTimeAggregates(
         parsedStats: [String: SessionStats],
         sessions: [Session]
-    ) -> AllTimeAggregates {
+    ) throws -> AllTimeAggregates {
         let cal = Calendar.current
         var heatmap: [Date: DailyHeatmapBucket] = [:]
 
@@ -123,7 +123,9 @@ enum SessionAllTimeAggregator {
 
         for (sessionId, stats) in parsedStats {
             // Heatmap bucket
+            try Task.checkCancellation()
             for (sliceTime, slice) in stats.fiveMinSlices {
+                try Task.checkCancellation()
                 let day = cal.startOfDay(for: sliceTime)
                 var b = heatmap[day, default: DailyHeatmapBucket(date: day, cost: 0, tokens: 0)]
                 b.cost += slice.estimatedCost
@@ -145,6 +147,7 @@ enum SessionAllTimeAggregator {
                 var tokensInPeriod = 0
                 var messagesInPeriod = 0
                 for (_, slice) in stats.fiveMinSlices {
+                    try Task.checkCancellation()
                     costInPeriod += slice.estimatedCost
                     tokensInPeriod += slice.totalTokens
                     messagesInPeriod += slice.messageCount

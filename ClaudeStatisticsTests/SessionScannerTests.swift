@@ -117,6 +117,24 @@ final class SessionScannerTests: XCTestCase {
         XCTAssertEqual(scanner.uniqueSessionId(forTranscriptPath: transcript.path), session.id)
     }
 
+    func testCoworkChildChangeMapsToMainEvenWhenChildIsDeleted() throws {
+        let transcript = try writeCoworkTranscript(workspace: "workspace", session: "session", local: "local_1",
+                                                   project: "project", filename: "main.jsonl")
+        let child = transcript.deletingPathExtension().appendingPathComponent("subagents/deleted.jsonl")
+        let scanner = makeScanner()
+        XCTAssertTrue(scanner.isCoworkTranscriptPath(child.path))
+        XCTAssertEqual(scanner.uniqueSessionId(forTranscriptPath: child.path),
+                       scanner.uniqueSessionId(forTranscriptPath: transcript.path))
+    }
+
+    func testStandardChildChangeMapsToMainWithoutRescanning() {
+        let scanner = makeScanner()
+        let root = standardProjects.appendingPathComponent("project/main.jsonl")
+        let child = standardProjects.appendingPathComponent("project/main/subagents/agent.jsonl")
+        XCTAssertEqual(scanner.uniqueSessionId(forTranscriptPath: child.path),
+                       scanner.uniqueSessionId(forTranscriptPath: root.path))
+    }
+
     private func makeScanner() -> SessionScanner {
         SessionScanner(
             projectsDirectory: { self.standardProjects.path },

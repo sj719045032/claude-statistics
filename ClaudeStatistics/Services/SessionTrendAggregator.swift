@@ -89,7 +89,9 @@ enum SessionTrendAggregator {
         to end: Date,
         granularity: TrendGranularity,
         cumulative: Bool = false,
-        modelFilter: ((String) -> Bool)? = nil
+        modelFilter: ((String) -> Bool)? = nil,
+        pricing: ModelPricing.Snapshot = ModelPricing.shared.snapshot(),
+        maxPoints: Int? = nil
     ) -> [TrendDataPoint] {
         guard start < end else { return [] }
 
@@ -98,8 +100,10 @@ enum SessionTrendAggregator {
         var buckets: [Date: (tokens: Int, cost: Double)] = [:]
 
         for stats in parsedStats.values {
+            if Task.isCancelled { return [] }
             let slices: [Date: DaySlice] = useFineSlices ? stats.fiveMinSlices : stats.daySlices
             for (sliceTime, slice) in slices {
+                if Task.isCancelled { return [] }
                 // Exclusive start: data at exact boundary belongs to previous period
                 guard sliceTime > start, sliceTime < end else { continue }
 
@@ -109,19 +113,11 @@ enum SessionTrendAggregator {
                 if let filter = modelFilter {
                     for (model, modelStats) in slice.modelBreakdown where filter(model) {
                         existing.tokens += modelStats.totalTokens
-                        existing.cost += ModelPricing.estimateCost(
-                            model: model,
-                            inputTokens: modelStats.inputTokens,
-                            outputTokens: modelStats.outputTokens,
-                            cacheCreation5mTokens: modelStats.cacheCreation5mTokens,
-                            cacheCreation1hTokens: modelStats.cacheCreation1hTokens,
-                            cacheCreationTotalTokens: modelStats.cacheCreationTotalTokens,
-                            cacheReadTokens: modelStats.cacheReadTokens
-                        )
+                        existing.cost += pricing.estimateCost(model: model, tokens: modelStats)
                     }
                 } else {
                     existing.tokens += slice.totalTokens
-                    existing.cost += slice.estimatedCost
+                    existing.cost += pricing.estimateCost(slice: slice)
                 }
                 buckets[bucket] = existing
             }
@@ -132,17 +128,26 @@ enum SessionTrendAggregator {
             var bucketTime = granularity.bucketStart(for: start)
             var cumTokens = 0
             var cumCost = 0.0
+            // Only bound the rendered cumulative samples. Every source bucket
+            // still contributes and the exact start/end totals are preserved.
+            let steps = max(0, cal.dateComponents([granularity.calendarComponent], from: bucketTime, to: end)
+                .value(for: granularity.calendarComponent) ?? 0) / granularity.stepValue + 1
+            let interiorLimit = max(1, (maxPoints ?? (steps + 2)) - 2)
+            let stride = max(1, (steps + interiorLimit - 1) / interiorLimit)
+            var index = 0
 
             while bucketTime < end {
+                if Task.isCancelled { return [] }
                 let bucket = buckets[bucketTime, default: (tokens: 0, cost: 0)]
                 cumTokens += bucket.tokens
                 cumCost += bucket.cost
                 // Only add points after the zero-origin to keep x-axis monotonic
-                if bucketTime > start {
+                if bucketTime > start && index % stride == 0 {
                     result.append(TrendDataPoint(time: bucketTime, tokens: cumTokens, cost: cumCost))
                 }
                 guard let nextBucket = cal.date(byAdding: granularity.calendarComponent, value: granularity.stepValue, to: bucketTime) else { break }
                 bucketTime = nextBucket
+                index += 1
             }
 
             // Data from the first or current partial bucket was accumulated but not yet plotted
@@ -159,6 +164,7 @@ enum SessionTrendAggregator {
         var bucketTime = granularity.bucketStart(for: start)
 
         while bucketTime < end {
+            if Task.isCancelled { return [] }
             let bucket = buckets[bucketTime, default: (tokens: 0, cost: 0)]
             result.append(TrendDataPoint(time: bucketTime, tokens: bucket.tokens, cost: bucket.cost))
             guard let nextBucket = cal.date(byAdding: granularity.calendarComponent, value: granularity.stepValue, to: bucketTime) else { break }
@@ -230,7 +236,8 @@ enum SessionTrendAggregator {
         parsedStats: [String: SessionStats],
         from start: Date,
         to end: Date,
-        modelFilter: ((String) -> Bool)? = nil
+        modelFilter: ((String) -> Bool)? = nil,
+        pricing: ModelPricing.Snapshot = ModelPricing.shared.snapshot()
     ) -> [ModelUsage] {
         guard start < end else { return [] }
 
@@ -238,7 +245,9 @@ enum SessionTrendAggregator {
         var modelSessionIds: [String: Set<String>] = [:]
 
         for (sessionId, stats) in parsedStats {
+            if Task.isCancelled { return [] }
             for (sliceTime, slice) in stats.fiveMinSlices {
+                if Task.isCancelled { return [] }
                 // Exclusive start: data at exact boundary belongs to previous period
                 guard sliceTime > start, sliceTime < end else { continue }
 
@@ -251,15 +260,7 @@ enum SessionTrendAggregator {
                     existing.cacheCreation1hTokens += modelStats.cacheCreation1hTokens
                     existing.cacheCreationTotalTokens += modelStats.cacheCreationTotalTokens
                     existing.cacheReadTokens += modelStats.cacheReadTokens
-                    existing.cost += ModelPricing.estimateCost(
-                        model: model,
-                        inputTokens: modelStats.inputTokens,
-                        outputTokens: modelStats.outputTokens,
-                        cacheCreation5mTokens: modelStats.cacheCreation5mTokens,
-                        cacheCreation1hTokens: modelStats.cacheCreation1hTokens,
-                        cacheCreationTotalTokens: modelStats.cacheCreationTotalTokens,
-                        cacheReadTokens: modelStats.cacheReadTokens
-                    )
+                    existing.cost += pricing.estimateCost(model: model, tokens: modelStats)
                     existing.messageCount += modelStats.messageCount
                     combined[model] = existing
                     modelSessionIds[model, default: []].insert(sessionId)

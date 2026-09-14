@@ -76,7 +76,11 @@ extension TranscriptParser {
             let hasUser = !hasAssistant && (lineSlice.range(of: userMarker) != nil || lineSlice.range(of: humanMarker) != nil)
             guard hasAssistant || hasUser else { continue }
 
-            guard let json = try? JSONSerialization.jsonObject(with: lineSlice) as? [String: Any] else { continue }
+            // The decoded tree is autoreleased; retaining it here and draining
+            // the pool means it dies with this record instead of with the file.
+            var decoded: [String: Any]?
+            autoreleasepool { decoded = try? JSONSerialization.jsonObject(with: lineSlice) as? [String: Any] }
+            guard let json = decoded else { continue }
             let entryType = json["type"] as? String ?? ""
             let timestamp = parseTimestamp(json["timestamp"] as? String)
 
@@ -175,7 +179,7 @@ extension TranscriptParser {
             let isoFallback = ISO8601DateFormatter()
             isoFallback.formatOptions = [.withInternetDateTime]
 
-            for subFile in subFiles where subFile.hasSuffix(".jsonl") {
+            for subFile in subFiles.sorted() where subFile.hasSuffix(".jsonl") {
                 let subPath = (subagentDir as NSString).appendingPathComponent(subFile)
                 guard let subData = FileManager.default.contents(atPath: subPath) else { continue }
 
@@ -190,7 +194,9 @@ extension TranscriptParser {
                     // Pre-filter: skip non-assistant lines without parsing JSON
                     guard lineSlice.range(of: Data("\"assistant\"".utf8), in: lineSlice.startIndex..<lineSlice.endIndex) != nil else { continue }
 
-                    guard let json = try? JSONSerialization.jsonObject(with: lineSlice) as? [String: Any],
+                    var decoded: [String: Any]?
+                    autoreleasepool { decoded = try? JSONSerialization.jsonObject(with: lineSlice) as? [String: Any] }
+                    guard let json = decoded,
                           json["type"] as? String == "assistant",
                           let message = json["message"] as? [String: Any],
                           let msgId = message["id"] as? String,
@@ -320,7 +326,11 @@ extension TranscriptParser {
             let hasUser = !hasAssistant && (lineSlice.range(of: userMarker) != nil || lineSlice.range(of: humanMarker) != nil)
             guard hasAssistant || hasUser else { continue }
 
-            guard let json = try? JSONSerialization.jsonObject(with: lineSlice) as? [String: Any] else { continue }
+            // The decoded tree is autoreleased; retaining it here and draining
+            // the pool means it dies with this record instead of with the file.
+            var decoded: [String: Any]?
+            autoreleasepool { decoded = try? JSONSerialization.jsonObject(with: lineSlice) as? [String: Any] }
+            guard let json = decoded else { continue }
             let entryType = json["type"] as? String ?? ""
             let timestamp = parseTimestamp(json["timestamp"] as? String)
 

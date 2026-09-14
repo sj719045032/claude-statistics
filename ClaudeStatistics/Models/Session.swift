@@ -39,8 +39,48 @@ final class ModelPricing {
     /// via this typealias.
     typealias Pricing = ModelPricingRates
 
-    private(set) var models: [String: Pricing] = [:]
-    private(set) var defaultPricing = Pricing(input: 3.0, output: 15.0, cacheWrite5m: 3.75, cacheWrite1h: 6.0, cacheRead: 0.30)
+    static let didChange = Notification.Name("ModelPricing.didChange")
+    private let lock = NSRecursiveLock()
+    private var storedModels: [String: Pricing] = [:]
+    private var storedDefault = Pricing(input: 3.0, output: 15.0, cacheWrite5m: 3.75, cacheWrite1h: 6.0, cacheRead: 0.30)
+    var models: [String: Pricing] { lock.lock(); defer { lock.unlock() }; return storedModels }
+    var defaultPricing: Pricing { lock.lock(); defer { lock.unlock() }; return storedDefault }
+
+    /// One immutable rate table for an entire background calculation. Updating
+    /// prices cannot mix old/new rates within a published aggregate.
+    struct Snapshot: Sendable {
+        let models: [String: Pricing]
+        let defaultPricing: Pricing
+        let date: Date
+
+        func isExactMatch(for model: String) -> Bool { models[model] != nil }
+        func pricing(for model: String) -> Pricing {
+            ModelPricing.resolvePricing(for: model, models: models, defaultPricing: defaultPricing, at: date)
+        }
+        func estimateCost(model: String, tokens: ModelTokenStats) -> Double {
+            let p = pricing(for: model)
+            let perM = 1_000_000.0
+            var cost = Double(tokens.inputTokens) / perM * p.input
+                + Double(tokens.outputTokens) / perM * p.output
+                + Double(tokens.cacheReadTokens) / perM * p.cacheRead
+            if tokens.cacheCreation5mTokens > 0 || tokens.cacheCreation1hTokens > 0 {
+                cost += Double(tokens.cacheCreation5mTokens) / perM * p.cacheWrite5m
+                cost += Double(tokens.cacheCreation1hTokens) / perM * p.cacheWrite1h
+            } else if tokens.cacheCreationTotalTokens > 0 {
+                cost += Double(tokens.cacheCreationTotalTokens) / perM * p.cacheWrite1h
+            }
+            return cost
+        }
+        func estimateCost(slice: DaySlice) -> Double {
+            slice.modelBreakdown.reduce(0) { $0 + estimateCost(model: $1.key, tokens: $1.value) }
+        }
+    }
+
+    func snapshot(at date: Date = Date()) -> Snapshot {
+        lock.lock()
+        defer { lock.unlock() }
+        return Snapshot(models: storedModels, defaultPricing: storedDefault, date: date)
+    }
 
     /// Aggregates pricing tables from every known provider. The
     /// `provider(for: kind)` path already prefers the dynamic store
@@ -75,6 +115,8 @@ final class ModelPricing {
     }
 
     private func loadPricing() {
+        lock.lock()
+        defer { lock.unlock() }
         let fm = FileManager.default
 
         // Try loading from config file
@@ -83,14 +125,14 @@ final class ModelPricing {
             let repairedModels = Self.repairedClaudePricingModels(loaded.models)
             var merged = Self.builtinModels()
             merged.merge(repairedModels) { _, user in user }
-            models = merged
-            if let d = loaded.default_pricing { defaultPricing = d }
+            storedModels = merged
+            if let d = loaded.default_pricing { storedDefault = d }
             if repairedModels != loaded.models { savePricing() }
             return
         }
 
         // Use built-in defaults and write config file for user to edit
-        models = Self.builtinModels()
+        storedModels = Self.builtinModels()
         savePricing()
     }
 
@@ -171,25 +213,35 @@ final class ModelPricing {
 
     /// Merge remotely fetched pricing into the current model set and persist
     func updateModels(_ newModels: [String: Pricing]) {
-        models.merge(newModels) { _, fetched in fetched }
+        lock.lock()
+        storedModels.merge(newModels) { _, fetched in fetched }
         savePricing()
+        lock.unlock()
+        NotificationCenter.default.post(name: Self.didChange, object: self)
     }
 
     /// Update a single model's pricing and persist
     func updateModel(id: String, pricing: Pricing) {
-        models[id] = pricing
+        lock.lock()
+        storedModels[id] = pricing
         savePricing()
+        lock.unlock()
+        NotificationCenter.default.post(name: Self.didChange, object: self)
     }
 
     /// Remove a model and persist
     func removeModel(id: String) {
-        models.removeValue(forKey: id)
+        lock.lock()
+        storedModels.removeValue(forKey: id)
         savePricing()
+        lock.unlock()
+        NotificationCenter.default.post(name: Self.didChange, object: self)
     }
 
     /// Reload pricing from disk
     func reload() {
         loadPricing()
+        NotificationCenter.default.post(name: Self.didChange, object: self)
     }
 
     private func savePricing() {
@@ -217,9 +269,13 @@ final class ModelPricing {
     }
 
     func pricing(for model: String) -> Pricing {
+        snapshot().pricing(for: model)
+    }
+
+    private static func resolvePricing(for model: String, models: [String: Pricing], defaultPricing: Pricing, at date: Date) -> Pricing {
         let lower = model.lowercased()
         if let p = models[model] {
-            return Self.effectiveClaudePricing(p, modelID: lower)
+            return Self.effectiveClaudePricing(p, modelID: lower, at: date)
         }
         if lower.contains("gemini-3.1-pro") { return models["gemini-3.1-pro-preview"] ?? defaultPricing }
         if lower.contains("gemini-3-pro") { return models["gemini-3-pro-preview"] ?? defaultPricing }
@@ -252,7 +308,7 @@ final class ModelPricing {
             let pricing = models[fallbackID]
                 ?? Self.claudeLegacyFallbackPricing(for: fallbackID)
                 ?? defaultPricing
-            return Self.effectiveClaudePricing(pricing, modelID: fallbackID)
+            return Self.effectiveClaudePricing(pricing, modelID: fallbackID, at: date)
         }
         return defaultPricing
     }
@@ -309,23 +365,11 @@ final class ModelPricing {
         cacheCreationTotalTokens: Int,
         cacheReadTokens: Int
     ) -> Double {
-        let p = shared.pricing(for: model)
-        let perM = 1_000_000.0
-
-        var cost = Double(inputTokens) / perM * p.input
-            + Double(outputTokens) / perM * p.output
-            + Double(cacheReadTokens) / perM * p.cacheRead
-
-        // If we have the 5m/1h breakdown, use precise rates
-        if cacheCreation5mTokens > 0 || cacheCreation1hTokens > 0 {
-            cost += Double(cacheCreation5mTokens) / perM * p.cacheWrite5m
-            cost += Double(cacheCreation1hTokens) / perM * p.cacheWrite1h
-        } else if cacheCreationTotalTokens > 0 {
-            // Fallback: no breakdown available, assume 1h rate (conservative)
-            cost += Double(cacheCreationTotalTokens) / perM * p.cacheWrite1h
-        }
-
-        return cost
+        shared.snapshot().estimateCost(model: model, tokens: ModelTokenStats(
+            inputTokens: inputTokens, outputTokens: outputTokens,
+            cacheCreation5mTokens: cacheCreation5mTokens, cacheCreation1hTokens: cacheCreation1hTokens,
+            cacheCreationTotalTokens: cacheCreationTotalTokens, cacheReadTokens: cacheReadTokens
+        ))
     }
 }
 

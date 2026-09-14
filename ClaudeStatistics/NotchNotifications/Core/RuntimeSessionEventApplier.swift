@@ -344,20 +344,26 @@ enum RuntimeSessionEventApplier {
         baseTasks: [String: RuntimeTaskEntry]?,
         fromOffset: UInt64?
     ) -> RuntimeTaskScanResult? {
-        guard let handle = try? FileHandle(forReadingFrom: URL(fileURLWithPath: transcriptPath)) else {
-            return nil
-        }
-        defer { try? handle.close() }
-
-        let fileSize = (try? handle.seekToEnd()) ?? 0
+        // Streamed a record at a time: this used to read the whole transcript
+        // into one `Data` and decode every line with no autorelease pool, so a
+        // full scan held the transcript several times over until it returned.
+        guard let size = try? TranscriptFileSnapshot.read(at: transcriptPath).size else { return nil }
+        // Resume from the last scanned offset whenever the caller has one. The
+        // caller passes the task state the prefix produced (`tasks` of the
+        // previous result, or the displayed tasks), empty when there were
+        // none. This used to rescan from byte 0 unless tasks were displayed,
+        // so a session that never used the task list — or any session after
+        // a Stop cleared its display — was fully re-read and re-decoded on
+        // every hook event (0.3–1 s per tool call on a 15 MB transcript).
         let startOffset: UInt64
-        if let fromOffset, fromOffset <= fileSize, baseTasks?.isEmpty == false {
+        if let fromOffset, fromOffset <= UInt64(size) {
             startOffset = fromOffset
         } else {
             startOffset = 0
         }
-        guard (try? handle.seek(toOffset: startOffset)) != nil else { return nil }
-        let data = handle.readDataToEndOfFile()
+        guard let reader = try? TranscriptFileReader(path: transcriptPath, fromOffset: Int64(startOffset),
+                                                     includeFinalLine: true) else { return nil }
+        let fileSize = UInt64(reader.snapshot.size)
 
         var latest: RuntimeTaskSnapshot?
         var scannedTasks: [String: RuntimeTaskEntry]?
@@ -367,42 +373,47 @@ enum RuntimeSessionEventApplier {
             latest = taskSnapshot(fromRuntimeTasks: baseTasks, timestamp: Date())
         }
 
-        var lineStart = data.startIndex
-        while lineStart < data.endIndex {
-            let lineEnd = data[lineStart...].firstIndex(of: UInt8(ascii: "\n")) ?? data.endIndex
-            let lineSlice = data[lineStart..<lineEnd]
-            lineStart = lineEnd < data.endIndex ? data.index(after: lineEnd) : data.endIndex
-            guard !lineSlice.isEmpty,
-                  let object = try? JSONSerialization.jsonObject(with: lineSlice) as? [String: Any] else {
-                continue
-            }
-
-            if let attachment = object["attachment"] as? [String: Any],
-               attachment["type"] as? String == "task_reminder",
-               let tasks = attachment["content"] as? [[String: Any]] {
-                sawTaskSignal = true
-                let entries = taskEntries(fromReminderTasks: tasks)
-                scannedTasks = entries.isEmpty ? nil : entries
-                latest = scannedTasks.flatMap {
-                    taskSnapshot(fromRuntimeTasks: $0, timestamp: timestamp(in: object))
+        while true {
+            var finished = false
+            autoreleasepool {
+                guard let record = try? reader.readNext() else {
+                    finished = true
+                    return
                 }
-                continue
-            }
+                guard !record.isEmpty,
+                      let object = try? JSONSerialization.jsonObject(with: record) as? [String: Any] else {
+                    return
+                }
 
-            if var tasks = scannedTasks,
-               let update = taskUpdate(fromTranscriptObject: object) {
-                sawTaskSignal = true
-                if var task = tasks[update.taskID] {
-                    task.status = update.status
-                    tasks[update.taskID] = task
-                    scannedTasks = tasks
-                    latest = taskSnapshot(fromRuntimeTasks: tasks, timestamp: timestamp(in: object) ?? Date())
+                if let attachment = object["attachment"] as? [String: Any],
+                   attachment["type"] as? String == "task_reminder",
+                   let tasks = attachment["content"] as? [[String: Any]] {
+                    sawTaskSignal = true
+                    let entries = taskEntries(fromReminderTasks: tasks)
+                    scannedTasks = entries.isEmpty ? nil : entries
+                    latest = scannedTasks.flatMap {
+                        taskSnapshot(fromRuntimeTasks: $0, timestamp: timestamp(in: object))
+                    }
+                    return
+                }
+
+                if var tasks = scannedTasks,
+                   let update = taskUpdate(fromTranscriptObject: object) {
+                    sawTaskSignal = true
+                    if var task = tasks[update.taskID] {
+                        task.status = update.status
+                        tasks[update.taskID] = task
+                        scannedTasks = tasks
+                        latest = taskSnapshot(fromRuntimeTasks: tasks, timestamp: timestamp(in: object) ?? Date())
+                    }
                 }
             }
+            if finished { break }
         }
 
         return RuntimeTaskScanResult(
             snapshot: latest,
+            tasks: scannedTasks ?? [:],
             nextOffset: fileSize,
             clearsCurrentTask: sawTaskSignal && latest == nil
         )
@@ -808,6 +819,10 @@ struct RuntimeTaskSnapshot {
 
 struct RuntimeTaskScanResult {
     let snapshot: RuntimeTaskSnapshot?
+    /// The task state at `nextOffset`, including tasks that are all completed
+    /// (which yield no snapshot). Passing it back as `baseTasks` with
+    /// `nextOffset` resumes the scan exactly where a full scan would be.
+    let tasks: [String: RuntimeTaskEntry]
     let nextOffset: UInt64
     let clearsCurrentTask: Bool
 }

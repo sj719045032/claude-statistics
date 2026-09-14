@@ -9,22 +9,20 @@ struct TranscriptView: View {
     let onBack: () -> Void
     @ObservedObject var viewModel: SessionViewModel
 
-    @State private var messages: [TranscriptDisplayMessage] = []
-    /// Per-message joined searchable text, built once after `loadMessages`.
-    /// Replaces a 6-field `joined(" ")` rebuild per filtered message per
-    /// keystroke. Keyed by `TranscriptDisplayMessage.id`.
-    @State private var searchableTexts: [String: String] = [:]
+    /// Row identity and byte locators for the whole transcript; message bodies
+    /// are materialized a page at a time.
+    @StateObject private var pager = TranscriptPagingModel()
     @State private var isLoading = true
     @State private var searchText = ""
-    @State private var matchedIds: [String] = []
     @State private var currentMatchIndex = 0
     @State private var scrollPosition: String?
-    @State private var roleFilters: Set<String> = []  // empty = show all
-    @State private var toolFilters: Set<String> = []  // empty = show all tools
+    @State private var searchDebounce: Task<Void, Never>?
     /// `true` when the visible anchor is within the last few messages —
     /// flips the floating jump button from "go to bottom" to "go to top".
     @State private var atBottom: Bool = false
     @State private var scrollButtonHovered: Bool = false
+
+    private var matchedIds: [String] { pager.searchState.matchedIds }
 
     private var roleOptions: [(key: String, label: String, icon: String)] {
         [
@@ -34,17 +32,7 @@ struct TranscriptView: View {
         ]
     }
 
-    private var availableTools: [String] {
-        Array(Set(messages.compactMap(\.toolName))).sorted()
-    }
-
-    private var filteredMessages: [TranscriptDisplayMessage] {
-        messages.filter { msg in
-            if !roleFilters.isEmpty && !roleFilters.contains(msg.role) { return false }
-            if !toolFilters.isEmpty && msg.role == "tool" && !toolFilters.contains(msg.toolName ?? "") { return false }
-            return true
-        }
-    }
+    private var filteredEntries: [TranscriptOutlineEntry] { pager.visibleEntries }
 
     private var sessionTitle: String? {
         let qs = viewModel.quickStat(for: session)
@@ -77,7 +65,7 @@ struct TranscriptView: View {
                     Spacer()
                 }
 
-                Text("transcript.title \(filteredMessages.count)")
+                Text("transcript.title \(filteredEntries.count)")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -97,7 +85,9 @@ struct TranscriptView: View {
                     .onSubmit { jumpToNext() }
 
                 if !searchText.isEmpty {
-                    if !matchedIds.isEmpty {
+                    if pager.searchState.isRunning && matchedIds.isEmpty {
+                        ProgressView().controlSize(.mini)
+                    } else if !matchedIds.isEmpty {
                         Text("\(currentMatchIndex + 1)/\(matchedIds.count)")
                             .font(.system(size: 10, design: .monospaced))
                             .foregroundStyle(.secondary)
@@ -136,14 +126,10 @@ struct TranscriptView: View {
             // Filter bar
             HStack(spacing: 4) {
                 ForEach(roleOptions, id: \.key) { option in
-                    let isActive = roleFilters.contains(option.key)
+                    let isActive = pager.roleFilters.contains(option.key)
                     Button {
-                        if isActive {
-                            roleFilters.remove(option.key)
-                            if option.key == "tool" { toolFilters = [] }
-                        } else {
-                            roleFilters.insert(option.key)
-                        }
+                        pager.toggleRole(option.key)
+                        debounceSearch()
                     } label: {
                         HStack(spacing: 3) {
                             Image(systemName: option.icon).font(.system(size: 9))
@@ -158,14 +144,15 @@ struct TranscriptView: View {
                     .buttonStyle(.plain)
                 }
 
-                if roleFilters.contains("tool") && !availableTools.isEmpty {
+                if pager.roleFilters.contains("tool") && !pager.availableTools.isEmpty {
                     Divider().frame(height: 14)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 3) {
-                            ForEach(availableTools, id: \.self) { tool in
-                                let isActive = toolFilters.contains(tool)
+                            ForEach(pager.availableTools, id: \.self) { tool in
+                                let isActive = pager.toolFilters.contains(tool)
                                 Button {
-                                    if isActive { toolFilters.remove(tool) } else { toolFilters.insert(tool) }
+                                    pager.toggleTool(tool)
+                                    debounceSearch()
                                 } label: {
                                     Text(tool)
                                         .font(.system(size: 9, design: .monospaced))
@@ -183,10 +170,10 @@ struct TranscriptView: View {
 
                 Spacer()
 
-                if !roleFilters.isEmpty || !toolFilters.isEmpty {
+                if !pager.roleFilters.isEmpty || !pager.toolFilters.isEmpty {
                     Button {
-                        roleFilters = []
-                        toolFilters = []
+                        pager.clearFilters()
+                        debounceSearch()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 10))
@@ -195,7 +182,7 @@ struct TranscriptView: View {
                     .buttonStyle(.plain)
                 }
 
-                Text("\(filteredMessages.count)")
+                Text("\(filteredEntries.count)")
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(.tertiary)
             }
@@ -208,21 +195,9 @@ struct TranscriptView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(filteredMessages) { msg in
-                            Group {
-                                if msg.role == "tool" {
-                                    ToolCallRow(message: msg, searchText: searchText,
-                                                isCurrentMatch: isCurrentMatch(msg.id),
-                                                providerDisplayName: viewModel.providerDisplayName,
-                                                sessionFilePath: session.filePath,
-                                                loadMessagesAtPath: viewModel.loadMessages(at:))
-                                } else {
-                                    MessageRow(message: msg, searchText: searchText,
-                                               isCurrentMatch: isCurrentMatch(msg.id),
-                                               assistantName: viewModel.providerDisplayName)
-                                }
-                            }
-                            .id(msg.id)
+                        ForEach(filteredEntries) { entry in
+                            row(for: entry)
+                                .id(entry.id)
                         }
                     }
                     .padding(.vertical, 4)
@@ -240,9 +215,9 @@ struct TranscriptView: View {
                     }
                 }
                 .overlay(alignment: .bottomTrailing) {
-                    if filteredMessages.count > 1 {
+                    if filteredEntries.count > 1 {
                         Button {
-                            let targetId: String? = atBottom ? filteredMessages.first?.id : filteredMessages.last?.id
+                            let targetId: String? = atBottom ? filteredEntries.first?.id : filteredEntries.last?.id
                             let anchor: UnitPoint = atBottom ? .top : .bottom
                             guard let id = targetId else { return }
                             withAnimation(.easeOut(duration: 0.25)) {
@@ -280,8 +255,9 @@ struct TranscriptView: View {
                 .scrollPosition(id: $scrollPosition, anchor: .top)
                 .onChange(of: scrollPosition) { _, newId in
                     guard let newId else { return }
-                    let endZone = max(0, filteredMessages.count - 5)
-                    guard let idx = filteredMessages.firstIndex(where: { $0.id == newId }) else { return }
+                    let entries = filteredEntries
+                    let endZone = max(0, entries.count - 5)
+                    guard let idx = entries.firstIndex(where: { $0.id == newId }) else { return }
                     let nowAtBottom = idx >= endZone
                     if nowAtBottom != atBottom {
                         withAnimation(Theme.quickSpring) { atBottom = nowAtBottom }
@@ -290,7 +266,23 @@ struct TranscriptView: View {
             }
         }
         .task {
-            await loadMessages()
+            if session.isArchived {
+                // Written to a temporary file, so the session's own provider
+                // pages it like any transcript.
+                let file = await viewModel.archivedTranscriptFile(for: session)
+                await pager.load(
+                    path: file?.path ?? session.filePath,
+                    provider: file == nil ? nil : viewModel.pagedTranscriptProvider,
+                    retaining: file,
+                    wholeParse: { await viewModel.loadMessages(in: file) }
+                )
+            } else {
+                await pager.load(
+                    path: session.filePath,
+                    provider: viewModel.pagedTranscriptProvider,
+                    wholeParse: { await viewModel.loadMessages(at: session.filePath) }
+                )
+            }
 
             // Set up search text
             if viewModel.transcriptInitialLoadDone {
@@ -299,51 +291,57 @@ struct TranscriptView: View {
                 searchText = query
             }
 
-            // Compute matches
-            if !searchText.isEmpty {
-                updateMatches(query: searchText, autoScroll: false)
-            }
-
-            // Determine target
-            var targetId: String?
-            if viewModel.transcriptInitialLoadDone {
-                currentMatchIndex = min(viewModel.transcriptMatchIndex, max(matchedIds.count - 1, 0))
-                if matchedIds.indices.contains(currentMatchIndex) {
-                    targetId = matchedIds[currentMatchIndex]
-                }
-            } else {
-                viewModel.transcriptInitialLoadDone = true
-                if initialSnippetContext != nil {
-                    locateSnippetMatch()
-                    // locateSnippetMatch sets scrollPosition directly, capture it
-                    targetId = scrollPosition
-                } else if let first = matchedIds.first {
-                    targetId = first
-                }
-            }
-
+            let restoringIndex = viewModel.transcriptInitialLoadDone
+            let snippet = restoringIndex ? nil : initialSnippetContext
+            viewModel.transcriptInitialLoadDone = true
             isLoading = false
 
-            // Schedule scroll for NEXT update cycle — messages must be rendered first
-            if let targetId {
-                Task { @MainActor in
-                    scrollPosition = targetId
+            guard !searchText.isEmpty else { return }
+            // The first search owns the scroll target: with paging the matches
+            // are not known until the background scan reports them.
+            runSearch(snippetContext: snippet) { matches, snippetMatch in
+                if restoringIndex {
+                    currentMatchIndex = min(viewModel.transcriptMatchIndex, max(matches.count - 1, 0))
+                } else if let snippetMatch, let index = matches.firstIndex(of: snippetMatch) {
+                    currentMatchIndex = index
+                } else {
+                    currentMatchIndex = 0
                 }
+                guard matches.indices.contains(currentMatchIndex) else { return }
+                scrollPosition = matches[currentMatchIndex]
             }
         }
         .onDisappear {
             // Save state to ViewModel so it survives popover cycles
             viewModel.transcriptSearchText = searchText
             viewModel.transcriptMatchIndex = currentMatchIndex
+            searchDebounce?.cancel()
+            pager.cancelAll()
         }
-        .onChange(of: searchText) { _, newValue in
-            updateMatches(query: newValue)
+        .onChange(of: searchText) { _, _ in
+            debounceSearch()
         }
-        .onChange(of: roleFilters) { _, _ in
-            updateMatches(query: searchText)
-        }
-        .onChange(of: toolFilters) { _, _ in
-            updateMatches(query: searchText)
+    }
+
+    // MARK: - Rows
+
+    @ViewBuilder
+    private func row(for entry: TranscriptOutlineEntry) -> some View {
+        if let msg = pager.row(id: entry.id) {
+            if msg.role == "tool" {
+                ToolCallRow(message: msg, searchText: searchText,
+                            isCurrentMatch: isCurrentMatch(msg.id),
+                            providerDisplayName: viewModel.providerDisplayName,
+                            sessionFilePath: session.filePath,
+                            loadMessagesAtPath: viewModel.loadMessages(at:))
+            } else {
+                MessageRow(message: msg, searchText: searchText,
+                           isCurrentMatch: isCurrentMatch(msg.id),
+                           assistantName: viewModel.providerDisplayName)
+            }
+        } else {
+            TranscriptRowPlaceholder(role: entry.role)
+                .task { pager.requestRow(id: entry.id) }
         }
     }
 
@@ -353,70 +351,39 @@ struct TranscriptView: View {
         matchedIds.indices.contains(currentMatchIndex) && matchedIds[currentMatchIndex] == id
     }
 
-    private func loadMessages() async {
-        let loaded = await PerformanceTracer.measureAsync("TranscriptView.loadMessages") {
-            await viewModel.loadMessages(for: session)
-        }
-        // Build the searchable-text lookup once so updateMatches and
-        // locateSnippetMatch don't rebuild the 6-field join per message
-        // per keystroke.
-        var lookup: [String: String] = [:]
-        lookup.reserveCapacity(loaded.count)
-        for msg in loaded {
-            lookup[msg.id] = SearchUtils.transcriptSearchableText(for: msg)
-        }
-        messages = loaded
-        searchableTexts = lookup
-        // NOTE: isLoading is set in .task AFTER scroll target is determined
-    }
-
-    private func updateMatches(query: String, autoScroll: Bool = true) {
-        PerformanceTracer.measure("TranscriptView.updateMatches") {
-            let trimmed = query.trimmingCharacters(in: .whitespaces)
-            guard !trimmed.isEmpty else {
-                matchedIds = []
-                currentMatchIndex = 0
-                return
-            }
-
-            matchedIds = filteredMessages.filter { msg in
-                let cached = searchableTexts[msg.id]
-                    ?? SearchUtils.transcriptSearchableText(for: msg)
-                return SearchUtils.textMatches(query: trimmed, in: cached)
-            }.map(\.id)
+    /// Search runs off the main thread over the full history, so a keystroke
+    /// must not start a scan the next keystroke invalidates.
+    private func debounceSearch() {
+        searchDebounce?.cancel()
+        let text = searchText
+        guard !text.trimmingCharacters(in: .whitespaces).isEmpty else {
+            pager.cancelSearch()
             currentMatchIndex = 0
-            if autoScroll, let first = matchedIds.first {
-                scrollPosition = first
+            return
+        }
+        searchDebounce = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard !Task.isCancelled, searchText == text else { return }
+            runSearch { matches, _ in
+                currentMatchIndex = 0
+                if let first = matches.first { scrollPosition = first }
             }
         }
     }
 
-    /// Find the match that best corresponds to the FTS snippet from session list
-    private func locateSnippetMatch() {
-        guard let snippet = initialSnippetContext, !snippet.isEmpty, !matchedIds.isEmpty else { return }
-
-        // Extract a short context phrase around the first «highlighted» term
-        // e.g. "问题是从列表 «snippet» 跳过去后" → "问题是从列表 snippet 跳过去后"
-        let contextPhrase = extractSnippetContext(snippet)
-        guard !contextPhrase.isEmpty else { return }
-
-        let phraseLower = contextPhrase.lowercased()
-
-        for (i, matchId) in matchedIds.enumerated() {
-            // Same fields as updateMatches — both routes consume the
-            // shared cache built in loadMessages.
-            guard let cached = searchableTexts[matchId] else { continue }
-            if cached.lowercased().contains(phraseLower) {
-                currentMatchIndex = i
-                scrollPosition = matchId
-                return
-            }
-        }
+    private func runSearch(snippetContext: String? = nil,
+                           onFinish: @escaping @MainActor ([String], String?) -> Void) {
+        pager.search(
+            query: searchText,
+            snippetContext: snippetContext.flatMap(Self.extractSnippetContext),
+            onFinish: onFinish
+        )
     }
 
     /// Extract a short phrase around the best «» highlight pair in an FTS snippet.
     /// Checks all pairs and picks the one with the most surrounding context.
-    private func extractSnippetContext(_ snippet: String) -> String {
+    static func extractSnippetContext(_ snippet: String) -> String? {
+        guard !snippet.isEmpty else { return nil }
         // Collect all «» pairs
         var pairs: [(open: Range<String.Index>, close: Range<String.Index>)] = []
         var searchFrom = snippet.startIndex
@@ -429,7 +396,9 @@ struct TranscriptView: View {
         guard !pairs.isEmpty else {
             // No markers, use first segment before …
             let firstSeg = snippet.components(separatedBy: "…").first ?? snippet
-            return firstSeg.replacingOccurrences(of: "«", with: "").replacingOccurrences(of: "»", with: "").trimmingCharacters(in: .whitespaces)
+            let cleaned = firstSeg.replacingOccurrences(of: "«", with: "")
+                .replacingOccurrences(of: "»", with: "").trimmingCharacters(in: .whitespaces)
+            return cleaned.isEmpty ? nil : cleaned
         }
 
         // Build context for each pair, pick the longest (most surrounding context)
@@ -447,7 +416,8 @@ struct TranscriptView: View {
             // Take context after »
             let afterAll = String(snippet[pair.close.upperBound...])
             let afterSeg = afterAll.components(separatedBy: "…").first ?? afterAll
-            let afterClean = afterSeg.replacingOccurrences(of: "«", with: "").replacingOccurrences(of: "»", with: "")
+            let afterClean = afterSeg.replacingOccurrences(of: "«", with: "")
+                .replacingOccurrences(of: "»", with: "")
                 .trimmingCharacters(in: .whitespaces)
             let afterContext = afterClean.count > 30 ? String(afterClean.prefix(30)) : afterClean
 
@@ -457,7 +427,7 @@ struct TranscriptView: View {
             }
         }
 
-        return bestContext
+        return bestContext.isEmpty ? nil : bestContext
     }
 
     private func jumpToNext() {
@@ -470,5 +440,25 @@ struct TranscriptView: View {
         guard !matchedIds.isEmpty else { return }
         currentMatchIndex = (currentMatchIndex - 1 + matchedIds.count) % matchedIds.count
         scrollPosition = matchedIds[currentMatchIndex]
+    }
+}
+
+/// Stand-in for a row whose body has not been read yet. Keeps the list's
+/// geometry stable while a page is materialized.
+private struct TranscriptRowPlaceholder: View {
+    let role: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Color.gray.opacity(0.12))
+                .frame(width: role == "tool" ? 90 : 160, height: 9)
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Color.gray.opacity(0.08))
+                .frame(maxWidth: .infinity)
+                .frame(height: 9)
+        }
+        .padding(.horizontal, 12)
+        .frame(height: role == "tool" ? 26 : 38, alignment: .center)
     }
 }

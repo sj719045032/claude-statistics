@@ -550,6 +550,9 @@ final class AppState: ObservableObject {
 
         let oldKind = providerKind
 
+        // The outgoing provider's views are now hidden.
+        store.popoverDidClose()
+
         ProviderRegistry.persistSelectedProvider(kind)
         providerKind = kind
 
@@ -961,6 +964,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         let config = TelemetryDeck.Config(appID: "C5662554-D78C-4334-A745-3661642DBE3D")
+        // Session stats run a 1 s main-thread timer that re-encodes every stored
+        // session into UserDefaults. The SDK stops it only when the app resigns
+        // active, which a menu-bar app never does, so it ran for the app's whole
+        // life (and counted background time as usage). Off: idle CPU drops below
+        // 1%. Removing this line restores TelemetryDeck's retention metrics.
+        config.sessionStatsEnabled = false
         TelemetryDeck.initialize(config: config)
 
         LanguageManager.setup()

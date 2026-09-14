@@ -55,6 +55,9 @@ struct ProjectGroup: Identifiable {
 
 @MainActor
 final class SessionViewModel: ObservableObject {
+    /// The detail stats parse for the current selection; replaced, not
+    /// stacked, when the selection changes.
+    private var statsTask: Task<Void, Never>?
     let store: SessionDataStore
 
     @Published var selectedSession: Session?
@@ -88,7 +91,26 @@ final class SessionViewModel: ObservableObject {
 
     /// Cached computed results — only recalculated when inputs change
     @Published private(set) var recentFamilies: [SessionFamily] = []
-    @Published private(set) var filteredSessions: [Session] = []
+    @Published private(set) var filteredSessions: [Session] = [] {
+        didSet { openTranscriptForDebugIfRequested() }
+    }
+
+    #if DEBUG
+    private var debugTranscriptOpened = false
+    #endif
+
+    /// Debug builds only: `CLAUDE_STATISTICS_DEBUG_OPEN_TRANSCRIPT=1` opens the
+    /// first listed session's transcript once, so the transcript view can be
+    /// screenshotted after launch without clicking through the panel.
+    private func openTranscriptForDebugIfRequested() {
+        #if DEBUG
+        guard !debugTranscriptOpened,
+              ProcessInfo.processInfo.environment["CLAUDE_STATISTICS_DEBUG_OPEN_TRANSCRIPT"] == "1",
+              let first = filteredSessions.first else { return }
+        debugTranscriptOpened = true
+        openTranscript(for: first)
+        #endif
+    }
     @Published private(set) var projectGroups: [ProjectGroup] = []
     private var allFamiliesByRootID: [String: SessionFamily] = [:]
 
@@ -321,13 +343,18 @@ final class SessionViewModel: ObservableObject {
 
         let provider = store.provider
         let path = session.filePath
-        Task.detached {
-            let stats = provider.parseSession(at: path)
-            await MainActor.run { [weak self] in
-                guard self?.selectedSession?.id == session.id else { return }
-                self?.selectedSessionStats = stats
-                self?.isLoadingStats = false
-            }
+        let bytes = max(1, session.fileSize)
+        statsTask?.cancel()
+        // A whole-file parse: admitted through the shared budget like every
+        // other parse, and abandoned when another session is selected first.
+        statsTask = Task { [weak self] in
+            guard let stats = try? await BackgroundWorkScheduler.shared.run(
+                estimatedBytes: bytes, priority: .interactive,
+                operation: { provider.parseSession(at: path) }
+            ) else { return }
+            guard let self, !Task.isCancelled, self.selectedSession?.id == session.id else { return }
+            self.selectedSessionStats = stats
+            self.isLoadingStats = false
         }
     }
 
@@ -335,46 +362,73 @@ final class SessionViewModel: ObservableObject {
         store.quickStats[session.id]
     }
 
-    func loadMessages(for session: Session) async -> [TranscriptDisplayMessage] {
-        if !session.isArchived {
-            return await loadMessages(at: session.filePath)
-        }
-        // Archived session: decompress transcript from DB
+    /// An archived session's transcript as a temporary file that its own
+    /// provider can page or parse like any transcript; nil when nothing
+    /// complete is archived. (Archives used to be decompressed whole and
+    /// decoded with Claude's parser whatever their provider.)
+    func archivedTranscriptFile(for session: Session) async -> ArchivedTranscriptFile? {
         let store = self.store
-        return await Task.detached {
-            guard let data = store.resolveTranscriptData(for: session) else { return [] }
-            // Extract session UUID from the composite session ID (format: "project::uuid")
-            let sessionId: String
-            if let range = session.id.range(of: "::", options: .backwards) {
-                sessionId = String(session.id[range.upperBound...])
-            } else {
-                sessionId = session.id
-            }
-            return TranscriptParser.shared.parseMessages(fromData: data, sessionId: sessionId)
-        }.value
+        let name = session.filePath.isEmpty
+            ? "\(session.externalID).jsonl" : (session.filePath as NSString).lastPathComponent
+        return try? await BackgroundWorkScheduler.shared.run(
+            estimatedBytes: Self.archivedTranscriptEstimate, priority: .interactive
+        ) {
+            ArchivedTranscriptFile.make(named: name) { store.writeArchivedTranscript(for: session, to: $0) }
+        }
+    }
+
+    /// Non-nil when the active provider can serve bounded transcript windows
+    /// instead of one whole-file parse.
+    var pagedTranscriptProvider: (any PagedTranscriptProvider)? {
+        store.provider as? any PagedTranscriptProvider
+    }
+
+    /// Admission estimate for writing an archived transcript to a file: one
+    /// stored segment or legacy chunk, compressed and decompressed, at a time.
+    private static let archivedTranscriptEstimate: Int64 = 24 * 1024 * 1024
+
+    /// Whole-file provider work for the detail views runs through the shared
+    /// budget, awaited in the caller's task: a view that goes away cancels its
+    /// queued request, and a result that arrives after cancellation is dropped.
+    private static func fileEstimate(_ path: String) -> Int64 {
+        max(1, (try? TranscriptFileSnapshot.read(at: path).size) ?? 1)
     }
 
     func loadMessages(at path: String) async -> [TranscriptDisplayMessage] {
+        await parseMessages(at: path, keeping: nil)
+    }
+
+    /// The whole-parse fallback for an archived transcript file.
+    func loadMessages(in file: ArchivedTranscriptFile?) async -> [TranscriptDisplayMessage] {
+        guard let file else { return [] }
+        return await parseMessages(at: file.path, keeping: file)
+    }
+
+    /// `file`, when given, stays alive — and on disk — until the parse returns.
+    private func parseMessages(at path: String, keeping file: ArchivedTranscriptFile?) async -> [TranscriptDisplayMessage] {
         let provider = store.provider
-        return await Task.detached {
-            provider.parseMessages(at: path)
-        }.value
+        return (try? await BackgroundWorkScheduler.shared.run(
+            estimatedBytes: Self.fileEstimate(path), priority: .interactive
+        ) {
+            withExtendedLifetime(file) { provider.parseMessages(at: path) }
+        }) ?? []
     }
 
     func loadTrendData(for session: Session, granularity: TrendGranularity) async -> [TrendDataPoint] {
-        if !session.isArchived {
-            let provider = store.provider
-            let path = session.filePath
-            return await Task.detached {
-                provider.parseTrendData(from: path, granularity: granularity)
-            }.value
+        let file: ArchivedTranscriptFile?
+        if session.isArchived {
+            guard let archived = await archivedTranscriptFile(for: session) else { return [] }
+            file = archived
+        } else {
+            file = nil
         }
-        // Archived session: decompress transcript from DB
-        let store = self.store
-        return await Task.detached {
-            guard let data = store.resolveTranscriptData(for: session) else { return [] }
-            return TranscriptParser.shared.parseTrendData(fromData: data, granularity: granularity)
-        }.value
+        let provider = store.provider
+        let path = file?.path ?? session.filePath
+        return (try? await BackgroundWorkScheduler.shared.run(
+            estimatedBytes: Self.fileEstimate(path), priority: .interactive
+        ) {
+            withExtendedLifetime(file) { provider.parseTrendData(from: path, granularity: granularity) }
+        }) ?? []
     }
 
     func openNewSession(_ session: Session) {

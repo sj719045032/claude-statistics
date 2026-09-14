@@ -86,6 +86,19 @@ final class StatusBarController: NSObject, ObservableObject {
                 self.hidePanel()
             }
         }
+
+        #if DEBUG
+        // Debug builds only: `CLAUDE_STATISTICS_DEBUG_SHOW_PANEL=1` opens the
+        // panel a few seconds after launch (once stores have loaded), so a
+        // build can be screenshotted without clicking the status item — UI
+        // automation has no accessibility access in this environment.
+        if ProcessInfo.processInfo.environment["CLAUDE_STATISTICS_DEBUG_SHOW_PANEL"] == "1" {
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                self?.showPanel()
+            }
+        }
+        #endif
     }
 
     private func setupHotKey() {
@@ -244,12 +257,17 @@ struct MenuBarUsageStrip: View {
     /// so every cell advances to the next segment at exactly the same
     /// moment. One timer, one tick, no drift between cells.
     @State private var tick: Int = 0
-    /// Bumped on `UserDefaults.didChangeNotification` so SwiftUI
-    /// re-evaluates `visibleKinds` whenever the user flips a Settings
-    /// toggle. Replaces the three hardcoded `@AppStorage` bindings; the
+    /// Bumped when a menu-bar visibility toggle changes (checked on every
+    /// `UserDefaults.didChangeNotification`) so SwiftUI re-evaluates
+    /// `visibleKinds` whenever the user flips a Settings toggle. Replaces the three hardcoded `@AppStorage` bindings; the
     /// list itself comes from `ProviderRegistry.allKnownDescriptors`,
     /// which already merges builtins with plugin contributions.
     @State private var preferenceRevision: Int = 0
+    /// The visible descriptor ids `preferenceRevision` was last bumped for.
+    /// Every defaults write in the process posts `didChangeNotification` —
+    /// TelemetryDeck's once a second among them — and re-rendering the strip
+    /// for each one churned the status item's views while idle.
+    @State private var visibilitySignature: [String]? = nil
     /// Sum of "I'm currently rendering" flags reported by each
     /// `MenuBarUsageCell` via preference. `nil` until the first
     /// reduction lands so we don't briefly force the fallback icon
@@ -292,6 +310,9 @@ struct MenuBarUsageStrip: View {
             tick &+= 1
         }
         .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
+            let signature = visibleDescriptorIDs
+            guard signature != visibilitySignature else { return }
+            visibilitySignature = signature
             preferenceRevision &+= 1
         }
     }
@@ -316,12 +337,15 @@ struct MenuBarUsageStrip: View {
     /// once `appState.usageViewModel(for descriptorID:)` exists.)
     private var visibleKinds: [ProviderKind] {
         let _ = preferenceRevision
-        return ProviderRegistry
+        return visibleDescriptorIDs.compactMap { ProviderKind(rawValue: $0) }
+    }
+
+    /// Ids of the descriptors whose menu-bar toggle is on, in display order.
+    private var visibleDescriptorIDs: [String] {
+        ProviderRegistry
             .allKnownDescriptors(plugins: appState.pluginRegistry)
-            .compactMap { descriptor in
-                guard MenuBarPreferences.isVisible(descriptorID: descriptor.id) else { return nil }
-                return ProviderKind(rawValue: descriptor.id)
-            }
+            .map(\.id)
+            .filter { MenuBarPreferences.isVisible(descriptorID: $0) }
     }
 
     /// Subset of `visibleKinds` for which a `UsageViewModel` actually

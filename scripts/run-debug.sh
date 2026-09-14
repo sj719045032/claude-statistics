@@ -153,6 +153,26 @@ done
 if [ -f "${APP_PATH}/Contents/MacOS/${APP_NAME}" ] && [ ! -f "${APP_PATH}/Contents/MacOS/${DEBUG_APP_NAME}" ]; then
   mv "${APP_PATH}/Contents/MacOS/${APP_NAME}" "${APP_PATH}/Contents/MacOS/${DEBUG_APP_NAME}"
 fi
+
+# Optional: embed locally built plugins as bundled plugins of this debug app
+# only, e.g. DEBUG_BUNDLED_PLUGINS=/tmp/CodexPlugin-bundled-build/Build/Products/Release/CodexPlugin.csplugin
+# (colon-separated). Bundled plugins load before the user plugin directory, and
+# the loader refuses a same-id user copy before dlopening it, so this exercises
+# an unreleased plugin build without touching the shared user plugin directory
+# the release app also reads. Copied before signing so the signature covers them.
+if [ -n "${DEBUG_BUNDLED_PLUGINS:-}" ]; then
+  mkdir -p "${APP_PATH}/Contents/PlugIns"
+  IFS=':' read -r -a DEBUG_PLUGIN_PATHS <<< "${DEBUG_BUNDLED_PLUGINS}"
+  for plugin in "${DEBUG_PLUGIN_PATHS[@]}"; do
+    if [ ! -d "${plugin}" ]; then
+      echo "ERROR: DEBUG_BUNDLED_PLUGINS entry not found: ${plugin}" >&2
+      exit 1
+    fi
+    echo "==> Bundling debug-only plugin $(basename "${plugin}")..."
+    rm -rf "${APP_PATH}/Contents/PlugIns/$(basename "${plugin}")"
+    cp -R "${plugin}" "${APP_PATH}/Contents/PlugIns/"
+  done
+fi
 /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable ${DEBUG_APP_NAME}" "${PLIST}" 2>/dev/null || \
   /usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string ${DEBUG_APP_NAME}" "${PLIST}"
 

@@ -1,6 +1,7 @@
 import Foundation
 import ClaudeStatisticsKit
 import SwiftUI
+import Combine
 
 @MainActor
 final class SessionDataStore: ObservableObject {
@@ -11,8 +12,16 @@ final class SessionDataStore: ObservableObject {
     @Published var sessions: [Session] = []
     @Published var quickStats: [String: SessionQuickStats] = [:]
     @Published var parsedStats: [String: SessionStats] = [:] {
-        didSet { parsedStatsVersion &+= 1 }
+        didSet {
+            parsedStatsVersion &+= 1
+            let changed = nextChangedStatsIDs ?? Set(oldValue.keys).union(parsedStats.keys)
+            for id in changed { statsRevisions[id] = parsedStats[id] == nil ? nil : parsedStatsVersion }
+        }
     }
+    private var statsRevisions: [String: UInt64] = [:]
+    private var nextChangedStatsIDs: Set<String>?
+    private let aggregateEngine = IncrementalSessionAggregator()
+    private var aggregateSubscriptions: Set<AnyCancellable> = []
     /// Monotonic version bumped whenever `parsedStats` is reassigned or
     /// mutated. Views memoize derived results (e.g. UsageView trend
     /// folds) keyed by this so cache invalidates the moment new parse
@@ -32,8 +41,6 @@ final class SessionDataStore: ObservableObject {
     private var retryAttemptCounts: [String: Int] = [:]
     private var retryTask: Task<Void, Never>?
     private var pendingRescan = false
-    /// Byte offset of last successful parse per session, for incremental parsing.
-    private var lastParsedOffsets: [String: Int64] = [:]
     /// Sessions that had dirty events since last transcript archive.
     private var dirtyArchiveIds: Set<String> = []
     private var archiveTimer: Task<Void, Never>?
@@ -42,8 +49,13 @@ final class SessionDataStore: ObservableObject {
     /// task drains the merged set when it finishes.
     private var pendingDirtyIds: Set<String> = []
     private var pendingForceRescan = false
+    /// Watcher paths whose rescan decision is still to be made. The provider
+    /// answers in the batch task, off the main actor: answering can read
+    /// provider state (Codex reads its thread table on every WAL event).
+    private var pendingRescanCandidates: Set<String> = []
     private var isProcessingDirtyBatch = false
     private var isPopoverVisible = false
+    private var needsRebucket = false
     private var watcher: (any SessionWatcher)?
     /// Idempotency flag for `start()`. Set on first start, cleared on
     /// `stop()`. PR2 (provider startup staging) calls `start()` lazily
@@ -51,6 +63,11 @@ final class SessionDataStore: ObservableObject {
     /// cold store is first accessed, so start() must tolerate being
     /// invoked twice.
     private var isStarted = false
+    private var workGeneration: UInt64 = 0
+    private var initialLoadTask: Task<Void, Never>?
+    private var dirtyBatchTask: Task<Void, Never>?
+    private var archiveWorkTask: Task<Void, Never>?
+    private var legacyRelocationTask: Task<Void, Never>?
 
     /// The store binds to a `ProviderKind`, not to a specific
     /// `SessionProvider` instance. Every read of `provider` resolves
@@ -63,19 +80,35 @@ final class SessionDataStore: ObservableObject {
     /// when the store was constructed during `bootstrap`, so the
     /// fallback Claude provider got baked in for life.
     let kind: ProviderKind
-    var provider: any SessionProvider { ProviderRegistry.provider(for: kind) }
-    private let db = DatabaseService.shared
+    var provider: any SessionProvider { providerOverride ?? ProviderRegistry.provider(for: kind) }
+    private let providerOverride: (any SessionProvider)?
+    private let db: DatabaseService
+    private let scheduler: BackgroundWorkScheduler
     private let maxQueuedRetryAttempts = 3
-    private let parseQueue: OperationQueue = {
-        let q = OperationQueue()
-        q.maxConcurrentOperationCount = 1
-        q.qualityOfService = .utility
-        q.name = "com.claude-statistics.parse"
-        return q
-    }()
 
-    init(kind: ProviderKind) {
+    init(kind: ProviderKind, provider: (any SessionProvider)? = nil,
+         database: DatabaseService = .shared, scheduler: BackgroundWorkScheduler = .shared) {
         self.kind = kind
+        self.providerOverride = provider
+        self.db = database
+        self.scheduler = scheduler
+        for name in [ModelPricing.didChange, .NSSystemTimeZoneDidChange, .NSCalendarDayChanged] {
+            NotificationCenter.default.publisher(for: name)
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in
+                    // Invalidate view-side derived caches without marking raw
+                    // session contributions dirty or reparsing any transcript.
+                    self?.parsedStatsVersion &+= 1
+                    self?.rebucket()
+                }
+                .store(in: &aggregateSubscriptions)
+        }
+    }
+
+    private func publishParsedStats(_ value: [String: SessionStats], changed: Set<String>) {
+        nextChangedStatsIDs = changed
+        parsedStats = value
+        nextChangedStatsIDs = nil
     }
 
     // MARK: - Lifecycle
@@ -98,14 +131,37 @@ final class SessionDataStore: ObservableObject {
     }
 
     func stop() {
+        isPopoverVisible = false
         watcher?.stop()
         retryTask?.cancel()
         retryTask = nil
         archiveTimer?.cancel()
         archiveTimer = nil
-        parseQueue.cancelAllOperations()
-        db.close()
+        cancelBackgroundWork()
+        // The connection is shared: stopping one provider must not close it
+        // underneath the other providers.
         isStarted = false
+    }
+
+    private func cancelBackgroundWork() {
+        workGeneration &+= 1
+        retryTask?.cancel()
+        retryTask = nil
+        retrySessionIds.removeAll()
+        retryAttemptCounts.removeAll()
+        initialLoadTask?.cancel()
+        initialLoadTask = nil
+        dirtyBatchTask?.cancel()
+        dirtyBatchTask = nil
+        archiveWorkTask?.cancel()
+        archiveWorkTask = nil
+        legacyRelocationTask?.cancel()
+        legacyRelocationTask = nil
+        rebucketWorker.cancel()
+        pendingDirtyIds.removeAll()
+        pendingForceRescan = false
+        pendingRescanCandidates.removeAll()
+        isProcessingDirtyBatch = false
     }
 
     private func startArchiveTimer() {
@@ -126,10 +182,13 @@ final class SessionDataStore: ObservableObject {
         let sessions = self.sessions.filter { ids.contains($0.id) && !$0.isArchived && !$0.filePath.isEmpty }
         guard !sessions.isEmpty else { return }
         let providerKind = self.kind
+        let scheduler = self.scheduler
         let db = self.db
-        Task.detached {
+        archiveWorkTask?.cancel()
+        archiveWorkTask = Task.detached {
             for session in sessions {
-                Self.archiveTranscriptIfNeeded(db: db, provider: providerKind, session: session)
+                guard !Task.isCancelled else { return }
+                await Self.archiveTranscriptIfNeeded(db: db, provider: providerKind, session: session, scheduler: scheduler)
             }
             DiagnosticLogger.shared.info("[\(providerKind.rawValue)] Periodic archive: compressed \(sessions.count) active sessions")
         }
@@ -139,6 +198,7 @@ final class SessionDataStore: ObservableObject {
 
     func popoverDidOpen() {
         isPopoverVisible = true
+        if needsRebucket { rebucket() }
         if !dirtySessionIds.isEmpty || !retrySessionIds.isEmpty {
             refreshDirtySessions()
         }
@@ -146,6 +206,10 @@ final class SessionDataStore: ObservableObject {
 
     func popoverDidClose() {
         isPopoverVisible = false
+        if rebucketWorker.isWorking {
+            needsRebucket = true
+            rebucketWorker.cancel()
+        }
         retryTask?.cancel()
         retryTask = nil
     }
@@ -158,18 +222,33 @@ final class SessionDataStore: ObservableObject {
         let provider = self.provider
         let providerKind = provider.kind
         let db = self.db
-        Task.detached { [weak self] in
+        let scheduler = self.scheduler
+        let generation = workGeneration
+        initialLoadTask = Task.detached { [weak self] in
             guard let self else { return }
+            defer {
+                Task { @MainActor [weak self] in
+                    guard let self, self.workGeneration == generation else { return }
+                    self.initialLoadTask = nil
+                    self.runNextDirtyBatch()
+                }
+            }
             let initialLoadSignpost = PerformanceTracer.begin("SessionDataStore.initialLoad")
             defer { PerformanceTracer.end("SessionDataStore.initialLoad", initialLoadSignpost) }
-            let scannedSessions = SessionDeduplicator.deduplicate(provider.scanSessions(), provider: providerKind)
+            guard let scannedSessions = try? await scheduler.run(operation: {
+                SessionDeduplicator.deduplicate(provider.scanSessions(), provider: providerKind)
+            }) else { return }
+            guard !Task.isCancelled else { return }
             DiagnosticLogger.shared.initialScanStarted(
                 provider: providerKind.rawValue,
                 sessionCount: scannedSessions.count
             )
 
             // Load DB cache and determine which sessions need reparsing
-            let cache = db.loadAllCached(provider: providerKind)
+            guard let cache = try? await scheduler.run(operation: {
+                db.loadAllCached(provider: providerKind)
+            }) else { return }
+            guard !Task.isCancelled else { return }
             let parserRevisionChangedIds = Set(scannedSessions.compactMap { session -> String? in
                 guard let revision = session.metadata[Self.parserRevisionMetadataKey],
                       let cached = cache[session.id],
@@ -188,7 +267,7 @@ final class SessionDataStore: ObservableObject {
                 )
             }
             db.saveSessionMetadata(provider: providerKind, sessions: scannedSessions)
-            let indexedSessionIds = db.indexedSessionIds(provider: providerKind)
+            let indexedSessionIds = db.sessionsWithCompleteIndex(provider: providerKind)
             var dirtyIds: [Session] = []
             var indexRepairIds: [Session] = []
             var quickMap: [String: SessionQuickStats] = [:]
@@ -199,9 +278,14 @@ final class SessionDataStore: ObservableObject {
             // the user sees complete data as soon as possible after a crash recovery.
             var interruptedIds: [Session] = []
             var freshOrChangedIds: [Session] = []
-            var cachedOffsets: [String: Int64] = [:]
             for session in scannedSessions {
-                if parserRevisionChangedIds.contains(session.id) ||
+                guard !Task.isCancelled else { return }
+                // Show the last committed values while validating changed data.
+                if let cached = cache[session.id] {
+                    if let quick = cached.quickStats { quickMap[session.id] = quick }
+                    if let stats = cached.sessionStats { statsMap[session.id] = stats }
+                }
+                if provider is any CheckpointedSessionDataProvider || parserRevisionChangedIds.contains(session.id) ||
                     db.needsReparse(sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, cache: cache) {
                     if let cached = cache[session.id], cached.sessionStats == nil, cached.quickStats != nil {
                         interruptedIds.append(session)
@@ -211,9 +295,6 @@ final class SessionDataStore: ObservableObject {
                 } else if let cached = cache[session.id] {
                     if let q = cached.quickStats { quickMap[session.id] = q }
                     if let s = cached.sessionStats { statsMap[session.id] = s }
-                    if !session.filePath.isEmpty {
-                        cachedOffsets[session.id] = session.fileSize
-                    }
                     if Self.needsSearchIndexRepair(
                         session: session,
                         cached: cached,
@@ -268,17 +349,19 @@ final class SessionDataStore: ObservableObject {
             let initialHasStats = !statsMap.isEmpty
             let initialParseProgress: String? = dirtyIds.isEmpty ? nil : "Loading..."
             await MainActor.run {
+                guard self.workGeneration == generation else { return }
                 self.sessions = allSessions
                 self.quickStats = initialQuickMap
                 self.parsedStats = initialStatsMap
-                self.lastParsedOffsets.merge(cachedOffsets) { _, new in new }
                 if initialHasStats { self.rebucket() }
                 self.parseProgress = initialParseProgress
             }
 
             if dirtyIds.isEmpty && indexRepairIds.isEmpty {
                 await MainActor.run {
+                    guard self.workGeneration == generation else { return }
                     self.isFullParseComplete = true
+                    self.startLegacyBlobRelocation()
                     self.parseProgress = nil
                     let totalMsgs = self.parsedStats.values.reduce(0) { $0 + $1.messageCount }
                     let totalToks = self.parsedStats.values.reduce(0) { $0 + $1.totalTokens }
@@ -291,99 +374,47 @@ final class SessionDataStore: ObservableObject {
                 return
             }
 
-            // Quick parse dirty sessions
-            var quickBySessionId: [String: SessionQuickStats] = [:]
-            for session in dirtyIds {
-                let quick = provider.parseQuickStats(at: session.filePath)
-                db.saveQuickStats(provider: providerKind, sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, stats: quick)
-                quickBySessionId[session.id] = quick
-                await MainActor.run {
-                    self.quickStats[session.id] = quick
-                }
-            }
-
-            // Full parse + index dirty sessions (parse in parallel, DB write serial)
+            // One complete session transaction at a time per store. Providers
+            // still share the global concurrent queue, but a completed parser's
+            // large FTS payload is committed/released before reading another file.
             let total = dirtyIds.count
             let parseStart = CFAbsoluteTimeGetCurrent()
-            let batchSize = 8
-            var processed = 0
-
-            for batchStart in stride(from: 0, to: total, by: batchSize) {
-                let batchEnd = min(batchStart + batchSize, total)
-                let batch = Array(dirtyIds[batchStart..<batchEnd])
-
-                // Parse batch in parallel
-                let results = await withTaskGroup(of: SessionParseOutcome.self) { group in
-                    for session in batch {
-                        let quick = quickBySessionId[session.id] ?? SessionQuickStats()
-                        let cachedSession = cache[session.id]
-                        group.addTask {
-                            await SessionParseValidator.parse(
-                                provider: provider,
-                                session: session,
-                                quick: quick,
-                                cached: cachedSession
-                            )
-                        }
-                    }
-                    var batchResults: [SessionParseOutcome] = []
-                    for await result in group {
-                        batchResults.append(result)
-                    }
-                    return batchResults
+            var newArchiveSessions: [Session] = []
+            for (index, session) in dirtyIds.enumerated() {
+                guard !Task.isCancelled else { return }
+                let quick: SessionQuickStats
+                if provider is any CheckpointedSessionDataProvider {
+                    quick = cache[session.id]?.quickStats ?? SessionQuickStats()
+                } else {
+                    guard let parsed = try? await scheduler.run(
+                        estimatedBytes: min(max(1, session.fileSize), Int64.max / 4) * 4,
+                        operation: { provider.parseQuickStats(at: session.filePath) }
+                    ) else { return }
+                    quick = parsed
+                    db.saveQuickStats(provider: providerKind, sessionId: session.id,
+                                      fileSize: session.fileSize, mtime: session.lastModified, stats: quick)
                 }
-
-                // PR5: collect this batch's stats writes into one
-                // request list and commit under a single SQLite
-                // transaction (statements prepared once, reset per
-                // request) instead of per-session BEGIN/COMMIT.
-                let sessionsById = Dictionary(uniqueKeysWithValues: batch.map { ($0.id, $0) })
-                var saveRequests: [DatabaseService.SaveSessionStatsRequest] = []
-                for result in results {
-                    guard let stats = result.committedStats else { continue }
-                    guard let session = sessionsById[result.sessionId] else { continue }
-                    saveRequests.append(DatabaseService.SaveSessionStatsRequest(
-                        sessionId: session.id,
-                        fileSize: session.fileSize,
-                        mtime: session.lastModified,
-                        stats: stats,
-                        searchMessages: result.searchMessages
-                    ))
+                let result = await SessionParseValidator.parseAndCommit(
+                    provider: provider, session: session, quick: quick, cached: cache[session.id],
+                    database: db, scheduler: scheduler
+                )
+                guard !Task.isCancelled else { return }
+                if result.stats != nil, cache[session.id]?.hasTranscript != true {
+                    newArchiveSessions.append(session)
                 }
-                db.saveSessionsStatsAndIndexes(provider: providerKind, requests: saveRequests)
-
-                // Archive transcript blobs for sessions that don't have one yet
-                // Seed incremental parse offsets for successfully parsed sessions
-                var batchOffsets: [String: Int64] = [:]
-                for result in results {
-                    guard result.committedStats != nil,
-                          let session = sessionsById[result.sessionId] else { continue }
-                    Self.archiveTranscriptIfNeeded(
-                        db: db, provider: providerKind, session: session,
-                        compressedTranscript: result.compressedTranscript
-                    )
-                    if !session.filePath.isEmpty {
-                        batchOffsets[session.id] = session.fileSize
-                    }
-                }
-
-                processed += results.count
-
-                let processedCount = processed
-                let shouldRebucket = processedCount % 20 < batchSize || processedCount == total
+                let processedCount = index + 1
                 await MainActor.run {
-                    var staged = self.parsedStats
-                    for result in results {
-                        self.handleParseRetryState(for: result.sessionId, shouldRetry: result.shouldRetry)
-                        if let stats = result.displayStats {
-                            staged[result.sessionId] = stats
-                        }
+                    guard self.workGeneration == generation else { return }
+                    self.handleParseRetryState(for: session.id, shouldRetry: result.shouldRetry)
+                    if let stats = result.stats {
+                        self.quickStats[session.id] = result.quickStats
+                        var staged = self.parsedStats
+                        staged[session.id] = stats
+                        self.publishParsedStats(staged, changed: [session.id])
                     }
-                    self.parsedStats = staged
-                    self.lastParsedOffsets.merge(batchOffsets) { _, new in new }
                     self.parseProgress = "Parsing \(processedCount)/\(total)"
                     self.parsePercent = Double(processedCount) / Double(total)
-                    if shouldRebucket {
+                    if processedCount % 20 == 0 || processedCount == total {
                         self.rebucket()
                     }
                 }
@@ -396,17 +427,20 @@ final class SessionDataStore: ObservableObject {
             )
 
             if !indexRepairIds.isEmpty {
-                Self.repairSearchIndexes(
+                guard !Task.isCancelled else { return }
+                await Self.repairSearchIndexes(
                     provider: provider,
                     db: db,
                     for: indexRepairIds,
-                    cache: cache
+                    cache: cache, scheduler: scheduler
                 )
             }
 
             // Backfill transcript blobs for sessions that have files on
             // disk and stats in cache but no archived transcript yet.
-            let sessionsNeedingBackfill = scannedSessions.filter { session in
+            let newArchiveIDs = Set(newArchiveSessions.map(\.id))
+            let sessionsNeedingBackfill = newArchiveSessions + scannedSessions.filter { session in
+                guard !newArchiveIDs.contains(session.id) else { return false }
                 guard let cached = cache[session.id],
                       cached.sessionStats != nil,
                       !cached.hasTranscript else { return false }
@@ -417,15 +451,18 @@ final class SessionDataStore: ObservableObject {
                     "[\(providerKind.rawValue)] Backfilling transcript archive for \(sessionsNeedingBackfill.count) sessions"
                 )
                 for session in sessionsNeedingBackfill {
-                    Self.archiveTranscriptIfNeeded(
-                        db: db, provider: providerKind, session: session
+                    guard !Task.isCancelled else { return }
+                    await Self.archiveTranscriptIfNeeded(
+                        db: db, provider: providerKind, session: session, scheduler: scheduler
                     )
                 }
             }
 
             await MainActor.run {
+                guard self.workGeneration == generation else { return }
                 self.rebucket()
                 self.isFullParseComplete = true
+                self.startLegacyBlobRelocation()
                 self.parseProgress = nil
                 self.parsePercent = nil
 
@@ -443,14 +480,14 @@ final class SessionDataStore: ObservableObject {
     // MARK: - File change handling
 
     private func handleFileChanges(_ changedPaths: Set<String>) {
+        guard isStarted, !changedPaths.isEmpty else { return }
         let changedIds = provider.changedSessionIds(for: changedPaths)
-        let needsRescan = provider.shouldRescanSessions(for: changedPaths)
-        guard needsRescan || !changedIds.isEmpty else { return }
 
         // Keep background session metadata fresh for the notch/island even when the
         // popover is closed. Parsing stays serialized on the store queue, so this
-        // remains bounded while avoiding stale active-session previews.
-        processDirtyIds(changedIds, forceRescan: needsRescan)
+        // remains bounded while avoiding stale active-session previews. Whether
+        // the batch needs a full scan is decided in the batch task, not here.
+        processDirtyIds(changedIds, rescanCandidates: changedPaths)
     }
 
     // MARK: - Dirty session processing
@@ -464,20 +501,24 @@ final class SessionDataStore: ObservableObject {
         processDirtyIds(ids, forceRescan: needsRescan)
     }
 
-    private func processDirtyIds(_ ids: Set<String>, forceRescan: Bool = false) {
+    private func processDirtyIds(_ ids: Set<String>, forceRescan: Bool = false,
+                                 rescanCandidates: Set<String> = []) {
         pendingDirtyIds.formUnion(ids)
+        pendingRescanCandidates.formUnion(rescanCandidates)
         if forceRescan { pendingForceRescan = true }
-        guard !isProcessingDirtyBatch else { return }
+        guard !isProcessingDirtyBatch, initialLoadTask == nil else { return }
         runNextDirtyBatch()
     }
 
     private func runNextDirtyBatch() {
         let ids = pendingDirtyIds
         let forceRescan = pendingForceRescan
+        let rescanCandidates = pendingRescanCandidates
         pendingDirtyIds.removeAll()
         pendingForceRescan = false
+        pendingRescanCandidates.removeAll()
 
-        guard forceRescan || !ids.isEmpty else {
+        guard forceRescan || !ids.isEmpty || !rescanCandidates.isEmpty else {
             isProcessingDirtyBatch = false
             return
         }
@@ -487,18 +528,35 @@ final class SessionDataStore: ObservableObject {
         let provider = self.provider
         let providerKind = provider.kind
         let db = self.db
+        let scheduler = self.scheduler
         // Snapshot the known sessions for the fast path. A new file that the
         // watcher already saw but we haven't scanned yet won't be in here, so
         // we promote to forceRescan when any dirty id is unknown.
         let knownSessions = self.sessions
         let knownIds = Set(knownSessions.map(\.id))
         let hasUnknownId = ids.contains { !knownIds.contains($0) }
-        let effectiveForceRescan = forceRescan || hasUnknownId
-        DiagnosticLogger.shared.verbose(
-            "Session dirty process provider=\(providerKind.rawValue) ids=\(ids.count) forceRescan=\(effectiveForceRescan) fastPath=\(!effectiveForceRescan)"
-        )
-        Task.detached { [weak self] in
+        let knownForceRescan = forceRescan || hasUnknownId
+        let generation = workGeneration
+        dirtyBatchTask = Task.detached { [weak self] in
             guard let self else { return }
+            guard !Task.isCancelled else { return }
+
+            let effectiveForceRescan = knownForceRescan ||
+                (!rescanCandidates.isEmpty && provider.shouldRescanSessions(for: rescanCandidates))
+            DiagnosticLogger.shared.verbose(
+                "Session dirty process provider=\(providerKind.rawValue) ids=\(ids.count) forceRescan=\(effectiveForceRescan) fastPath=\(!effectiveForceRescan)"
+            )
+            // Only provider-state events and the provider said nothing a scan
+            // reads has changed: nothing to do. Drain the queue exactly as a
+            // finished batch does.
+            guard effectiveForceRescan || !ids.isEmpty else {
+                await MainActor.run {
+                    guard self.workGeneration == generation else { return }
+                    self.dirtyBatchTask = nil
+                    self.runNextDirtyBatch()
+                }
+                return
+            }
 
             let scannedSessions: [Session]
             let dirtySessions: [Session]
@@ -508,10 +566,15 @@ final class SessionDataStore: ObservableObject {
                 // fingerprint changed against the cache. Use fingerprint-only
                 // load (no JSON decode) for the staleness filter, then only
                 // decode JSON for the actual dirty sessions as retry fallback.
-                scannedSessions = SessionDeduplicator.deduplicate(provider.scanSessions(), provider: providerKind)
+                guard let scanned = try? await scheduler.run(operation: {
+                    SessionDeduplicator.deduplicate(provider.scanSessions(), provider: providerKind)
+                }) else { return }
+                scannedSessions = scanned
+                guard !Task.isCancelled else { return }
                 db.saveSessionMetadata(provider: providerKind, sessions: scannedSessions)
                 let fingerprints = db.loadCacheFingerprints(provider: providerKind)
                 await MainActor.run {
+                    guard self.workGeneration == generation else { return }
                     // Preserve archived sessions that have no files on disk
                     let archivedSessions = self.sessions.filter(\.isArchived)
                     self.sessions = scannedSessions + archivedSessions
@@ -524,13 +587,20 @@ final class SessionDataStore: ObservableObject {
                         fingerprints: fingerprints
                     )
                 }
-                cache = db.loadCached(provider: providerKind, sessionIds: Set(dirtySessions.map(\.id)))
+                let dirtyIDs = Set(dirtySessions.map(\.id))
+                guard let loaded = try? await scheduler.run(operation: {
+                    db.loadCached(provider: providerKind, sessionIds: dirtyIDs)
+                }) else { return }
+                cache = loaded
             } else {
                 // Fast path: watcher already told us exactly which sessions changed
                 // and they all exist in the snapshot. Skip the full directory walk
                 // and only load the cache rows we need as retry fallbacks.
                 scannedSessions = knownSessions
-                cache = db.loadCached(provider: providerKind, sessionIds: ids)
+                guard let loaded = try? await scheduler.run(operation: {
+                    db.loadCached(provider: providerKind, sessionIds: ids)
+                }) else { return }
+                cache = loaded
                 dirtySessions = scannedSessions.filter { ids.contains($0.id) }
             }
 
@@ -543,82 +613,42 @@ final class SessionDataStore: ObservableObject {
             let showProgress = total > 3
 
             if showProgress {
-                await MainActor.run { self.parseProgress = "Updating..." }
+                await MainActor.run {
+                    guard self.workGeneration == generation else { return }
+                    self.parseProgress = "Updating..."
+                }
             }
 
-            // PR5: batch all dirty-refresh stats writes into one
-            // transaction at end of loop. parsedStats / progress
-            // still update per-iteration so the UI reflects each
-            // parse completing; if the app crashes mid-loop the
-            // unsaved sessions are simply re-detected as dirty on
-            // next launch (file mtime > cached mtime).
-            var saveRequests: [DatabaseService.SaveSessionStatsRequest] = []
-            let lastOffsets = await MainActor.run { self.lastParsedOffsets }
-            let existingStats = await MainActor.run { self.parsedStats }
+            var stagedStats: [String: SessionStats] = [:]
+            var stagedQuick: [String: SessionQuickStats] = [:]
             for (i, session) in dirtySessions.enumerated() {
+                guard !Task.isCancelled else { return }
                 guard FileManager.default.fileExists(atPath: session.filePath) else { continue }
-                // Try incremental parse when we have offset + existing stats
-                if let offset = lastOffsets[session.id],
-                   let existing = existingStats[session.id],
-                   let fileData = FileManager.default.contents(atPath: session.filePath),
-                   Int64(fileData.count) > offset,
-                   let result = provider.parseSessionIncremental(
-                       fromData: fileData, fromOffset: offset,
-                       existingStats: existing, path: session.filePath
-                   ) {
-                    let stats = result.stats
-                    let newOffset = result.newOffset
-                    saveRequests.append(DatabaseService.SaveSessionStatsRequest(
-                        sessionId: session.id,
-                        fileSize: session.fileSize,
-                        mtime: session.lastModified,
-                        stats: stats,
-                        searchMessages: []
-                    ))
-                    await MainActor.run {
-                        self.lastParsedOffsets[session.id] = newOffset
-                        self.parsedStats[session.id] = stats
-                        if showProgress {
-                            let processed = i + 1
-                            self.parseProgress = "Updating \(processed)/\(total)"
-                            self.parsePercent = Double(processed) / Double(total)
-                        }
-                    }
-                    continue
+                let quick: SessionQuickStats
+                if provider is any CheckpointedSessionDataProvider {
+                    quick = cache[session.id]?.quickStats ?? SessionQuickStats()
+                } else {
+                    // Legacy APIs require complete Data and cannot return an
+                    // incremental FTS projection. Use their combined parser,
+                    // not an extra full-file read to probe incremental support.
+                    guard let parsed = try? await scheduler.run(
+                        estimatedBytes: min(max(1, session.fileSize), Int64.max / 4) * 4,
+                        operation: { provider.parseQuickStats(at: session.filePath) }
+                    ) else { return }
+                    quick = parsed
                 }
-
-                // Full parse fallback
-                let quick = provider.parseQuickStats(at: session.filePath)
-                db.saveQuickStats(provider: providerKind, sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified, stats: quick)
-                await MainActor.run { self.quickStats[session.id] = quick }
-
-                let outcome = await SessionParseValidator.parse(
-                    provider: provider,
-                    session: session,
-                    quick: quick,
-                    cached: cache[session.id],
-                    archiveTranscript: false
+                let outcome = await SessionParseValidator.parseAndCommit(
+                    provider: provider, session: session, quick: quick,
+                    cached: cache[session.id], database: db, scheduler: scheduler
                 )
-                if let stats = outcome.committedStats {
-                    saveRequests.append(DatabaseService.SaveSessionStatsRequest(
-                        sessionId: session.id,
-                        fileSize: session.fileSize,
-                        mtime: session.lastModified,
-                        stats: stats,
-                        searchMessages: outcome.searchMessages
-                    ))
-                    if !session.filePath.isEmpty {
-                        let fileSize = (try? FileManager.default.attributesOfItem(atPath: session.filePath)[.size] as? Int64) ?? session.fileSize
-                        await MainActor.run {
-                            self.lastParsedOffsets[session.id] = fileSize
-                        }
-                    }
+                guard !Task.isCancelled else { return }
+                if let stats = outcome.stats {
+                    stagedStats[session.id] = stats
+                    stagedQuick[session.id] = outcome.quickStats
                 }
                 await MainActor.run {
+                    guard self.workGeneration == generation else { return }
                     self.handleParseRetryState(for: session.id, shouldRetry: outcome.shouldRetry)
-                    if let stats = outcome.displayStats {
-                        self.parsedStats[session.id] = stats
-                    }
                     if showProgress {
                         let processed = i + 1
                         self.parseProgress = "Updating \(processed)/\(total)"
@@ -626,22 +656,35 @@ final class SessionDataStore: ObservableObject {
                     }
                 }
             }
-            db.saveSessionsStatsAndIndexes(provider: providerKind, requests: saveRequests)
+            guard !Task.isCancelled else { return }
 
-            let parsedSessionIds = Set(dirtySessions.map(\.id))
+            let committedStats = stagedStats
+            let committedQuick = stagedQuick
+            let metadataChanged = effectiveForceRescan && scannedSessions != knownSessions.filter { !$0.isArchived }
+            let parsedSessionIds = Set(committedStats.keys)
             await MainActor.run {
+                guard self.workGeneration == generation else { return }
+                if !committedStats.isEmpty {
+                    var staged = self.parsedStats
+                    staged.merge(committedStats) { _, new in new }
+                    self.publishParsedStats(staged, changed: Set(committedStats.keys))
+                    self.quickStats.merge(committedQuick) { _, new in new }
+                }
                 self.dirtyArchiveIds.formUnion(parsedSessionIds)
             }
 
             if showProgress {
                 await MainActor.run {
+                    guard self.workGeneration == generation else { return }
                     self.parseProgress = nil
                     self.parsePercent = nil
                 }
             }
 
             await MainActor.run {
-                self.rebucket()
+                guard self.workGeneration == generation else { return }
+                self.dirtyBatchTask = nil
+                if !committedStats.isEmpty || metadataChanged { self.rebucket() }
                 // Drain anything queued while this batch was running. If nothing
                 // is pending, runNextDirtyBatch() flips isProcessingDirtyBatch
                 // back to false and exits.
@@ -671,37 +714,46 @@ final class SessionDataStore: ObservableObject {
         guard isPopoverVisible, !retrySessionIds.isEmpty, retryTask == nil else { return }
         retryTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 2_000_000_000)
-            guard let self else { return }
+            guard let self, !Task.isCancelled else { return }
             self.retryTask = nil
             guard self.isPopoverVisible, !self.retrySessionIds.isEmpty else { return }
             self.refreshDirtySessions()
         }
     }
 
-    nonisolated private static func repairSearchIndexes(
+    nonisolated static func repairSearchIndexes(
         provider: any SessionProvider,
         db: DatabaseService,
         for sessions: [Session],
-        cache: [String: DatabaseService.CachedSession]
-    ) {
+        cache: [String: DatabaseService.CachedSession],
+        scheduler: BackgroundWorkScheduler = .shared
+    ) async {
         guard !sessions.isEmpty else { return }
         DiagnosticLogger.shared.info("Repairing missing \(provider.kind.rawValue) search index for \(sessions.count) sessions")
 
-        // PR5: collect repair writes into one batched transaction.
-        var saveRequests: [DatabaseService.SaveSessionStatsRequest] = []
+        // Commit/release one session before reading the next. Retaining every
+        // missing index until the end made cold repair grow with all history.
         for session in sessions {
+            guard !Task.isCancelled else { return }
             guard let cached = cache[session.id],
                   let stats = cached.sessionStats else { continue }
-            let searchMessages = provider.parseSearchIndexMessages(at: session.filePath)
-            saveRequests.append(DatabaseService.SaveSessionStatsRequest(
-                sessionId: session.id,
-                fileSize: session.fileSize,
-                mtime: session.lastModified,
-                stats: stats,
-                searchMessages: searchMessages
-            ))
+            _ = try? await scheduler.run(
+                estimatedBytes: min(max(1, session.fileSize), Int64.max / 4) * 4
+            ) {
+                try autoreleasepool {
+                    try Task.checkCancellation()
+                    let before = try TranscriptFileSnapshot.read(at: session.filePath)
+                    let messages = provider.parseSearchIndexMessages(at: session.filePath)
+                    try Task.checkCancellation()
+                    guard try TranscriptFileSnapshot.read(at: session.filePath) == before else { return false }
+                    return db.saveSessionsStatsAndIndexes(provider: provider.kind, requests: [
+                        DatabaseService.SaveSessionStatsRequest(
+                            sessionId: session.id, fileSize: session.fileSize, mtime: session.lastModified,
+                            stats: stats, searchMessages: messages)
+                    ])
+                }
+            }
         }
-        db.saveSessionsStatsAndIndexes(provider: provider.kind, requests: saveRequests)
     }
 
     nonisolated private static func needsSearchIndexRepair(
@@ -724,30 +776,53 @@ final class SessionDataStore: ObservableObject {
 
     // MARK: - Transcript Archival
 
+    /// Move this provider's pre-v14 archives out of their `session_cache`
+    /// rows, one session at a time at background priority. Inline, each blob
+    /// is walked by every read or update of the columns stored after it —
+    /// parser checkpoints, index completeness, metadata — on every parse.
+    private func startLegacyBlobRelocation() {
+        guard legacyRelocationTask == nil else { return }
+        let db = self.db
+        let providerKind = self.kind
+        let scheduler = self.scheduler
+        legacyRelocationTask = Task.detached {
+            db.discardIncompleteLegacyRelocations(provider: providerKind)
+            let ids = db.sessionsWithInlineLegacyTranscripts(provider: providerKind)
+            guard !ids.isEmpty else { return }
+            var moved = 0
+            for id in ids {
+                guard !Task.isCancelled else { return }
+                let relocated = (try? await scheduler.run(
+                    estimatedBytes: Int64(DatabaseService.legacyRelocationChunkBytes) * 2,
+                    priority: .background
+                ) {
+                    db.relocateInlineLegacyTranscript(provider: providerKind, sessionId: id)
+                }) ?? false
+                if relocated { moved += 1 }
+            }
+            // The copies went through the WAL; hand its space back.
+            if moved > 0 { db.checkpoint() }
+            DiagnosticLogger.shared.info(
+                "[\(providerKind.rawValue)] Moved \(moved)/\(ids.count) pre-v14 transcript archives out of session rows"
+            )
+        }
+    }
+
     nonisolated private static func archiveTranscriptIfNeeded(
         db: DatabaseService,
         provider: ProviderKind,
         session: Session,
-        compressedTranscript: Data? = nil
-    ) {
+        scheduler: BackgroundWorkScheduler = .shared
+    ) async {
         guard !session.isArchived, !session.filePath.isEmpty else { return }
-        let compressed: Data
-        if let preComputed = compressedTranscript {
-            compressed = preComputed
-        } else {
-            guard let rawData = FileManager.default.contents(atPath: session.filePath),
-                  let c = (try? (rawData as NSData).compressed(using: .zlib)) as Data?
-            else { return }
-            compressed = c
+        // Segment-sized, not file-sized: the archiver never holds the
+        // transcript, so it no longer has to run alone in the shared budget.
+        _ = try? await scheduler.run(estimatedBytes: TranscriptArchiver.estimatedPeakBytes) {
+            try TranscriptArchiver.archive(
+                path: session.filePath,
+                into: db.transcriptArchive(provider: provider, session: session)
+            )
         }
-        db.saveTranscriptAndMetadata(
-            provider: provider,
-            sessionId: session.id,
-            compressedTranscript: compressed,
-            projectPath: session.projectPath,
-            cwd: session.cwd,
-            metadata: session.metadata
-        )
     }
 
     // MARK: - Rebucket (PR3 — runs off the main thread)
@@ -761,6 +836,9 @@ final class SessionDataStore: ObservableObject {
         let selectedPeriod: StatsPeriod
         let weeklyResetDate: Date?
         let allTimeLabel: String
+        let revisions: [String: UInt64]
+        let pricing: ModelPricing.Snapshot
+        let calendar: Calendar
     }
 
     /// All published outputs of a rebucket pass, computed off-main and
@@ -778,194 +856,49 @@ final class SessionDataStore: ObservableObject {
         let topProjects: [TopProject]
     }
 
-    /// Monotonic generation token. Each `rebucket()` call bumps it
-    /// before dispatching the background compute; the background result
-    /// is discarded if a newer call has bumped it again. Prevents a
-    /// slow earlier compute (large parsedStats) from clobbering a faster
-    /// later one (e.g. user rapidly switching period).
-    private var rebucketGeneration: UInt64 = 0
+    private lazy var rebucketWorker = LatestSnapshotWorker<RebucketSnapshot, RebucketResult>(
+        compute: { [aggregateEngine, scheduler] snapshot in
+            try await scheduler.run(priority: .interactive) {
+                let span = PerformanceTracer.begin("SessionDataStore.rebucket")
+                defer { PerformanceTracer.end("SessionDataStore.rebucket", span) }
+                let output = try await aggregateEngine.update(.init(
+                    stats: snapshot.parsedStats, revisions: snapshot.revisions, sessions: snapshot.sessions,
+                    period: snapshot.selectedPeriod, weeklyResetDate: snapshot.weeklyResetDate,
+                    allTimeLabel: snapshot.allTimeLabel, pricing: snapshot.pricing, calendar: snapshot.calendar
+                ))
+                return Self.rebucketResult(output, period: snapshot.selectedPeriod)
+            }
+        },
+        publish: { [weak self] result in self?.applyRebucketResult(result) }
+    )
 
     private func rebucket() {
-        let signpostState = PerformanceTracer.begin("SessionDataStore.rebucket")
-        defer { PerformanceTracer.end("SessionDataStore.rebucket", signpostState) }
-        guard !parsedStats.isEmpty else { return }
-
-        rebucketGeneration &+= 1
-        let gen = rebucketGeneration
+        needsRebucket = true
+        guard isPopoverVisible else { return }
+        needsRebucket = false
         let snapshot = RebucketSnapshot(
             parsedStats: parsedStats,
             sessions: sessions,
             selectedPeriod: selectedPeriod,
             weeklyResetDate: weeklyResetDate,
-            allTimeLabel: LanguageManager.localizedString("period.all")
+            allTimeLabel: LanguageManager.localizedString("period.all"),
+            revisions: statsRevisions,
+            pricing: ModelPricing.shared.snapshot(),
+            calendar: Calendar.current
         )
-        Task.detached(priority: .userInitiated) { [weak self] in
-            let result = SessionDataStore.computeRebucket(snapshot: snapshot)
-            await MainActor.run { [weak self] in
-                guard let self, self.rebucketGeneration == gen else { return }
-                self.applyRebucketResult(result)
-            }
-        }
+        rebucketWorker.submit(snapshot)
     }
 
-    /// Pure aggregation. Picks the all-time fast path or the per-period
-    /// bucketing path based on the snapshot's `selectedPeriod`. Static +
-    /// nonisolated so it can run from `Task.detached` without main-actor
-    /// hops.
-    private nonisolated static func computeRebucket(snapshot: RebucketSnapshot) -> RebucketResult {
-        let allTimeSignpost = PerformanceTracer.begin("SessionDataStore.rebucketAllTime.compute")
-        let allTimeAgg = SessionAllTimeAggregator.allTimeAggregates(
-            parsedStats: snapshot.parsedStats,
-            sessions: snapshot.sessions
-        )
-        PerformanceTracer.end("SessionDataStore.rebucketAllTime.compute", allTimeSignpost)
-
-        if snapshot.selectedPeriod == .all {
-            return computeAllTimeRebucket(snapshot: snapshot, allTimeAgg: allTimeAgg)
-        }
-
-        var buckets: [Date: PeriodStats] = [:]
-        var periodSessionIds: [Date: Set<String>] = [:]
-        var periodModelSessionIds: [Date: [String: Set<String>]] = [:]
-
-        let resetDate = snapshot.weeklyResetDate
-        // Use fiveMinSlices when weekly period has non-midnight boundary for accurate attribution
-        let useFineSlices = snapshot.selectedPeriod == .weekly && resetDate != nil
-
-        for (sessionId, stats) in snapshot.parsedStats {
-            let slices = useFineSlices ? stats.fiveMinSlices : stats.daySlices
-            if !slices.isEmpty {
-                for (sliceStart, slice) in slices {
-                    let periodStart = snapshot.selectedPeriod.startOfPeriod(for: sliceStart, weeklyResetDate: resetDate)
-                    if buckets[periodStart] == nil {
-                        buckets[periodStart] = PeriodStats(
-                            period: periodStart,
-                            periodLabel: snapshot.selectedPeriod.label(for: periodStart, weeklyResetDate: resetDate),
-                            chartLabel: snapshot.selectedPeriod.chartLabel(for: periodStart, weeklyResetDate: resetDate)
-                        )
-                    }
-                    buckets[periodStart]?.accumulate(daySlice: slice)
-                    periodSessionIds[periodStart, default: []].insert(sessionId)
-                    for model in slice.modelBreakdown.keys {
-                        var modelDict = periodModelSessionIds[periodStart] ?? [:]
-                        var idSet = modelDict[model] ?? []
-                        idSet.insert(sessionId)
-                        modelDict[model] = idSet
-                        periodModelSessionIds[periodStart] = modelDict
-                    }
-                }
-            } else {
-                // Fallback for sessions without day slices
-                let session = snapshot.sessions.first { $0.id == sessionId }
-                let date = stats.startTime ?? session?.lastModified ?? Date.distantPast
-                let periodStart = snapshot.selectedPeriod.startOfPeriod(for: date, weeklyResetDate: resetDate)
-                if buckets[periodStart] == nil {
-                    buckets[periodStart] = PeriodStats(
-                        period: periodStart,
-                        periodLabel: snapshot.selectedPeriod.label(for: periodStart, weeklyResetDate: resetDate),
-                        chartLabel: snapshot.selectedPeriod.chartLabel(for: periodStart, weeklyResetDate: resetDate)
-                    )
-                }
-                buckets[periodStart]?.accumulate(stats: stats)
-                periodSessionIds[periodStart, default: []].insert(sessionId)
-                for model in stats.modelBreakdown.keys {
-                    var modelDict = periodModelSessionIds[periodStart] ?? [:]
-                    var idSet = modelDict[model] ?? []
-                    idSet.insert(sessionId)
-                    modelDict[model] = idSet
-                    periodModelSessionIds[periodStart] = modelDict
-                }
-                if stats.modelBreakdown.isEmpty {
-                    var modelDict = periodModelSessionIds[periodStart] ?? [:]
-                    var idSet = modelDict[stats.model] ?? []
-                    idSet.insert(sessionId)
-                    modelDict[stats.model] = idSet
-                    periodModelSessionIds[periodStart] = modelDict
-                }
-            }
-        }
-
-        // Set accurate session counts (one session counted once per period)
-        for (period, ids) in periodSessionIds {
-            buckets[period]?.sessionCount = ids.count
-            if let modelDict = periodModelSessionIds[period] {
-                for (model, modelIds) in modelDict {
-                    if var usage = buckets[period]?.modelBreakdown[model] {
-                        usage.sessionCount = modelIds.count
-                        buckets[period]?.modelBreakdown[model] = usage
-                    }
-                }
-            }
-        }
-
-        let periodStats = buckets.values.sorted { $0.period > $1.period }
-        let visibleStats = Array(periodStats.prefix(snapshot.selectedPeriod.displayCount))
-
+    private nonisolated static func rebucketResult(_ output: IncrementalSessionAggregator.Output,
+                                                      period: StatsPeriod) -> RebucketResult {
+        let visible = Array(output.periods.prefix(period.displayCount))
         return RebucketResult(
-            periodStats: periodStats,
-            allTimeCost: snapshot.parsedStats.values.reduce(0) { $0 + $1.estimatedCost },
-            allTimeSessions: snapshot.parsedStats.count,
-            allTimeTokens: snapshot.parsedStats.values.reduce(0) { $0 + $1.totalTokens },
-            allTimeMessages: snapshot.parsedStats.values.reduce(0) { $0 + $1.messageCount },
-            visibleStats: visibleStats,
-            visibleModelBreakdown: computeModelBreakdown(for: visibleStats),
-            dailyHeatmap: allTimeAgg.dailyHeatmap,
-            availableHeatmapYears: allTimeAgg.availableYears,
-            topProjects: allTimeAgg.topProjects
-        )
-    }
-
-    /// All-Time scope produces a single aggregated `PeriodStats` spanning
-    /// all data. `period.period` is intentionally `Date.distantPast` to
-    /// line up with `StatsPeriod.all.startOfPeriod(for:)` —
-    /// `aggregateTrendData` compares the two for equality when deciding
-    /// which slices to include.
-    private nonisolated static func computeAllTimeRebucket(snapshot: RebucketSnapshot,
-                                                           allTimeAgg: AllTimeAggregates) -> RebucketResult {
-        let label = snapshot.allTimeLabel
-        var agg = PeriodStats(period: Date.distantPast, periodLabel: label, chartLabel: label)
-        var modelSessionIds: [String: Set<String>] = [:]
-
-        for (sessionId, stats) in snapshot.parsedStats {
-            if stats.fiveMinSlices.isEmpty {
-                agg.accumulate(stats: stats)
-                for model in stats.modelBreakdown.keys {
-                    modelSessionIds[model, default: []].insert(sessionId)
-                }
-                if stats.modelBreakdown.isEmpty {
-                    modelSessionIds[stats.model, default: []].insert(sessionId)
-                }
-            } else {
-                for (_, slice) in stats.fiveMinSlices {
-                    agg.accumulate(daySlice: slice)
-                    for model in slice.modelBreakdown.keys {
-                        modelSessionIds[model, default: []].insert(sessionId)
-                    }
-                }
-            }
-        }
-        agg.sessionCount = snapshot.parsedStats.count
-        for (model, ids) in modelSessionIds {
-            if var usage = agg.modelBreakdown[model] {
-                usage.sessionCount = ids.count
-                agg.modelBreakdown[model] = usage
-            }
-        }
-
-        let periodStats = [agg]
-        let visibleModels = computeModelBreakdown(for: periodStats)
-
-        return RebucketResult(
-            periodStats: periodStats,
-            allTimeCost: agg.totalCost,
-            allTimeSessions: agg.sessionCount,
-            allTimeTokens: agg.totalTokens,
-            allTimeMessages: agg.messageCount,
-            visibleStats: periodStats,
-            visibleModelBreakdown: visibleModels,
-            dailyHeatmap: allTimeAgg.dailyHeatmap,
-            availableHeatmapYears: allTimeAgg.availableYears,
-            topProjects: allTimeAgg.topProjects
+            periodStats: output.periods, allTimeCost: output.allTime.totalCost,
+            allTimeSessions: output.allTime.sessionCount, allTimeTokens: output.allTime.totalTokens,
+            allTimeMessages: output.allTime.messageCount, visibleStats: visible,
+            visibleModelBreakdown: computeModelBreakdown(for: visible),
+            dailyHeatmap: output.heatmap, availableHeatmapYears: output.years,
+            topProjects: output.projects
         )
     }
 
@@ -1010,18 +943,21 @@ final class SessionDataStore: ObservableObject {
     /// Aggregate projects by their `cwd` (or projectPath fallback) for a specific period.
     func aggregatePeriodTopProjects(for period: PeriodStats, periodType: StatsPeriod) async -> [TopProject] {
         // Snapshot main-actor state so the heavy fold runs off the UI thread.
-        let currentSessions = sessions.isEmpty ? ProviderRegistry.provider(for: provider.kind).scanSessions() : sessions
+        let currentSessions = sessions
+        let provider = self.provider
         let snapshot = parsedStats
         let resetDate = weeklyResetDate
-        return await Task.detached {
-            SessionAllTimeAggregator.periodTopProjects(
+        return (try? await scheduler.run(priority: .interactive) {
+            let sourceSessions = currentSessions.isEmpty ? provider.scanSessions() : currentSessions
+            try Task.checkCancellation()
+            return SessionAllTimeAggregator.periodTopProjects(
                 parsedStats: snapshot,
-                sessions: currentSessions,
+                sessions: sourceSessions,
                 period: period,
                 periodType: periodType,
                 weeklyResetDate: resetDate
             )
-        }.value
+        }) ?? []
     }
 
     /// Aggregate all sessions by their `cwd` (or projectPath fallback), sorted by estimated cost desc.
@@ -1042,10 +978,8 @@ final class SessionDataStore: ObservableObject {
     var availableHeatmapYears: [Int] { _availableHeatmapYearsCache }
     @Published private var _availableHeatmapYearsCache: [Int] = []
 
-    // PR3: `recomputeAllTimeAggregates` was folded into `computeRebucket`
-    // so heatmap / top-projects / aggregate stats all land in one
-    // background pass instead of running a second main-thread sweep
-    // afterwards.
+    // Heatmap, top projects and period statistics share the incremental
+    // contribution index and land in the same guarded publication.
 
     // MARK: - Delete
 
@@ -1059,8 +993,10 @@ final class SessionDataStore: ObservableObject {
         sessions.removeAll { ids.contains($0.id) }
         for id in ids {
             quickStats.removeValue(forKey: id)
-            parsedStats.removeValue(forKey: id)
         }
+        var remaining = parsedStats
+        for id in ids { remaining.removeValue(forKey: id) }
+        publishParsedStats(remaining, changed: ids)
         db.removeSessions(provider: provider.kind, ids)
         rebucket()
     }
@@ -1073,7 +1009,7 @@ final class SessionDataStore: ObservableObject {
 
     func forceRescan() {
         dirtySessionIds.removeAll()
-        parseQueue.cancelAllOperations()
+        cancelBackgroundWork()
         isFullParseComplete = false
         // Only reset sessions that still have files on disk;
         // archived sessions (no .jsonl) are preserved.
@@ -1086,33 +1022,25 @@ final class SessionDataStore: ObservableObject {
 
     // MARK: - Transcript Resolution
 
-    /// Returns the raw transcript data for a session — from disk if the
-    /// file exists, otherwise decompressed from the DB blob archive.
-    nonisolated func resolveTranscriptData(for session: Session) -> Data? {
-        if !session.filePath.isEmpty,
-           let data = FileManager.default.contents(atPath: session.filePath) {
-            return data
-        }
-        guard let compressed = db.loadTranscript(
-            provider: ProviderKind(rawValue: session.provider) ?? .claude,
-            sessionId: session.id
-        ) else { return nil }
-        return (try? (compressed as NSData).decompressed(using: .zlib)) as Data?
+    /// Writes an archived session's transcript to `url` a stored piece at a
+    /// time; see `DatabaseService.writeArchivedTranscript`.
+    nonisolated func writeArchivedTranscript(for session: Session, to url: URL) -> Bool {
+        db.writeArchivedTranscript(provider: ProviderKind(rawValue: session.provider) ?? .claude,
+                                   sessionId: session.id, to: url)
     }
 
     // MARK: - Helpers
 
-    /// Search messages via FTS index. Runs on a detached task so SQLite
-    /// FTS work never blocks the main thread; callers gate stale results
-    /// with their own generation token.
+    /// Search messages via FTS without blocking the main thread. A cancelled
+    /// caller also cancels its queued work; no detached query outlives the view.
     func searchMessages(query: String) async -> [DatabaseService.SearchResult] {
         let db = self.db
         let kind = self.kind
-        return await Task.detached(priority: .userInitiated) {
+        return (try? await scheduler.run(priority: .interactive) {
             let signpostState = PerformanceTracer.begin("SessionDataStore.searchMessages")
             defer { PerformanceTracer.end("SessionDataStore.searchMessages", signpostState) }
             return db.search(query: query, provider: kind)
-        }.value
+        }) ?? []
     }
 
     /// Returns the period-over-period comparison for `stat` vs the preceding period.
@@ -1155,7 +1083,7 @@ final class SessionDataStore: ObservableObject {
         let snapshot = parsedStats
         let snapshotSessions = sessions
         let resetDate = weeklyResetDate
-        return await Task.detached {
+        return (try? await scheduler.run(priority: .interactive) {
             SessionTrendAggregator.trendData(
                 parsedStats: snapshot,
                 sessions: snapshotSessions,
@@ -1163,27 +1091,15 @@ final class SessionDataStore: ObservableObject {
                 periodType: periodType,
                 weeklyResetDate: resetDate
             )
-        }.value
-    }
-
-    /// Aggregate raw token/cost usage for a rolling time window.
-    func aggregateWindowTrendData(from start: Date, to end: Date, granularity: TrendGranularity, cumulative: Bool = false, modelFilter: ((String) -> Bool)? = nil) -> [TrendDataPoint] {
-        SessionTrendAggregator.windowTrendData(
-            parsedStats: parsedStats,
-            from: start,
-            to: end,
-            granularity: granularity,
-            cumulative: cumulative,
-            modelFilter: modelFilter
-        )
+        }) ?? []
     }
 
     /// Snapshots parsedStats for the given sessions, then computes trend data off the main thread.
     func aggregateProjectTrendData(sessions: [Session], granularity: TrendGranularity = .day) async -> [TrendDataPoint] {
         let snapshot: [SessionStats] = sessions.compactMap { parsedStats[$0.id] }
-        return await Task.detached {
+        return (try? await scheduler.run(priority: .interactive) {
             SessionTrendAggregator.projectTrend(stats: snapshot, granularity: granularity)
-        }.value
+        }) ?? []
     }
 
     /// Aggregates model breakdown for a specific set of sessions.
@@ -1191,18 +1107,9 @@ final class SessionDataStore: ObservableObject {
         // Snapshot on main actor — the per-model fold below is pure but
         // touches `ModelPricing.estimateCost` which is fine off-main.
         let snapshot: [SessionStats] = sessions.compactMap { parsedStats[$0.id] }
-        return await Task.detached {
+        return (try? await scheduler.run(priority: .interactive) {
             SessionTrendAggregator.projectModelBreakdown(stats: snapshot)
-        }.value
-    }
-
-    func windowModelBreakdown(from start: Date, to end: Date, modelFilter: ((String) -> Bool)? = nil) -> [ModelUsage] {
-        SessionTrendAggregator.windowModelBreakdown(
-            parsedStats: parsedStats,
-            from: start,
-            to: end,
-            modelFilter: modelFilter
-        )
+        }) ?? []
     }
 
     var globalModelBreakdown: [ModelUsage] {

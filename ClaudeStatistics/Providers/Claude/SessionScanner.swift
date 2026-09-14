@@ -174,7 +174,7 @@ final class SessionScanner {
     }
 
     func isCoworkTranscriptPath(_ path: String) -> Bool {
-        coworkPathComponents(for: path) != nil
+        coworkPathComponents(for: Self.mainTranscriptPath(for: path)) != nil
     }
 
     static func uniqueSessionId(projectDirectory: String, transcriptFileName: String) -> String {
@@ -183,6 +183,7 @@ final class SessionScanner {
     }
 
     func uniqueSessionId(forTranscriptPath path: String) -> String? {
+        let path = Self.mainTranscriptPath(for: path)
         if let components = coworkPathComponents(for: path) {
             let namespace = components.prefix(3).joined(separator: "/")
             return "cowork::\(namespace)::" + Self.uniqueSessionId(
@@ -195,6 +196,15 @@ final class SessionScanner {
         let projectDir = (((path as NSString).deletingLastPathComponent as NSString).lastPathComponent)
         guard fileName.hasSuffix(".jsonl"), !projectDir.isEmpty else { return nil }
         return Self.uniqueSessionId(projectDirectory: projectDir, transcriptFileName: fileName)
+    }
+
+    /// Child changes invalidate their parent even after the child was deleted.
+    /// This is a structural path mapping, so it needs no transcript read/stat.
+    private static func mainTranscriptPath(for path: String) -> String {
+        let file = URL(fileURLWithPath: path)
+        let directory = file.deletingLastPathComponent()
+        guard file.pathExtension == "jsonl", directory.lastPathComponent == "subagents" else { return path }
+        return directory.deletingLastPathComponent().appendingPathExtension("jsonl").path
     }
 
     private func coworkPathComponents(for path: String) -> [String]? {
