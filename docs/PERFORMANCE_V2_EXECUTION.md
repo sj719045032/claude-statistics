@@ -1202,7 +1202,24 @@ Everything below is open, measured or reasoned, and not waived by the tests:
    app keeps the old plugins until then, and 3.5.11 cannot read v15-moved
    archives (it re-inlines them).
 7. **Old plugins' whole results** stay unbounded by design of their API.
-8. **Long-run memory.** The debug app's footprint went from 53.8 MB after
-   launch to 93.3 MB after about 4.4 h with other agent sessions active
-   (peak 117.4 MB). Not yet investigated: whether it plateaus (caches) or
-   keeps growing, and what holds it.
+8. **Long-run memory — met.**
+   `TranscriptNavigationMemoryRealDataTests` (gated) reopens the four largest
+   local Claude transcripts (327,788,852 bytes) per round: open, jump to the
+   end and the start, sweep ~30 rows through more pages than the window keeps,
+   full-history search, close. Live allocator bytes after each of 30 rounds:
+   47.7 MB, climbing to 54.5 MB by round 17, then **54.4–54.6 MB for the last
+   14 rounds** — a warm-up that fills and stops, not sustained growth. The
+   window never held more than 12 pages. (A 14-round run: 49.2 → 54.2 MB.)
+   What makes up the ~6 MB warm-up was not broken down by class: the heap
+   snapshots aimed at the test host caught a short-lived launcher process.
+   `leaks` on the debug app after 2 d 20 h: 289 leaks, 14 KB, all in a system
+   XPC connection (LinkServices), none in app code.
+   The same debug process (up 2 d 20 h, Codex and Claude stores loaded, other
+   agent sessions active), heap-sampled every 10 min for an hour from
+   01:28:42Z: live malloc **85.13 → 84.57 MB**, no class changing by 100 KB
+   or more between the first and last sample; physical footprint moved
+   between 122 and 139 MB (page reuse, not live allocations). Its footprint
+   had risen from 53.8 MB after launch to ~150 MB — most of it the Claude
+   store started in that process on day 3 (its full parse set the 395 MB
+   lifetime peak) plus allocator pages kept after that peak. No live-bytes
+   sample exists from launch, so that split is inferred, not measured.

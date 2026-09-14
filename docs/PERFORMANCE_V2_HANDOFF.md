@@ -327,8 +327,11 @@ numbers for every item are in `PERFORMANCE_V2_EXECUTION.md`.
    `ClaudeStatisticsApp.swift`): final idle **0.750%** on a quiet machine.
    That line drops TelemetryDeck's retention metrics; the owner confirmed it
    (without it idle is ~1.07%). Re-measured after 4 h of uptime while two
-   other agent sessions wrote: 1.27–1.45%, not an idle figure. Footprint grew
-   53.8 → 93.3 MB over those hours (peak 117.4 MB) — not yet investigated.
+   other agent sessions wrote: 1.27–1.45%, not an idle figure.
+   Long-run memory: 30 rounds of reopening the four largest transcripts
+   plateau at 54.4–54.6 MB live after round 17; `leaks` finds 14 KB, all
+   system XPC; the debug app after 2 d 20 h held live malloc flat
+   (85.13 → 84.57 MB) over an hour of sampling.
    The byte-wise newline search is now `memchr` (869 MB scan 2.3 s → 0.2 s).
 8. **Rendered UI — done for Claude and Codex** via `#if DEBUG` launch
    switches and window-only captures. Gemini runtime verified with the plugin
