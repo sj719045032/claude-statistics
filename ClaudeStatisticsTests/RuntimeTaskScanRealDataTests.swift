@@ -11,15 +11,7 @@ final class RuntimeTaskScanRealDataTests: XCTestCase {
         guard ProcessInfo.processInfo.environment["CLAUDE_STATS_REAL_DATA"] == "1" else {
             throw XCTSkip("set CLAUDE_STATS_REAL_DATA=1")
         }
-        let root = URL(fileURLWithPath: (NSHomeDirectory() as NSString).appendingPathComponent(".claude/projects"))
-        let keys: [URLResourceKey] = [.fileSizeKey]
-        var largest: (URL, Int)?
-        for case let url as URL in FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys) ?? .init()
-        where url.pathExtension == "jsonl" {
-            let size = (try? url.resourceValues(forKeys: Set(keys)).fileSize) ?? 0
-            if size > (largest?.1 ?? 0) { largest = (url, size) }
-        }
-        let (url, size) = try XCTUnwrap(largest)
+        let (url, size) = try XCTUnwrap(RealClaudeTranscripts.largest(1).first)
 
         var start = CFAbsoluteTimeGetCurrent()
         let full = RuntimeSessionEventApplier.taskScanResult(at: url.path, baseTasks: nil, fromOffset: nil)

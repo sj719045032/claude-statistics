@@ -16,29 +16,16 @@ import ClaudeStatisticsKit
 /// `CLAUDE_STATS_REAL_DATA_FILES` caps how many transcripts are compared
 /// (default 12, largest first).
 final class TranscriptPagingRealDataTests: XCTestCase {
-    private func realTranscripts() throws -> [URL] {
-        let root = URL(fileURLWithPath: (NSHomeDirectory() as NSString)
-            .appendingPathComponent(".claude/projects"))
-        guard FileManager.default.fileExists(atPath: root.path) else { return [] }
-        let keys: [URLResourceKey] = [.fileSizeKey, .isRegularFileKey]
-        guard let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys) else {
-            return []
-        }
-        var files: [(URL, Int)] = []
-        for case let url as URL in walker where url.pathExtension == "jsonl" {
-            let values = try? url.resourceValues(forKeys: Set(keys))
-            guard values?.isRegularFile == true, let size = values?.fileSize, size > 0 else { continue }
-            files.append((url, size))
-        }
+    private func realTranscripts() -> [URL] {
         let limit = Int(ProcessInfo.processInfo.environment["CLAUDE_STATS_REAL_DATA_FILES"] ?? "12") ?? 12
-        return files.sorted { $0.1 > $1.1 }.prefix(limit).map(\.0)
+        return RealClaudeTranscripts.largest(limit).map(\.url)
     }
 
     func testRealTranscriptsMatchTheWholeFileParse() throws {
         guard ProcessInfo.processInfo.environment["CLAUDE_STATS_REAL_DATA"] == "1" else {
             throw XCTSkip("set CLAUDE_STATS_REAL_DATA=1 to compare against real transcripts")
         }
-        let files = try realTranscripts()
+        let files = realTranscripts()
         try XCTSkipIf(files.isEmpty, "no local Claude transcripts")
 
         let parser = TranscriptParser.shared

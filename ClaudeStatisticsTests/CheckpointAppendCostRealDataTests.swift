@@ -12,15 +12,9 @@ final class CheckpointAppendCostRealDataTests: XCTestCase {
         guard ProcessInfo.processInfo.environment["CLAUDE_STATS_REAL_DATA"] == "1" else {
             throw XCTSkip("set CLAUDE_STATS_REAL_DATA=1")
         }
-        let projects = URL(fileURLWithPath: (NSHomeDirectory() as NSString).appendingPathComponent(".claude/projects"))
-        let keys: [URLResourceKey] = [.fileSizeKey]
-        var largest: (URL, Int)?
-        for case let url as URL in FileManager.default.enumerator(at: projects, includingPropertiesForKeys: keys) ?? .init()
-        where url.pathExtension == "jsonl" && !url.path.contains("/subagents/") {
-            let size = (try? url.resourceValues(forKeys: Set(keys)).fileSize) ?? 0
-            if size > (largest?.1 ?? 0) { largest = (url, size) }
-        }
-        let source = try XCTUnwrap(largest).0
+        let source = try XCTUnwrap(
+            RealClaudeTranscripts.largest(.max).first { !$0.url.path.contains("/subagents/") }
+        ).url
 
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("AppendCost-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
